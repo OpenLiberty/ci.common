@@ -1,3 +1,18 @@
+/**
+ * (C) Copyright IBM Corporation 2017.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package net.wasdev.wlp.common.arquillian.util;
 
 import java.io.ByteArrayInputStream;
@@ -28,7 +43,6 @@ import org.xml.sax.SAXException;
 public class HttpPortUtil {
 
 	public static final int DEFAULT_PORT = 9080;
-	public static final int ERROR_PORT = -1;
 	private static final XPath XPATH = XPathFactory.newInstance().newXPath();
 
 	private static final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -37,7 +51,7 @@ public class HttpPortUtil {
 	}
 
 	public static Integer getHttpPort(File serverXML, File bootstrapProperties) throws FileNotFoundException,
-			IOException, ParserConfigurationException, SAXException, XPathExpressionException {
+			IOException, ParserConfigurationException, SAXException, XPathExpressionException, ArquillianConfigurationException {
 		if (serverXML != null && serverXML.exists() && serverXML.isFile()) {
 			byte[] encoded = Files.readAllBytes(Paths.get(serverXML.getCanonicalPath()));
 			Properties prop = new Properties();
@@ -49,7 +63,7 @@ public class HttpPortUtil {
 	}
 
 	protected static Integer getHttpPort(String serverXML, Properties bootstrapProperties)
-			throws ParserConfigurationException, SAXException, IOException, XPathExpressionException {
+			throws ParserConfigurationException, SAXException, IOException, XPathExpressionException, ArquillianConfigurationException {
 		DocumentBuilder builder = factory.newDocumentBuilder();
 		Document doc = builder.parse(new ByteArrayInputStream(serverXML.getBytes()));
 
@@ -71,12 +85,11 @@ public class HttpPortUtil {
 				String variable = m.group(1);
 				return getHttpPortFromBootstrapProperties(variable, bootstrapProperties);
 			}
+			throw new ArquillianConfigurationException("Bootstrap properties variable " + portString + " is not in the correct format.");
 		}
-
-		return ERROR_PORT;
 	}
 
-	private static Integer getHttpPortFromBootstrapProperties(String variable, Properties bootstrapProperties) {
+	private static Integer getHttpPortFromBootstrapProperties(String variable, Properties bootstrapProperties) throws ArquillianConfigurationException {
 		if(bootstrapProperties != null) {
 			String value = bootstrapProperties.getProperty(variable);
 			if (value != null) {
@@ -87,7 +100,7 @@ public class HttpPortUtil {
 				}
 			}
 		}
-		return ERROR_PORT;
+		throw new ArquillianConfigurationException("Unable to find variable \"" + variable + "\" in bootstrap properties.");
 	}
 
 }
