@@ -53,8 +53,10 @@ public enum LibertyManagedProperty {
 			for (Entry<String, String> entry : arquillianProperties.entrySet()) {
 				String key = entry.getKey();
 				String value = entry.getValue();
-				LibertyManagedProperty p = LibertyManagedProperty.getArquillianProperty(key);
-				props.put(p, value);
+				if(key != null && value != null) {
+					LibertyManagedProperty p = LibertyManagedProperty.getArquillianProperty(key);
+					props.put(p, value);
+				}
 			}
 		}
 		return props;
