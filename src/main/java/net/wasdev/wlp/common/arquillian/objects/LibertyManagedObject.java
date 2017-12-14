@@ -23,15 +23,54 @@ import java.util.Map.Entry;
 
 import net.wasdev.wlp.common.arquillian.util.Constants;
 
+/**
+ * Data object for the arquillian.xml configuration for the WLP managed container.
+ * @author ctianus.ibm.com
+ *
+ */
 public class LibertyManagedObject {
+	
+	/**
+	 * These properties should correspond with the parameters in WLPManagedContainerConfiguration
+	 * @author ctianus.ibm.com
+	 *
+	 */
+	public enum LibertyManagedProperty implements LibertyProperty.LibertyPropertyI {
+		serverStartTimeout,
+		appDeployTimeout,
+		appUndeployTimeout,
+		sharedLib,
+		deployType,
+		javaVmArguments,
+		addLocalConnector,
+		securityConfiguration,
+		failSafeUndeployment,
+		outputToConsole,
+		allowConnectingToRunningServer,
+		verifyApps,
+		verifyAppDeployTimeout;
+	}
+	
+	private static final String XML_START = 
+			"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+			+ "<arquillian xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+			+ "	xmlns=\"http://jboss.org/schema/arquillian\"\n"
+			+ "	xsi:schemaLocation=\"http://jboss.org/schema/arquillian http://jboss.org/schema/arquillian/arquillian_1_0.xsd\">\n"
+			+ "	<container qualifier=\"liberty_managed\" default=\"true\">\n"
+			+ "		<configuration>\n";
+	
+	private static final String XML_END = 
+			"		</configuration>\n"
+			+ "	</container>\n"
+			+ "</arquillian>\n";
 
 	private final String wlpHome;
 	private final String serverName;
 	private final int httpPort;
-	private final Map<LibertyManagedProperty, String> arquillianProperties;
+	private final Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties;
 
 	public LibertyManagedObject(String wlpHome, String serverName, int httpPort,
-			Map<LibertyManagedProperty, String> arquillianProperties) {
+			Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties) {
 		this.wlpHome = wlpHome;
 		this.serverName = serverName;
 		this.httpPort = httpPort;
@@ -50,41 +89,29 @@ public class LibertyManagedObject {
 		return httpPort;
 	}
 
-	public Map<LibertyManagedProperty, String> getArquillianProperties() {
+	public Map<LibertyProperty.LibertyPropertyI, String> getArquillianProperties() {
 		return arquillianProperties;
 	}
 
 	public void build(File arquillianXml) throws IOException {
 		// Generate the XML
-		String xmlStart = 
-				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
-				+ "<arquillian xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
-				+ "	xmlns=\"http://jboss.org/schema/arquillian\"\n"
-				+ "	xsi:schemaLocation=\"http://jboss.org/schema/arquillian http://jboss.org/schema/arquillian/arquillian_1_0.xsd\">\n"
-				+ "	<engine>\n"
-				+ "		<property name=\"deploymentExportPath\">target/</property>\n"
-				+ "	</engine>\n"
-				+ "	<container qualifier=\"liberty_managed\" default=\"true\">\n"
-				+ "		<configuration>\n"
-				+ "			<property name=\"wlpHome\">" + getWlpHome() + "</property>\n"
-				+ "			<property name=\"serverName\">" + getServerName() + "</property>\n"
-				+ "			<property name=\"httpPort\">" + getHttpPort() + "</property>\n";
+		StringBuilder xml = new StringBuilder(XML_START);
+		xml.append("			<property name=\"wlpHome\">").append(getWlpHome()).append("</property>\n");
+		xml.append("			<property name=\"serverName\">").append(getServerName()).append("</property>\n");
+		xml.append("			<property name=\"httpPort\">").append(getHttpPort()).append("</property>\n");
 
-		String xmlEnd = 
-				"		</configuration>\n"
-				+ "	</container>\n"
-				+ "</arquillian>\n"
-				+ Constants.CONFIGURE_ARQUILLIAN_COMMENT;
-
-		String xmlProperties = "";
-		for (Entry<LibertyManagedProperty, String> e : arquillianProperties.entrySet()) {
-			String key = e.getKey().name();
-			xmlProperties += "			<property name=\"" + key + "\">" + e.getValue() + "</property>\n";
+		for (Entry<LibertyProperty.LibertyPropertyI, String> e : arquillianProperties.entrySet()) {
+			LibertyManagedProperty property = (LibertyManagedProperty) e.getKey();
+			String key = property.name();
+			xml.append("			<property name=\"").append(key).append("\">").append(e.getValue()).append("</property>\n");
 		}
+		
+		xml.append(XML_END);
+		xml.append(Constants.CONFIGURE_ARQUILLIAN_COMMENT);
 
 		// Write to file
 		FileWriter writer = new FileWriter(arquillianXml);
-		writer.write(xmlStart + xmlProperties + xmlEnd);
+		writer.write(xml.toString());
 		writer.close();
 	}
 
