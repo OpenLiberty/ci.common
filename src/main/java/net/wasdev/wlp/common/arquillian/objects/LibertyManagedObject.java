@@ -40,16 +40,33 @@ public class LibertyManagedObject {
      *
      */
     public enum LibertyManagedProperty implements LibertyProperty.LibertyPropertyI {
-        serverStartTimeout, appDeployTimeout, appUndeployTimeout, sharedLib, deployType, javaVmArguments, addLocalConnector, securityConfiguration, failSafeUndeployment, outputToConsole, allowConnectingToRunningServer, verifyApps, verifyAppDeployTimeout;
+        serverStartTimeout, 
+        appDeployTimeout, 
+        appUndeployTimeout, 
+        sharedLib, 
+        deployType, 
+        javaVmArguments, 
+        addLocalConnector, 
+        securityConfiguration, 
+        failSafeUndeployment, 
+        outputToConsole, 
+        allowConnectingToRunningServer, 
+        verifyApps, 
+        verifyAppDeployTimeout;
     }
 
-    private static final String XML_START = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+    private static final String XML_START 
+            = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
             + "<arquillian xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
             + "	xmlns=\"http://jboss.org/schema/arquillian\"\n"
             + "	xsi:schemaLocation=\"http://jboss.org/schema/arquillian http://jboss.org/schema/arquillian/arquillian_1_0.xsd\">\n"
-            + "	<container qualifier=\"liberty_managed\" default=\"true\">\n" + "		<configuration>\n";
+            + "	<container qualifier=\"liberty_managed\" default=\"true\">\n" 
+            + "		<configuration>\n";
 
-    private static final String XML_END = "		</configuration>\n" + "	</container>\n" + "</arquillian>\n";
+    private static final String XML_END
+            = "		</configuration>\n" 
+            + "	</container>\n" 
+            + "</arquillian>\n";
 
     private final String wlpHome;
     private final String serverName;
