@@ -42,7 +42,7 @@ public class LibertyRemoteObject {
 				+ "	xmlns=\"http://jboss.org/schema/arquillian\"\n"
 				+ "	xsi:schemaLocation=\"http://jboss.org/schema/arquillian http://jboss.org/schema/arquillian/arquillian_1_0.xsd\">\n"
 				+ "	<engine>\n" + "		<property name=\"deploymentExportPath\">target/</property>\n" + "	</engine>\n"
-				+ "	<container qualifier=\"wlp-remote\" default=\"true\">\n" + "		<configuration>\n";
+				+ "	<container qualifier=\"liberty_remote\" default=\"true\">\n" + "		<configuration>\n";
 
 		String xmlEnd = "		</configuration>\n" + "	</container>\n" + "</arquillian>\n"
 				+ Constants.CONFIGURE_ARQUILLIAN_COMMENT;
