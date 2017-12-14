@@ -29,68 +29,68 @@ import net.wasdev.wlp.common.arquillian.util.Constants;
  *
  */
 public class LibertyRemoteObject {
-	
-	/**
-	 * These properties should correspond with the parameters in
-	 * WLPRemoteContainerConfiguration
-	 * 
-	 * @author ctianus.ibm.com
-	 *
-	 */
-	public enum LibertyRemoteProperty implements LibertyProperty.LibertyPropertyI {
-		serverName, 
-		serverStartTimeout, 
-		appDeployTimeout, 
-		appUndeployTimeout, 
-		username, 
-		password, 
-		hostName, 
-		httpPort, 
-		httpsPort, 
-		outputToConsole;
-	}
-	
-	private static final String XML_START
-			= "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
-			+ "<arquillian xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
-			+ "	xmlns=\"http://jboss.org/schema/arquillian\"\n"
-			+ "	xsi:schemaLocation=\"http://jboss.org/schema/arquillian http://jboss.org/schema/arquillian/arquillian_1_0.xsd\">\n"
-			+ "	<container qualifier=\"liberty_remote\" default=\"true\">\n" 
-			+ "		<configuration>\n";
-	
-	private static final String XML_END
-			= "		</configuration>\n" 
-			+ "	</container>\n"
-			+ "</arquillian>\n";
+    
+    /**
+     * These properties should correspond with the parameters in
+     * WLPRemoteContainerConfiguration
+     * 
+     * @author ctianus.ibm.com
+     *
+     */
+    public enum LibertyRemoteProperty implements LibertyProperty.LibertyPropertyI {
+        serverName, 
+        serverStartTimeout, 
+        appDeployTimeout, 
+        appUndeployTimeout, 
+        username, 
+        password, 
+        hostName, 
+        httpPort, 
+        httpsPort, 
+        outputToConsole;
+    }
+    
+    private static final String XML_START
+            = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+            + "<arquillian xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+            + "    xmlns=\"http://jboss.org/schema/arquillian\"\n"
+            + "    xsi:schemaLocation=\"http://jboss.org/schema/arquillian http://jboss.org/schema/arquillian/arquillian_1_0.xsd\">\n"
+            + "    <container qualifier=\"liberty_remote\" default=\"true\">\n" 
+            + "        <configuration>\n";
+    
+    private static final String XML_END
+            = "        </configuration>\n" 
+            + "    </container>\n"
+            + "</arquillian>\n";
 
-	private final Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties;
+    private final Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties;
 
-	public LibertyRemoteObject(Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties) {
-		this.arquillianProperties = arquillianProperties;
-	}
+    public LibertyRemoteObject(Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties) {
+        this.arquillianProperties = arquillianProperties;
+    }
 
-	public Map<LibertyProperty.LibertyPropertyI, String> getArquillianProperties() {
-		return arquillianProperties;
-	}
+    public Map<LibertyProperty.LibertyPropertyI, String> getArquillianProperties() {
+        return arquillianProperties;
+    }
 
-	public void build(File arquillianXml) throws IOException {
-		
-		// Generate the XML
-		StringBuilder xml = new StringBuilder(XML_START);
+    public void build(File arquillianXml) throws IOException {
+        
+        // Generate the XML
+        StringBuilder xml = new StringBuilder(XML_START);
 
-		for (Entry<LibertyProperty.LibertyPropertyI, String> e : arquillianProperties.entrySet()) {
-			LibertyRemoteProperty property = (LibertyRemoteProperty) e.getKey();
-			String key = property.name();
-			xml.append("			<property name=\"").append(key).append("\">").append(e.getValue()).append("</property>\n");
-		}
-		
-		xml.append(XML_END);
-		xml.append(Constants.CONFIGURE_ARQUILLIAN_COMMENT);
-		
-		// Write to file
-		FileWriter writer = new FileWriter(arquillianXml);
-		writer.write(xml.toString());
-		writer.close();
-	}
+        for (Entry<LibertyProperty.LibertyPropertyI, String> e : arquillianProperties.entrySet()) {
+            LibertyRemoteProperty property = (LibertyRemoteProperty) e.getKey();
+            String key = property.name();
+            xml.append("            <property name=\"").append(key).append("\">").append(e.getValue()).append("</property>\n");
+        }
+        
+        xml.append(XML_END);
+        xml.append(Constants.CONFIGURE_ARQUILLIAN_COMMENT);
+        
+        // Write to file
+        FileWriter writer = new FileWriter(arquillianXml);
+        writer.write(xml.toString());
+        writer.close();
+    }
 
 }

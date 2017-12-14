@@ -100,7 +100,8 @@ public class HttpPortUtil {
 				}
 			}
 		}
-		throw new ArquillianConfigurationException("Unable to find variable \"" + variable + "\" in bootstrap properties.");
-	}
+        throw new ArquillianConfigurationException(
+                "Unable to find variable \"" + variable + "\" in bootstrap properties.");
+    }
 
 }
