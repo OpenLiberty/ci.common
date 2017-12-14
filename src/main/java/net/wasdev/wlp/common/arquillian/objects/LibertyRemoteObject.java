@@ -37,14 +37,21 @@ public class LibertyRemoteObject {
 
 	public void build(File arquillianXml) throws IOException {
 		// Generate the XML
-		String xmlStart = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+		String xmlStart 
+				= "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
 				+ "<arquillian xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
 				+ "	xmlns=\"http://jboss.org/schema/arquillian\"\n"
 				+ "	xsi:schemaLocation=\"http://jboss.org/schema/arquillian http://jboss.org/schema/arquillian/arquillian_1_0.xsd\">\n"
-				+ "	<engine>\n" + "		<property name=\"deploymentExportPath\">target/</property>\n" + "	</engine>\n"
-				+ "	<container qualifier=\"liberty_remote\" default=\"true\">\n" + "		<configuration>\n";
+				+ "	<engine>\n" 
+				+ "		<property name=\"deploymentExportPath\">target/</property>\n" 
+				+ "	</engine>\n"
+				+ "	<container qualifier=\"liberty_remote\" default=\"true\">\n" 
+				+ "		<configuration>\n";
 
-		String xmlEnd = "		</configuration>\n" + "	</container>\n" + "</arquillian>\n"
+		String xmlEnd 
+				= "		</configuration>\n" 
+				+ "	</container>\n"
+				+ "</arquillian>\n"
 				+ Constants.CONFIGURE_ARQUILLIAN_COMMENT;
 
 		String xmlProperties = "";
