@@ -22,35 +22,41 @@ import java.util.Map.Entry;
 import net.wasdev.wlp.common.arquillian.util.ArquillianConfigurationException;
 
 /**
- * These properties should correspond with the parameters in WLPRemoteContainerConfiguration
+ * These properties should correspond with the parameters in
+ * WLPRemoteContainerConfiguration
+ * 
  * @author ctianus.ibm.com
  *
  */
 public enum LibertyRemoteProperty {
-	serverName,
-    serverStartTimeout,
-    appDeployTimeout,
-    appUndeployTimeout,
-    username,
-    password,
-    hostName,
-    httpPort,
-    httpsPort,
-    outputToConsole;
-	
+	serverName, 
+	serverStartTimeout, 
+	appDeployTimeout, 
+	appUndeployTimeout, 
+	username, 
+	password, 
+	hostName, 
+	httpPort, 
+	httpsPort, 
+	outputToConsole;
+
 	/**
-	 * Converts Map<String, String> to Map<LibertyRemoteProperty, String>. Validates each key property name.
+	 * Converts Map<String, String> to Map<LibertyRemoteProperty, String>.
+	 * Validates each key property name.
+	 * 
 	 * @param arquillianProperties
 	 * @return a map of converted arquillianProperties
-	 * @throws ArquillianConfigurationException if a property name is invalid.
+	 * @throws ArquillianConfigurationException
+	 *             if a property name is invalid.
 	 */
-	public static Map<LibertyRemoteProperty, String> getArquillianProperties(Map<String, String> arquillianProperties) throws ArquillianConfigurationException {
+	public static Map<LibertyRemoteProperty, String> getArquillianProperties(Map<String, String> arquillianProperties)
+			throws ArquillianConfigurationException {
 		Map<LibertyRemoteProperty, String> props = new HashMap<LibertyRemoteProperty, String>();
-		if(arquillianProperties != null && !arquillianProperties.isEmpty()) {
+		if (arquillianProperties != null && !arquillianProperties.isEmpty()) {
 			for (Entry<String, String> entry : arquillianProperties.entrySet()) {
 				String key = entry.getKey();
 				String value = entry.getValue();
-				if(key != null && value != null) {
+				if (key != null && value != null) {
 					LibertyRemoteProperty p = LibertyRemoteProperty.getArquillianProperty(key);
 					props.put(p, value);
 				}
