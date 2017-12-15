@@ -91,8 +91,8 @@ public class HttpPortUtilTest {
 	public void testHttpPortSetFromBootstrapProperties() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
 		Properties bootstrapProperties = new Properties();
-		bootstrapProperties.setProperty("default.http.port", "9080");
-		assertTrue(HttpPortUtil.getHttpPort(serverXML, bootstrapProperties) == 9080);
+		bootstrapProperties.setProperty("default.http.port", "9082");
+		assertTrue(HttpPortUtil.getHttpPort(serverXML, bootstrapProperties) == 9082);
 	}
 	
 	@Test(expected = ArquillianConfigurationException.class)
