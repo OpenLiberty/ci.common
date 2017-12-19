@@ -16,7 +16,6 @@
 package net.wasdev.wlp.common.arquillian.objects;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -88,9 +87,7 @@ public class LibertyRemoteObject {
         xml.append(Constants.CONFIGURE_ARQUILLIAN_COMMENT);
         
         // Write to file
-        FileWriter writer = new FileWriter(arquillianXml);
-        writer.write(xml.toString());
-        writer.close();
+        LibertyProperty.write(xml, arquillianXml);
     }
 
 }

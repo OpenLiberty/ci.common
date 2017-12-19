@@ -1,5 +1,8 @@
 package net.wasdev.wlp.common.arquillian.objects;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -56,6 +59,21 @@ public class LibertyProperty {
                     "Property \"" + key + "\" in arquillianProperties does not exist. You probably have a typo.");
         }
         throw new ArquillianConfigurationException("This should never happen.");
+    }
+
+    protected static void write(StringBuilder xml, File arquillianXml) throws IOException {
+        // First create the parent folder of arquillian.xml if it doesn't exist
+        // (this happens in gradle if you don't specify any resources in
+        // src/test/resources)
+        File arquillianXmlFolder = arquillianXml.getParentFile();
+        if (!arquillianXmlFolder.exists()) {
+            arquillianXmlFolder.mkdirs();
+        }
+        
+        // Now that we are guaranteed that the folder exists, we can write
+        FileWriter writer = new FileWriter(arquillianXml);
+        writer.write(xml.toString());
+        writer.close();
     }
 
 }
