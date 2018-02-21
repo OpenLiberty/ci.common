@@ -4,4 +4,4 @@ jdk:
     - openjdk8
 
 script:
-	- mvn clean install
+- mvn clean install
