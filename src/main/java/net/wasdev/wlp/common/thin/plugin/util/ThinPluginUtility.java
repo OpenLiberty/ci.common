@@ -15,6 +15,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -25,7 +26,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
@@ -36,39 +36,32 @@ public class ThinPluginUtility {
 	public static final String SPRING_BOOT_CLASSES_HEADER = "Spring-Boot-Classes";
 	public static final String SPRING_BOOT_LIB_HEADER = "Spring-Boot-Lib";
 	public static final String SPRING_LIB_INDEX_FILE = "META-INF/spring.lib.index";
+	private final JarFile sourceFatJar;
 	private final File targetThinJar;
 	private final File libIndexCache;
 	private final boolean putLibCacheInDirectory;
-	private final List<String> libEntries = new ArrayList<>();
-	private final Set<String> prefixList = new HashSet<>();
-	private final JarFile jf;
 	private final SpringBootManifest sprMF;
-	private String prefix;
-	private String postfix;
+	private final List<String> libEntries = new ArrayList<>();
+	private final Set<String> hashPrefixes = new HashSet<>();
+	
 
 	public ThinPluginUtility(File sourceFatJar, File targetThinJar, File libIndexCache, boolean putLibCacheInDirectory)
 			throws IOException {
+		this.sourceFatJar = new JarFile(sourceFatJar);
 		this.targetThinJar = targetThinJar;
 		this.libIndexCache = libIndexCache;
 		this.putLibCacheInDirectory = putLibCacheInDirectory;
-		jf = new JarFile(sourceFatJar);
-		sprMF = new SpringBootManifest(jf.getManifest());
+		sprMF = new SpringBootManifest(this.sourceFatJar.getManifest());
 	}
 
 	public void execute() throws IOException, NoSuchAlgorithmException {
-		try {
-			thin();
-		} catch (IOException | NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
+		thin();
 	}
 
 	private void thin() throws FileNotFoundException, IOException, NoSuchAlgorithmException {
-		Enumeration<JarEntry> entries = jf.entries();
+		Enumeration<JarEntry> entries = sourceFatJar.entries();
 		JarEntry entry;
-		JarOutputStream thinJar = new JarOutputStream(new FileOutputStream(targetThinJar), jf.getManifest());
+		JarOutputStream thinJar = new JarOutputStream(new FileOutputStream(targetThinJar), sourceFatJar.getManifest());
 		ZipOutputStream libJar = null;
 		if (!putLibCacheInDirectory) {
 			libJar = new ZipOutputStream(new FileOutputStream(libIndexCache));
@@ -92,27 +85,28 @@ public class ThinPluginUtility {
 	private void storeEntry(JarOutputStream thinJar, ZipOutputStream libJar, JarEntry entry)
 			throws IOException, NoSuchAlgorithmException {
 		String path = entry.getName();
+		
 		if (entry.getName().startsWith(sprMF.springBootLib) && !entry.getName().equals(sprMF.springBootLib)) {
-			storeHashedLibEntries(entry, entry.getName());
-			if (!putLibCacheInDirectory && libJar != null) {
-				storeLibraryInZip(libJar, entry);
+			
+			String hash = hash(sourceFatJar, entry);
+			String hashPrefix = hash.substring(0, 2) + "/";
+			String hashSuffix = hash.substring(2, hash.length());
+			
+			if(putLibCacheInDirectory) {
+				storeLibraryInDir(entry, hashPrefix, hashSuffix);
 			} else {
-				storeLibraryInDir(entry);
+				storeLibraryInZip(libJar, entry, hashPrefix, hashSuffix);
 			}
+			
+			String libLine = "/" + path + '=' + hash;
+			libEntries.add(libLine);
 		}else {
-			try (InputStream is = jf.getInputStream(entry)) {
-				writeEntry(is, thinJar, entry, path);
+			try (InputStream is = sourceFatJar.getInputStream(entry)) {
+				writeEntry(is, thinJar, path);
 			}
 		}
 	}    
-	
-	private void storeHashedLibEntries(JarEntry entry, String path) throws IOException, NoSuchAlgorithmException {
-		String hash = hash(jf, entry);
-		String libLine = "/" + path + '=' + hash;
-		libEntries.add(libLine);
-		prefix = hash.substring(0, 2) + "/";
-		postfix = hash.substring(2, hash.length());
-	}
+
 	
 	private static String hash(JarFile jf, ZipEntry entry) throws IOException, NoSuchAlgorithmException {
 		InputStream eis = jf.getInputStream(entry);
@@ -136,57 +130,52 @@ public class ThinPluginUtility {
 	}
 
 	
-	private void storeLibraryInZip(ZipOutputStream libJar, JarEntry entry)
+	private void storeLibraryInZip(ZipOutputStream libJar, JarEntry entry, String hashPrefix, String hashSuffix)
 			throws IOException, NoSuchAlgorithmException {
 		String path = entry.getName();
-		try (InputStream is = jf.getInputStream(entry)) {
-			putNextLibEntry(libJar);
-			path = prefix + postfix + ".jar";
-			writeEntry(is, libJar, entry, path);
+		try (InputStream is = sourceFatJar.getInputStream(entry)) {
+			if (!hashPrefixes.contains(hashPrefix)) {
+				libJar.putNextEntry(new ZipEntry(hashPrefix));
+				libJar.closeEntry();
+				hashPrefixes.add(hashPrefix);
+			}
+			path = hashPrefix + hashSuffix + ".jar";
+			writeEntry(is, libJar, path);
 		}
 	}
-
-	private void storeLibraryInDir(JarEntry entry) throws IOException, NoSuchAlgorithmException {
+	
+	private void storeLibraryInDir(JarEntry entry, String hashPrefix, String hashSuffix) throws IOException, NoSuchAlgorithmException {
 		if (!libIndexCache.exists()) {
 			libIndexCache.mkdirs();
 		}
-		File jarDir = new File(libIndexCache, prefix.toString());
-		if (!jarDir.exists()) {
-			jarDir.mkdirs();
+		File libDir = new File(libIndexCache, hashPrefix);
+		if (!libDir.exists()) {
+			libDir.mkdirs();
 		}
-		File libFile = new File(jarDir, postfix.toString() + ".jar");
-		InputStream eis = jf.getInputStream(entry);
-		JarInputStream zis = new JarInputStream(eis);
+		File libFile = new File(libDir, hashSuffix + ".jar");
+		InputStream is = sourceFatJar.getInputStream(entry);
 
-		try (ZipOutputStream libJar = new ZipOutputStream(new FileOutputStream(libFile))) {
-			ZipEntry jarEntry = null;
-			while ((jarEntry = zis.getNextJarEntry()) != null) {
-				writeEntry(zis, libJar, jarEntry, jarEntry.getName());
-			}
+		try (OutputStream libJar = new FileOutputStream(libFile)) {
+			copyStream(is, libJar);
 		} finally {
-			zis.close();
-			eis.close();
+			is.close();
 		}
 	}
 
-	private void putNextLibEntry(ZipOutputStream libJar) throws IOException {
-		if (!prefixList.contains(prefix)) {
-			libJar.putNextEntry(new ZipEntry(prefix));
-			libJar.closeEntry();
-			prefixList.add(prefix);
-		}
-	}
-
-	private void writeEntry(InputStream is, ZipOutputStream zos, ZipEntry entry, String entryName) throws IOException {
+	private void writeEntry(InputStream is, ZipOutputStream zos , String entryName) throws IOException {
 		try {
 			zos.putNextEntry(new ZipEntry(entryName));
-			byte[] buffer = new byte[4096];
-			int read = -1;
-			while ((read = is.read(buffer)) != -1) {
-				zos.write(buffer, 0, read);
-			}
+			copyStream(is, zos);
 		} finally {
 			zos.closeEntry();
+		}
+	}
+	
+	private void copyStream(InputStream is, OutputStream os) throws IOException {
+		byte[] buffer = new byte[4096];
+		int read = -1;
+		while ((read = is.read(buffer)) != -1) {
+			os.write(buffer, 0, read);
 		}
 	}
 
