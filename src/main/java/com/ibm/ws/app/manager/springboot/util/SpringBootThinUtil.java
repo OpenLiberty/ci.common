@@ -8,7 +8,7 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
-package net.wasdev.wlp.common.thin.plugin.util;
+package com.ibm.ws.app.manager.springboot.util;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -31,11 +31,9 @@ import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-public class ThinPluginUtility {
-	public static final String SPRING_START_CLASS_HEADER = "Start-Class";
-	public static final String SPRING_BOOT_CLASSES_HEADER = "Spring-Boot-Classes";
-	public static final String SPRING_BOOT_LIB_HEADER = "Spring-Boot-Lib";
-	public static final String SPRING_LIB_INDEX_FILE = "META-INF/spring.lib.index";
+import com.ibm.ws.app.manager.springboot.internal.SpringConstants;
+
+public class SpringBootThinUtil {
 	private final JarFile sourceFatJar;
 	private final File targetThinJar;
 	private final File libIndexCache;
@@ -43,9 +41,8 @@ public class ThinPluginUtility {
 	private final SpringBootManifest sprMF;
 	private final List<String> libEntries = new ArrayList<>();
 	private final Set<String> hashPrefixes = new HashSet<>();
-	
 
-	public ThinPluginUtility(File sourceFatJar, File targetThinJar, File libIndexCache, boolean putLibCacheInDirectory)
+	public SpringBootThinUtil(File sourceFatJar, File targetThinJar, File libIndexCache, boolean putLibCacheInDirectory)
 			throws IOException {
 		this.sourceFatJar = new JarFile(sourceFatJar);
 		this.targetThinJar = targetThinJar;
@@ -62,52 +59,51 @@ public class ThinPluginUtility {
 		Enumeration<JarEntry> entries = sourceFatJar.entries();
 		JarEntry entry;
 		JarOutputStream thinJar = new JarOutputStream(new FileOutputStream(targetThinJar), sourceFatJar.getManifest());
-		ZipOutputStream libJar = null;
+		ZipOutputStream libZip = null;
 		if (!putLibCacheInDirectory) {
-			libJar = new ZipOutputStream(new FileOutputStream(libIndexCache));
+			libZip = new ZipOutputStream(new FileOutputStream(libIndexCache));
 		}
 		try {
 			while (entries.hasMoreElements() && (entry = entries.nextElement()) != null) {
 				if (!JarFile.MANIFEST_NAME.equals(entry.getName()) && !entry.getName().startsWith("org")) { // hack to omit spring boot loader
-					storeEntry(thinJar, libJar, entry);
+					storeEntry(thinJar, libZip, entry);
 				}
 			}
 			addLibIndexFileToThinJar(thinJar);
 		} finally {
 			thinJar.close();
-			if (libJar != null) {
-				libJar.close();
+			if (libZip != null) {
+				libZip.close();
 			}
 
 		}
 	}
-	
-	private void storeEntry(JarOutputStream thinJar, ZipOutputStream libJar, JarEntry entry)
+
+	private void storeEntry(JarOutputStream thinJar, ZipOutputStream libZip, JarEntry entry)
 			throws IOException, NoSuchAlgorithmException {
 		String path = entry.getName();
-		
+
 		if (entry.getName().startsWith(sprMF.springBootLib) && !entry.getName().equals(sprMF.springBootLib)) {
-			
+
 			String hash = hash(sourceFatJar, entry);
 			String hashPrefix = hash.substring(0, 2) + "/";
 			String hashSuffix = hash.substring(2, hash.length());
-			
-			if(putLibCacheInDirectory) {
+
+			if (putLibCacheInDirectory) {
 				storeLibraryInDir(entry, hashPrefix, hashSuffix);
 			} else {
-				storeLibraryInZip(libJar, entry, hashPrefix, hashSuffix);
+				storeLibraryInZip(libZip, entry, hashPrefix, hashSuffix);
 			}
-			
+
 			String libLine = "/" + path + '=' + hash;
 			libEntries.add(libLine);
-		}else {
+		} else {
 			try (InputStream is = sourceFatJar.getInputStream(entry)) {
 				writeEntry(is, thinJar, path);
 			}
 		}
-	}    
+	}
 
-	
 	private static String hash(JarFile jf, ZipEntry entry) throws IOException, NoSuchAlgorithmException {
 		InputStream eis = jf.getInputStream(entry);
 		MessageDigest digest = MessageDigest.getInstance("sha-256");
@@ -129,22 +125,22 @@ public class ThinPluginUtility {
 		return stringBuffer.toString();
 	}
 
-	
-	private void storeLibraryInZip(ZipOutputStream libJar, JarEntry entry, String hashPrefix, String hashSuffix)
+	private void storeLibraryInZip(ZipOutputStream libZip, JarEntry entry, String hashPrefix, String hashSuffix)
 			throws IOException, NoSuchAlgorithmException {
 		String path = entry.getName();
 		try (InputStream is = sourceFatJar.getInputStream(entry)) {
 			if (!hashPrefixes.contains(hashPrefix)) {
-				libJar.putNextEntry(new ZipEntry(hashPrefix));
-				libJar.closeEntry();
+				libZip.putNextEntry(new ZipEntry(hashPrefix));
+				libZip.closeEntry();
 				hashPrefixes.add(hashPrefix);
 			}
 			path = hashPrefix + hashSuffix + ".jar";
-			writeEntry(is, libJar, path);
+			writeEntry(is, libZip, path);
 		}
 	}
-	
-	private void storeLibraryInDir(JarEntry entry, String hashPrefix, String hashSuffix) throws IOException, NoSuchAlgorithmException {
+
+	private void storeLibraryInDir(JarEntry entry, String hashPrefix, String hashSuffix)
+			throws IOException, NoSuchAlgorithmException {
 		if (!libIndexCache.exists()) {
 			libIndexCache.mkdirs();
 		}
@@ -162,7 +158,7 @@ public class ThinPluginUtility {
 		}
 	}
 
-	private void writeEntry(InputStream is, ZipOutputStream zos , String entryName) throws IOException {
+	private void writeEntry(InputStream is, ZipOutputStream zos, String entryName) throws IOException {
 		try {
 			zos.putNextEntry(new ZipEntry(entryName));
 			copyStream(is, zos);
@@ -170,7 +166,7 @@ public class ThinPluginUtility {
 			zos.closeEntry();
 		}
 	}
-	
+
 	private void copyStream(InputStream is, OutputStream os) throws IOException {
 		byte[] buffer = new byte[4096];
 		int read = -1;
@@ -180,7 +176,7 @@ public class ThinPluginUtility {
 	}
 
 	private void addLibIndexFileToThinJar(JarOutputStream thinJar) throws IOException {
-		thinJar.putNextEntry(new ZipEntry(SPRING_LIB_INDEX_FILE));
+		thinJar.putNextEntry(new ZipEntry(SpringConstants.SPRING_LIB_INDEX_FILE));
 		try {
 			for (String libEntry : libEntries) {
 				thinJar.write(libEntry.getBytes(StandardCharsets.UTF_8));
@@ -197,9 +193,9 @@ public class ThinPluginUtility {
 		final String springBootLib;
 
 		SpringBootManifest(Manifest manifest) throws IOException {
-			springStartClass = manifest.getMainAttributes().getValue(SPRING_START_CLASS_HEADER);
-			springBootClasses = manifest.getMainAttributes().getValue(SPRING_BOOT_CLASSES_HEADER);
-			springBootLib = manifest.getMainAttributes().getValue(SPRING_BOOT_LIB_HEADER);
+			springStartClass = manifest.getMainAttributes().getValue(SpringConstants.SPRING_START_CLASS_HEADER);
+			springBootClasses = manifest.getMainAttributes().getValue(SpringConstants.SPRING_BOOT_CLASSES_HEADER);
+			springBootLib = manifest.getMainAttributes().getValue(SpringConstants.SPRING_BOOT_LIB_HEADER);
 
 		}
 	}
