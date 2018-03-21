@@ -8,7 +8,7 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
-package com.ibm.ws.app.manager.springboot.util;
+package net.wasdev.wlp.common.springboot.util;
 
 import java.io.File;
 import java.io.FileNotFoundException;
