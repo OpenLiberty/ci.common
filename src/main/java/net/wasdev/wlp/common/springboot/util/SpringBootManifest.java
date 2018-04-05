@@ -25,6 +25,9 @@ public class SpringBootManifest {
     enum SpringLauncher {
         JarLauncher("JarLauncher", "BOOT-INF/lib/", "BOOT-INF/classes/"),
         WarLauncher("WarLauncher", "WEB-INF/lib/", "WEB-INF/classes/");
+    	private String name;
+        private String libDefault;
+        private String classesDefault;
 
         private SpringLauncher(String name, String libDefault, String classesDefault) {
             this.name = name;
@@ -32,15 +35,11 @@ public class SpringBootManifest {
             this.classesDefault = classesDefault;
         }
 
-        private String name;
-        private String libDefault;
-        private String classesDefault;
-
         static SpringLauncher fromMainClass(String mainClass) {
             if (mainClass != null) {
-                mainClass = mainClass.trim();
+                String mClass = mainClass.trim();
                 for (SpringLauncher l : SpringLauncher.values()) {
-                    if (mainClass.endsWith(l.name)) {
+                    if (mClass.endsWith(l.name)) {
                         return l;
                     }
                 }
