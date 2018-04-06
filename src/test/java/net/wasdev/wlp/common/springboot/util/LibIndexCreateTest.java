@@ -139,7 +139,7 @@ public class LibIndexCreateTest {
 		for (String filePath : filePaths) {
 			ZipEntry ze = new ZipEntry(filePath);
 			fatJarStream.putNextEntry(ze);
-			if (!filePath.endsWith("/")) {
+			if (!filePath.endsWith(File.separator)) {
 				// if this is an actual file entry write some data. The content is irrelevant
 				// to the test. We only care about the structure of the zip file.
 				fatJarStream.write(new byte[] { 'H', 'e', 'l', 'o' }, 0, 4);
@@ -159,6 +159,7 @@ public class LibIndexCreateTest {
 			assertTrue("Unexpected path found in zip: " + zipEntry.toString(),
 					expectedEntries.remove(zipEntry.toString()));
 		}
+		
 		assertTrue("Missing " + expectedEntries.size() + " expected paths from jar.", expectedEntries.isEmpty());
 	}
 
@@ -166,7 +167,11 @@ public class LibIndexCreateTest {
 		ArrayList<String> paths = new ArrayList<>();
 		int dirPathLen = directory.getAbsolutePath().length();
 		getEntryPaths(directory, paths, dirPathLen);
+		String separator = File.separator;
 		for (String path : paths) {
+			if(!("/").equals(separator)){
+				path = path.replace(separator, "/");
+			}
 			assertTrue("Unexpected path found in directory: " + path, expectedEntries.remove(path));
 		}
 		assertTrue("Missing " + expectedEntries.size() + " expected paths from jar.", expectedEntries.isEmpty());
@@ -177,7 +182,7 @@ public class LibIndexCreateTest {
 		for (File file : files) {
 			String actualPath = file.getAbsolutePath().substring(dirPathLen + 1);
 			if (file.isDirectory()) {
-				actualPath += "/";
+				actualPath += File.separator;
 				getEntryPaths(file, paths, dirPathLen);
 			}
 			paths.add(actualPath);
