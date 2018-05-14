@@ -48,6 +48,34 @@ import org.xml.sax.SAXException;
  */
 public abstract class InstallFeatureUtil {
     
+    private final File installDirectory;
+    
+    private final Set<File> downloadedJsons;
+    
+    /**
+     * Initialize the utility and check for unsupported scenarios.
+     * 
+     * @param installDirectory The install directory
+     * @param from The "from" parameter specified in the plugin configuration, or null if not specified
+     * @param to The "to" parameter specified in the plugin configuration, or null if not specified
+     * @param pluginListedEsas The list of ESAs specified in the plugin configuration, or null if not specified
+     * @throws PluginScenarioException If the current scenario is not supported
+     * @throws PluginExecutionException If properties files cannot be found in the installDirectory/lib/versions
+     */
+    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
+        this.installDirectory = installDirectory;
+        if (getMapBasedInstallKernelJar(installDirectory) == null) {
+            throw new PluginScenarioException("Install map jar not found.");
+        }
+        downloadedJsons = downloadProductJsons(installDirectory);
+        if (downloadedJsons.isEmpty()) {
+            throw new PluginScenarioException("Cannot find JSONs for to the installed runtime from the Maven repository.");
+        }
+        if (hasUnsupportedParameters(from, to, pluginListedEsas)) {
+            throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
+        }
+    }
+    
     /**
      * Log debug
      * @param msg
@@ -97,34 +125,6 @@ public abstract class InstallFeatureUtil {
      */
     public abstract File downloadArtifact(String groupId, String artifactId, String type, String version)
             throws PluginExecutionException;
-    
-    private final File installDirectory;
-    
-    private final Set<File> downloadedJsons;
-    
-    /**
-     * Initialize the utility and check for unsupported scenarios.
-     * 
-     * @param installDirectory The install directory
-     * @param from The "from" parameter specified in the plugin configuration, or null if not specified
-     * @param to The "to" parameter specified in the plugin configuration, or null if not specified
-     * @param pluginListedEsas The list of ESAs specified in the plugin configuration, or null if not specified
-     * @throws PluginScenarioException If the current scenario is not supported
-     * @throws PluginExecutionException If properties files cannot be found in the installDirectory/lib/versions
-     */
-    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
-        this.installDirectory = installDirectory;
-        if (getMapBasedInstallKernelJar(installDirectory) == null) {
-            throw new PluginScenarioException("Install map jar not found.");
-        }
-        downloadedJsons = downloadProductJsons(installDirectory);
-        if (downloadedJsons.isEmpty()) {
-            throw new PluginScenarioException("Cannot find JSONs for to the installed runtime from the Maven repository.");
-        }
-        if (hasUnsupportedParameters(from, to, pluginListedEsas)) {
-            throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
-        }
-    }
     
     /**
      * Combine the given String collections into a set
