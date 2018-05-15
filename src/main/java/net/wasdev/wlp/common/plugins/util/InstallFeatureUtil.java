@@ -382,7 +382,7 @@ public abstract class InstallFeatureUtil {
      */
     private boolean hasUnsupportedParameters(String from, String to, Set<String> pluginListedEsas) {
         boolean hasFrom = from != null;
-        boolean hasTo = !"usr".equals(to) && !"core".equals(to);
+        boolean hasTo = to != null && (!"usr".equals(to) && !"core".equals(to));
         boolean hasPluginListedEsas = !pluginListedEsas.isEmpty();
         debug("hasFrom: " + hasFrom);
         debug("hasTo: " + hasTo);
@@ -444,8 +444,9 @@ public abstract class InstallFeatureUtil {
             } else if (resolvedFeatures.isEmpty()) {
                 debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
-                if(exceptionMessage.contains("CWWKF1250I")){
+                if (exceptionMessage.contains("CWWKF1250I")){
                     warn(exceptionMessage);
+                    return;
                 } else {
                     throw new PluginExecutionException(exceptionMessage);
                 }
