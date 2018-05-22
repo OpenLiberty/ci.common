@@ -35,7 +35,6 @@ import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.logging.Level;
-import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -248,10 +247,10 @@ public abstract class InstallFeatureUtil {
         }
         if (!updatedParsedXmls.contains(includeFile)){
             String onConflict = node.getAttribute("onConflict");
-            if (!onConflict.equalsIgnoreCase("ignore")){
-                if (onConflict.equals("") || onConflict.equalsIgnoreCase("merge")){
+            if (!"ignore".equalsIgnoreCase(onConflict)){
+                if ("".equals(onConflict) || "merge".equalsIgnoreCase(onConflict)){
                     result.addAll(getServerXmlFeatures(includeFile, updatedParsedXmls));
-                } else if (onConflict.equalsIgnoreCase("replace")){
+                } else if ("replace".equalsIgnoreCase(onConflict)){
                     result = getServerXmlFeatures(includeFile, updatedParsedXmls);
                 }
             }

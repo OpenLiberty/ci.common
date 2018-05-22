@@ -16,6 +16,8 @@
 package net.wasdev.wlp.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -41,30 +43,46 @@ public class InstallFeatureUtilTest {
     public TemporaryFolder temp = new TemporaryFolder();
 
     private class InstallFeatureTestUtil extends InstallFeatureUtil {
+        
+        private String lastInfoMessage = null;
+        
+        public void resetLastInfoMessage() {
+            lastInfoMessage = null;
+        }
+        
+        public String getLastInfoMessage() {
+            return lastInfoMessage;
+        }
+        
         public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)  throws PluginScenarioException, PluginExecutionException {
             super(installDirectory, from, to, pluginListedEsas);
         }
 
         @Override
         public void debug(String msg) {
+            // not needed for tests
         }
-        
+
         @Override
         public void debug(String msg, Throwable e) {
+            // not needed for tests
         }
-        
+
         @Override
         public void debug(Throwable e) {
+            // not needed for tests
         }
-        
+
         @Override
         public void warn(String msg) {
+            // not needed for tests
         }
 
         @Override
         public void info(String msg) {
+            lastInfoMessage = msg;
         }
-        
+
         @Override
         public boolean isDebugEnabled() {
             return false;
@@ -85,7 +103,8 @@ public class InstallFeatureUtilTest {
     
     @Test
     public void testConstructor() throws Exception {
-        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        assertNotNull(util);
     }
     
     @Test(expected = PluginExecutionException.class)
@@ -99,7 +118,8 @@ public class InstallFeatureUtilTest {
     
     @Test
     public void testConstructorTo() throws Exception {
-        new InstallFeatureTestUtil(installDir, null, "myextension", new HashSet<String>());
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, "myextension", new HashSet<String>());
+        assertNotNull(util);
     }
     
     /**
@@ -150,13 +170,20 @@ public class InstallFeatureUtilTest {
     
     @Test
     public void testProductInfoValidate() throws Exception {
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        InstallFeatureTestUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        assertNotNull(util);
+        
         File productInfo = new File(installDir, "bin/productInfo");
-        productInfo.setExecutable(true);
+        assertTrue(productInfo.setExecutable(true));
+        
         File productInfoBat = new File(installDir, "bin/productInfo.bat");
-        productInfoBat.setExecutable(true);
+        assertTrue(productInfoBat.setExecutable(true));
+
+        util.resetLastInfoMessage();
+        assertNull(util.getLastInfoMessage());
         
         util.productInfoValidate();
+        assertNotNull(util.getLastInfoMessage());
     }
 
 }
