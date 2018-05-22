@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
@@ -50,7 +51,14 @@ public abstract class InstallFeatureUtil {
     
     private final File installDirectory;
     
+    private final File installJarFile;
+    
+    private final String to;
+    
     private final Set<File> downloadedJsons;
+    
+    private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
+    private static final String INSTALL_MAP_SUFFIX = ".jar";
     
     /**
      * Initialize the utility and check for unsupported scenarios.
@@ -64,14 +72,16 @@ public abstract class InstallFeatureUtil {
      */
     public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
-        if (getMapBasedInstallKernelJar(installDirectory) == null) {
+        this.to = to;
+        installJarFile = getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
+        if (installJarFile == null) {
             throw new PluginScenarioException("Install map jar not found.");
         }
         downloadedJsons = downloadProductJsons(installDirectory);
         if (downloadedJsons.isEmpty()) {
             throw new PluginScenarioException("Cannot find JSONs for to the installed runtime from the Maven repository.");
         }
-        if (hasUnsupportedParameters(from, to, pluginListedEsas)) {
+        if (hasUnsupportedParameters(from, pluginListedEsas)) {
             throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
         }
     }
@@ -149,59 +159,66 @@ public abstract class InstallFeatureUtil {
      */
     public Set<String> getServerFeatures(File serverDirectory, boolean noPluginListedFeatures) {
         // parse server.xml features only if there are no configured features in the pom
-        Set<String> result = new HashSet<String>();
         if (noPluginListedFeatures) {
             debug("No features were listed for the plugin. Using server.xml.");
-            result.addAll(getConfigDropinFeatures(serverDirectory, "overrides"));
-            result.addAll(getServerXmlFeatures(serverDirectory, "server.xml", null));
-            result.addAll(getConfigDropinFeatures(serverDirectory, "defaults"));
+            return getServerFeatures(serverDirectory);
         } else {
             debug("Features were listed for the plugin. Skipping server.xml.");
+            return new HashSet<String>();
         }
+    }
+
+    /**
+     * Get the set of features defined in the server.xml
+     * @param serverDirectory The server directory containing the server.xml
+     * @return the set of features that should be installed from server.xml
+     */
+    public static Set<String> getServerFeatures(File serverDirectory) {
+        Set<String> result = new HashSet<String>();
+        result.addAll(getConfigDropinFeatures(serverDirectory, "overrides"));
+        result.addAll(getServerXmlFeatures(new File(serverDirectory, "server.xml"), null));
+        result.addAll(getConfigDropinFeatures(serverDirectory, "defaults"));
         return result;
     }
     
-    private Set<String> getConfigDropinFeatures(File serverDirectory, String folderName){
+    private static Set<String> getConfigDropinFeatures(File serverDirectory, String folderName) {
         Set<String> result = new HashSet<String>();
-        String configDropin = serverDirectory.getAbsolutePath() + "/configDropins/";
-        File configDropinFolder = new File(configDropin+folderName);
-        String[] overrideFileList = configDropinFolder.list();
-        if (overrideFileList == null) {
-            debug(folderName + " configDropins folder does not exist.");
+        String configDropins = serverDirectory.getAbsolutePath() + "/configDropins/" + folderName;
+        File configDropinsFolder = new File(configDropins);
+        String[] configDropinsFileList = configDropinsFolder.list();
+        if (configDropinsFileList == null) {
             return result;
         }
-        List<String> configDropinXmls = new ArrayList<String>();
-        for (String xml : overrideFileList){
+        List<String> configDropinsXmls = new ArrayList<String>();
+        for (String xml : configDropinsFileList){
             if (xml.endsWith(".xml")) {
-                configDropinXmls.add(xml);
+                configDropinsXmls.add(configDropins + "/" +xml);
             }
         }
-        if (configDropinXmls.isEmpty()) {
-            debug(folderName + " configDropins folder is empty.");
+        if (configDropinsXmls.isEmpty()) {
             return result;
         }
-        for (String filename : configDropinXmls) {
-            result.addAll(getServerXmlFeatures(configDropinFolder, filename, null));
+        for (String filename : configDropinsXmls) {
+            result.addAll(getServerXmlFeatures(new File(filename), null));
         }
         return result;
     }
 
-    private Set<String> getServerXmlFeatures(File fileContext, String serverFile, List<String> parsedXmls) {
+    private static Set<String> getServerXmlFeatures(File serverFile, List<File> parsedXmls) {
         Set<String> result = new HashSet<String>();
-        File serverXml = new File(fileContext, serverFile);
-        List<String> updatedParsedXmls = new ArrayList<String>();
+        List<File> updatedParsedXmls = new ArrayList<File>();
         updatedParsedXmls.add(serverFile);
         if (parsedXmls != null){
             updatedParsedXmls.addAll(parsedXmls);
         }
-        if (serverXml.exists()) {
+        if (serverFile.exists()) {
             try {
                 Document doc = new XmlDocument() {
                     public Document getDocument(File file) throws IOException, ParserConfigurationException, SAXException {
                         createDocument(file);
                         return doc;
                     }
-                }.getDocument(serverXml);
+                }.getDocument(serverFile);
                 Element root = doc.getDocumentElement();
                 NodeList nodes = root.getChildNodes();
                 for (int i = 0; i < nodes.getLength(); i++) {
@@ -209,44 +226,40 @@ public abstract class InstallFeatureUtil {
                         Element child = (Element) nodes.item(i);
                         if ("featureManager".equals(child.getNodeName())) {
                             result.addAll(parseFeatureManagerNode(child));
-                        }
-                        if ("include".equals(child.getNodeName())){
-                            result = parseIncludeNode(result, child, fileContext, updatedParsedXmls);
+                        } else if ("include".equals(child.getNodeName())){
+                            result = parseIncludeNode(result, serverFile, child, updatedParsedXmls);
                         }
                     }
                 }
             } catch (IOException | ParserConfigurationException | SAXException e) {
-                warn("Failed to parse the xml file " + serverXml + ": " + e.getLocalizedMessage());
-                debug(e);
+                // just skip this server.xml if it cannot be parsed
             }
         }
         return result;
     }
     
-    private Set<String> parseIncludeNode(Set<String> origResult, Element node, File fileContext,
-            List<String> updatedParsedXmls) {
+    private static Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Element node,
+            List<File> updatedParsedXmls) {
         Set<String> result = origResult;
         String includeFileName = node.getAttribute("location");
-        if (!updatedParsedXmls.contains(includeFileName)){
+        File includeFile = new File(includeFileName);
+        if (!includeFile.isAbsolute()){
+            includeFile = new File(serverFile.getParentFile().getAbsolutePath(), includeFileName);
+        }
+        if (!updatedParsedXmls.contains(includeFile)){
             String onConflict = node.getAttribute("onConflict");
-            boolean onConflictMerge = Pattern.compile(Pattern.quote("MERGE"), Pattern.CASE_INSENSITIVE).matcher(onConflict).find();
-            boolean onConflictReplace = Pattern.compile(Pattern.quote("REPLACE"), Pattern.CASE_INSENSITIVE).matcher(onConflict).find();
-            boolean onConflictIgnore = Pattern.compile(Pattern.quote("IGNORE"), Pattern.CASE_INSENSITIVE).matcher(onConflict).find();
-            if (!(onConflictMerge || onConflictReplace || onConflictIgnore)){
-                onConflictMerge = true;
-            }
-            if (!onConflictIgnore){
-                if (onConflictMerge){
-                    result.addAll(getServerXmlFeatures(fileContext, includeFileName, updatedParsedXmls));
-                } else if (onConflictReplace){
-                    result = getServerXmlFeatures(fileContext, includeFileName, updatedParsedXmls);
+            if (!onConflict.equalsIgnoreCase("ignore")){
+                if (onConflict.equals("") || onConflict.equalsIgnoreCase("merge")){
+                    result.addAll(getServerXmlFeatures(includeFile, updatedParsedXmls));
+                } else if (onConflict.equalsIgnoreCase("replace")){
+                    result = getServerXmlFeatures(includeFile, updatedParsedXmls);
                 }
             }
         }
         return result;
     }
 
-    private List<String> parseFeatureManagerNode(Element node) {
+    private static List<String> parseFeatureManagerNode(Element node) {
         List<String> result = new ArrayList<String>();
         NodeList features = node.getElementsByTagName("feature");
         if (features != null) {
@@ -370,24 +383,21 @@ public abstract class InstallFeatureUtil {
     /**
      * Returns true if this scenario is not supported for installing from Maven
      * repository, which is one of the following conditions: "from" parameter is
-     * specified (don't need Maven repositories), "to" parameter is specified
-     * and not usr/core (only usr/core are supported with Maven for now), or esa
-     * files are specified in the configuration (not supported with Maven for
-     * now)
+     * specified (don't need Maven repositories), or esa files are specified in
+     * the configuration (not supported with Maven for now)
      * 
-     * @param from the "from" parameter specified in the plugin
-     * @param to the "to" parameter specified in the plugin
-     * @param pluginListedEsas the ESA files specified in the plugin configuration
+     * @param from
+     *            the "from" parameter specified in the plugin
+     * @param pluginListedEsas
+     *            the ESA files specified in the plugin configuration
      * @return true if the fallback scenario occurred, false otherwise
      */
-    private boolean hasUnsupportedParameters(String from, String to, Set<String> pluginListedEsas) {
+    private boolean hasUnsupportedParameters(String from, Set<String> pluginListedEsas) {
         boolean hasFrom = from != null;
-        boolean hasTo = to != null && (!"usr".equals(to) && !"core".equals(to));
         boolean hasPluginListedEsas = !pluginListedEsas.isEmpty();
         debug("hasFrom: " + hasFrom);
-        debug("hasTo: " + hasTo);
         debug("hasPluginListedEsas: " + hasPluginListedEsas);
-        return hasFrom || hasTo || hasPluginListedEsas;
+        return hasFrom || hasPluginListedEsas;
     }
     
     private File downloadEsaArtifact(String mavenCoordinates) throws PluginExecutionException {
@@ -420,6 +430,7 @@ public abstract class InstallFeatureUtil {
      * @throws PluginExecutionException
      *             if any of the features could not be installed
      */
+    @SuppressWarnings("unchecked")
     public void installFeatures(boolean isAcceptLicense, List<String> featuresToInstall) throws PluginExecutionException {
         List<File> jsonRepos = new ArrayList<File>(downloadedJsons);
         debug("JSON repos: " + jsonRepos);
@@ -445,7 +456,8 @@ public abstract class InstallFeatureUtil {
                 debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
                 if (exceptionMessage.contains("CWWKF1250I")){
-                    warn(exceptionMessage);
+                    // the features are already installed, so no action is needed
+                    info(exceptionMessage);
                     return;
                 } else {
                     throw new PluginExecutionException(exceptionMessage);
@@ -453,9 +465,13 @@ public abstract class InstallFeatureUtil {
             }
             Collection<File> artifacts = downloadEsas(resolvedFeatures);
 
+            StringBuilder installedFeaturesBuilder = new StringBuilder();
+            Collection<String> actionReturnResult = new ArrayList<String>();
             for (File esaFile: artifacts ){
                 mapBasedInstallKernel.put("license.accept", isAcceptLicense);
                 mapBasedInstallKernel.put("action.install", esaFile);
+                mapBasedInstallKernel.put("to.extension", to);
+                debug("Installing to extension: " + to);
                 Integer ac = (Integer) mapBasedInstallKernel.get("action.result");
                 debug("action.result: "+ac);
                 debug("action.error.message: "+mapBasedInstallKernel.get("action.error.message"));
@@ -463,15 +479,22 @@ public abstract class InstallFeatureUtil {
                     debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
                     String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
                     debug(exceptionMessage);
+                    throw new PluginExecutionException(exceptionMessage);
+                } else if (mapBasedInstallKernel.get("action.install.result") != null) {
+                    actionReturnResult.addAll((Collection<String>) mapBasedInstallKernel.get("action.install.result"));
                 }
             }
+            for (String installResult : actionReturnResult) {
+                installedFeaturesBuilder.append(installResult).append(" ");
+            }
+            productInfoValidate();
+            info("The following features have been installed: " + installedFeaturesBuilder.toString());
         } catch (PrivilegedActionException e) {
-            throw new PluginExecutionException("Could not load the jar " + getMapBasedInstallKernelJar(installDirectory).getAbsolutePath(), e);
+            throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
         }
     }
     
-    private Map<String, Object> createMapBasedInstallKernelInstance(File installDirectory) throws PrivilegedActionException {
-        final File installJarFile = getMapBasedInstallKernelJar(installDirectory);
+    private Map<String, Object> createMapBasedInstallKernelInstance(File installDirectory) throws PrivilegedActionException, PluginExecutionException {
         String installJarFileSubpath = installJarFile.getParentFile().getName() + File.separator + installJarFile.getName();
         Map<String, Object> mapBasedInstallKernel = AccessController.doPrivileged(new PrivilegedExceptionAction<Map<String, Object>>() {
             @SuppressWarnings({ "unchecked", "resource" })
@@ -484,7 +507,7 @@ public abstract class InstallFeatureUtil {
             }
         });
         if (mapBasedInstallKernel == null){
-            debug("mbik is null");
+            throw new PluginExecutionException("Cannot run install jar file " + installJarFile);
         }
 
         // Init
@@ -499,62 +522,163 @@ public abstract class InstallFeatureUtil {
     }
     
     /**
-     * Find latest install map jar from lib directory
+     * Find latest install map jar from specified directory
      * 
      * @return the install map jar file
      */
-    private File getMapBasedInstallKernelJar(File installDirectory) {
-        final String installMapPrefix = "com.ibm.ws.install.map";
-        final String installMapSuffix = ".jar";
-
-        File dir = new File(installDirectory, "lib");
+    public static File getMapBasedInstallKernelJar(File dir) {
 
         File[] installMapJars = dir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.startsWith(installMapPrefix) && name.endsWith(installMapSuffix);
+                return name.startsWith(INSTALL_MAP_PREFIX) && name.endsWith(INSTALL_MAP_SUFFIX);
             }
         });
 
-        File latestJar = null;
-        if (installMapJars != null && installMapJars.length > 0) {
+        File result = null;
+        if (installMapJars != null) {
             for (File jar : installMapJars) {
-                debug("latestJar: " + latestJar);
-                debug("jar: " + jar);
-
-                if (latestJar == null) {
-                    // first jar found
-                    latestJar = jar;
-                    continue;
-                }
-                String latestJarVersion = extractVersion(latestJar.getName(), installMapPrefix, installMapSuffix);
-                if (latestJarVersion == null) {
-                    // jar without version is the oldest jar 
-                    latestJar = jar;
-                    continue;
-                }
-                String jarVersion = extractVersion(jar.getName(), installMapPrefix, installMapSuffix);
-                if (jarVersion != null && jarVersion.compareTo(latestJarVersion) > 0) {
-                    // jar has a later version
-                    latestJar = jar;
-                    continue;
+                if (isReplacementJar(result, jar)) {
+                    result = jar;
                 }
             }
         }
 
-        debug("Using install map from jar: " + (latestJar == null ? null : latestJar.getAbsolutePath()));
-        return latestJar;
+        return result;
     }
     
-    private String extractVersion(String fileName, String prefix, String suffix) {
-        int startIndex = prefix.length()+1;
-        int endIndex = fileName.lastIndexOf(suffix);
+    /**
+     * Returns whether file2 can replace file1 as the install map jar.
+     */
+    private static boolean isReplacementJar(File file1, File file2) {
+        if (file1 == null) {
+            return true;
+        } else if (file2 == null) {
+            return false;
+        } else {
+            String version1 = extractVersion(file1.getName());
+            String version2 = extractVersion(file2.getName());
+            return compare(version1, version2) < 0;
+        }
+    }
+    
+    private static String extractVersion(String fileName) {
+        int startIndex = INSTALL_MAP_PREFIX.length() + 1;
+        int endIndex = fileName.lastIndexOf(INSTALL_MAP_SUFFIX);
         if (startIndex < endIndex) {
-            String versionString = fileName.substring(startIndex, endIndex);
-            debug("Extracted version string: " + versionString);
-            return versionString;
+            return fileName.substring(startIndex, endIndex);
         } else {
             return null;
         }
     }
+
+    /**
+     * Performs pairwise comparison of version strings, including nulls and non-integer components.
+     * @param version1
+     * @param version2
+     * @return positive if version2 is greater, negative if version1 is greater, otherwise 0
+     */
+    private static int compare(String version1, String version2) {
+        if (version1 == null && version2 == null) {
+            return 0;
+        } else if (version1 == null && version2 != null) {
+            return -1;
+        } else if (version1 != null && version2 == null) {
+            return 1;
+        }
+        String[] components1 = version1.split("\\.");
+        String[] components2 = version2.split("\\.");
+        for (int i = 0; i < components1.length && i < components2.length; i++) {
+            int comparison;
+            try {
+                comparison = new Integer(components1[i]).compareTo(new Integer(components2[i]));
+            } catch (NumberFormatException e) {
+                comparison = components1[i].compareTo(components2[i]);
+            }
+            if (comparison != 0) {
+                return comparison;
+            }
+        }
+        return components1.length - components2.length;
+    }
+    
+    /**
+     * Performs product validation by running bin/productInfo validate
+     * 
+     * @throws PluginExecutionException
+     *             if product validation failed or could not be run
+     */
+    public void productInfoValidate() throws PluginExecutionException {
+        Process pr = null;
+        InputStream is = null;
+        Scanner s = null;
+        Worker worker = null;
+        try {
+            String osName = System.getProperty("os.name", "unknown").toLowerCase();
+            boolean isWindows = osName.indexOf("windows") >= 0;
+            String command;
+            if (isWindows) {
+                command = installDirectory + "\\bin\\productInfo.bat validate";
+            } else {
+                command = installDirectory + "/bin/productInfo validate";
+            }
+            pr = Runtime.getRuntime().exec(command);
+            worker = new Worker(pr);
+            worker.start();
+            worker.join(300000);
+            if (worker.exit == null) {
+                throw new PluginExecutionException("Product validation error: timeout");
+            }
+            int exitValue = pr.exitValue();
+            if (exitValue != 0) {
+                is = pr.getInputStream();
+                s = new Scanner(is);
+                s.useDelimiter("\\A");
+                if (s.hasNext()) {
+                    throw new PluginExecutionException(s.next());
+                } else {
+                    throw new PluginExecutionException("Product validation exited with return code " + exitValue);
+                }
+            } else {
+                info("Product validation completed successfully.");
+            }
+        } catch (IOException ex) {
+            throw new PluginExecutionException("Product validation error: " + ex);
+        } catch (InterruptedException ex) {
+            worker.interrupt();
+            Thread.currentThread().interrupt();
+            throw new PluginExecutionException("Product validation error: " + ex);
+        } finally {
+            if (s != null) {
+                s.close();
+            }
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                }
+            }
+            if (pr != null) {
+                pr.destroy();
+            }
+        }
+    }
+
+    private static class Worker extends Thread {
+        private final Process process;
+        private Integer exit;
+
+        private Worker(Process process) {
+            this.process = process;
+        }
+
+        public void run() {
+            try {
+                exit = process.waitFor();
+            } catch (InterruptedException ignore) {
+                return;
+            }
+        }
+    }
+
 }
