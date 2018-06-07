@@ -10,7 +10,7 @@
 
 	<groupId>net.wasdev.wlp.common</groupId>
 	<artifactId>ci.common</artifactId>
-	<version>1.1-SNAPSHOT</version>
+	<version>1.2-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>ci.common</name>
