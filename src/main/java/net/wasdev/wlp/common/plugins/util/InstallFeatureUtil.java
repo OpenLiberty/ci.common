@@ -145,7 +145,9 @@ public abstract class InstallFeatureUtil {
     public static Set<String> combineToSet(Collection<String>... collections) {
         Set<String> result = new HashSet<String>();
         for (Collection<String> collection : collections) {
-            result.addAll(collection);
+            if (collection != null) {
+                result.addAll(collection);
+            }
         }
         return result;
     }
@@ -170,89 +172,174 @@ public abstract class InstallFeatureUtil {
     /**
      * Get the set of features defined in the server.xml
      * @param serverDirectory The server directory containing the server.xml
-     * @return the set of features that should be installed from server.xml
+     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      */
     public static Set<String> getServerFeatures(File serverDirectory) {
-        Set<String> result = new HashSet<String>();
-        result.addAll(getConfigDropinFeatures(serverDirectory, "overrides"));
-        result.addAll(getServerXmlFeatures(new File(serverDirectory, "server.xml"), null));
-        result.addAll(getConfigDropinFeatures(serverDirectory, "defaults"));
-        return result;
+        Set<String> defaults = getConfigDropinsFeatures(serverDirectory, "defaults");
+        Set<String> defaultsAndServerXmlFeatures = getServerXmlFeatures(defaults, new File(serverDirectory, "server.xml"), null);
+        // add the overrides at the end since they should not be replaced by any other content
+        Set<String> overrides = getConfigDropinsFeatures(serverDirectory, "overrides");
+        return combineToSet(defaultsAndServerXmlFeatures, overrides);
     }
     
-    private static Set<String> getConfigDropinFeatures(File serverDirectory, String folderName) {
-        Set<String> result = new HashSet<String>();
-        String configDropins = serverDirectory.getAbsolutePath() + "/configDropins/" + folderName;
-        File configDropinsFolder = new File(configDropins);
-        String[] configDropinsFileList = configDropinsFolder.list();
-        if (configDropinsFileList == null) {
-            return result;
+    /**
+     * Gets features from the configDropins's defaults or overrides directory
+     * 
+     * @param serverDirectory
+     *            The server directory
+     * @param folderName
+     *            The folder under configDropins: either "defaults" or
+     *            "overrides"
+     * @return The set of features to install, or empty set if the folder has xml
+     *         files with featureManager sections but no features to install, or
+     *         null if there are no xml files or they have no featureManager
+     *         section
+     */
+    private static Set<String> getConfigDropinsFeatures(File serverDirectory, String folderName) {
+        File configDropinsFolder;
+        try {
+            configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName).getCanonicalFile();
+        } catch (IOException e) {
+            // skip this directory if its path cannot be queried
+            return null;
         }
-        List<String> configDropinsXmls = new ArrayList<String>();
-        for (String xml : configDropinsFileList){
-            if (xml.endsWith(".xml")) {
-                configDropinsXmls.add(configDropins + "/" +xml);
+        File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.endsWith(".xml");
             }
+        });
+        if (configDropinsXmls == null || configDropinsXmls.length == 0) {
+            return null;
         }
-        if (configDropinsXmls.isEmpty()) {
-            return result;
-        }
-        for (String filename : configDropinsXmls) {
-            result.addAll(getServerXmlFeatures(new File(filename), null));
+        Set<String> result = null;
+        for (File xml : configDropinsXmls) {
+            Set<String> features = getServerXmlFeatures(null, xml, null);
+            if (features != null) {
+                if (result == null) {
+                    result = new HashSet<String>();
+                }
+                result.addAll(features);
+            }
         }
         return result;
     }
 
-    private static Set<String> getServerXmlFeatures(File serverFile, List<File> parsedXmls) {
-        Set<String> result = new HashSet<String>();
+    /**
+     * Adds features from the given server file into the origResult or a new set
+     * if origResult is null.
+     * 
+     * @param origResult
+     *            The features that have been parsed so far.
+     * @param serverFile
+     *            The server XML file.
+     * @param parsedXmls
+     *            The list of XML files that have been parsed so far.
+     * @return list of features that should be installed according to the
+     *         origResult and the current serverFile, or empty set if the file
+     *         (or its children) only has a featureManager section with no
+     *         features, or null if the file (and all of its children) has no
+     *         featureManager section
+     */
+    private static Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
+        Set<String> result = origResult;
         List<File> updatedParsedXmls = new ArrayList<File>();
-        updatedParsedXmls.add(serverFile);
-        if (parsedXmls != null){
+        File canonicalServerFile;
+        try {
+            canonicalServerFile = serverFile.getCanonicalFile();
+        } catch (IOException e) {
+            // skip this server.xml if its path cannot be queried
+            return result;
+        }
+        updatedParsedXmls.add(canonicalServerFile);
+        if (parsedXmls != null) {
             updatedParsedXmls.addAll(parsedXmls);
         }
-        if (serverFile.exists()) {
+        if (canonicalServerFile.exists()) {
             try {
                 Document doc = new XmlDocument() {
                     public Document getDocument(File file) throws IOException, ParserConfigurationException, SAXException {
                         createDocument(file);
                         return doc;
                     }
-                }.getDocument(serverFile);
+                }.getDocument(canonicalServerFile);
                 Element root = doc.getDocumentElement();
                 NodeList nodes = root.getChildNodes();
+
                 for (int i = 0; i < nodes.getLength(); i++) {
                     if (nodes.item(i) instanceof Element) {
                         Element child = (Element) nodes.item(i);
                         if ("featureManager".equals(child.getNodeName())) {
+                            if (result == null) {
+                                result = new HashSet<String>();
+                            }
                             result.addAll(parseFeatureManagerNode(child));
                         } else if ("include".equals(child.getNodeName())){
-                            result = parseIncludeNode(result, serverFile, child, updatedParsedXmls);
+                            result = parseIncludeNode(result, canonicalServerFile, child, updatedParsedXmls);
                         }
                     }
                 }
             } catch (IOException | ParserConfigurationException | SAXException e) {
                 // just skip this server.xml if it cannot be parsed
+                return result;
             }
         }
         return result;
     }
     
+    /**
+     * Parse features from an include node.
+     * 
+     * @param origResult
+     *            The features that have been parsed so far.
+     * @param serverFile
+     *            The parent server XML file containing the include node.
+     * @param node
+     *            The include node.
+     * @param updatedParsedXmls
+     *            The list of XML files that have been parsed so far.
+     * @return updated list of features that should be installed, or null if no
+     *         featureManager section had been found so far.
+     */
     private static Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
         String includeFileName = node.getAttribute("location");
         File includeFile = new File(includeFileName);
-        if (!includeFile.isAbsolute()){
-            includeFile = new File(serverFile.getParentFile().getAbsolutePath(), includeFileName);
+        try {
+            if (!includeFile.isAbsolute()) {
+                includeFile = new File(serverFile.getParentFile().getAbsolutePath(), includeFileName)
+                        .getCanonicalFile();
+            } else {
+                includeFile = includeFile.getCanonicalFile();
+            }
+        } catch (IOException e) {
+            // skip this xml if its path cannot be queried
+            return result;
         }
-        if (!updatedParsedXmls.contains(includeFile)){
+        if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
-            if (!"ignore".equalsIgnoreCase(onConflict)){
-                if ("".equals(onConflict) || "merge".equalsIgnoreCase(onConflict)){
-                    result.addAll(getServerXmlFeatures(includeFile, updatedParsedXmls));
-                } else if ("replace".equalsIgnoreCase(onConflict)){
-                    result = getServerXmlFeatures(includeFile, updatedParsedXmls);
+            if ("".equals(onConflict) || "merge".equalsIgnoreCase(onConflict)) {
+                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+                if (features != null) {
+                    if (result == null) {
+                        result = features;
+                    } else {
+                        result.addAll(features);
+                    }
+                }                
+            } else if ("replace".equalsIgnoreCase(onConflict)) {
+                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+                if (features != null && !features.isEmpty()) {
+                    // only replace if the child has features
+                    result = features;
                 }
+            } else if ("ignore".equalsIgnoreCase(onConflict)) {
+                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+                if (result == null) {
+                    // parent has no results (i.e. no featureManager section), so use the child's results
+                    result = features;
+                } // else the parent already has some results (even if it's empty), so ignore the child
             }
         }
         return result;
@@ -455,8 +542,8 @@ public abstract class InstallFeatureUtil {
                 debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
                 if (exceptionMessage.contains("CWWKF1250I")){
-                    // the features are already installed, so no action is needed
                     info(exceptionMessage);
+                    info("The features are already installed, so no action is needed.");
                     return;
                 } else {
                     throw new PluginExecutionException(exceptionMessage);
@@ -562,7 +649,7 @@ public abstract class InstallFeatureUtil {
     }
     
     private static String extractVersion(String fileName) {
-        int startIndex = INSTALL_MAP_PREFIX.length() + 1;
+        int startIndex = INSTALL_MAP_PREFIX.length() + 1; // skip the underscore after the prefix
         int endIndex = fileName.lastIndexOf(INSTALL_MAP_SUFFIX);
         if (startIndex < endIndex) {
             return fileName.substring(startIndex, endIndex);
@@ -613,10 +700,8 @@ public abstract class InstallFeatureUtil {
         Scanner s = null;
         Worker worker = null;
         try {
-            String osName = System.getProperty("os.name", "unknown").toLowerCase();
-            boolean isWindows = osName.indexOf("windows") >= 0;
             String command;
-            if (isWindows) {
+            if (OSUtil.isWindows()) {
                 command = installDirectory + "\\bin\\productInfo.bat validate";
             } else {
                 command = installDirectory + "/bin/productInfo validate";
@@ -632,6 +717,7 @@ public abstract class InstallFeatureUtil {
             if (exitValue != 0) {
                 is = pr.getInputStream();
                 s = new Scanner(is);
+                // use regex to match the beginning of the input
                 s.useDelimiter("\\A");
                 if (s.hasNext()) {
                     throw new PluginExecutionException(s.next());

@@ -17,7 +17,6 @@ package net.wasdev.wlp.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -43,17 +42,6 @@ public class InstallFeatureUtilTest {
     public TemporaryFolder temp = new TemporaryFolder();
 
     private class InstallFeatureTestUtil extends InstallFeatureUtil {
-        
-        private String lastInfoMessage = null;
-        
-        public void resetLastInfoMessage() {
-            lastInfoMessage = null;
-        }
-        
-        public String getLastInfoMessage() {
-            return lastInfoMessage;
-        }
-        
         public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)  throws PluginScenarioException, PluginExecutionException {
             super(installDirectory, from, to, pluginListedEsas);
         }
@@ -80,7 +68,7 @@ public class InstallFeatureUtilTest {
 
         @Override
         public void info(String msg) {
-            lastInfoMessage = msg;
+            // not needed for tests
         }
 
         @Override
@@ -166,24 +154,6 @@ public class InstallFeatureUtilTest {
         b.add("5");
         Set<String> result = InstallFeatureUtil.combineToSet(a, b, c);
         assertEquals(5, result.size());
-    }
-    
-    @Test
-    public void testProductInfoValidate() throws Exception {
-        InstallFeatureTestUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
-        assertNotNull(util);
-        
-        File productInfo = new File(installDir, "bin/productInfo");
-        assertTrue(productInfo.setExecutable(true));
-        
-        File productInfoBat = new File(installDir, "bin/productInfo.bat");
-        assertTrue(productInfoBat.setExecutable(true));
-
-        util.resetLastInfoMessage();
-        assertNull(util.getLastInfoMessage());
-        
-        util.productInfoValidate();
-        assertNotNull(util.getLastInfoMessage());
     }
 
 }

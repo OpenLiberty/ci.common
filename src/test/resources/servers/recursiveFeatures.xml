@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="new server">
+	<featureManager>
+        <feature>recursive</feature>
+    </featureManager>
+    <include location="recursiveFeatures.xml" onConflict="MERGE"/>
+</server>
