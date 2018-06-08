@@ -243,7 +243,7 @@ public abstract class InstallFeatureUtil {
      */
     private static Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
         Set<String> result = origResult;
-        List<File> updatedParsedXmls = new ArrayList<File>();
+        List<File> updatedParsedXmls = parsedXmls != null ? parsedXmls : new ArrayList<File>();
         File canonicalServerFile;
         try {
             canonicalServerFile = serverFile.getCanonicalFile();
@@ -252,9 +252,6 @@ public abstract class InstallFeatureUtil {
             return result;
         }
         updatedParsedXmls.add(canonicalServerFile);
-        if (parsedXmls != null) {
-            updatedParsedXmls.addAll(parsedXmls);
-        }
         if (canonicalServerFile.exists()) {
             try {
                 Document doc = new XmlDocument() {
@@ -319,27 +316,26 @@ public abstract class InstallFeatureUtil {
         }
         if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
-            if ("".equals(onConflict) || "merge".equalsIgnoreCase(onConflict)) {
-                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+            Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+            if ("replace".equalsIgnoreCase(onConflict)) {
+                if (features != null && !features.isEmpty()) {
+                    // only replace if the child has features
+                    result = features;
+                }
+            } else if ("ignore".equalsIgnoreCase(onConflict)) {
+                if (result == null) {
+                    // parent has no results (i.e. no featureManager section), so use the child's results
+                    result = features;
+                } // else the parent already has some results (even if it's empty), so ignore the child
+            } else {
+                // anything else counts as "merge", even if the onConflict value is invalid
                 if (features != null) {
                     if (result == null) {
                         result = features;
                     } else {
                         result.addAll(features);
                     }
-                }                
-            } else if ("replace".equalsIgnoreCase(onConflict)) {
-                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
-                if (features != null && !features.isEmpty()) {
-                    // only replace if the child has features
-                    result = features;
-                }
-            } else if ("ignore".equalsIgnoreCase(onConflict)) {
-                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
-                if (result == null) {
-                    // parent has no results (i.e. no featureManager section), so use the child's results
-                    result = features;
-                } // else the parent already has some results (even if it's empty), so ignore the child
+                }  
             }
         }
         return result;

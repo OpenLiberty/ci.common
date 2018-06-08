@@ -25,8 +25,7 @@ public class OSUtil {
      */
     public static boolean isWindows() {
         String osName = System.getProperty("os.name", "unknown").toLowerCase();
-        boolean isWindows = osName.indexOf("windows") >= 0;
-        return isWindows;
+        return osName.indexOf("windows") >= 0;
     }
 
 }
