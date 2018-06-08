@@ -174,7 +174,7 @@ public abstract class InstallFeatureUtil {
      * @param serverDirectory The server directory containing the server.xml
      * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      */
-    public static Set<String> getServerFeatures(File serverDirectory) {
+    public Set<String> getServerFeatures(File serverDirectory) {
         Set<String> defaults = getConfigDropinsFeatures(serverDirectory, "defaults");
         Set<String> defaultsAndServerXmlFeatures = getServerXmlFeatures(defaults, new File(serverDirectory, "server.xml"), null);
         // add the overrides at the end since they should not be replaced by any other content
@@ -195,12 +195,14 @@ public abstract class InstallFeatureUtil {
      *         null if there are no xml files or they have no featureManager
      *         section
      */
-    private static Set<String> getConfigDropinsFeatures(File serverDirectory, String folderName) {
+    private Set<String> getConfigDropinsFeatures(File serverDirectory, String folderName) {
         File configDropinsFolder;
         try {
             configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName).getCanonicalFile();
         } catch (IOException e) {
             // skip this directory if its path cannot be queried
+            warn("The " + serverDirectory + "/configDropins/" + folderName + " directory cannot be accessed. Skipping its server features.");
+            debug(e);
             return null;
         }
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
@@ -241,7 +243,7 @@ public abstract class InstallFeatureUtil {
      *         features, or null if the file (and all of its children) has no
      *         featureManager section
      */
-    private static Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
+    private Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
         Set<String> result = origResult;
         List<File> updatedParsedXmls = parsedXmls != null ? parsedXmls : new ArrayList<File>();
         File canonicalServerFile;
@@ -249,6 +251,8 @@ public abstract class InstallFeatureUtil {
             canonicalServerFile = serverFile.getCanonicalFile();
         } catch (IOException e) {
             // skip this server.xml if its path cannot be queried
+            warn("The server file " + serverFile + " cannot be accessed. Skipping its features.");
+            debug(e);
             return result;
         }
         updatedParsedXmls.add(canonicalServerFile);
@@ -278,6 +282,8 @@ public abstract class InstallFeatureUtil {
                 }
             } catch (IOException | ParserConfigurationException | SAXException e) {
                 // just skip this server.xml if it cannot be parsed
+                warn("The server file " + serverFile + " cannot be parsed. Skipping its features.");
+                debug(e);
                 return result;
             }
         }
@@ -298,7 +304,7 @@ public abstract class InstallFeatureUtil {
      * @return updated list of features that should be installed, or null if no
      *         featureManager section had been found so far.
      */
-    private static Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Element node,
+    private Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
         String includeFileName = node.getAttribute("location");
@@ -312,6 +318,8 @@ public abstract class InstallFeatureUtil {
             }
         } catch (IOException e) {
             // skip this xml if its path cannot be queried
+            warn("The server file " + serverFile + " includes a file " + includeFileName + " that cannot be accessed. Skipping the included features.");
+            debug(e);
             return result;
         }
         if (!updatedParsedXmls.contains(includeFile)) {

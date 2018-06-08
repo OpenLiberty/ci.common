@@ -20,78 +20,18 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.io.FileUtils;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
-public class InstallFeatureUtilTest {
-
-    private static final String RESOURCES_INSTALL_DIR = "src/test/resources/installdir";
-    
-    private File installDir;
-    
-    @Rule
-    public TemporaryFolder temp = new TemporaryFolder();
-
-    private class InstallFeatureTestUtil extends InstallFeatureUtil {
-        public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)  throws PluginScenarioException, PluginExecutionException {
-            super(installDirectory, from, to, pluginListedEsas);
-        }
-
-        @Override
-        public void debug(String msg) {
-            // not needed for tests
-        }
-
-        @Override
-        public void debug(String msg, Throwable e) {
-            // not needed for tests
-        }
-
-        @Override
-        public void debug(Throwable e) {
-            // not needed for tests
-        }
-
-        @Override
-        public void warn(String msg) {
-            // not needed for tests
-        }
-
-        @Override
-        public void info(String msg) {
-            // not needed for tests
-        }
-
-        @Override
-        public boolean isDebugEnabled() {
-            return false;
-        }
-        
-        @Override
-        public File downloadArtifact(String groupId, String artifactId, String type, String version) throws PluginExecutionException {
-            return new File("dummy");
-        }
-    }
-    
-    @Before
-    public void setupInstallDir() throws IOException {
-        installDir = temp.newFolder();
-        File src = new File(RESOURCES_INSTALL_DIR);
-        FileUtils.copyDirectory(src, installDir);
-    }
+public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     
     @Test
     public void testConstructor() throws Exception {
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        InstallFeatureUtil util = getNewInstallFeatureUtil();
         assertNotNull(util);
     }
     
@@ -135,7 +75,7 @@ public class InstallFeatureUtilTest {
      */
     @Test(expected = PluginExecutionException.class)
     public void testInstallFeatures() throws Exception {
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        InstallFeatureUtil util = getNewInstallFeatureUtil();
         List<String> featuresToInstall = new ArrayList<String>();
         featuresToInstall.add("a-1.0");
         util.installFeatures(true, featuresToInstall);
