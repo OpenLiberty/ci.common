@@ -27,7 +27,10 @@ import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -175,27 +178,29 @@ public abstract class InstallFeatureUtil {
      * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      */
     public Set<String> getServerFeatures(File serverDirectory) {
-        Set<String> defaults = getConfigDropinsFeatures(serverDirectory, "defaults");
-        Set<String> defaultsAndServerXmlFeatures = getServerXmlFeatures(defaults, new File(serverDirectory, "server.xml"), null);
-        // add the overrides at the end since they should not be replaced by any other content
-        Set<String> overrides = getConfigDropinsFeatures(serverDirectory, "overrides");
-        return combineToSet(defaultsAndServerXmlFeatures, overrides);
+        Set<String> result = getConfigDropinsFeatures(null, serverDirectory, "defaults");
+        result = getServerXmlFeatures(result, new File(serverDirectory, "server.xml"), null);
+        // add the overrides at the end since they should not be replaced by any previous content
+        return getConfigDropinsFeatures(result, serverDirectory, "overrides");
     }
     
     /**
      * Gets features from the configDropins's defaults or overrides directory
      * 
+     * @param origResult
+     *            The features that have been parsed so far.
      * @param serverDirectory
      *            The server directory
      * @param folderName
      *            The folder under configDropins: either "defaults" or
      *            "overrides"
-     * @return The set of features to install, or empty set if the folder has xml
-     *         files with featureManager sections but no features to install, or
-     *         null if there are no xml files or they have no featureManager
-     *         section
+     * @return The set of features to install, or empty set if the cumulatively
+     *         parsed xml files only have featureManager sections but no
+     *         features to install, or null if there are no valid xml files or
+     *         they have no featureManager section
      */
-    private Set<String> getConfigDropinsFeatures(File serverDirectory, String folderName) {
+    private Set<String> getConfigDropinsFeatures(Set<String> origResult, File serverDirectory, String folderName) {
+        Set<String> result = origResult;
         File configDropinsFolder;
         try {
             configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName).getCanonicalFile();
@@ -203,7 +208,7 @@ public abstract class InstallFeatureUtil {
             // skip this directory if its path cannot be queried
             warn("The " + serverDirectory + "/configDropins/" + folderName + " directory cannot be accessed. Skipping its server features.");
             debug(e);
-            return null;
+            return result;
         }
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
             @Override
@@ -212,16 +217,21 @@ public abstract class InstallFeatureUtil {
             }
         });
         if (configDropinsXmls == null || configDropinsXmls.length == 0) {
-            return null;
+            return result;
         }
-        Set<String> result = null;
+        // sort the files in alphabetical order so that overrides will happen in the proper order
+        Comparator<File> comparator = new Comparator<File>() {
+            @Override
+            public int compare(File left, File right) {
+                return left.getAbsolutePath().compareTo(right.getAbsolutePath());
+            }
+        };
+        Collections.sort(Arrays.asList(configDropinsXmls), comparator);
+
         for (File xml : configDropinsXmls) {
-            Set<String> features = getServerXmlFeatures(null, xml, null);
+            Set<String> features = getServerXmlFeatures(result, xml, null);
             if (features != null) {
-                if (result == null) {
-                    result = new HashSet<String>();
-                }
-                result.addAll(features);
+                result = features;
             }
         }
         return result;
@@ -237,11 +247,10 @@ public abstract class InstallFeatureUtil {
      *            The server XML file.
      * @param parsedXmls
      *            The list of XML files that have been parsed so far.
-     * @return list of features that should be installed according to the
-     *         origResult and the current serverFile, or empty set if the file
-     *         (or its children) only has a featureManager section with no
-     *         features, or null if the file (and all of its children) has no
-     *         featureManager section
+     * @return The set of features to install, or empty set if the cumulatively
+     *         parsed xml files only have featureManager sections but no
+     *         features to install, or null if there are no valid xml files or
+     *         they have no featureManager section
      */
     private Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
         Set<String> result = origResult;
@@ -301,8 +310,10 @@ public abstract class InstallFeatureUtil {
      *            The include node.
      * @param updatedParsedXmls
      *            The list of XML files that have been parsed so far.
-     * @return updated list of features that should be installed, or null if no
-     *         featureManager section had been found so far.
+     * @return The set of features to install, or empty set if the cumulatively
+     *         parsed xml files only have featureManager sections but no
+     *         features to install, or null if there are no valid xml files or
+     *         they have no featureManager section
      */
     private Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Element node,
             List<File> updatedParsedXmls) {

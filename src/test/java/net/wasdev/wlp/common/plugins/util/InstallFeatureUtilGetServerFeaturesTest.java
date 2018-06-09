@@ -403,4 +403,41 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         
         verifyServerFeatures(expected);
     }
+    
+    /**
+     * Tests server.xml with an overrides that has a combination of all types of includes, including replace
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testOverridesWithReplace() throws Exception {
+        // server.xml with some content
+        copyAsName("server_nested_replace.xml", "server.xml");
+        copy("nestedReplace2.xml");
+        copy("nestedReplace3.xml");
+
+        // defaults
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
+
+        // includes for the overrides directory
+        copyAsName("extraFeatures.xml", "configDropins/overrides/extraFeatures.xml"); // merge
+        copyAsName("extraFeatures2.xml", "configDropins/overrides/extraFeatures2.xml"); // ignore
+        copyAsName("extraFeatures3.xml", "configDropins/overrides/extraFeatures3.xml"); // replace
+        copyAsName("extraFeatures4.xml", "configDropins/overrides/extraFeatures4.xml"); // merge
+
+        // overrides file that specifies includes (alphabetically after the other files in the same directory)
+        copyAsName("extraFeaturesOverride.xml", "configDropins/overrides/extraFeaturesOverride.xml");
+
+        // another overrides file that comes afterwards
+        copyAsName("extraFeaturesOverride2.xml", "configDropins/overrides/extraFeaturesOverride2.xml");
+
+        // Only keep 3rd include (since it is replace), 4th include (since it comes after), 
+        // and the additional overrides after it
+        Set<String> expected = new HashSet<String>();
+        expected.add("extra3");
+        expected.add("extra4");
+        expected.add("override2");
+
+        verifyServerFeatures(expected);
+    }
 }
