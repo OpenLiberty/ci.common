@@ -223,7 +223,7 @@ public abstract class InstallFeatureUtil {
         Comparator<File> comparator = new Comparator<File>() {
             @Override
             public int compare(File left, File right) {
-                return left.getAbsolutePath().compareTo(right.getAbsolutePath());
+                return left.getAbsolutePath().toLowerCase().compareTo(right.getAbsolutePath().toLowerCase());
             }
         };
         Collections.sort(Arrays.asList(configDropinsXmls), comparator);
