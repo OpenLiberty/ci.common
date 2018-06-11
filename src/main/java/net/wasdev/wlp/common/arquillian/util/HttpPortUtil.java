@@ -55,7 +55,9 @@ public class HttpPortUtil {
 		if (serverXML != null && serverXML.exists() && serverXML.isFile()) {
 			byte[] encoded = Files.readAllBytes(Paths.get(serverXML.getCanonicalPath()));
 			Properties prop = new Properties();
-			prop.load(new FileInputStream(bootstrapProperties));
+			if(bootstrapProperties != null && bootstrapProperties.exists()) {
+		         prop.load(new FileInputStream(bootstrapProperties));
+			}
 			return getHttpPort(new String(encoded, StandardCharsets.UTF_8), prop);
 		}
 		throw new FileNotFoundException(
