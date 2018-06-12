@@ -440,4 +440,21 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
 
         verifyServerFeatures(expected);
     }
+    
+    /**
+     * Tests server.xml with spaces and case sensitivity
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testSpaceAndCaseSensitivity() throws Exception{
+        copyAsName("server_space_case_sensitivity.xml", "server.xml");
+        copy("extraFeaturesSpaceCaseSensitivity.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extralowercase");
+        
+        verifyServerFeatures(expected);
+    }
 }

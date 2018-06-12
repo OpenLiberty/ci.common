@@ -360,12 +360,23 @@ public abstract class InstallFeatureUtil {
         return result;
     }
 
-    private static List<String> parseFeatureManagerNode(Element node) {
-        List<String> result = new ArrayList<String>();
+    /**
+     * Parse feature elements from a featureManager node, trimming whitespace
+     * and treating everything as lowercase.
+     * 
+     * @param node
+     *            The featureManager node
+     * @return Set of trimmed lowercase feature names
+     */
+    private static Set<String> parseFeatureManagerNode(Element node) {
+        Set<String> result = new HashSet<String>();
         NodeList features = node.getElementsByTagName("feature");
         if (features != null) {
             for (int j = 0; j < features.getLength(); j++) {
-                result.add(features.item(j).getTextContent());
+                String content = features.item(j).getTextContent();
+                if (content != null) {
+                    result.add(content.trim().toLowerCase());                    
+                }
             }
         }
         return result;
