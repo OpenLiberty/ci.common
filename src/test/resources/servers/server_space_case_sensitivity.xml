@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="new server">
+    <featureManager>
+        <feature>      oRiG   
+             
+         </feature>
+        <feature>      EXTRALOWERcase         </feature>
+    </featureManager>
+    <include location="extraFeaturesSpaceCaseSensitivity.xml" onConflict="MERGE"/>
+</server>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="new server">
+    <include location="extraFeatures.xml" onConflict="MERGE"/>
+    <include location="extraFeatures2.xml" onConflict="IGNORE"/>
+    <include location="extraFeatures3.xml" onConflict="REPLACE"/>
+    <include location="extraFeatures4.xml" onConflict="MERGE"/>
+    <featureManager>
+        <feature>orig</feature>
+    </featureManager>
+</server>
