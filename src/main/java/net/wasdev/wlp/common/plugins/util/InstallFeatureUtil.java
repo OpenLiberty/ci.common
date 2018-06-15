@@ -154,23 +154,6 @@ public abstract class InstallFeatureUtil {
         }
         return result;
     }
-    
-    /**
-     * Get the set of features defined in the server.xml if there were no features listed in the plugin configuration
-     * @param serverDirectory The server directory containing the server.xml
-     * @param noPluginListedFeatures true if there were no features listed in the plugin configuration
-     * @return the set of features that should be installed from server.xml
-     */
-    public Set<String> getServerFeatures(File serverDirectory, boolean noPluginListedFeatures) {
-        // parse server.xml features only if there are no configured features in the pom
-        if (noPluginListedFeatures) {
-            debug("No features were listed for the plugin. Using server.xml.");
-            return getServerFeatures(serverDirectory);
-        } else {
-            debug("Features were listed for the plugin. Skipping server.xml.");
-            return new HashSet<String>();
-        }
-    }
 
     /**
      * Get the set of features defined in the server.xml
@@ -582,8 +565,10 @@ public abstract class InstallFeatureUtil {
             for (File esaFile: artifacts ){
                 mapBasedInstallKernel.put("license.accept", isAcceptLicense);
                 mapBasedInstallKernel.put("action.install", esaFile);
-                mapBasedInstallKernel.put("to.extension", to);
-                debug("Installing to extension: " + to);
+                if (to != null) {
+                    mapBasedInstallKernel.put("to.extension", to);
+                    debug("Installing to extension: " + to);
+                }
                 Integer ac = (Integer) mapBasedInstallKernel.get("action.result");
                 debug("action.result: "+ac);
                 debug("action.error.message: "+mapBasedInstallKernel.get("action.error.message"));
