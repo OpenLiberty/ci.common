@@ -707,7 +707,10 @@ public abstract class InstallFeatureUtil {
      */
     private void productInfoValidate() throws PluginExecutionException {
         String output = productInfo(installDirectory, "validate");
-        if (output != null && output.contains("[ERROR]")) {
+        if (output == null) {
+            throw new PluginExecutionException(
+                    "Could not perform product validation. The productInfo command returned with no output");
+        } else if (output.contains("[ERROR]")) {
             throw new PluginExecutionException(output);
         } else {
             info("Product validation completed successfully.");
