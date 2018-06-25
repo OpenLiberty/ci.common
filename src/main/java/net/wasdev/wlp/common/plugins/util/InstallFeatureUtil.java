@@ -705,7 +705,24 @@ public abstract class InstallFeatureUtil {
      * @throws PluginExecutionException
      *             if product validation failed or could not be run
      */
-    public void productInfoValidate() throws PluginExecutionException {
+    private void productInfoValidate() throws PluginExecutionException {
+        String output = productInfo(installDirectory, "validate");
+        if (output != null && output.contains("[ERROR]")) {
+            throw new PluginExecutionException(output);
+        } else {
+            info("Product validation completed successfully.");
+        }
+    }
+    
+    /**
+     * Runs the productInfo command and returns the output
+     * 
+     * @param installDirectory The directory of the installed runtime
+     * @param action The action to perform for the productInfo command
+     * @return The command output
+     * @throws PluginExecutionException if the exit value of the command was not 0
+     */
+    public static String productInfo(File installDirectory, String action) throws PluginExecutionException {
         Process pr = null;
         InputStream is = null;
         Scanner s = null;
@@ -713,37 +730,36 @@ public abstract class InstallFeatureUtil {
         try {
             String command;
             if (OSUtil.isWindows()) {
-                command = installDirectory + "\\bin\\productInfo.bat validate";
+                command = installDirectory + "\\bin\\productInfo.bat " + action;
             } else {
-                command = installDirectory + "/bin/productInfo validate";
+                command = installDirectory + "/bin/productInfo " + action;
             }
             pr = Runtime.getRuntime().exec(command);
             worker = new Worker(pr);
             worker.start();
             worker.join(300000);
             if (worker.exit == null) {
-                throw new PluginExecutionException("Product validation error: timeout");
+                throw new PluginExecutionException("productInfo command timed out");
             }
             int exitValue = pr.exitValue();
             if (exitValue != 0) {
-                is = pr.getInputStream();
-                s = new Scanner(is);
-                // use regex to match the beginning of the input
-                s.useDelimiter("\\A");
-                if (s.hasNext()) {
-                    throw new PluginExecutionException(s.next());
-                } else {
-                    throw new PluginExecutionException("Product validation exited with return code " + exitValue);
-                }
-            } else {
-                info("Product validation completed successfully.");
+                throw new PluginExecutionException("productInfo exited with return code " + exitValue);
             }
+            
+            is = pr.getInputStream();
+            s = new Scanner(is);
+            // use regex to match the beginning of the input
+            s.useDelimiter("\\A");
+            if (s.hasNext()) {
+                return s.next();
+            }
+            return null;
         } catch (IOException ex) {
-            throw new PluginExecutionException("Product validation error: " + ex);
+            throw new PluginExecutionException("productInfo error: " + ex);
         } catch (InterruptedException ex) {
             worker.interrupt();
             Thread.currentThread().interrupt();
-            throw new PluginExecutionException("Product validation error: " + ex);
+            throw new PluginExecutionException("productInfo error: " + ex);
         } finally {
             if (s != null) {
                 s.close();
