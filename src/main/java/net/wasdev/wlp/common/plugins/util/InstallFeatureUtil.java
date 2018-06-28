@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.jar.JarFile;
 import java.util.logging.Level;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -61,6 +62,10 @@ public abstract class InstallFeatureUtil {
     
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
+    private static final String REPOSITORY_RESOLVER_GROUP_ID = "io.openliberty.features";
+    private static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
+    private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
+    private String openLibertyVersion;
     
     /**
      * Initialize the utility and check for unsupported scenarios.
@@ -440,6 +445,9 @@ public abstract class InstallFeatureUtil {
                                         + propertiesFile.getAbsolutePath()
                                         + ". Ensure the file is valid properties file for the Liberty product or extension.");
                     }
+                    if (productId.equals(OPEN_LIBERTY_PRODUCT_ID)) {
+                        openLibertyVersion = productVersion;
+                    }
                     list.add(new ProductProperties(productId, productVersion));
                 } catch (IOException e) {
                     throw new PluginExecutionException("Cannot read the product properties file " + propertiesFile.getAbsolutePath(), e);
@@ -608,6 +616,13 @@ public abstract class InstallFeatureUtil {
         }
 
         // Init
+        String bundle = downloadOverrideBundle(REPOSITORY_RESOLVER_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID, "jar");
+        if (bundle != null) {
+            List<String> bundles = new ArrayList<String>();
+            bundles.add(bundle);
+            debug("Overriding jar using: " + bundle);
+            mapBasedInstallKernel.put("override.jar.bundles", bundles);
+        }
         mapBasedInstallKernel.put("runtime.install.dir", installDirectory);
         mapBasedInstallKernel.put("install.map.jar", installJarFileSubpath);
         debug("install.map.jar: " + installJarFileSubpath);
@@ -616,6 +631,90 @@ public abstract class InstallFeatureUtil {
         File usrDir = new File(installDirectory, "usr/tmp");
         mapBasedInstallKernel.put("target.user.directory", usrDir);
         return mapBasedInstallKernel;
+    }
+
+    /**
+     * Download the override bundle from the repository with the given groupId and
+     * artifactId, corresponding to the latest version in the range between the
+     * current Open Liberty version (inclusive) and the next version
+     * (exclusive). Returns a string in the format "filepath;BundleName" where
+     * BundleName is the bundle symbolic name from its manifest.
+     *
+     * @param groupId
+     *            the groupId of the bundle to download
+     * @param artifactId
+     *            the artifactId of the bundle to download
+     * @param type
+     *            the type of the bundle e.g. jar
+     * @return a String representing the bundle in filepath;BundleName format
+     */
+    private String downloadOverrideBundle(String groupId, String artifactId, String type) throws PluginExecutionException {
+        String result = null;
+        File overrideJar = null;
+        try {
+            overrideJar = downloadArtifact(groupId, artifactId, type,
+                    String.format("[%s)", openLibertyVersion + ", " + getNextProductVersion(openLibertyVersion)));
+        } catch (PluginExecutionException e) {
+            debug("Could not find override bundle " + groupId + ":" + artifactId
+                    + " for the current Open Liberty version " + openLibertyVersion, e);
+            return result;
+        }
+        String symbolicName = extractSymbolicName(overrideJar);
+        if (symbolicName != null) {
+            result = overrideJar.getAbsolutePath() + ";" + symbolicName;
+        }
+        return result;
+    }
+
+    /**
+     * Gets the next product version number.
+     * 
+     * @param version
+     *            the product version
+     * @return the String representation of the next product version
+     */
+    private String getNextProductVersion(String version) throws PluginExecutionException {
+        String result = null;
+        int versionSplittingIndex = version.lastIndexOf(".") + 1;
+        if (versionSplittingIndex == 0) {
+            throw new PluginExecutionException("Product version " + version
+                    + " is not in the expected format. It must have period separated version segments.");
+        }
+        String quarterVersion = version.substring(versionSplittingIndex);
+        int nextQuarterSpecifier;
+        try {
+            nextQuarterSpecifier = Integer.parseInt(quarterVersion) + 1;
+        } catch (NumberFormatException e) {
+            throw new PluginExecutionException("Product version " + version
+                    + " is not in the expected format. Its last segment is expected to be an integer.", e);
+        }
+        result = version.substring(0, versionSplittingIndex) + nextQuarterSpecifier;
+        return result;
+    }
+
+    /**
+     * Extracts the bundle symbolic name from the jar manifest.
+     * 
+     * @param jar
+     *            the jar from which the symbolic name will be extracted
+     * @return the Bundle-SymbolicName
+     */
+    private String extractSymbolicName(File jar) throws PluginExecutionException {
+        JarFile jarFile = null;
+        try {
+            jarFile = new JarFile(jar);
+            return jarFile.getManifest().getMainAttributes().getValue("Bundle-SymbolicName");
+        } catch (IOException e) {
+            throw new PluginExecutionException("Could not load the jar " + jar.getAbsolutePath(), e);
+        } finally {
+            if (jarFile != null) {
+                try {
+                    jarFile.close();
+                } catch (IOException e) {
+                    // nothing to do here
+                }
+            }
+        }
     }
     
     /**
@@ -646,6 +745,10 @@ public abstract class InstallFeatureUtil {
     
     /**
      * Returns whether file2 can replace file1 as the install map jar.
+     *
+     * @param file1
+     * @param file2
+     * @return true if file2 is a replacement jar for file1 false otherwise
      */
     private static boolean isReplacementJar(File file1, File file2) {
         if (file1 == null) {
@@ -659,6 +762,12 @@ public abstract class InstallFeatureUtil {
         }
     }
     
+    /**
+     * Returns the extracted version from fileName
+     *
+     * @param fileName
+     * @return the version extracted from fileName
+     */
     private static String extractVersion(String fileName) {
         int startIndex = INSTALL_MAP_PREFIX.length() + 1; // skip the underscore after the prefix
         int endIndex = fileName.lastIndexOf(INSTALL_MAP_SUFFIX);
@@ -673,7 +782,7 @@ public abstract class InstallFeatureUtil {
      * Performs pairwise comparison of version strings, including nulls and non-integer components.
      * @param version1
      * @param version2
-     * @return positive if version2 is greater, negative if version1 is greater, otherwise 0
+     * @return positive if version1 is greater, negative if version2 is greater, otherwise 0
      */
     private static int compare(String version1, String version2) {
         if (version1 == null && version2 == null) {
