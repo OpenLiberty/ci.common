@@ -52,6 +52,9 @@ import org.xml.sax.SAXException;
  */
 public abstract class InstallFeatureUtil {
     
+    public static final String REPOSITORY_RESOLVER_GROUP_ID = "io.openliberty.features";
+    public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
+    
     private final File installDirectory;
     
     private final File installJarFile;
@@ -62,8 +65,6 @@ public abstract class InstallFeatureUtil {
     
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
-    private static final String REPOSITORY_RESOLVER_GROUP_ID = "io.openliberty.features";
-    private static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
     private String openLibertyVersion;
     
@@ -648,7 +649,7 @@ public abstract class InstallFeatureUtil {
      *            the type of the bundle e.g. jar
      * @return a String representing the bundle in filepath;BundleName format
      */
-    private String downloadOverrideBundle(String groupId, String artifactId, String type) throws PluginExecutionException {
+    public String downloadOverrideBundle(String groupId, String artifactId, String type) throws PluginExecutionException {
         String result = null;
         File overrideJar = null;
         try {
@@ -673,7 +674,7 @@ public abstract class InstallFeatureUtil {
      *            the product version
      * @return the String representation of the next product version
      */
-    private String getNextProductVersion(String version) throws PluginExecutionException {
+    public static String getNextProductVersion(String version) throws PluginExecutionException {
         String result = null;
         int versionSplittingIndex = version.lastIndexOf(".") + 1;
         if (versionSplittingIndex == 0) {
@@ -699,7 +700,7 @@ public abstract class InstallFeatureUtil {
      *            the jar from which the symbolic name will be extracted
      * @return the Bundle-SymbolicName
      */
-    private String extractSymbolicName(File jar) throws PluginExecutionException {
+    public static String extractSymbolicName(File jar) throws PluginExecutionException {
         JarFile jarFile = null;
         try {
             jarFile = new JarFile(jar);

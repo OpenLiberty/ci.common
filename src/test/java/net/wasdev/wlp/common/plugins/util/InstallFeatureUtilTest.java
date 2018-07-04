@@ -29,6 +29,9 @@ import org.junit.Test;
 
 public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     
+    private static final String RESOLVER_JAR_PATH = "resolver/io/openliberty/features/repository-resolver/18.0.0.2/repository-resolver-18.0.0.2.jar";
+    private static final String RESOLVER_SYMBOLIC_NAME = "com.ibm.ws.repository.resolver";
+
     @Test
     public void testConstructor() throws Exception {
         InstallFeatureUtil util = getNewInstallFeatureUtil();
@@ -94,6 +97,69 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         b.add("5");
         Set<String> result = InstallFeatureUtil.combineToSet(a, b, c);
         assertEquals(5, result.size());
+    }
+
+    @Test
+    public void testExtractSymbolicName() throws Exception {
+        String symbolicName = InstallFeatureUtil.extractSymbolicName(new File(RESOURCES_DIR, RESOLVER_JAR_PATH));
+        assertEquals("Symbolic name does not match", RESOLVER_SYMBOLIC_NAME, symbolicName);
+    }
+
+    @Test
+    public void testGetNextProductVersion() throws Exception {
+        assertEquals("18.0.0.3", InstallFeatureUtil.getNextProductVersion("18.0.0.2"));
+        assertEquals("18.0.0.10", InstallFeatureUtil.getNextProductVersion("18.0.0.9"));
+        assertEquals("18.0.0.11", InstallFeatureUtil.getNextProductVersion("18.0.0.10"));
+        assertEquals("1.1", InstallFeatureUtil.getNextProductVersion("1.0"));
+        assertEquals("1.1.2", InstallFeatureUtil.getNextProductVersion("1.1.1"));
+    }
+
+    @Test(expected = PluginExecutionException.class)
+    public void testGetNextProductVersionNoPeriods() throws Exception {
+        InstallFeatureUtil.getNextProductVersion("18002");
+    }
+
+    @Test(expected = PluginExecutionException.class)
+    public void testGetNextProductVersionNonNumeric() throws Exception {
+        InstallFeatureUtil.getNextProductVersion("18.0.0.a");
+    }
+
+    @Test(expected = PluginExecutionException.class)
+    public void testGetNextProductVersionNonNumeric2() throws Exception {
+        InstallFeatureUtil.getNextProductVersion("18.0.0.2-a");
+    }
+
+    @Test
+    public void testDownloadOverrideBundle() throws Exception {
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>()) {
+            @Override
+            public File downloadArtifact(String groupId, String artifactId, String type, String version)
+                    throws PluginExecutionException {
+                if (artifactId.equals(InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_ID)) {
+                    assertEquals("[18.0.0.2, 18.0.0.3)", version);
+                    String downloadVersion = "18.0.0.2";
+
+                    String[] groupComponents = groupId.split("\\.");
+                    StringBuilder sb = new StringBuilder("resolver");
+                    for (String groupComponent : groupComponents) {
+                        sb.append("/" + groupComponent);
+                    }
+                    sb.append("/" + artifactId + "/" + downloadVersion + "/" + artifactId + "-" + downloadVersion
+                            + "." + type);
+                    return new File(RESOURCES_DIR, sb.toString());
+                } else {
+                    return super.downloadArtifact(groupId, artifactId, type, version);
+                }
+            }
+        };
+        String result = util.downloadOverrideBundle(InstallFeatureUtil.REPOSITORY_RESOLVER_GROUP_ID,
+                InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_ID, "jar");
+        String expectedEndsWith = RESOLVER_JAR_PATH + ";" + RESOLVER_SYMBOLIC_NAME;
+        String expectedEndsWithWindows = expectedEndsWith.replaceAll("/", "\\\\");
+        assertTrue(
+                "downloadOverrideBundle should return a string that ends with " + expectedEndsWith + " or "
+                        + expectedEndsWithWindows + ", but actual result was " + result,
+                result.endsWith(expectedEndsWith) || result.endsWith(expectedEndsWithWindows));
     }
 
 }
