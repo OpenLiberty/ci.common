@@ -27,7 +27,9 @@ import org.junit.rules.TemporaryFolder;
 
 public class BaseInstallFeatureUtilTest {
 
-    private static final String RESOURCES_INSTALL_DIR = "src/test/resources/installdir";
+    public static final String RESOURCES_DIR = "src/test/resources";
+    
+    private static final String RESOURCES_INSTALL_DIR = RESOURCES_DIR + "/installdir";
     
     public File installDir;
     
