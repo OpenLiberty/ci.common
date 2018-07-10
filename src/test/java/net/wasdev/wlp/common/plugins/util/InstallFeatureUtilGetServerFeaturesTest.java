@@ -464,15 +464,29 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
     
     /**
-     * Tests server.xml with include urls
+     * Tests server.xml with include url
      * 
      * @throws Exception
      */
     @Test
     public void testIncludeUrl() throws Exception {
+        testIncludeUrl("extraFeatures.xml", "orig", "extra");
+    }
+    
+    /**
+     * Tests server.xml with invalid include url
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testIncludeInvalidUrl() throws Exception {
+        testIncludeUrl("NON_EXISTENT_FILE.xml", "orig");
+    }
+
+    private void testIncludeUrl(String includeFileName, String... expectedFeatures) throws Exception {
         copyAsName("server_url.xml", "server.xml");
 
-        File includeFile = new File(src, "extraFeatures.xml");
+        File includeFile = new File(src, includeFileName);
         String includeReplacement = "<include location=\"" + includeFile.toURI().toURL() + "\" onConflict=\"MERGE\"/>\n";
         
         Path serverXmlPath = Paths.get(new File(serverDirectory, "server.xml").toURI());
@@ -482,8 +496,9 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         Files.write(serverXmlPath, content.getBytes(charset));
 
         Set<String> expected = new HashSet<String>();
-        expected.add("orig");
-        expected.add("extra");
+        for (String expectedFeature : expectedFeatures) {
+            expected.add(expectedFeature);
+        }
 
         verifyServerFeatures(expected);
     }
