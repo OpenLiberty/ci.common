@@ -632,7 +632,7 @@ public abstract class InstallFeatureUtil {
             @SuppressWarnings({ "unchecked", "resource" })
             @Override
             public Map<String, Object> run() throws Exception {
-                ClassLoader loader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, null);
+                ClassLoader loader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, getClass().getClassLoader());
                 Class<Map<String, Object>> clazz;
                 clazz = (Class<Map<String, Object>>) loader.loadClass("com.ibm.ws.install.map.InstallMap");
                 return clazz.newInstance();
