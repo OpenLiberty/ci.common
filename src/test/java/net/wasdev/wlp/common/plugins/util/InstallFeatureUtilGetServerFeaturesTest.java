@@ -18,6 +18,11 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -457,4 +462,49 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         
         verifyServerFeatures(expected);
     }
+    
+    /**
+     * Tests server.xml with include url
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testIncludeUrl() throws Exception {
+        replaceIncludeUrl("extraFeatures.xml");
+        
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+
+        verifyServerFeatures(expected);
+    }
+    
+    /**
+     * Tests server.xml with invalid include url
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testIncludeInvalidUrl() throws Exception {
+        replaceIncludeUrl("NON_EXISTENT_FILE.xml");
+        
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+
+        verifyServerFeatures(expected);
+    }
+
+    private void replaceIncludeUrl(String includeFileName) throws Exception {
+        copyAsName("server_url.xml", "server.xml");
+
+        File includeFile = new File(src, includeFileName);
+        String includeReplacement = "<include location=\"" + includeFile.toURI().toURL() + "\" onConflict=\"MERGE\"/>\n";
+        
+        Path serverXmlPath = Paths.get(new File(serverDirectory, "server.xml").toURI());
+        Charset charset = StandardCharsets.UTF_8;
+        String content = new String(Files.readAllBytes(serverXmlPath), StandardCharsets.UTF_8);
+        content = content.replaceAll("@includeReplacementToken@", includeReplacement);
+        Files.write(serverXmlPath, content.getBytes(charset));
+    }
+    
 }

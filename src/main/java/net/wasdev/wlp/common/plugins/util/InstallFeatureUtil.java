@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.AccessController;
@@ -42,6 +43,7 @@ import java.util.logging.Level;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.commons.io.FileUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -66,6 +68,7 @@ public abstract class InstallFeatureUtil {
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
+    private static final int COPY_FILE_TIMEOUT_MILLIS = 5 * 60 * 1000;
     private String openLibertyVersion;
     
     /**
@@ -308,7 +311,24 @@ public abstract class InstallFeatureUtil {
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
         String includeFileName = node.getAttribute("location");
-        File includeFile = new File(includeFileName);
+        if (includeFileName == null || includeFileName.trim().isEmpty()) {
+            return result;
+        }
+        File includeFile = null;
+        if (isURL(includeFileName)) {
+            try {
+                File tempFile = File.createTempFile("serverFromURL", ".xml");
+                FileUtils.copyURLToFile(new URL(includeFileName), tempFile, COPY_FILE_TIMEOUT_MILLIS, COPY_FILE_TIMEOUT_MILLIS);
+                includeFile = tempFile;
+            } catch (IOException e) {
+                // skip this xml if it cannot be accessed from URL
+                warn("The server file " + serverFile + " includes a URL " + includeFileName + " that cannot be accessed. Skipping the included features.");
+                debug(e);
+                return result;
+            }
+        } else {
+            includeFile = new File(includeFileName);
+        }
         try {
             if (!includeFile.isAbsolute()) {
                 includeFile = new File(serverFile.getParentFile().getAbsolutePath(), includeFileName)
@@ -325,26 +345,32 @@ public abstract class InstallFeatureUtil {
         if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
             Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
-            if ("replace".equalsIgnoreCase(onConflict)) {
-                if (features != null && !features.isEmpty()) {
-                    // only replace if the child has features
-                    result = features;
-                }
-            } else if ("ignore".equalsIgnoreCase(onConflict)) {
-                if (result == null) {
-                    // parent has no results (i.e. no featureManager section), so use the child's results
-                    result = features;
-                } // else the parent already has some results (even if it's empty), so ignore the child
-            } else {
-                // anything else counts as "merge", even if the onConflict value is invalid
-                if (features != null) {
-                    if (result == null) {
-                        result = features;
-                    } else {
-                        result.addAll(features);
-                    }
-                }  
+            result = handleOnConflict(result, onConflict, features);
+        }
+        return result;
+    }
+
+    private Set<String> handleOnConflict(Set<String> origResult, String onConflict, Set<String> features) {
+        Set<String> result = origResult;
+        if ("replace".equalsIgnoreCase(onConflict)) {
+            if (features != null && !features.isEmpty()) {
+                // only replace if the child has features
+                result = features;
             }
+        } else if ("ignore".equalsIgnoreCase(onConflict)) {
+            if (result == null) {
+                // parent has no results (i.e. no featureManager section), so use the child's results
+                result = features;
+            } // else the parent already has some results (even if it's empty), so ignore the child
+        } else {
+            // anything else counts as "merge", even if the onConflict value is invalid
+            if (features != null) {
+                if (result == null) {
+                    result = features;
+                } else {
+                    result.addAll(features);
+                }
+            }  
         }
         return result;
     }
@@ -903,6 +929,15 @@ public abstract class InstallFeatureUtil {
             } catch (InterruptedException ignore) {
                 return;
             }
+        }
+    }
+    
+    private static boolean isURL(String url) {
+        try {
+            new URL(url);
+            return true;
+        } catch (MalformedURLException ex) {
+            return false;
         }
     }
 
