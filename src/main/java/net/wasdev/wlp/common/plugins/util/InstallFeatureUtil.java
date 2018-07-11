@@ -345,26 +345,32 @@ public abstract class InstallFeatureUtil {
         if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
             Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
-            if ("replace".equalsIgnoreCase(onConflict)) {
-                if (features != null && !features.isEmpty()) {
-                    // only replace if the child has features
-                    result = features;
-                }
-            } else if ("ignore".equalsIgnoreCase(onConflict)) {
-                if (result == null) {
-                    // parent has no results (i.e. no featureManager section), so use the child's results
-                    result = features;
-                } // else the parent already has some results (even if it's empty), so ignore the child
-            } else {
-                // anything else counts as "merge", even if the onConflict value is invalid
-                if (features != null) {
-                    if (result == null) {
-                        result = features;
-                    } else {
-                        result.addAll(features);
-                    }
-                }  
+            result = handleOnConflict(result, onConflict, features);
+        }
+        return result;
+    }
+
+    private Set<String> handleOnConflict(Set<String> origResult, String onConflict, Set<String> features) {
+        Set<String> result = origResult;
+        if ("replace".equalsIgnoreCase(onConflict)) {
+            if (features != null && !features.isEmpty()) {
+                // only replace if the child has features
+                result = features;
             }
+        } else if ("ignore".equalsIgnoreCase(onConflict)) {
+            if (result == null) {
+                // parent has no results (i.e. no featureManager section), so use the child's results
+                result = features;
+            } // else the parent already has some results (even if it's empty), so ignore the child
+        } else {
+            // anything else counts as "merge", even if the onConflict value is invalid
+            if (features != null) {
+                if (result == null) {
+                    result = features;
+                } else {
+                    result.addAll(features);
+                }
+            }  
         }
         return result;
     }

@@ -470,7 +470,13 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
      */
     @Test
     public void testIncludeUrl() throws Exception {
-        testIncludeUrl("extraFeatures.xml", "orig", "extra");
+        replaceIncludeUrl("extraFeatures.xml");
+        
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+
+        verifyServerFeatures(expected);
     }
     
     /**
@@ -480,10 +486,15 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
      */
     @Test
     public void testIncludeInvalidUrl() throws Exception {
-        testIncludeUrl("NON_EXISTENT_FILE.xml", "orig");
+        replaceIncludeUrl("NON_EXISTENT_FILE.xml");
+        
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+
+        verifyServerFeatures(expected);
     }
 
-    private void testIncludeUrl(String includeFileName, String... expectedFeatures) throws Exception {
+    private void replaceIncludeUrl(String includeFileName) throws Exception {
         copyAsName("server_url.xml", "server.xml");
 
         File includeFile = new File(src, includeFileName);
@@ -494,13 +505,6 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         String content = new String(Files.readAllBytes(serverXmlPath), StandardCharsets.UTF_8);
         content = content.replaceAll("@includeReplacementToken@", includeReplacement);
         Files.write(serverXmlPath, content.getBytes(charset));
-
-        Set<String> expected = new HashSet<String>();
-        for (String expectedFeature : expectedFeatures) {
-            expected.add(expectedFeature);
-        }
-
-        verifyServerFeatures(expected);
     }
     
 }
