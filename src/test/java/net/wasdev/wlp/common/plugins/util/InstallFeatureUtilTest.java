@@ -152,8 +152,8 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
                 }
             }
         };
-        String result = util.downloadOverrideBundle(InstallFeatureUtil.REPOSITORY_RESOLVER_GROUP_ID,
-                InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_ID, "jar");
+        String result = util.getOverrideBundleDescriptor(InstallFeatureUtil.OPEN_LIBERTY_GROUP_ID,
+                InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_ID);
         String expectedEndsWith = RESOLVER_JAR_PATH + ";" + RESOLVER_SYMBOLIC_NAME;
         String expectedEndsWithWindows = expectedEndsWith.replaceAll("/", "\\\\");
         assertTrue(
