@@ -94,7 +94,7 @@ public abstract class InstallFeatureUtil {
         if (installJarFile == null) {
             throw new PluginScenarioException("Install map jar not found.");
         }
-        downloadedJsons = downloadProductJsons(installDirectory);
+        downloadedJsons = downloadProductJsons();
         if (downloadedJsons.isEmpty()) {
             throw new PluginScenarioException("Cannot find JSONs for to the installed runtime from the Maven repository.");
         }
@@ -405,11 +405,10 @@ public abstract class InstallFeatureUtil {
     
     /**
      * Get the JSON files corresponding to the product properties from the lib/versions/*.properties files
-     * @param installDirectory The install directory
      * @return the set of JSON files for the product
      * @throws PluginExecutionException if properties files could not be found from lib/versions
      */
-    private Set<File> downloadProductJsons(File installDirectory) throws PluginExecutionException {        
+    private Set<File> downloadProductJsons() throws PluginExecutionException {        
         // download JSONs
         Set<File> downloadedJsons = new HashSet<File>();
         for (ProductProperties properties : propertiesList) {
