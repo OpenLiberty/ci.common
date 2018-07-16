@@ -15,6 +15,7 @@
  */
 package net.wasdev.wlp.common.springboot.util;
 
+import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 
 /**
@@ -117,16 +118,17 @@ public class SpringBootManifest {
 	}
 
 	public SpringBootManifest(Manifest mf) {
-		String mainClass = mf.getMainAttributes().getValue(JAR_MAIN_CLASS);
+		Attributes attributes = mf.getMainAttributes();
+		String mainClass = attributes.getValue(JAR_MAIN_CLASS);
 		SpringLauncher launcher = SpringLauncher.fromMainClass(mainClass);
-		springStartClass = mf.getMainAttributes().getValue(SPRING_START_CLASS_HEADER);
-		springBootClasses = getSpringHeader(mf, SPRING_BOOT_CLASSES_HEADER, launcher);
-		springBootLib = getSpringHeader(mf, SPRING_BOOT_LIB_HEADER, launcher);
+		springStartClass = attributes.getValue(SPRING_START_CLASS_HEADER);
+		springBootClasses = getSpringHeader(attributes, SPRING_BOOT_CLASSES_HEADER, launcher);
+		springBootLib = getSpringHeader(attributes, SPRING_BOOT_LIB_HEADER, launcher);
 		springBootLibPrivided = getLibProvided(launcher, springBootLib);
 	}
 
-	private static String getSpringHeader(Manifest mf, String springBootHeaderKey, SpringLauncher launcher) {
-		String value = mf.getMainAttributes().getValue(springBootHeaderKey);
+	private static String getSpringHeader(Attributes attributes, String springBootHeaderKey, SpringLauncher launcher) {
+		String value = attributes.getValue(springBootHeaderKey);
 		if (value == null) {
 			value = launcher.getDefault(springBootHeaderKey);
 		}
