@@ -132,14 +132,7 @@ public class SpringBootManifest {
         if (value == null) {
             value = launcher.getDefault(springBootHeaderKey);
         }
-        return removeTrailingSlash(value);
-    }
-
-    private static String removeTrailingSlash(String path) {
-        if (path != null && path.length() > 1 && path.endsWith("/")) {
-            return path.substring(0, path.length() - 1);
-        }
-        return path;
+        return value;
     }
 
     private static String getLibProvided(SpringLauncher launcher, String springBootLib) {
