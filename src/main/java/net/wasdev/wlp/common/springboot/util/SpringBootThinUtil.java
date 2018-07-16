@@ -57,6 +57,8 @@ public class SpringBootThinUtil {
 	private final StarterFilter starterFilter;
 	public static final String SPRING_LIB_INDEX_FILE = "META-INF/spring.lib.index";
 	private static final String SPRING_BOOT_LOADER_CLASSPATH = "org/springframework/boot/loader/";
+	private static String THE_UNKNOWN_STARTER = "";
+	private static final Set<String> emptySet = new HashSet<String>(0);
 
 	public SpringBootThinUtil(File sourceFatJar, File targetThinJar, File libIndexCache) throws IOException {
 		this(sourceFatJar, targetThinJar, libIndexCache, null);
@@ -131,11 +133,11 @@ public class SpringBootThinUtil {
 		return false;
 	}
 
-	boolean isFromLibPath(String entryName) {
+	private boolean isFromLibPath(String entryName) {
 		return entryName.startsWith(springBootLibPath) && !entryName.endsWith("/");
 	}
 
-	boolean isFromLibProvidedPath(String entryName) {
+	private boolean isFromLibProvidedPath(String entryName) {
 		if (springBootLibProvidedPath != null) {
 			return entryName.startsWith(springBootLibProvidedPath) && !entryName.endsWith("/");
 		}
@@ -254,12 +256,10 @@ public class SpringBootThinUtil {
 		return new StarterFilter(springBootStarter, starterArtifactIds);
 	}
 
-	private static String THE_UNKNOWN_STARTER = "";
-	private static final Set<String> emptySet = new HashSet<String>(0);
 
 	public static class StarterFilter implements Function<String, Boolean> {
-		final String starterName;
-		final Set<String> starterArtifactIds;
+		private final String starterName;
+		private final Set<String> starterArtifactIds;
 
 		public StarterFilter(String starterName, Set<String> starterArtifactIds) {
 			this.starterName = starterName;
@@ -286,18 +286,6 @@ public class SpringBootThinUtil {
 	 *
 	 */
 	static class EmbeddedContainer {
-
-		public static Set<String> getSupportedStarters() {
-			return getStartersToDependentArtifactIdsMap().keySet();
-		}
-
-		public static Set<String> getStarterArtifactIds(String starter) {
-			Set<String> starterArtifactIds = getStartersToDependentArtifactIdsMap().getOrDefault(starter, null);
-			if (null == starterArtifactIds) {
-				return emptySet;
-			}
-			return starterArtifactIds;
-		}
 
 		// For now mvn dependencies for embedded container starters are provided here.
 		private final static List<String> mvnSpringBoot15TomcatStarterDeps = Arrays.asList(
@@ -408,13 +396,26 @@ public class SpringBootThinUtil {
 
 		public static final String SPRING_BOOT_STARTER = "spring-boot-starter";
 		public static final String SPRING_BOOT_STARTER_REACTOR = "spring-boot-starter-reactor";
+		
+		@SuppressWarnings("serial")
+		private static final Map<String, Set<String>> startersToDependentArtifactIdsMap;
+
+		
+		public static Set<String> getSupportedStarters() {
+			return getStartersToDependentArtifactIdsMap().keySet();
+		}
+
+		public static Set<String> getStarterArtifactIds(String starter) {
+			Set<String> starterArtifactIds = getStartersToDependentArtifactIdsMap().getOrDefault(starter, null);
+			if (null == starterArtifactIds) {
+				return emptySet;
+			}
+			return starterArtifactIds;
+		}
 
 		public static Map<String, Set<String>> getStartersToDependentArtifactIdsMap() {
 			return startersToDependentArtifactIdsMap;
 		}
-
-		@SuppressWarnings("serial")
-		private static final Map<String, Set<String>> startersToDependentArtifactIdsMap;
 
 		static {
 			Map<String, Set<String>> theMap = new HashMap<String, Set<String>>(6);

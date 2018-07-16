@@ -25,10 +25,20 @@ public class SpringBootManifest {
 	private static final String SPRING_START_CLASS_HEADER = "Start-Class";
 	private static final String SPRING_BOOT_CLASSES_HEADER = "Spring-Boot-Classes";
 	private static final String SPRING_BOOT_LIB_HEADER = "Spring-Boot-Lib";
+	private final String springStartClass;
+	private final String springBootClasses;
+	private final String springBootLib;
+	private final String springBootLibPrivided;
 
 	enum SpringLauncher {
 		JarLauncher("JarLauncher", "BOOT-INF/lib/", "BOOT-INF/classes/"), WarLauncher("WarLauncher", "WEB-INF/lib/",
 				"WEB-INF/classes/", "-provided");
+		
+		private final String name;
+		private final String libDefault;
+		private final String classesDefault;
+		private final String libProvidedSuffix;
+
 
 		private SpringLauncher(String name, String libDefault, String classesDefault) {
 			this(name, libDefault, classesDefault, null);
@@ -40,15 +50,10 @@ public class SpringBootManifest {
 			this.classesDefault = classesDefault;
 			this.libProvidedSuffix = libProvidedSuffix;
 		}
-
-		private final String name;
-		private final String libDefault;
-		private final String classesDefault;
-		private final String libProvidedSuffix;
-
-		static SpringLauncher fromMainClass(String mainClass) {
-			if (mainClass != null) {
-				mainClass = mainClass.trim();
+		
+		private static SpringLauncher fromMainClass(String className) {
+			if (className != null) {
+				String mainClass = className.trim();
 				for (SpringLauncher l : SpringLauncher.values()) {
 					if (mainClass.endsWith(l.name)) {
 						return l;
@@ -74,10 +79,6 @@ public class SpringBootManifest {
 		}
 	}
 
-	private final String springStartClass;
-	private final String springBootClasses;
-	private final String springBootLib;
-	private final String springBootLibPrivided;
 
 	/**
 	 * Returns the start class for the Spring Boot application.
