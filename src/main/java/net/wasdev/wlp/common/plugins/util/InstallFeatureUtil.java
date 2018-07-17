@@ -88,9 +88,7 @@ public abstract class InstallFeatureUtil {
         this.installDirectory = installDirectory;
         this.to = to;
         propertiesList = loadProperties(new File(installDirectory, "lib/versions"));
-        File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
-        installJarFile = (installJarOverride != null) ? installJarOverride
-                : getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
+        installJarFile = loadInstallJarFile(installDirectory);
         if (installJarFile == null) {
             throw new PluginScenarioException("Install map jar not found.");
         }
@@ -101,6 +99,14 @@ public abstract class InstallFeatureUtil {
         if (hasUnsupportedParameters(from, pluginListedEsas)) {
             throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
         }
+    }
+
+    private File loadInstallJarFile(File installDirectory) {
+        File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
+        if (installJarOverride != null && installJarOverride.exists()) {
+            return installJarOverride;
+        }
+        return getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
     }
     
     /**
@@ -682,7 +688,7 @@ public abstract class InstallFeatureUtil {
      */
     public String getOverrideBundleDescriptor(String groupId, String artifactId) throws PluginExecutionException {
         File overrideJar = downloadOverrideJar(groupId, artifactId);
-        if (overrideJar != null) {
+        if (overrideJar != null && overrideJar.exists()) {
             String symbolicName = extractSymbolicName(overrideJar);
             if (symbolicName != null) {
                 return overrideJar.getAbsolutePath() + ";" + symbolicName;
