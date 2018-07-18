@@ -54,12 +54,15 @@ import org.xml.sax.SAXException;
  */
 public abstract class InstallFeatureUtil {
     
-    public static final String REPOSITORY_RESOLVER_GROUP_ID = "io.openliberty.features";
+    public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
+    public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     
     private final File installDirectory;
     
     private final File installJarFile;
+    
+    private final List<ProductProperties> propertiesList;
     
     private final String to;
     
@@ -84,17 +87,26 @@ public abstract class InstallFeatureUtil {
     public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
         this.to = to;
-        installJarFile = getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
+        propertiesList = loadProperties(new File(installDirectory, "lib/versions"));
+        installJarFile = loadInstallJarFile(installDirectory);
         if (installJarFile == null) {
             throw new PluginScenarioException("Install map jar not found.");
         }
-        downloadedJsons = downloadProductJsons(installDirectory);
+        downloadedJsons = downloadProductJsons();
         if (downloadedJsons.isEmpty()) {
             throw new PluginScenarioException("Cannot find JSONs for to the installed runtime from the Maven repository.");
         }
         if (hasUnsupportedParameters(from, pluginListedEsas)) {
             throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
         }
+    }
+
+    private File loadInstallJarFile(File installDirectory) {
+        File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
+        if (installJarOverride != null && installJarOverride.exists()) {
+            return installJarOverride;
+        }
+        return getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
     }
     
     /**
@@ -399,20 +411,10 @@ public abstract class InstallFeatureUtil {
     
     /**
      * Get the JSON files corresponding to the product properties from the lib/versions/*.properties files
-     * @param installDirectory The install directory
      * @return the set of JSON files for the product
      * @throws PluginExecutionException if properties files could not be found from lib/versions
      */
-    private Set<File> downloadProductJsons(File installDirectory) throws PluginExecutionException {
-        // get productId and version for all properties
-        File versionsDir = new File(installDirectory, "lib/versions");
-        List<ProductProperties> propertiesList = loadProperties(versionsDir);
-
-        if (propertiesList.isEmpty()) {
-            throw new PluginExecutionException("Could not find any properties file in the " + versionsDir
-                    + " directory. Ensure the directory " + installDirectory + " contains a Liberty installation.");
-        }
-        
+    private Set<File> downloadProductJsons() throws PluginExecutionException {        
         // download JSONs
         Set<File> downloadedJsons = new HashSet<File>();
         for (ProductProperties properties : propertiesList) {
@@ -487,6 +489,11 @@ public abstract class InstallFeatureUtil {
                     }
                 }
             }
+        }
+        
+        if (list.isEmpty()) {
+            throw new PluginExecutionException("Could not find any properties file in the " + dir
+                    + " directory. Ensure the directory " + installDirectory + " contains a Liberty installation.");
         }
 
         return list;
@@ -627,12 +634,11 @@ public abstract class InstallFeatureUtil {
     }
     
     private Map<String, Object> createMapBasedInstallKernelInstance(File installDirectory) throws PrivilegedActionException, PluginExecutionException {
-        String installJarFileSubpath = installJarFile.getParentFile().getName() + File.separator + installJarFile.getName();
         Map<String, Object> mapBasedInstallKernel = AccessController.doPrivileged(new PrivilegedExceptionAction<Map<String, Object>>() {
             @SuppressWarnings({ "unchecked", "resource" })
             @Override
             public Map<String, Object> run() throws Exception {
-                ClassLoader loader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, null);
+                ClassLoader loader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, getClass().getClassLoader());
                 Class<Map<String, Object>> clazz;
                 clazz = (Class<Map<String, Object>>) loader.loadClass("com.ibm.ws.install.map.InstallMap");
                 return clazz.newInstance();
@@ -643,7 +649,7 @@ public abstract class InstallFeatureUtil {
         }
 
         // Init
-        String bundle = downloadOverrideBundle(REPOSITORY_RESOLVER_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID, "jar");
+        String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID);
         if (bundle != null) {
             List<String> bundles = new ArrayList<String>();
             bundles.add(bundle);
@@ -651,8 +657,15 @@ public abstract class InstallFeatureUtil {
             mapBasedInstallKernel.put("override.jar.bundles", bundles);
         }
         mapBasedInstallKernel.put("runtime.install.dir", installDirectory);
-        mapBasedInstallKernel.put("install.map.jar", installJarFileSubpath);
-        debug("install.map.jar: " + installJarFileSubpath);
+        try {
+            mapBasedInstallKernel.put("install.map.jar.file", installJarFile);
+            debug("install.map.jar.file: " + installJarFile);
+        } catch (RuntimeException e) {
+            debug("This version of the install map does not support the key \"install.map.jar.file\"", e);
+            String installJarFileSubpath = installJarFile.getParentFile().getName() + File.separator + installJarFile.getName();
+            mapBasedInstallKernel.put("install.map.jar", installJarFileSubpath);
+            debug("install.map.jar: " + installJarFileSubpath);
+        }
         debug("install.kernel.init.code: " + mapBasedInstallKernel.get("install.kernel.init.code"));
         debug("install.kernel.init.error.message: " + mapBasedInstallKernel.get("install.kernel.init.error.message"));
         File usrDir = new File(installDirectory, "usr/tmp");
@@ -671,26 +684,28 @@ public abstract class InstallFeatureUtil {
      *            the groupId of the bundle to download
      * @param artifactId
      *            the artifactId of the bundle to download
-     * @param type
-     *            the type of the bundle e.g. jar
      * @return a String representing the bundle in filepath;BundleName format
      */
-    public String downloadOverrideBundle(String groupId, String artifactId, String type) throws PluginExecutionException {
-        String result = null;
-        File overrideJar = null;
+    public String getOverrideBundleDescriptor(String groupId, String artifactId) throws PluginExecutionException {
+        File overrideJar = downloadOverrideJar(groupId, artifactId);
+        if (overrideJar != null && overrideJar.exists()) {
+            String symbolicName = extractSymbolicName(overrideJar);
+            if (symbolicName != null) {
+                return overrideJar.getAbsolutePath() + ";" + symbolicName;
+            }
+        }
+        return null;
+    }
+
+    private File downloadOverrideJar(String groupId, String artifactId) {
         try {
-            overrideJar = downloadArtifact(groupId, artifactId, type,
+            return downloadArtifact(groupId, artifactId, "jar",
                     String.format("[%s)", openLibertyVersion + ", " + getNextProductVersion(openLibertyVersion)));
         } catch (PluginExecutionException e) {
             debug("Could not find override bundle " + groupId + ":" + artifactId
                     + " for the current Open Liberty version " + openLibertyVersion, e);
-            return result;
+            return null;
         }
-        String symbolicName = extractSymbolicName(overrideJar);
-        if (symbolicName != null) {
-            result = overrideJar.getAbsolutePath() + ";" + symbolicName;
-        }
-        return result;
     }
 
     /**
