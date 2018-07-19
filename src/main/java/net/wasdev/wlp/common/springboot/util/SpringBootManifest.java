@@ -29,7 +29,7 @@ public class SpringBootManifest {
 	private final String springStartClass;
 	private final String springBootClasses;
 	private final String springBootLib;
-	private final String springBootLibPrivided;
+	private final String springBootLibProvided;
 
 	enum SpringLauncher {
 		JarLauncher("JarLauncher", "BOOT-INF/lib/", "BOOT-INF/classes/"), WarLauncher("WarLauncher", "WEB-INF/lib/",
@@ -114,7 +114,7 @@ public class SpringBootManifest {
 	 * @return the path to the lib provided folder
 	 */
 	public String getSpringBootLibProvided() {
-		return springBootLibPrivided;
+		return springBootLibProvided;
 	}
 
 	public SpringBootManifest(Manifest mf) {
@@ -124,7 +124,7 @@ public class SpringBootManifest {
 		springStartClass = attributes.getValue(SPRING_START_CLASS_HEADER);
 		springBootClasses = getSpringHeader(attributes, SPRING_BOOT_CLASSES_HEADER, launcher);
 		springBootLib = getSpringHeader(attributes, SPRING_BOOT_LIB_HEADER, launcher);
-		springBootLibPrivided = getLibProvided(launcher, springBootLib);
+		springBootLibProvided = getLibProvided(launcher, springBootLib);
 	}
 
 	private static String getSpringHeader(Attributes attributes, String springBootHeaderKey, SpringLauncher launcher) {

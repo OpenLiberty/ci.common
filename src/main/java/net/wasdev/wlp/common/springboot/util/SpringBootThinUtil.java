@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
@@ -84,11 +83,11 @@ public class SpringBootThinUtil {
 		this.starterFilter = getStarterFilter(this.sourceFatJar);
 	}
 
-	public void execute() throws IOException, NoSuchAlgorithmException {
-		thin();
-	}
 
-	private void thin() throws FileNotFoundException, IOException, NoSuchAlgorithmException {
+	public void execute() throws FileNotFoundException, IOException, NoSuchAlgorithmException {
+		if(!targetThinJar.exists()) {
+			targetThinJar.createNewFile();
+		}
 		try (JarOutputStream thinJar = new JarOutputStream(new FileOutputStream(targetThinJar),
 				sourceFatJar.getManifest())) {
 			Set<String> entryNames = new HashSet<>();
@@ -99,9 +98,8 @@ public class SpringBootThinUtil {
 					storeEntry(thinJar, entry);
 				}
 			}
-			addLibIndexFileToThinJar(thinJar);
-
-		}
+			addLibIndexFileToThinJar(thinJar);			
+		} 
 	}
 
 	private void storeEntry(JarOutputStream thinJar, JarEntry entry) throws IOException, NoSuchAlgorithmException {
@@ -238,18 +236,17 @@ public class SpringBootThinUtil {
 
 	private static StarterFilter getStarterFilter(Enumeration<JarEntry> entries) {
 		final AtomicReference<String> starterRef = new AtomicReference<String>();
+		outerloop:
 		while (entries.hasMoreElements()) {
+			String path = entries.nextElement().getName();
 			if (starterRef.get() == null) {
-				String path = entries.nextElement().getName();
 				for (String starterJarNamePrefix : EmbeddedContainer.getSupportedStarters()) {
 					if (path.contains(starterJarNamePrefix)) {
 						starterRef.set(starterJarNamePrefix);
-						break;
+						break outerloop;
 					}
-				}
-			} else {
-				break;
-			}
+				}		
+			} 	
 		}
 		String springBootStarter = (starterRef.get() != null) ? starterRef.get() : THE_UNKNOWN_STARTER;
 		Set<String> starterArtifactIds = EmbeddedContainer.getStarterArtifactIds(springBootStarter);
@@ -257,7 +254,7 @@ public class SpringBootThinUtil {
 	}
 
 
-	public static class StarterFilter implements Function<String, Boolean> {
+	public static class StarterFilter {
 		private final String starterName;
 		private final Set<String> starterArtifactIds;
 
@@ -266,7 +263,6 @@ public class SpringBootThinUtil {
 			this.starterArtifactIds = starterArtifactIds;
 		}
 
-		@Override
 		public Boolean apply(String jarName) {
 			// return true iff jarName is a starter artifact
 			return starterArtifactIds.contains(getArtifactId(jarName));
@@ -397,7 +393,6 @@ public class SpringBootThinUtil {
 		public static final String SPRING_BOOT_STARTER = "spring-boot-starter";
 		public static final String SPRING_BOOT_STARTER_REACTOR = "spring-boot-starter-reactor";
 		
-		@SuppressWarnings("serial")
 		private static final Map<String, Set<String>> startersToDependentArtifactIdsMap;
 
 		
@@ -406,7 +401,7 @@ public class SpringBootThinUtil {
 		}
 
 		public static Set<String> getStarterArtifactIds(String starter) {
-			Set<String> starterArtifactIds = getStartersToDependentArtifactIdsMap().getOrDefault(starter, null);
+			Set<String> starterArtifactIds = getStartersToDependentArtifactIdsMap().get(starter);
 			if (null == starterArtifactIds) {
 				return emptySet;
 			}
