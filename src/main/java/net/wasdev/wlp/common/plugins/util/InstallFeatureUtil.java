@@ -102,9 +102,11 @@ public abstract class InstallFeatureUtil {
     }
 
     private File loadInstallJarFile(File installDirectory) {
-        File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
-        if (installJarOverride != null && installJarOverride.exists()) {
-            return installJarOverride;
+        if (openLibertyVersion != null) {
+            File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
+            if (installJarOverride != null && installJarOverride.exists()) {
+                return installJarOverride;
+            }
         }
         return getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
     }
