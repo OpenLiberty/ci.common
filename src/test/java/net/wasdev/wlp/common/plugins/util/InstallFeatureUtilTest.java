@@ -47,6 +47,38 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
     }
     
+    /**
+     * No install map - expect a scenario exception
+     */
+    @Test(expected = PluginScenarioException.class)
+    public void testConstructorNoInstallMap() throws Exception {
+        File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
+        assertTrue(installMap.delete());
+        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+    }
+    
+    /**
+     * No openliberty.properties, but it should find the runtime install map and not encounter an error
+     */
+    @Test
+    public void testConstructorNoOpenLibertyProperties() throws Exception {
+        File olProps = new File(installDir, "lib/versions/openliberty.properties");
+        assertTrue(olProps.delete());
+        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+    }
+    
+    /**
+     * No install map or openliberty.properties - expect a scenario exception
+     */
+    @Test(expected = PluginScenarioException.class)
+    public void testConstructorNoInstallMapNoOpenLibertyProperties() throws Exception {
+        File olProps = new File(installDir, "lib/versions/openliberty.properties");
+        assertTrue(olProps.delete());
+        File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
+        assertTrue(installMap.delete());
+        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+    }
+        
     @Test
     public void testConstructorTo() throws Exception {
         InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, "myextension", new HashSet<String>());
