@@ -59,17 +59,20 @@ public class SpringBootThinUtil {
 	private static String THE_UNKNOWN_STARTER = "";
 	private static final Set<String> emptySet = new HashSet<String>(0);
 
-	public SpringBootThinUtil(File sourceFatJar, File targetThinJar, File libIndexCache) throws IOException {
+	public SpringBootThinUtil(File sourceFatJar, File targetThinJar, File libIndexCache) throws IOException, SpringBootThinException {
 		this(sourceFatJar, targetThinJar, libIndexCache, null);
 	}
 
 	public SpringBootThinUtil(File sourceFatJar, File targetThinJar, File libIndexCache, File libIndexCacheParent)
-			throws IOException {
+			throws IOException, SpringBootThinException {
 		this.sourceFatJar = new JarFile(sourceFatJar);
 		this.targetThinJar = targetThinJar;
 		this.libIndexCache = libIndexCache;
 		this.libIndexCacheParent = libIndexCacheParent;
 		SpringBootManifest sbmf = new SpringBootManifest(this.sourceFatJar.getManifest());
+		if (sbmf.getSpringStartClass() == null) {
+		    throw new SpringBootThinException("Could not find the Spring Boot application executable archive");
+        }
 		String springBootLibPath = sbmf.getSpringBootLib();
 		if (!springBootLibPath.endsWith("/")) {
 			springBootLibPath += "/";
