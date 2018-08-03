@@ -71,7 +71,7 @@ public class SpringBootThinUtil {
 		this.libIndexCacheParent = libIndexCacheParent;
 		SpringBootManifest sbmf = new SpringBootManifest(this.sourceFatJar.getManifest());
 		if (sbmf.getSpringStartClass() == null) {
-		    throw new SpringBootThinException("Could not find the Spring Boot application executable archive");
+		    throw new SpringBootThinException("The " + sourceFatJar.getCanonicalPath() +" file is not an executable archive.");
         }
 		String springBootLibPath = sbmf.getSpringBootLib();
 		if (!springBootLibPath.endsWith("/")) {
