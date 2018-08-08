@@ -594,7 +594,11 @@ public abstract class InstallFeatureUtil {
             } else if (resolvedFeatures.isEmpty()) {
                 debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
-                if (exceptionMessage.contains("CWWKF1250I")){
+                if (exceptionMessage == null) {
+                    debug("resolvedFeatures was empty but the install kernel did not issue any messages");
+                    info("The features are already installed, so no action is needed.");
+                    return;
+                } else if (exceptionMessage.contains("CWWKF1250I")) {
                     info(exceptionMessage);
                     info("The features are already installed, so no action is needed.");
                     return;
