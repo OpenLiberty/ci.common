@@ -404,7 +404,12 @@ public abstract class InstallFeatureUtil {
             for (int j = 0; j < features.getLength(); j++) {
                 String content = features.item(j).getTextContent();
                 if (content != null) {
-                    result.add(content.trim().toLowerCase());                    
+                    if (content.contains(":")) {
+                        String[] split = content.split(":", 2);
+                        result.add(split[1].trim().toLowerCase());
+                    } else {
+                        result.add(content.trim().toLowerCase());
+                    }
                 }
             }
         }
