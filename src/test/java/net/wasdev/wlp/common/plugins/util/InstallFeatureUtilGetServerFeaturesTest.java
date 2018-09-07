@@ -507,4 +507,21 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         Files.write(serverXmlPath, content.getBytes(charset));
     }
     
+    /**
+     * Tests server.xml with user features
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testUserFeatures() throws Exception{
+        copyAsName("server_user_features.xml", "server.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("feature1");
+        expected.add("feature2");
+        expected.add("feature3");
+
+        verifyServerFeatures(expected);
+    }
+    
 }
