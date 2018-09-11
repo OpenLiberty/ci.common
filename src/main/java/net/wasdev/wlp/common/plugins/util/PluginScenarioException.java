@@ -16,6 +16,10 @@
 
 package net.wasdev.wlp.common.plugins.util;
 
+/**
+ * Generic exception for invalid scenario. This should not fail the build but instead be handled gracefully.
+ *
+ */
 public class PluginScenarioException extends Exception {
 
     private static final long serialVersionUID = 1L;

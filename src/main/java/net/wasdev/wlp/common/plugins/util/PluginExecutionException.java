@@ -16,6 +16,10 @@
 
 package net.wasdev.wlp.common.plugins.util;
 
+/**
+ * Generic exception that should fail the build execution. 
+ *
+ */
 public class PluginExecutionException extends Exception {
 
     private static final long serialVersionUID = 1L;
