@@ -565,16 +565,17 @@ public abstract class InstallFeatureUtil {
     /**
      * Gets the set of all Open Liberty features by scanning the product JSONs.
      * 
+     * @param jsons The set of product JSON files to scan
      * @return set of all Open Liberty features
-     * @throws PluginExecutionException if any of the downloaded JSONs could not be found
+     * @throws PluginExecutionException if any of the JSONs could not be found
      */
-    private Set<String> getOpenLibertyFeatureSet() throws PluginExecutionException {
+    public static Set<String> getOpenLibertyFeatureSet(Set<File> jsons) throws PluginExecutionException {
         Set<String> openLibertyFeatures = new HashSet<String>();
-        for (File file : downloadedJsons) {
+        for (File file : jsons) {
             Scanner s = null;
             try {
                 s = new Scanner(file);
-                // scan for artifactIds that belong to the Open Liberty groupId
+                // scan Maven coordinates for artifactIds that belong to the Open Liberty groupId
                 while (s.findWithinHorizon(OPEN_LIBERTY_GROUP_ID + ":([^:]*):", 0) != null) {
                     MatchResult match = s.match();
                     if (match.groupCount() >= 1) {
@@ -600,7 +601,7 @@ public abstract class InstallFeatureUtil {
      * @throws PluginExecutionException if any of the downloaded JSONs could not be found
      */
     private boolean isOnlyOpenLibertyFeatures(List<String> featuresToInstall) throws PluginExecutionException {
-        boolean result = getOpenLibertyFeatureSet().containsAll(featuresToInstall);
+        boolean result = getOpenLibertyFeatureSet(downloadedJsons).containsAll(featuresToInstall);
         debug("Is only installing Open Liberty features? " + result);
         return result;
     }

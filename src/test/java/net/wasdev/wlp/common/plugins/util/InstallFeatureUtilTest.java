@@ -193,5 +193,19 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
                         + expectedEndsWithWindows + ", but actual result was " + result,
                 result.endsWith(expectedEndsWith) || result.endsWith(expectedEndsWithWindows));
     }
+    
+    @Test
+    public void testGetOpenLibertyFeatureSet() throws Exception {
+        Set<File> jsons = new HashSet<File>();
+        jsons.add(new File(RESOURCES_DIR, "jsons/ol.json"));
+        jsons.add(new File(RESOURCES_DIR, "jsons/wlp.json"));
+        
+        Set<String> olFeatures = InstallFeatureUtil.getOpenLibertyFeatureSet(jsons);
+        
+        String olFeaturesString = olFeatures.toString();
+        assertEquals("Feature set " + olFeaturesString + " does not have the expected number of features.", 2, olFeatures.size());
+        assertTrue("Feature set " + olFeaturesString + " does not contain expected feature com.ibm.websphere.appserver.anno-1.0", olFeatures.contains("com.ibm.websphere.appserver.anno-1.0"));
+        assertTrue("Feature set " + olFeaturesString + " does not contain expected feature appClientSupport-1.0", olFeatures.contains("appClientSupport-1.0"));
+    }
 
 }

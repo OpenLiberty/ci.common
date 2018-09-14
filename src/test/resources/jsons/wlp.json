@@ -1,0 +1,244 @@
+
+[
+    {
+        "description": "<div id=\"ibm-wasdev-feature-desc-content\">\nThe adminCenter-1.0 feature enables the Liberty Admin Center, a web-based graphical interface for deploying, monitoring and managing Liberty servers in standalone and collective environments.\n</div>\n<h2 id=\"ibm-wasdev-feature-instructions-title\">Command Line Install</h2>\n<div id=\"ibm-wasdev-feature-instructions-content\">\nTo install the feature from the command line, type:<br/><code>bin/installUtility install adminCenter-1.0</code> <br/>\nIf you are installing into 8.5.5.5 or earlier and the feature supports that version, use the featureManager command, for example:<br/><code>bin/featureManager install adminCenter-1.0 --when-file-exists=ignore</code>\n</div>\n <h2 id=\"ibm-wasdev-feature-notes-title\">Config Instructions</h2> \n<div id=\"ibm-wasdev-feature-notes-content\">\nTo use the feature at runtime add the following to your server.xml file<br/>\n<code>&lt;featureManager&gt;</br>\n&nbsp;&nbsp;&lt;feature&gt;adminCenter-1.0&lt;/feature&gt;</br>\n&lt;/featureManager&gt;</br></code> </div>\n <h2 id=\"ibm-wasdev-feature-notes-title\">Additional Information</h2> \n <div id=\"ibm-wasdev-feature-additional-information\">\n  <ul>\n   <li>For the complete feature documentation, see the <a href=\"http://www.ibm.com/support/knowledgecenter/SSAW57_liberty/com.ibm.websphere.wlp.nd.multiplatform.doc/ae/rwlp_feature_adminCenter-1.0.html\">adminCenter-1.0</a> feature description in IBM Knowledge Center.</li>\n   <li>For more detailed installation instructions, including using Installation Manager and WebSphere Developer Tools, see <a href=\"http://www.ibm.com/support/knowledgecenter/SSAW57_liberty/com.ibm.websphere.wlp.nd.multiplatform.doc/com.ibm.websphere.wlp.nd.multiplatform.doc/ae/twlp_inst_assets.html\">Installing Liberty Repository assets</a> in IBM Knowledge Center.</li>\n   <li>For offline installation from a directory-based repository using 8.5.5.8 or higher, see <a href=\"https://www.ibm.com/support/knowledgecenter/SSAW57_liberty/com.ibm.websphere.wlp.nd.multiplatform.doc/com.ibm.websphere.wlp.nd.multiplatform.doc/ae/t_install_assets_installUtility.html\">Installing assets using the installUtility command</a> in IBM Knowledge Center.</li>\n   <li>For system requirements, see <a href=\"http://www-969.ibm.com/software/reports/compatibility/clarity-reports/report/html/softwareReqsForProductByComponent?deliverableId=1337870535828&duComponent=Server_118F7A80A6C511E2A4CA497F0925FE1B\">WebSphere Application Server detailed system requirements</a>. Select the appropriate release, and click <b>WebSphere Application Server (all editions)</b>. Select the edition, and choose the offering you want in Requirements by component.</li>\n  </ul>\n</div>\n",
+        "licenseId": "http://www.ibm.com/licenses/wlp-featureterms-v1",
+        "licenseType": "UNSPECIFIED",
+        "name": "Admin Center",
+        "provider": {
+            "name": "IBM",
+            "url": "http://www.ibm.com"
+        },
+        "shortDescription": "The adminCenter-1.0 feature enables the Liberty Admin Center, a web-based graphical interface for deploying, monitoring and managing Liberty servers in standalone and collective environments.",
+        "type": "com.ibm.websphere.Feature",
+        "version": "1.0.0",
+        "wlpInformation": {
+            "appliesTo": "com.ibm.websphere.appserver; productVersion=18.0.0.2",
+            "appliesToFilterInfo": [
+                {
+                    "editions": [
+                        "Liberty Core",
+                        "Base",
+                        "Express",
+                        "Developers",
+                        "ND",
+                        "z/OS"
+                    ],
+                    "hasMaxVersion": "true",
+                    "maxVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "minVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "productId": "com.ibm.websphere.appserver"
+                }
+            ],
+            "displayPolicy": "VISIBLE",
+            "downloadPolicy": "INSTALLER",
+            "ibmInstallTo": "core",
+            "installPolicy": "MANUAL",
+            "javaSEVersionRequirements": {
+                "minVersion": "1.6.0",
+                "rawRequirements": [
+                    "com.ibm.ws.org.joda.time.1.6.2_1.0.21.jar: (&(osgi.ee=JavaSE)(version=1.6))",
+                    "com.ibm.websphere.jsonsupport_1.0.21.jar: (&(osgi.ee=JavaSE)(version=1.6))",
+                    "com.ibm.ws.org.owasp.esapi.2.1.0_1.0.21.jar: (&(osgi.ee=JavaSE)(version=1.6))",
+                    "com.ibm.ws.ui_1.0.21.jar: (&(osgi.ee=JavaSE)(version=1.6))"
+                ],
+                "versionDisplayString": "Java SE 6, Java SE 7, Java SE 8"
+            },
+            "links": [
+                {
+                    "label": "Features that this feature enables",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.restHandler-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature",
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.restConnector-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature",
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.jta-1.1&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature",
+                        "wlpInformation.provideFeature=com.ibm.wsspi.appserver.webBundle-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature",
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.jsp-2.2&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature",
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.servlet-3.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature"
+                    ]
+                },
+                {
+                    "label": "Features that enable this feature",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.requireFeature=com.ibm.websphere.appserver.adminCenter-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature"
+                    ]
+                },
+                {
+                    "label": "Features that this feature supersedes",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.supersededBy=adminCenter-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2"
+                    ]
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name"
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name",
+                    "linkLabelSuffix": " (optional)"
+                }
+            ],
+            "lowerCaseShortName": "admincenter-1.0",
+            "mainAttachmentSHA256": "ab7f01fa77b2ee6bb620b6b88dad3ea7a92dba0d5061bb3f130368a464edc614",
+            "mainAttachmentSize": 3162884,
+            "provideFeature": [
+                "com.ibm.websphere.appserver.adminCenter-1.0"
+            ],
+            "requireFeature": [
+                "com.ibm.websphere.appserver.restHandler-1.0",
+                "com.ibm.websphere.appserver.restConnector-1.0",
+                "com.ibm.websphere.appserver.jta-1.1",
+                "com.ibm.wsspi.appserver.webBundle-1.0",
+                "com.ibm.websphere.appserver.jsp-2.2",
+                "com.ibm.websphere.appserver.servlet-3.0"
+            ],
+            "requireFeatureWithTolerates": [
+                {
+                    "feature": "com.ibm.websphere.appserver.servlet-3.0",
+                    "tolerates": [
+                        "3.1",
+                        "4.0"
+                    ]
+                },
+                {
+                    "feature": "com.ibm.wsspi.appserver.webBundle-1.0"
+                },
+                {
+                    "feature": "com.ibm.websphere.appserver.restHandler-1.0"
+                },
+                {
+                    "feature": "com.ibm.websphere.appserver.jta-1.1",
+                    "tolerates": [
+                        "1.2"
+                    ]
+                },
+                {
+                    "feature": "com.ibm.websphere.appserver.jsp-2.2",
+                    "tolerates": [
+                        "2.3"
+                    ]
+                },
+                {
+                    "feature": "com.ibm.websphere.appserver.restConnector-1.0",
+                    "tolerates": [
+                        "2.0"
+                    ]
+                }
+            ],
+            "shortName": "adminCenter-1.0",
+            "singleton": "false",
+            "typeLabel": "Feature",
+            "vanityRelativeURL": "features-com.ibm.websphere.appserver.adminCenter-1.0",
+            "visibility": "PUBLIC",
+            "webDisplayPolicy": "VISIBLE",
+            "mavenCoordinates": "com.ibm.websphere.appserver.features:adminCenter-1.0:18.0.0.2"
+        }
+    },
+    {
+        "description": "<div id=\"ibm-wasdev-feature-desc-content\">\n%description\n</div>\n<h2 id=\"ibm-wasdev-feature-instructions-title\">Command Line Install</h2>\n<div id=\"ibm-wasdev-feature-instructions-content\">\nTo install the feature from the command line, type:<br/><code>bin/installUtility install com.ibm.websphere.appserver.adminCenter.collectiveController-1.0</code> <br/>\nIf you are installing into 8.5.5.5 or earlier and the feature supports that version, use the featureManager command, for example:<br/><code>bin/featureManager install com.ibm.websphere.appserver.adminCenter.collectiveController-1.0 --when-file-exists=ignore</code>\n</div>\n",
+        "licenseId": "http://www.ibm.com/licenses/wlp-featureterms-restricted-v1",
+        "licenseType": "UNSPECIFIED",
+        "name": "com.ibm.websphere.appserver.adminCenter.collectiveController-1.0",
+        "provider": {
+            "name": "IBM Corp."
+        },
+        "shortDescription": "%description",
+        "type": "com.ibm.websphere.Feature",
+        "version": "1.0.0",
+        "wlpInformation": {
+            "appliesTo": "com.ibm.websphere.appserver; productEdition=\"BASE_ILAN,DEVELOPERS,ND,zOS\"; productVersion=\"18.0.0.2\"",
+            "appliesToFilterInfo": [
+                {
+                    "editions": [
+                        "Developers",
+                        "ND",
+                        "z/OS"
+                    ],
+                    "hasMaxVersion": "true",
+                    "maxVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "minVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "productId": "com.ibm.websphere.appserver",
+                    "rawEditions": [
+                        "BASE_ILAN",
+                        "DEVELOPERS",
+                        "ND",
+                        "zOS"
+                    ]
+                }
+            ],
+            "displayPolicy": "HIDDEN",
+            "downloadPolicy": "INSTALLER",
+            "ibmInstallTo": "core",
+            "installPolicy": "WHEN_SATISFIED",
+            "javaSEVersionRequirements": {
+                "minVersion": "1.6.0",
+                "rawRequirements": [
+                    "com.ibm.ws.org.joda.time.1.6.2_1.0.21.jar: (&(osgi.ee=JavaSE)(version=1.6))",
+                    "com.ibm.ws.ui.collective_1.0.21.jar: (&(osgi.ee=JavaSE)(version=1.6))"
+                ],
+                "versionDisplayString": "Java SE 6, Java SE 7, Java SE 8"
+            },
+            "links": [
+                {
+                    "label": "Features that this feature enables",
+                    "linkLabelProperty": "name"
+                },
+                {
+                    "label": "Features that enable this feature",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.requireFeature=com.ibm.websphere.appserver.adminCenter.collectiveController-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature"
+                    ]
+                },
+                {
+                    "label": "Features that this feature supersedes",
+                    "linkLabelProperty": "name"
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name"
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name",
+                    "linkLabelSuffix": " (optional)"
+                }
+            ],
+            "mainAttachmentSHA256": "c9ee9507677ec1f961206d3842254f6d41c4a66867e7a1c57c7fbd9bf74520e5",
+            "mainAttachmentSize": 500157,
+            "provideFeature": [
+                "com.ibm.websphere.appserver.adminCenter.collectiveController-1.0"
+            ],
+            "provisionCapability": "osgi.identity; filter:=\"(&(type=osgi.subsystem.feature)(osgi.identity=com.ibm.websphere.appserver.adminCenter-1.0))\",osgi.identity; filter:=\"(&(type=osgi.subsystem.feature)(osgi.identity=com.ibm.websphere.appserver.collectiveController-1.0))\"",
+            "singleton": "false",
+            "typeLabel": "Feature",
+            "vanityRelativeURL": "features-com.ibm.websphere.appserver.adminCenter.collectiveController-1.0",
+            "visibility": "PRIVATE",
+            "webDisplayPolicy": "HIDDEN",
+            "mavenCoordinates": "com.ibm.websphere.appserver.features:com.ibm.websphere.appserver.adminCenter.collectiveController-1.0:18.0.0.2"
+        }
+    }
+]
