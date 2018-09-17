@@ -571,7 +571,7 @@ public abstract class InstallFeatureUtil {
      * @throws PluginExecutionException if any of the JSONs could not be found
      */
     public static Set<String> getLibertyFeatureSet(Set<File> jsons) throws PluginExecutionException {
-        Set<String> openLibertyFeatures = new HashSet<String>();
+        Set<String> libertyFeatures = new HashSet<String>();
         for (File file : jsons) {
             Scanner s = null;
             try {
@@ -580,7 +580,7 @@ public abstract class InstallFeatureUtil {
                 while (s.findWithinHorizon("(?:" + OPEN_LIBERTY_GROUP_ID + "|" + WEBSPHERE_LIBERTY_GROUP_ID + "):([^:]*):", 0) != null) {
                     MatchResult match = s.match();
                     if (match.groupCount() >= 1) {
-                        openLibertyFeatures.add(match.group(1));
+                        libertyFeatures.add(match.group(1));
                     }
                 }
             } catch (FileNotFoundException e) {
@@ -591,7 +591,7 @@ public abstract class InstallFeatureUtil {
                 }
             }
         }
-        return openLibertyFeatures;
+        return libertyFeatures;
     }
     
     /**
