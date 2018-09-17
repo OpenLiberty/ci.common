@@ -1,0 +1,221 @@
+
+[
+    {
+        "description": "<div id=\"ibm-wasdev-feature-desc-content\">\n%description\n</div>\n<h2 id=\"ibm-wasdev-feature-instructions-title\">Command Line Install</h2>\n<div id=\"ibm-wasdev-feature-instructions-content\">\nTo install the feature from the command line, type:<br/><code>bin/installUtility install com.ibm.websphere.appserver.anno-1.0</code> <br/>\nIf you are installing into 8.5.5.5 or earlier and the feature supports that version, use the featureManager command, for example:<br/><code>bin/featureManager install com.ibm.websphere.appserver.anno-1.0 --when-file-exists=ignore</code>\n</div>\n",
+        "licenseId": "https://www.eclipse.org/legal/epl-v10.html",
+        "licenseType": "UNSPECIFIED",
+        "name": "com.ibm.websphere.appserver.anno-1.0",
+        "provider": {
+            "name": "IBM Corp."
+        },
+        "shortDescription": "%description",
+        "type": "com.ibm.websphere.Feature",
+        "version": "1.0.0",
+        "wlpInformation": {
+            "appliesTo": "io.openliberty;productVersion=\"18.0.0.2\"",
+            "appliesToFilterInfo": [
+                {
+                    "editions": [
+                        "Liberty Core",
+                        "Base",
+                        "Express",
+                        "Developers",
+                        "ND",
+                        "z/OS"
+                    ],
+                    "hasMaxVersion": "true",
+                    "maxVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "minVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "productId": "io.openliberty"
+                }
+            ],
+            "displayPolicy": "HIDDEN",
+            "downloadPolicy": "INSTALLER",
+            "ibmInstallTo": "core",
+            "installPolicy": "MANUAL",
+            "javaSEVersionRequirements": {
+                "minVersion": "1.6.0",
+                "rawRequirements": [
+                    "com.ibm.ws.anno_1.0.21.jar: (&(osgi.ee=JavaSE)(version=1.6))"
+                ],
+                "versionDisplayString": "Java SE 6, Java SE 7, Java SE 8"
+            },
+            "links": [
+                {
+                    "label": "Features that this feature enables",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.javax.annotation-1.1&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature",
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.artifact-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature"
+                    ]
+                },
+                {
+                    "label": "Features that enable this feature",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.requireFeature=com.ibm.websphere.appserver.anno-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature"
+                    ]
+                },
+                {
+                    "label": "Features that this feature supersedes",
+                    "linkLabelProperty": "name"
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name"
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name",
+                    "linkLabelSuffix": " (optional)"
+                }
+            ],
+            "mainAttachmentSHA256": "95859811f1979aab50bd5cc006aeaf3d131e5133d16dd091dc89e2b519ff266b",
+            "mainAttachmentSize": 608819,
+            "provideFeature": [
+                "com.ibm.websphere.appserver.anno-1.0"
+            ],
+            "requireFeature": [
+                "com.ibm.websphere.appserver.javax.annotation-1.1",
+                "com.ibm.websphere.appserver.artifact-1.0"
+            ],
+            "requireFeatureWithTolerates": [
+                {
+                    "feature": "com.ibm.websphere.appserver.artifact-1.0"
+                },
+                {
+                    "feature": "com.ibm.websphere.appserver.javax.annotation-1.1",
+                    "tolerates": [
+                        "1.2",
+                        "1.3"
+                    ]
+                }
+            ],
+            "singleton": "false",
+            "typeLabel": "Feature",
+            "vanityRelativeURL": "features-com.ibm.websphere.appserver.anno-1.0",
+            "visibility": "PRIVATE",
+            "webDisplayPolicy": "HIDDEN",
+            "mavenCoordinates": "io.openliberty.features:com.ibm.websphere.appserver.anno-1.0:18.0.0.2"
+        }
+    },
+    {
+        "description": "<div id=\"ibm-wasdev-feature-desc-content\">\nThis feature enables the Liberty server to process client modules and support remote client containers.\n</div>\n<h2 id=\"ibm-wasdev-feature-instructions-title\">Command Line Install</h2>\n<div id=\"ibm-wasdev-feature-instructions-content\">\nTo install the feature from the command line, type:<br/><code>bin/installUtility install appClientSupport-1.0</code> <br/>\nIf you are installing into 8.5.5.5 or earlier and the feature supports that version, use the featureManager command, for example:<br/><code>bin/featureManager install appClientSupport-1.0 --when-file-exists=ignore</code>\n</div>\n <h2 id=\"ibm-wasdev-feature-notes-title\">Config Instructions</h2> \n<div id=\"ibm-wasdev-feature-notes-content\">\nTo use the feature at runtime add the following to your server.xml file<br/>\n<code>&lt;featureManager&gt;</br>\n&nbsp;&nbsp;&lt;feature&gt;appClientSupport-1.0&lt;/feature&gt;</br>\n&lt;/featureManager&gt;</br></code> </div>\n <h2 id=\"ibm-wasdev-feature-notes-title\">Additional Information</h2> \n <div id=\"ibm-wasdev-feature-additional-information\">\n  <ul>\n   <li>For the complete feature documentation, see the <a href=\"http://www.ibm.com/support/knowledgecenter/SSAW57_liberty/com.ibm.websphere.wlp.nd.multiplatform.doc/ae/rwlp_feature_appClientSupport-1.0.html\">appClientSupport-1.0</a> feature description in IBM Knowledge Center.</li>\n   <li>For more detailed installation instructions, including using Installation Manager and WebSphere Developer Tools, see <a href=\"http://www.ibm.com/support/knowledgecenter/SSAW57_liberty/com.ibm.websphere.wlp.nd.multiplatform.doc/com.ibm.websphere.wlp.nd.multiplatform.doc/ae/twlp_inst_assets.html\">Installing Liberty Repository assets</a> in IBM Knowledge Center.</li>\n   <li>For offline installation from a directory-based repository using 8.5.5.8 or higher, see <a href=\"https://www.ibm.com/support/knowledgecenter/SSAW57_liberty/com.ibm.websphere.wlp.nd.multiplatform.doc/com.ibm.websphere.wlp.nd.multiplatform.doc/ae/t_install_assets_installUtility.html\">Installing assets using the installUtility command</a> in IBM Knowledge Center.</li>\n   <li>For system requirements, see <a href=\"http://www-969.ibm.com/software/reports/compatibility/clarity-reports/report/html/softwareReqsForProductByComponent?deliverableId=1337870535828&duComponent=Server_118F7A80A6C511E2A4CA497F0925FE1B\">WebSphere Application Server detailed system requirements</a>. Select the appropriate release, and click <b>WebSphere Application Server (all editions)</b>. Select the edition, and choose the offering you want in Requirements by component.</li>\n  </ul>\n</div>\n",
+        "licenseId": "https://www.eclipse.org/legal/epl-v10.html",
+        "licenseType": "UNSPECIFIED",
+        "name": "Application Client Support for Server",
+        "provider": {
+            "name": "IBM Corp."
+        },
+        "shortDescription": "This feature enables the Liberty server to process client modules and support remote client containers.",
+        "type": "com.ibm.websphere.Feature",
+        "version": "1.0.0",
+        "wlpInformation": {
+            "appliesTo": "io.openliberty;productEdition=Open;productVersion=\"18.0.0.2\"",
+            "appliesToFilterInfo": [
+                {
+                    "editions": [
+                        "Base",
+                        "Express",
+                        "Developers",
+                        "ND",
+                        "z/OS"
+                    ],
+                    "hasMaxVersion": "true",
+                    "maxVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "minVersion": {
+                        "compatibilityLabel": "18.0.0.2",
+                        "inclusive": true,
+                        "label": "18.0.0",
+                        "value": "18.0.0.2"
+                    },
+                    "productId": "io.openliberty",
+                    "rawEditions": [
+                        "Open"
+                    ]
+                }
+            ],
+            "displayPolicy": "VISIBLE",
+            "downloadPolicy": "INSTALLER",
+            "ibmInstallTo": "core",
+            "installPolicy": "MANUAL",
+            "javaSEVersionRequirements": {
+                "minVersion": "1.6.0",
+                "versionDisplayString": "Java SE 6, Java SE 7, Java SE 8"
+            },
+            "links": [
+                {
+                    "label": "Features that this feature enables",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.provideFeature=com.ibm.websphere.appclient.appClient-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature",
+                        "wlpInformation.provideFeature=com.ibm.websphere.appserver.clientContainerRemoteSupport-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature"
+                    ]
+                },
+                {
+                    "label": "Features that enable this feature",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.requireFeature=com.ibm.websphere.appserver.appClientSupport-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2&type=com.ibm.websphere.Feature"
+                    ]
+                },
+                {
+                    "label": "Features that this feature supersedes",
+                    "linkLabelProperty": "name",
+                    "query": [
+                        "wlpInformation.supersededBy=appClientSupport-1.0&wlpInformation.appliesToFilterInfo.minVersion.value=18.0.0.2"
+                    ]
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name"
+                },
+                {
+                    "label": "Features that supersede this feature",
+                    "linkLabelProperty": "name",
+                    "linkLabelSuffix": " (optional)"
+                }
+            ],
+            "lowerCaseShortName": "appclientsupport-1.0",
+            "mainAttachmentSHA256": "5bfe13a7a474e012b7df2ca79bd96d15e7c406bf3588a69a6d06a9772ca88ea8",
+            "mainAttachmentSize": 16320,
+            "provideFeature": [
+                "com.ibm.websphere.appserver.appClientSupport-1.0"
+            ],
+            "requireFeature": [
+                "com.ibm.websphere.appclient.appClient-1.0",
+                "com.ibm.websphere.appserver.clientContainerRemoteSupport-1.0"
+            ],
+            "requireFeatureWithTolerates": [
+                {
+                    "feature": "com.ibm.websphere.appserver.clientContainerRemoteSupport-1.0"
+                },
+                {
+                    "feature": "com.ibm.websphere.appclient.appClient-1.0"
+                }
+            ],
+            "shortName": "appClientSupport-1.0",
+            "singleton": "false",
+            "typeLabel": "Feature",
+            "vanityRelativeURL": "features-com.ibm.websphere.appserver.appClientSupport-1.0",
+            "visibility": "PUBLIC",
+            "webDisplayPolicy": "VISIBLE",
+            "mavenCoordinates": "io.openliberty.features:appClientSupport-1.0:18.0.0.2"
+        }
+    }
+]

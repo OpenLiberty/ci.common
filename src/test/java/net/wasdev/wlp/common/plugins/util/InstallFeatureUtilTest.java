@@ -193,5 +193,22 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
                         + expectedEndsWithWindows + ", but actual result was " + result,
                 result.endsWith(expectedEndsWith) || result.endsWith(expectedEndsWithWindows));
     }
+    
+    @Test
+    public void testGetLibertyFeatureSet() throws Exception {
+        Set<File> jsons = new HashSet<File>();
+        jsons.add(new File(RESOURCES_DIR, "jsons/ol.json"));
+        jsons.add(new File(RESOURCES_DIR, "jsons/wlp.json"));
+        jsons.add(new File(RESOURCES_DIR, "jsons/other.json"));
+        
+        Set<String> features = InstallFeatureUtil.getLibertyFeatureSet(jsons);
+        
+        String featuresString = features.toString();
+        assertEquals("Feature set " + featuresString + " does not have the expected number of features.", 4, features.size());
+        assertTrue("Feature set " + featuresString + " does not contain expected Open Liberty feature com.ibm.websphere.appserver.anno-1.0", features.contains("com.ibm.websphere.appserver.anno-1.0"));
+        assertTrue("Feature set " + featuresString + " does not contain expected Open Liberty feature appClientSupport-1.0", features.contains("appClientSupport-1.0"));
+        assertTrue("Feature set " + featuresString + " does not contain expected WebSphere Liberty feature adminCenter-1.0", features.contains("adminCenter-1.0"));
+        assertTrue("Feature set " + featuresString + " does not contain expected WebSphere Liberty feature com.ibm.websphere.appserver.adminCenter.collectiveController-1.0", features.contains("com.ibm.websphere.appserver.adminCenter.collectiveController-1.0"));
+    }
 
 }

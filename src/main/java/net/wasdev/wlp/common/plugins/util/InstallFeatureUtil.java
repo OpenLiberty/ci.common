@@ -18,6 +18,7 @@ package net.wasdev.wlp.common.plugins.util;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,6 +41,7 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
+import java.util.regex.MatchResult;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -55,6 +57,7 @@ import org.xml.sax.SAXException;
 public abstract class InstallFeatureUtil {
     
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
+    public static final String WEBSPHERE_LIBERTY_GROUP_ID = "com.ibm.websphere.appserver.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     
@@ -561,6 +564,50 @@ public abstract class InstallFeatureUtil {
     }
     
     /**
+     * Gets the set of all Open and WebSphere Liberty features by scanning the product JSONs.
+     * 
+     * @param jsons The set of product JSON files to scan
+     * @return set of all Open and WebSphere Liberty features
+     * @throws PluginExecutionException if any of the JSONs could not be found
+     */
+    public static Set<String> getLibertyFeatureSet(Set<File> jsons) throws PluginExecutionException {
+        Set<String> libertyFeatures = new HashSet<String>();
+        for (File file : jsons) {
+            Scanner s = null;
+            try {
+                s = new Scanner(file);
+                // scan Maven coordinates for artifactIds that belong to either the Open or WebSphere Liberty groupIds
+                while (s.findWithinHorizon("(?:" + OPEN_LIBERTY_GROUP_ID + "|" + WEBSPHERE_LIBERTY_GROUP_ID + "):([^:]*):", 0) != null) {
+                    MatchResult match = s.match();
+                    if (match.groupCount() >= 1) {
+                        libertyFeatures.add(match.group(1));
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                throw new PluginExecutionException("The JSON file is not found at " + file.getAbsolutePath(), e);
+            } finally {
+                if (s != null) {
+                    s.close();
+                }
+            }
+        }
+        return libertyFeatures;
+    }
+    
+    /**
+     * Returns true if all features in featuresToInstall are Open or WebSphere Liberty features.
+     * 
+     * @param featuresToInstall list of features to check
+     * @return true if featureToInstall has only Open or WebSphere Liberty features
+     * @throws PluginExecutionException if any of the downloaded JSONs could not be found
+     */
+    private boolean isOnlyLibertyFeatures(List<String> featuresToInstall) throws PluginExecutionException {
+        boolean result = getLibertyFeatureSet(downloadedJsons).containsAll(featuresToInstall);
+        debug("Is installing only Open or WebSphere Liberty features? " + result);
+        return result;
+    }
+    
+    /**
      * Resolve, download, and install features from a Maven repository. This
      * method calls the resolver with the given JSONs and feature list,
      * downloads the ESAs corresponding to the resolved features, then installs
@@ -579,13 +626,16 @@ public abstract class InstallFeatureUtil {
         List<File> jsonRepos = new ArrayList<File>(downloadedJsons);
         debug("JSON repos: " + jsonRepos);
         info("Installing features: " + featuresToInstall);
+        
+        // override license acceptance if installing only Open or WebSphere Liberty features
+        boolean acceptLicenseMapValue = isOnlyLibertyFeatures(featuresToInstall) ? true : isAcceptLicense;
 
         try {
             Map<String, Object> mapBasedInstallKernel = createMapBasedInstallKernelInstance(installDirectory);
             mapBasedInstallKernel.put("install.local.esa", true);
             mapBasedInstallKernel.put("single.json.file", jsonRepos);
             mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
-            mapBasedInstallKernel.put("license.accept", isAcceptLicense);
+            mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
 
             if (isDebugEnabled()) {
                 mapBasedInstallKernel.put("debug", Level.FINEST);
@@ -616,7 +666,7 @@ public abstract class InstallFeatureUtil {
             StringBuilder installedFeaturesBuilder = new StringBuilder();
             Collection<String> actionReturnResult = new ArrayList<String>();
             for (File esaFile: artifacts ){
-                mapBasedInstallKernel.put("license.accept", isAcceptLicense);
+                mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
                 mapBasedInstallKernel.put("action.install", esaFile);
                 if (to != null) {
                     mapBasedInstallKernel.put("to.extension", to);
