@@ -602,8 +602,27 @@ public abstract class InstallFeatureUtil {
      * @throws PluginExecutionException if any of the downloaded JSONs could not be found
      */
     private boolean isOnlyLibertyFeatures(List<String> featuresToInstall) throws PluginExecutionException {
-        boolean result = getLibertyFeatureSet(downloadedJsons).containsAll(featuresToInstall);
+        boolean result = containsIgnoreCase(getLibertyFeatureSet(downloadedJsons), featuresToInstall);
         debug("Is installing only Open or WebSphere Liberty features? " + result);
+        return result;
+    }
+    
+    /**
+     * Returns whether the reference collection contains all of the strings in the target collection, ignoring case.
+     * 
+     * @param reference The reference collection
+     * @param target The target collection
+     * @return true if reference contains all Strings from target, ignoring case
+     */
+    public static boolean containsIgnoreCase(Collection<String> reference, Collection<String> target) {
+        return toLowerCase(reference).containsAll(toLowerCase(target));
+    }
+
+    private static Set<String> toLowerCase(Collection<String> strings) {
+        Set<String> result = new HashSet<String>(strings.size());
+        for (String s : strings) {
+            result.add(s.toLowerCase());
+        }
         return result;
     }
     
