@@ -18,6 +18,7 @@ package net.wasdev.wlp.common.plugins.util;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -209,6 +210,34 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         assertTrue("Feature set " + featuresString + " does not contain expected Open Liberty feature appClientSupport-1.0", features.contains("appClientSupport-1.0"));
         assertTrue("Feature set " + featuresString + " does not contain expected WebSphere Liberty feature adminCenter-1.0", features.contains("adminCenter-1.0"));
         assertTrue("Feature set " + featuresString + " does not contain expected WebSphere Liberty feature com.ibm.websphere.appserver.adminCenter.collectiveController-1.0", features.contains("com.ibm.websphere.appserver.adminCenter.collectiveController-1.0"));
+    }
+    
+    @Test
+    public void testContainsIgnoreCase() throws Exception {
+        List<String> reference = new ArrayList<String>();
+        reference.add("featureNameA");
+        reference.add("featureNameB");
+        reference.add("featureNameC");
+        
+        List<String> target = new ArrayList<String>();
+        target.add("featureNameA");
+        target.add("FEATURENAMEB");
+        assertTrue("Collection " + reference + " should contain all of the elements from " + target + " ignoring case", InstallFeatureUtil.containsIgnoreCase(reference, target));
+
+        target = new ArrayList<String>();
+        target.add("featurenamec");
+        assertTrue("Collection " + reference + " should contain all of the elements from " + target + " ignoring case", InstallFeatureUtil.containsIgnoreCase(reference, target));
+
+        target = new ArrayList<String>();
+        target.add("feature");
+        assertFalse("Collection " + reference + " should not contain all of the elements from " + target + " ignoring case", InstallFeatureUtil.containsIgnoreCase(reference, target));
+
+        target = new ArrayList<String>();
+        target.add("featureNameA");
+        target.add("featureNameB");
+        target.add("featureNameC");
+        target.add("other");
+        assertFalse("Collection " + reference + " should not contain all of the elements from " + target + " ignoring case", InstallFeatureUtil.containsIgnoreCase(reference, target));
     }
 
 }
