@@ -57,7 +57,6 @@ import org.xml.sax.SAXException;
 public abstract class InstallFeatureUtil {
     
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
-    public static final String WEBSPHERE_LIBERTY_GROUP_ID = "com.ibm.websphere.appserver.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     
@@ -564,20 +563,20 @@ public abstract class InstallFeatureUtil {
     }
     
     /**
-     * Gets the set of all Open and WebSphere Liberty features by scanning the product JSONs.
+     * Gets the set of all Open Liberty features by scanning the product JSONs.
      * 
      * @param jsons The set of product JSON files to scan
-     * @return set of all Open and WebSphere Liberty features
+     * @return set of all Open Liberty features
      * @throws PluginExecutionException if any of the JSONs could not be found
      */
-    public static Set<String> getLibertyFeatureSet(Set<File> jsons) throws PluginExecutionException {
+    public static Set<String> getOpenLibertyFeatureSet(Set<File> jsons) throws PluginExecutionException {
         Set<String> libertyFeatures = new HashSet<String>();
         for (File file : jsons) {
             Scanner s = null;
             try {
                 s = new Scanner(file);
-                // scan Maven coordinates for artifactIds that belong to either the Open or WebSphere Liberty groupIds
-                while (s.findWithinHorizon("(?:" + OPEN_LIBERTY_GROUP_ID + "|" + WEBSPHERE_LIBERTY_GROUP_ID + "):([^:]*):", 0) != null) {
+                // scan Maven coordinates for artifactIds that belong to the Open Liberty groupId
+                while (s.findWithinHorizon(OPEN_LIBERTY_GROUP_ID + ":([^:]*):", 0) != null) {
                     MatchResult match = s.match();
                     if (match.groupCount() >= 1) {
                         libertyFeatures.add(match.group(1));
@@ -595,15 +594,15 @@ public abstract class InstallFeatureUtil {
     }
     
     /**
-     * Returns true if all features in featuresToInstall are Open or WebSphere Liberty features.
+     * Returns true if all features in featuresToInstall are Open Liberty features.
      * 
      * @param featuresToInstall list of features to check
-     * @return true if featureToInstall has only Open or WebSphere Liberty features
+     * @return true if featureToInstall has only Open Liberty features
      * @throws PluginExecutionException if any of the downloaded JSONs could not be found
      */
-    private boolean isOnlyLibertyFeatures(List<String> featuresToInstall) throws PluginExecutionException {
-        boolean result = containsIgnoreCase(getLibertyFeatureSet(downloadedJsons), featuresToInstall);
-        debug("Is installing only Open or WebSphere Liberty features? " + result);
+    private boolean isOnlyOpenLibertyFeatures(List<String> featuresToInstall) throws PluginExecutionException {
+        boolean result = containsIgnoreCase(getOpenLibertyFeatureSet(downloadedJsons), featuresToInstall);
+        debug("Is installing only Open Liberty features? " + result);
         return result;
     }
     
@@ -646,8 +645,8 @@ public abstract class InstallFeatureUtil {
         debug("JSON repos: " + jsonRepos);
         info("Installing features: " + featuresToInstall);
         
-        // override license acceptance if installing only Open or WebSphere Liberty features
-        boolean acceptLicenseMapValue = isOnlyLibertyFeatures(featuresToInstall) ? true : isAcceptLicense;
+        // override license acceptance if installing only Open Liberty features
+        boolean acceptLicenseMapValue = isOnlyOpenLibertyFeatures(featuresToInstall) ? true : isAcceptLicense;
 
         try {
             Map<String, Object> mapBasedInstallKernel = createMapBasedInstallKernelInstance(installDirectory);
