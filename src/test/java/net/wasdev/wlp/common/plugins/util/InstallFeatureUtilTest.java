@@ -208,8 +208,8 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         assertEquals("Feature set " + featuresString + " does not have the expected number of features.", 2, features.size());
         assertTrue("Feature set " + featuresString + " does not contain expected Open Liberty feature com.ibm.websphere.appserver.anno-1.0", features.contains("com.ibm.websphere.appserver.anno-1.0"));
         assertTrue("Feature set " + featuresString + " does not contain expected Open Liberty feature appClientSupport-1.0", features.contains("appClientSupport-1.0"));
-        assertTrue("Feature set " + featuresString + " contains unexpected WebSphere Liberty feature adminCenter-1.0", !features.contains("adminCenter-1.0"));
-        assertTrue("Feature set " + featuresString + " contains unexpected WebSphere Liberty feature com.ibm.websphere.appserver.adminCenter.collectiveController-1.0", !features.contains("com.ibm.websphere.appserver.adminCenter.collectiveController-1.0"));
+        assertFalse("Feature set " + featuresString + " contains unexpected WebSphere Liberty feature adminCenter-1.0", features.contains("adminCenter-1.0"));
+        assertFalse("Feature set " + featuresString + " contains unexpected WebSphere Liberty feature com.ibm.websphere.appserver.adminCenter.collectiveController-1.0", features.contains("com.ibm.websphere.appserver.adminCenter.collectiveController-1.0"));
     }
     
     @Test
