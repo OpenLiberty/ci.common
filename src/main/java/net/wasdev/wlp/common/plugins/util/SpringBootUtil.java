@@ -19,12 +19,16 @@ import java.io.File;
 import java.io.IOException;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
+import java.util.jar.JarEntry;
 import java.util.jar.Manifest;
+
+import java.util.Enumeration;
 
 public class SpringBootUtil {
 
     public static final String BOOT_VERSION_ATTRIBUTE = "Spring-Boot-Version";
     public static final String BOOT_START_CLASS_ATTRIBUTE = "Start-Class";
+    public static final String BOOT_JAR_EXPRESSION = "BOOT-INF/lib/spring-boot-\\d[\\.]\\d[\\.]\\d.RELEASE.jar";
     
     /**
      * Check whether the given artifact is a Spring Boot Uber JAR
@@ -43,6 +47,15 @@ public class SpringBootUtil {
                 if(attributes.getValue(BOOT_VERSION_ATTRIBUTE) != null
                         && attributes.getValue(BOOT_START_CLASS_ATTRIBUTE) != null) {
                     return true;
+                } else { //Checking that there is a spring-boot-VERSION.RELEASE.jar in the BOOT-INF/lib directory
+                         //Handles the Gradle case where the spring plugin does not set the properties in the manifest
+                    Enumeration<JarEntry> entries = jarFile.entries();
+                    while(entries.hasMoreElements()) {
+                        JarEntry entry = entries.nextElement();
+                        if (entry.getName().matches(BOOT_JAR_EXPRESSION)) {
+                            return true;
+                        }
+                    }
                 }
             }
         } catch (IOException e) {}
