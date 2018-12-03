@@ -51,6 +51,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import net.wasdev.wlp.common.plugins.config.XmlDocument;
+
 /**
  * Utility class to install features from Maven repositories.
  */
