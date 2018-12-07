@@ -6,8 +6,11 @@ import java.io.IOException;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 
+import org.apache.commons.io.FileUtils;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
+
+import net.wasdev.wlp.common.plugins.util.PluginExecutionException;
 
 public abstract class LooseApplication {
     
@@ -56,7 +59,7 @@ public abstract class LooseApplication {
         }
     }
     
-    public void addManifestFile(Element parent, Object...params) throws Exception {
+    public void addManifestFileWithParent(Element parent, Object...params) throws Exception {
         config.addFile(parent, getManifestOrDefault(params), MANIFEST_TARGET);
     }
     
@@ -69,7 +72,6 @@ public abstract class LooseApplication {
      * Params are as follows:
      * Maven:
      *  - project: MavenProject
-     *  - pluginGroupId: String
      *  - pluginArtifactId: String
      *  Gradle:
      *  - 
@@ -77,26 +79,26 @@ public abstract class LooseApplication {
      * @param params
      * @return
      */
-    public abstract File getManifestFile(Object...params);
+    public abstract File getManifestFile(Object...params) throws PluginExecutionException;
     
-    private File getManifestOrDefault(Object...params) throws IOException {
+    private File getManifestOrDefault(Object...params) throws IOException, PluginExecutionException {
         File manifestFile = getManifestFile(params);
+        File defaultManifestFileLocation = new File(buildDirectory + "/tmp" + MANIFEST_TARGET);
+        defaultManifestFileLocation.getParentFile().mkdirs();
         if(manifestFile != null && manifestFile.exists() && manifestFile.isFile()) {
-            return manifestFile;
+            // Copy the file to a good location (guaranteed inside META-INF folder)
+            // See https://github.com/WASdev/ci.gradle/issues/286
+            FileUtils.copyFile(manifestFile, defaultManifestFileLocation);
         }
-        return getDefaultManifest();
+        else {
+            // Generate the manifest file at the good location
+            FileOutputStream fos = new FileOutputStream(defaultManifestFileLocation);
+            Manifest manifest = new Manifest();
+            manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+            manifest.write(fos);
+            fos.close();
+        }
+        return defaultManifestFileLocation;
     }
     
-    private File getDefaultManifest() throws IOException {
-        File defaultMF = new File(buildDirectory + "/tmp" + MANIFEST_TARGET);
-        defaultMF.getParentFile().mkdirs();
-        FileOutputStream fos = new FileOutputStream(defaultMF);
-        
-        Manifest manifest = new Manifest();
-        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        manifest.write(fos);
-        fos.close();
-        return defaultMF;
-    }
-
 }
