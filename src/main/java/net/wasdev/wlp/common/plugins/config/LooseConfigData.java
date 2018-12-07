@@ -16,9 +16,11 @@
 package net.wasdev.wlp.common.plugins.config;
 
 import java.io.File;
+import java.io.IOException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
 
 public class LooseConfigData extends XmlDocument {
@@ -27,29 +29,29 @@ public class LooseConfigData extends XmlDocument {
         createDocument("archive");
     }
     
-    public void addDir(String src, String target) {
-        if (new File(src).exists()) {
+    public void addDir(File src, String target) throws DOMException, IOException {
+        if (src != null && src.exists() && src.isDirectory()) {
             addDir(doc.getDocumentElement(), src, target);
         }
     }
     
-    public void addDir(Element parent, String src, String target) {
-        if (new File(src).exists()) {
+    public void addDir(Element parent, File src, String target) throws DOMException, IOException {
+        if (src != null && src.exists() && src.isDirectory()) {
             Element child = doc.createElement("dir");
-            addElement(parent, child, target, src);
+            addElement(parent, child, src, target);
         }
     }
     
-    public void addFile(String src, String target) {
-        if (new File(src).exists()) {
+    public void addFile(File src, String target) throws DOMException, IOException {
+        if (src != null && src.exists() && src.isFile()) {
             addFile(doc.getDocumentElement(), src, target);
         }
     }
     
-    public void addFile(Element parent, String src, String target) {
-        if (new File(src).exists()) {
+    public void addFile(Element parent, File src, String target) throws DOMException, IOException {
+        if (src != null && src.exists() && src.isFile()) {
             Element child = doc.createElement("file");
-            addElement(parent, child, target, src);
+            addElement(parent, child, src, target);
         }
     }
     
@@ -63,9 +65,9 @@ public class LooseConfigData extends XmlDocument {
         return child;
     }
     
-    public void addArchive(String src, String target) {
+    public void addArchive(File src, String target) throws DOMException, IOException {
         Element child = addArchive(target);
-        addElement(child, doc.createElement("dir"), "/", src);
+        addElement(child, doc.createElement("dir"), src, "/");
     }
     
     public void toXmlFile(File xmlFile) throws Exception {        
@@ -76,13 +78,13 @@ public class LooseConfigData extends XmlDocument {
         return doc.getDocumentElement();
     }
     
-    private void addElement(Element parent, Element child, String targetAttr, String srcAttr) {
-        child.setAttribute("sourceOnDisk", srcAttr);
-        addElement(parent, child, targetAttr);
+    private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
+        child.setAttribute("sourceOnDisk", src.getCanonicalPath());
+        addElement(parent, child, target);
     }
     
-    private void addElement(Element parent, Element child, String targetAttr) {
-        child.setAttribute("targetInArchive", targetAttr);
+    private void addElement(Element parent, Element child, String target) {
+        child.setAttribute("targetInArchive", target);
         parent.appendChild(child);
     }
 }
