@@ -59,30 +59,15 @@ public abstract class LooseApplication {
         }
     }
     
-    public void addManifestFileWithParent(Element parent, Object...params) throws Exception {
-        config.addFile(parent, getManifestOrDefault(params), MANIFEST_TARGET);
+    public void addManifestFileWithParent(Element parent, File manifestFile) throws Exception {
+        config.addFile(parent, getManifestOrDefault(manifestFile), MANIFEST_TARGET);
     }
     
-    public void addManifestFile(Object...params) throws Exception {
-        config.addFile(getManifestOrDefault(params), MANIFEST_TARGET);
-    }
+    public void addManifestFile(File manifestFile) throws Exception {
+        config.addFile(getManifestOrDefault(manifestFile), MANIFEST_TARGET);
+    } 
     
-    /**
-     * Abstract method to be implemented for manifest file retrieval.
-     * Params are as follows:
-     * Maven:
-     *  - project: MavenProject
-     *  - pluginArtifactId: String
-     *  Gradle:
-     *  - 
-     * 
-     * @param params
-     * @return
-     */
-    public abstract File getManifestFile(Object...params) throws PluginExecutionException;
-    
-    private File getManifestOrDefault(Object...params) throws IOException, PluginExecutionException {
-        File manifestFile = getManifestFile(params);
+    private File getManifestOrDefault(File manifestFile) throws IOException, PluginExecutionException {
         File defaultManifestFileLocation = new File(buildDirectory + "/tmp" + MANIFEST_TARGET);
         defaultManifestFileLocation.getParentFile().mkdirs();
         if(manifestFile != null && manifestFile.exists() && manifestFile.isFile()) {
