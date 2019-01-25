@@ -166,17 +166,25 @@ public abstract class InstallFeatureUtil {
             throws PluginExecutionException;
     
     /**
-     * Combine the given String collections into a set
+     * Combine the given String collections into a set using case-insensitive matching.
+     * If there are multiple instances of the same string but with different capitalization, 
+     * only the first one found will be included.
      * 
      * @param collections a collection of strings
-     * @return the combined set of strings
+     * @return the combined set of strings, ignoring case
      */
     @SafeVarargs
     public static Set<String> combineToSet(Collection<String>... collections) {
         Set<String> result = new HashSet<String>();
+        Set<String> lowercaseSet = new HashSet<String>();
         for (Collection<String> collection : collections) {
             if (collection != null) {
-                result.addAll(collection);
+                for (String value : collection) {
+                    if (!lowercaseSet.contains(value.toLowerCase())) {
+                        lowercaseSet.add(value.toLowerCase());
+                        result.add(value);
+                    }
+                }
             }
         }
         return result;
