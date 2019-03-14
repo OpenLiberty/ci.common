@@ -29,6 +29,7 @@ public class SpringBootUtil {
     public static final String BOOT_VERSION_ATTRIBUTE = "Spring-Boot-Version";
     public static final String BOOT_START_CLASS_ATTRIBUTE = "Start-Class";
     public static final String BOOT_JAR_EXPRESSION = "BOOT-INF/lib/spring-boot-\\d[\\.]\\d[\\.]\\d.RELEASE.jar";
+    public static final String BOOT_WAR_EXPRESSION = "WEB-INF/lib/spring-boot-\\d[\\.]\\d[\\.]\\d.RELEASE.jar";
     
     /**
      * Check whether the given artifact is a Spring Boot Uber JAR
@@ -52,9 +53,10 @@ public class SpringBootUtil {
                     Enumeration<JarEntry> entries = jarFile.entries();
                     while(entries.hasMoreElements()) {
                         JarEntry entry = entries.nextElement();
-                        if (entry.getName().matches(BOOT_JAR_EXPRESSION)) {
+                        String entryName = entry.getName();
+                        if (!entryName.startsWith("org") && (entryName.matches(BOOT_JAR_EXPRESSION) || entryName.matches(BOOT_WAR_EXPRESSION))) {                        
                             return true;
-                        }
+                        }         
                     }
                 }
             }
