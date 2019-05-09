@@ -39,7 +39,8 @@ public class LibertyManagedObject {
      *
      */
     public enum LibertyManagedProperty implements LibertyProperty.LibertyPropertyI {
-        serverStartTimeout, 
+        serverStartTimeout,
+        serverStopTimeout, 
         appDeployTimeout, 
         appUndeployTimeout, 
         sharedLib, 
@@ -50,8 +51,10 @@ public class LibertyManagedObject {
         failSafeUndeployment, 
         outputToConsole, 
         allowConnectingToRunningServer, 
-        verifyApps, 
-        verifyAppDeployTimeout;
+        verifyApps,
+        verifyAppDeployTimeout,
+        fileDeleteRetries,
+        standardFileDeleteRetryInterval;
     }
 
     private static final String XML_START 
