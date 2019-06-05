@@ -20,10 +20,26 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.nio.file.Watchable;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
+
+import org.apache.commons.io.FileUtils;
+
+import com.sun.nio.file.SensitivityWatchEventModifier;
 
 /**
  * Utility class for dev mode.
@@ -32,12 +48,14 @@ public abstract class DevUtil {
 
     /**
      * Log debug
+     * 
      * @param msg
      */
     public abstract void debug(String msg);
 
     /**
      * Log debug
+     * 
      * @param msg
      * @param e
      */
@@ -45,30 +63,35 @@ public abstract class DevUtil {
 
     /**
      * Log debug
+     * 
      * @param e
      */
     public abstract void debug(Throwable e);
 
     /**
      * Log warning
+     * 
      * @param msg
      */
     public abstract void warn(String msg);
 
     /**
      * Log info
+     * 
      * @param msg
      */
     public abstract void info(String msg);
 
     /**
      * Log error
+     * 
      * @param msg
      */
     public abstract void error(String msg);
 
     /**
      * Returns whether debug is enabled by the current logger
+     * 
      * @return whether debug is enabled
      */
     public abstract boolean isDebugEnabled();
@@ -78,13 +101,50 @@ public abstract class DevUtil {
      */
     public abstract void stopServer();
 
+    /**
+     * Starts the default server
+     */
+    public abstract void startServer();
+
+    /**
+     * Updates artifacts of current project
+     */
+    public abstract void getArtifacts(List<String> artifactPaths);
+
+    /**
+     * Recompile Java files
+     * 
+     * @param javaFilesChanged
+     * @param artifactPaths
+     * @param executor
+     * @param tests
+     */
+    public abstract void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths,
+            ThreadPoolExecutor executor, boolean tests);
+
+    /**
+     * Recompile the build file
+     * @param buildFile
+     * @param artifactPaths
+     */
+    public abstract void recompileBuildFile(File buildFile, List<String> artifactPaths);
+
     private List<String> jvmOptions;
 
     private File serverDirectory;
+    private File sourceDirectory;
+    private File testSourceDirectory;
+    private File configDirectory;
+    private List<File> resourceDirs;
 
-    public DevUtil(List<String> jvmOptions, File serverDirectory) {
+    public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
+            File configDirectory, List<File> resourceDirs) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
+        this.sourceDirectory = sourceDirectory;
+        this.testSourceDirectory = testSourceDirectory;
+        this.configDirectory = configDirectory;
+        this.resourceDirs = resourceDirs;
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
@@ -132,8 +192,7 @@ public abstract class DevUtil {
         // creating jvm.options file to open a debug port
         debug("jvmOptions: " + jvmOptions);
         if (jvmOptions != null && !jvmOptions.isEmpty()) {
-            warn(
-                    "Cannot start liberty:dev in debug mode because jvmOptions are specified in the server configuration");
+            warn("Cannot start liberty:dev in debug mode because jvmOptions are specified in the server configuration");
         } else {
             File jvmOptionsFile = new File(serverDirectory.getAbsolutePath() + "/jvm.options");
             if (jvmOptionsFile.exists()) {
@@ -158,6 +217,174 @@ public abstract class DevUtil {
                 info("Successfully created liberty:dev jvm.options file");
             }
         }
+    }
+    
+    public void watchFiles(Path srcPath, Path testSrcPath, Path configPath, File buildFile, File outputDirectory,
+            File testOutputDirectory, final ThreadPoolExecutor executor, List<String> artifactPaths,
+            boolean noConfigDir, File configFile) throws Exception {
+        
+        try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
+            registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
+            registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
+            registerAll(this.configDirectory.toPath(), configPath, watcher);
+            for (File resourceDir : resourceDirs) {
+                registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
+            }
+
+            buildFile.getParentFile().toPath().register(
+                    watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+                            StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
+                    SensitivityWatchEventModifier.HIGH);
+            debug("Registering watchservice directory: " + buildFile.getParentFile().toPath());
+
+            while (true) {
+                final WatchKey wk = watcher.take();
+                for (WatchEvent<?> event : wk.pollEvents()) {
+                    final Path changed = (Path) event.context();
+
+                    final Watchable watchable = wk.watchable();
+                    final Path directory = (Path) watchable;
+                    debug("Processing events for watched directory: " + directory);
+
+                    File fileChanged = new File(directory.toString(), changed.toString());
+                    debug("Changed: " + changed + "; " + event.kind());
+
+                    // resource file check
+                    File resourceParent = null;
+                    for (File resourceDir : resourceDirs) {
+                        if (directory.startsWith(resourceDir.toPath())) {
+                            resourceParent = resourceDir;
+                        }
+                    }
+
+                    // src/main/java directory
+                    if (directory.startsWith(this.sourceDirectory.toPath())) {
+                        ArrayList<File> javaFilesChanged = new ArrayList<File>();
+                        javaFilesChanged.add(fileChanged);
+                        if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                                && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                        || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                            debug("Java source file modified: " + fileChanged.getName());
+                            recompileJavaSource(javaFilesChanged, artifactPaths, executor);
+                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                            debug("Java file deleted: " + fileChanged.getName());
+                            deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+                        }
+                    } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
+                        ArrayList<File> javaFilesChanged = new ArrayList<File>();
+                        javaFilesChanged.add(fileChanged);
+                        if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                                && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                        || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                            recompileJavaTest(javaFilesChanged, artifactPaths, executor);
+                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                            debug("Java file deleted: " + fileChanged.getName());
+                            deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
+                        }
+                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
+                        if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                            if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                copyFile(fileChanged, this.configDirectory, serverDirectory);
+                            }
+                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                            if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                info("Config file deleted: " + fileChanged.getName());
+                                deleteFile(fileChanged, this.configDirectory, serverDirectory);
+                            }
+                        }
+                    } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
+                        debug("Resource dir: " + resourceParent.toString());
+                        debug("File within resource directory");
+                        if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                            copyFile(fileChanged, resourceParent, outputDirectory);
+                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                            debug("Resource file deleted: " + fileChanged.getName());
+                            deleteFile(fileChanged, resourceParent, outputDirectory);
+                        }
+                    } else if (fileChanged.equals(buildFile) && directory.startsWith(buildFile.getParentFile().toPath())
+                            && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
+                        recompileBuildFile(buildFile, artifactPaths);
+                    }
+                }
+                // reset the key
+                boolean valid = wk.reset();
+                if (!valid) {
+                    info("WatchService key has been unregistered");
+                }
+            }
+        }
+    }
+
+    public String readFile(File file) throws IOException {
+        return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
+    }
+
+    public void copyFile(File fileChanged, File srcDir, File targetDir) throws IOException {
+        String relPath = fileChanged.getAbsolutePath().substring(
+                fileChanged.getAbsolutePath().indexOf(srcDir.getAbsolutePath()) + srcDir.getAbsolutePath().length());
+
+        File targetResource = new File(targetDir.getAbsolutePath() + relPath);
+        info("Copying file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
+        FileUtils.copyFile(fileChanged, targetResource);
+    }
+
+    protected void deleteFile(File deletedFile, File dir, File targetDir) {
+        debug("File that was deleted: " + deletedFile.getAbsolutePath());
+        String relPath = deletedFile.getAbsolutePath().substring(
+                deletedFile.getAbsolutePath().indexOf(dir.getAbsolutePath()) + dir.getAbsolutePath().length());
+        File targetFile = new File(targetDir.getAbsolutePath() + relPath);
+        debug("Target file exists: " + targetFile.exists());
+        if (targetFile.exists()) {
+            targetFile.delete();
+            info("Deleted file: " + targetFile.getAbsolutePath());
+        }
+    }
+
+    protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
+        // register directory and sub-directories
+        Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                debug("Registering watchservice directory: " + dir.toString());
+                dir.register(watcher,
+                        new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+                                StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
+                        SensitivityWatchEventModifier.HIGH);
+                return FileVisitResult.CONTINUE;
+            }
+
+        });
+    }
+
+    protected void deleteJavaFile(File fileChanged, File classesDir, File compileSourceRoot) {
+        if (fileChanged.getName().endsWith(".java")) {
+            String fileName = fileChanged.getName().substring(0, fileChanged.getName().indexOf(".java"));
+            File parentFile = fileChanged.getParentFile();
+            String relPath = parentFile.getAbsolutePath()
+                    .substring(parentFile.getAbsolutePath().indexOf(compileSourceRoot.getAbsolutePath())
+                            + compileSourceRoot.getAbsolutePath().length())
+                    + "/" + fileName + ".class";
+            File targetFile = new File(classesDir.getAbsolutePath() + relPath);
+
+            if (targetFile.exists()) {
+                targetFile.delete();
+                info("Java class deleted: " + targetFile.getAbsolutePath());
+            }
+        } else {
+            debug("File deleted but was not a java file: " + fileChanged.getName());
+        }
+    }
+
+    protected void recompileJavaSource(List<File> javaFilesChanged, List<String> artifactPaths,
+            ThreadPoolExecutor executor) throws Exception {
+        recompileJava(javaFilesChanged, artifactPaths, executor, false);
+    }
+
+    protected void recompileJavaTest(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor)
+            throws Exception {
+        recompileJava(javaFilesChanged, artifactPaths, executor, true);
     }
 
 }
