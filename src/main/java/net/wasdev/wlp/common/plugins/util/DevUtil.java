@@ -20,6 +20,9 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -33,9 +36,24 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
+
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.StandardLocation;
+import javax.tools.ToolProvider;
 
 import org.apache.commons.io.FileUtils;
 
@@ -112,22 +130,17 @@ public abstract class DevUtil {
     public abstract void getArtifacts(List<String> artifactPaths);
 
     /**
-     * Recompile Java files
-     * 
-     * @param javaFilesChanged
-     * @param artifactPaths
-     * @param executor
-     * @param tests
-     */
-    public abstract void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, boolean tests);
-
-    /**
      * Recompile the build file
+     * 
      * @param buildFile
      * @param artifactPaths
      */
     public abstract void recompileBuildFile(File buildFile, List<String> artifactPaths);
+
+    public abstract int getMessageOccurrences(String regexp, File logFile);
+
+    public abstract void runTestThread(ThreadPoolExecutor executor, String regexp, File logFile,
+            int messageOccurrences);
 
     private List<String> jvmOptions;
 
@@ -136,15 +149,19 @@ public abstract class DevUtil {
     private File testSourceDirectory;
     private File configDirectory;
     private List<File> resourceDirs;
+    boolean skipTests;
+    boolean skipITs;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs) {
+            File configDirectory, List<File> resourceDirs, boolean skipTests, boolean skipITs) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.resourceDirs = resourceDirs;
+        this.skipTests = skipTests;
+        this.skipITs = skipITs;
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
@@ -218,11 +235,11 @@ public abstract class DevUtil {
             }
         }
     }
-    
+
     public void watchFiles(Path srcPath, Path testSrcPath, Path configPath, File buildFile, File outputDirectory,
             File testOutputDirectory, final ThreadPoolExecutor executor, List<String> artifactPaths,
             boolean noConfigDir, File configFile) throws Exception {
-        
+
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
             registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
             registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
@@ -265,7 +282,8 @@ public abstract class DevUtil {
                                 && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                         || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                             debug("Java source file modified: " + fileChanged.getName());
-                            recompileJavaSource(javaFilesChanged, artifactPaths, executor);
+                            recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                    testOutputDirectory);
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             debug("Java file deleted: " + fileChanged.getName());
                             deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
@@ -276,12 +294,14 @@ public abstract class DevUtil {
                         if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                 && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                         || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            recompileJavaTest(javaFilesChanged, artifactPaths, executor);
+                            recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                    testOutputDirectory);
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             debug("Java file deleted: " + fileChanged.getName());
                             deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
                         }
-                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
+                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config
+                                                                                      // files
                         if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                             if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
@@ -378,13 +398,136 @@ public abstract class DevUtil {
     }
 
     protected void recompileJavaSource(List<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor) throws Exception {
-        recompileJava(javaFilesChanged, artifactPaths, executor, false);
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
+        recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
     }
 
-    protected void recompileJavaTest(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor)
-            throws Exception {
-        recompileJava(javaFilesChanged, artifactPaths, executor, true);
+    protected void recompileJavaTest(List<File> javaFilesChanged, List<String> artifactPaths,
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
+        recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
+    }
+
+    protected void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
+            boolean tests, File outputDirectory, File testOutputDirectory) {
+        try {
+            File logFile = null;
+            String regexp = null;
+            int messageOccurrences = -1;
+            if (!(this.skipTests || this.skipITs)) {
+                getMessageOccurrences(regexp, logFile);
+            }
+
+            // source root is src/main/java or src/test/java
+            File classesDir = tests ? testOutputDirectory : outputDirectory;
+
+            List<String> optionList = new ArrayList<>();
+            List<File> outputDirs = new ArrayList<File>();
+
+            if (tests) {
+                outputDirs.add(outputDirectory);
+                outputDirs.add(testOutputDirectory);
+            } else {
+                outputDirs.add(outputDirectory);
+            }
+            Set<File> classPathElems = getClassPath(artifactPaths, outputDirs);
+
+            JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+            StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
+
+            fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
+            fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
+
+            Iterable<? extends JavaFileObject> compilationUnits = fileManager
+                    .getJavaFileObjectsFromFiles(javaFilesChanged);
+
+            JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
+                    compilationUnits);
+            boolean didCompile = task.call();
+            if (didCompile) {
+                if (tests) {
+                    info("Tests compilation was successful.");
+                } else {
+                    info("Source compilation was successful.");
+                }
+
+                // run tests after successful compile
+                if (tests) {
+                    // if only tests were compiled, don't need to wait for
+                    // app to update
+                    runTestThread(executor, null, null, -1);
+                } else {
+                    runTestThread(executor, regexp, logFile, messageOccurrences);
+                }
+            } else {
+                if (tests) {
+                    info("Tests compilation had errors.");
+                } else {
+                    info("Source compilation had errors.");
+                }
+            }
+        } catch (Exception e) {
+            debug("Error compiling java files", e);
+        }
+    }
+
+    protected Set<File> getClassPath(List<String> artifactPaths, List<File> outputDirs) {
+        List<URL> urls = new ArrayList<>();
+        ClassLoader c = Thread.currentThread().getContextClassLoader();
+        while (c != null) {
+            if (c instanceof URLClassLoader) {
+                urls.addAll(Arrays.asList(((URLClassLoader) c).getURLs()));
+            }
+            c = c.getParent();
+        }
+
+        Set<String> parsedFiles = new HashSet<>();
+        Deque<String> toParse = new ArrayDeque<>();
+        for (URL url : urls) {
+            toParse.add(new File(url.getPath()).getAbsolutePath());
+        }
+
+        for (String artifactPath : artifactPaths) {
+            toParse.add(new File(artifactPath).getAbsolutePath());
+        }
+
+        Set<File> classPathElements = new HashSet<>();
+        classPathElements.addAll(outputDirs);
+        while (!toParse.isEmpty()) {
+            String s = toParse.poll();
+            if (!parsedFiles.contains(s)) {
+                parsedFiles.add(s);
+                File file = new File(s);
+                if (file.exists() && file.getName().endsWith(".jar")) {
+                    classPathElements.add(file);
+                    if (!file.isDirectory() && file.getName().endsWith(".jar")) {
+                        try (JarFile jar = new JarFile(file)) {
+                            Manifest mf = jar.getManifest();
+                            if (mf == null || mf.getMainAttributes() == null) {
+                                continue;
+                            }
+                            Object classPath = mf.getMainAttributes().get(Attributes.Name.CLASS_PATH);
+                            if (classPath != null) {
+                                for (String i : classPath.toString().split(" ")) {
+                                    File f;
+                                    try {
+                                        URL u = new URL(i);
+                                        f = new File(u.getPath());
+                                    } catch (MalformedURLException e) {
+                                        f = new File(file.getParentFile(), i);
+                                    }
+                                    if (f.exists()) {
+                                        toParse.add(f.getAbsolutePath());
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            throw new RuntimeException("Failed to open class path file " + file, e);
+                        }
+                    }
+                }
+            }
+        }
+        return classPathElements;
     }
 
 }
