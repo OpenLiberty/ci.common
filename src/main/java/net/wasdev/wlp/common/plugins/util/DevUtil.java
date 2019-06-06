@@ -44,6 +44,7 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
@@ -138,25 +139,22 @@ public abstract class DevUtil {
     public abstract void recompileBuildFile(File buildFile, List<String> artifactPaths);
 
     /**
-     * Get the message occurrences for Java recompile
+     * Get the number of times the application updated message has appeared in the application log
      * 
-     * @param regexp
-     * @param logFile
-     * @return
+     * @return 
      */
-    public abstract int getMessageOccurrences(String regexp, File logFile);
+    public abstract int countApplicationUpdatedMessages();
 
     /**
-     * Run tests for Java recompile
+     * Run unit and/or integration tests
      * 
-     * @param executor
-     * @param regexp
-     * @param logFile
-     * @param messageOccurrences
+     * @param waitForApplicationUpdate Whether to wait for the application to update before running integration tests
+     * @param messageOccurrences The previous number of times the application updated message has appeared.
+     * @param executor The thread pool executor
+     * @param forceSkipUTs Whether to force skip the unit tests
      */
-    public abstract void runTestThread(ThreadPoolExecutor executor, String regexp, File logFile,
-            int messageOccurrences);
-    
+    public abstract void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs);
+
     /**
      * Check the configuration file for new features
      * 
@@ -171,19 +169,15 @@ public abstract class DevUtil {
     private File testSourceDirectory;
     private File configDirectory;
     private List<File> resourceDirs;
-    boolean skipTests;
-    boolean skipITs;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs, boolean skipTests, boolean skipITs) {
+            File configDirectory, List<File> resourceDirs) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.resourceDirs = resourceDirs;
-        this.skipTests = skipTests;
-        this.skipITs = skipITs;
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
@@ -432,12 +426,7 @@ public abstract class DevUtil {
     protected void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
             boolean tests, File outputDirectory, File testOutputDirectory) {
         try {
-            File logFile = null;
-            String regexp = null;
-            int messageOccurrences = -1;
-            if (!(this.skipTests || this.skipITs)) {
-                getMessageOccurrences(regexp, logFile);
-            }
+            int messageOccurrences = countApplicationUpdatedMessages();
 
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
@@ -476,9 +465,9 @@ public abstract class DevUtil {
                 if (tests) {
                     // if only tests were compiled, don't need to wait for
                     // app to update
-                    runTestThread(executor, null, null, -1);
+                    runTestThread(false, executor, -1, false);
                 } else {
-                    runTestThread(executor, regexp, logFile, messageOccurrences);
+                    runTestThread(true, executor, messageOccurrences, false);
                 }
             } else {
                 if (tests) {
@@ -550,6 +539,41 @@ public abstract class DevUtil {
             }
         }
         return classPathElements;
+    }
+
+    /**
+     * Runt tests in a new thread.
+     * 
+     * @param waitForApplicationUpdate whether it should wait for the application to update before running integration tests
+     * @param executor the thread pool executor
+     * @param messageOccurrences how many times the application updated message has occurred in the log
+     * @param forceSkipUTs whether to force skip the unit tests
+     */
+    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences, boolean forceSkipUTs) {
+        try {
+            executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs));
+        } catch (RejectedExecutionException e) {
+            debug("Cannot add thread since max threads reached", e);
+        }
+    }
+
+    private class TestJob implements Runnable {
+        private boolean waitForApplicationUpdate;
+        private int messageOccurrences;
+        private ThreadPoolExecutor executor;
+        private boolean forceSkipUTs;
+
+        public TestJob(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs) {
+            this.waitForApplicationUpdate = waitForApplicationUpdate;
+            this.messageOccurrences = messageOccurrences;
+            this.executor = executor;
+            this.forceSkipUTs = forceSkipUTs;
+        }
+
+        @Override
+        public void run() {
+            runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs);
+        }
     }
 
 }
