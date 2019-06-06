@@ -137,10 +137,32 @@ public abstract class DevUtil {
      */
     public abstract void recompileBuildFile(File buildFile, List<String> artifactPaths);
 
+    /**
+     * Get the message occurrences for Java recompile
+     * 
+     * @param regexp
+     * @param logFile
+     * @return
+     */
     public abstract int getMessageOccurrences(String regexp, File logFile);
 
+    /**
+     * Run tests for Java recompile
+     * 
+     * @param executor
+     * @param regexp
+     * @param logFile
+     * @param messageOccurrences
+     */
     public abstract void runTestThread(ThreadPoolExecutor executor, String regexp, File logFile,
             int messageOccurrences);
+    
+    /**
+     * Check the configuration file for new features
+     * 
+     * @param configFile
+     */
+    public abstract void checkConfigFile(File configFile);
 
     private List<String> jvmOptions;
 
@@ -300,11 +322,11 @@ public abstract class DevUtil {
                             debug("Java file deleted: " + fileChanged.getName());
                             deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
                         }
-                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config
-                                                                                      // files
+                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
                         if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                             if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                checkConfigFile(fileChanged);
                                 copyFile(fileChanged, this.configDirectory, serverDirectory);
                             }
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
