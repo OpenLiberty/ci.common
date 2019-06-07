@@ -156,7 +156,7 @@ public abstract class DevUtil {
      */
     public abstract void runTestThread(ThreadPoolExecutor executor, String regexp, File logFile,
             int messageOccurrences);
-    
+
     /**
      * Check the configuration file for new features
      * 
@@ -263,9 +263,12 @@ public abstract class DevUtil {
             boolean noConfigDir, File configFile) throws Exception {
 
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
-            registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
-            registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
-            registerAll(this.configDirectory.toPath(), configPath, watcher);
+            if (this.sourceDirectory.exists())
+                registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
+            if (this.testSourceDirectory.exists())
+                registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
+            if (this.configDirectory.exists())
+                registerAll(this.configDirectory.toPath(), configPath, watcher);
             for (File resourceDir : resourceDirs) {
                 registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
             }
@@ -322,12 +325,13 @@ public abstract class DevUtil {
                             debug("Java file deleted: " + fileChanged.getName());
                             deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
                         }
-                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
+                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config
+                                                                                      // files
                         if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                             if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
-                                checkConfigFile(fileChanged);
                                 copyFile(fileChanged, this.configDirectory, serverDirectory);
+                                checkConfigFile(fileChanged);
                             }
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
