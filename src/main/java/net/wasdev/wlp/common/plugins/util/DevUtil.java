@@ -164,7 +164,7 @@ public abstract class DevUtil {
      * @param configFile
      */
     public abstract void checkConfigFile(File configFile);
-    
+
     public abstract boolean initialCompile(File dir);
 
     public abstract boolean compile(File dir);
@@ -329,7 +329,6 @@ public abstract class DevUtil {
                         final Watchable watchable = wk.watchable();
                         final Path directory = (Path) watchable;
                         debug("Processing events for watched directory: " + directory);
-
                         File fileChanged = new File(directory.toString(), changed.toString());
                         debug("Changed: " + changed + "; " + event.kind());
 
@@ -351,12 +350,14 @@ public abstract class DevUtil {
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 debug("Java source file modified: " + fileChanged.getName());
+
                                 // tests are run in recompileJavaSource
                                 recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
                                 deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+
                                 // run all tests since Java files were changed
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false);
                             }
@@ -366,12 +367,14 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+
                                 // tests are run in recompileJavaTest
                                 recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
                                 deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
+
                                 // run all tests without waiting for app update since only unit test source changed
                                 runTestThread(false, executor, -1, false);
                             }
@@ -382,6 +385,7 @@ public abstract class DevUtil {
                                 if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                     copyFile(fileChanged, this.configDirectory, serverDirectory);
                                     checkConfigFile(fileChanged);
+
                                     // run integration tests only since config files changed
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true);
                                 }
@@ -389,6 +393,7 @@ public abstract class DevUtil {
                                 if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                     info("Config file deleted: " + fileChanged.getName());
                                     deleteFile(fileChanged, this.configDirectory, serverDirectory);
+
                                     // run integration tests only since config file changed
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true);
                                 }
@@ -399,6 +404,7 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyFile(fileChanged, resourceParent, outputDirectory);
+
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
@@ -410,6 +416,7 @@ public abstract class DevUtil {
                         } else if (fileChanged.equals(buildFile)
                                 && directory.startsWith(buildFile.getParentFile().toPath())
                                 && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
+
                                     boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths);
                                     // run all tests on build file change
                                     if (recompiledBuild) {
@@ -422,14 +429,13 @@ public abstract class DevUtil {
                     if (!valid) {
                         debug("WatchService key has been unregistered");
                     }
+
                 } catch (InterruptedException | NullPointerException e) {
                     // do nothing let loop continue
-
                 }
             }
         }
     }
-    
 
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
@@ -546,7 +552,7 @@ public abstract class DevUtil {
             
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
-            
+
             List<String> optionList = new ArrayList<>();
             List<File> outputDirs = new ArrayList<File>();
 
@@ -563,7 +569,7 @@ public abstract class DevUtil {
 
             fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
             fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
-            
+
             Iterable<? extends JavaFileObject> compilationUnits = fileManager
                     .getJavaFileObjectsFromFiles(javaFilesChanged);
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
