@@ -163,6 +163,8 @@ public abstract class DevUtil {
      * @param configFile
      */
     public abstract void checkConfigFile(File configFile);
+    
+    public abstract boolean initialCompile(File dir);
 
     private List<String> jvmOptions;
 
@@ -258,28 +260,80 @@ public abstract class DevUtil {
         }
     }
 
-    public void watchFiles(Path srcPath, Path testSrcPath, Path configPath, File buildFile, File outputDirectory,
+    public void watchFiles(File buildFile, File outputDirectory,
             File testOutputDirectory, final ThreadPoolExecutor executor, List<String> artifactPaths,
             boolean noConfigDir, File configFile) throws Exception {
 
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
-            if (this.sourceDirectory.exists())
+            Path srcPath = sourceDirectory.getAbsoluteFile().toPath(); 
+            Path testSrcPath = testSourceDirectory.getAbsoluteFile().toPath();  
+            Path configPath = configDirectory.getAbsoluteFile().toPath(); 
+            
+            boolean sourceDirRegistered = false;
+            boolean testSourceDirRegistered = false;
+            boolean configDirRegistered = false;
+            
+            if (this.sourceDirectory.exists()){
                 registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
-            if (this.testSourceDirectory.exists())
+                sourceDirRegistered = true;
+            }
+            if (this.testSourceDirectory.exists()){
                 registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
-            if (this.configDirectory.exists())
+                testSourceDirRegistered = true;
+            }
+            if (this.configDirectory.exists()){
                 registerAll(this.configDirectory.toPath(), configPath, watcher);
+                configDirRegistered = true;
+            }
             for (File resourceDir : resourceDirs) {
-                registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
+                if (resourceDir.exists()){
+                    registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
+                } else {
+                    // add logic to  determine if resource dir should be watched
+                }
             }
 
             buildFile.getParentFile().toPath().register(
                     watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                             StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                     SensitivityWatchEventModifier.HIGH);
-            debug("Registering watchservice directory: " + buildFile.getParentFile().toPath());
+            debug("Watching directory: " + buildFile.getParentFile().toPath());
 
             while (true) {
+                // check if javaSourceDirectory has been added
+                if (!sourceDirRegistered && this.sourceDirectory.exists()){
+                    initialCompile(this.sourceDirectory);
+                    registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
+                    debug("Registering Java source directory: " + this.sourceDirectory);
+                    sourceDirRegistered = true;
+                } else if (!sourceDirRegistered && !this.sourceDirectory.exists()){
+                    sourceDirRegistered = false;
+                }
+                
+                // check if testSourceDirectory has been added
+                if (!testSourceDirRegistered && this.testSourceDirectory.exists()){
+                    initialCompile(this.testSourceDirectory);
+                    registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
+                    debug("Registering Java test directory: " + this.testSourceDirectory);
+                    testSourceDirRegistered = true;
+                } else if (!testSourceDirRegistered && !this.testSourceDirectory.exists()){
+                    testSourceDirRegistered = false;
+                }
+                
+                // check if config directory has been added
+                if (!configDirRegistered && this.configDirectory.exists()){
+                    registerAll(this.configDirectory.toPath(), configPath, watcher);
+                    debug("Registering configuration directory: " + this.configDirectory);
+                    configDirRegistered = true;
+                } else if (!configDirRegistered && !this.configDirectory.exists()){
+                    configDirRegistered = false;
+                }
+               
+                
+
+                // check if resource directories have been added
+                
+                
                 final WatchKey wk = watcher.take();
                 for (WatchEvent<?> event : wk.pollEvents()) {
                     final Path changed = (Path) event.context();
@@ -313,7 +367,7 @@ public abstract class DevUtil {
                             debug("Java file deleted: " + fileChanged.getName());
                             deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
                         }
-                    } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
+                    } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test 
                         ArrayList<File> javaFilesChanged = new ArrayList<File>();
                         javaFilesChanged.add(fileChanged);
                         if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
@@ -338,7 +392,7 @@ public abstract class DevUtil {
                                 info("Config file deleted: " + fileChanged.getName());
                                 deleteFile(fileChanged, this.configDirectory, serverDirectory);
                             }
-                        }
+                        }     
                     } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
                         debug("Resource dir: " + resourceParent.toString());
                         debug("File within resource directory");
@@ -353,15 +407,16 @@ public abstract class DevUtil {
                             && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
                         recompileBuildFile(buildFile, artifactPaths);
                     }
-                }
-                // reset the key
-                boolean valid = wk.reset();
-                if (!valid) {
-                    info("WatchService key has been unregistered");
+                    }
+                    // reset the key
+                    boolean valid = wk.reset();
+                    if (!valid) {
+                        info("WatchService key has been unregistered");
+                    }
                 }
             }
         }
-    }
+    
 
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
@@ -393,7 +448,7 @@ public abstract class DevUtil {
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                debug("Registering watchservice directory: " + dir.toString());
+                debug("Watching directory: " + dir.toString());
                 dir.register(watcher,
                         new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                                 StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
@@ -442,10 +497,9 @@ public abstract class DevUtil {
             if (!(this.skipTests || this.skipITs)) {
                 getMessageOccurrences(regexp, logFile);
             }
-
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
-
+            
             List<String> optionList = new ArrayList<>();
             List<File> outputDirs = new ArrayList<File>();
 
@@ -462,10 +516,9 @@ public abstract class DevUtil {
 
             fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
             fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
-
+            
             Iterable<? extends JavaFileObject> compilationUnits = fileManager
                     .getJavaFileObjectsFromFiles(javaFilesChanged);
-
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
                     compilationUnits);
             boolean didCompile = task.call();
