@@ -45,6 +45,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -163,7 +164,7 @@ public abstract class DevUtil {
      * @param configFile
      */
     public abstract void checkConfigFile(File configFile);
-    
+
     public abstract boolean initialCompile(File dir);
 
     private List<String> jvmOptions;
@@ -260,36 +261,36 @@ public abstract class DevUtil {
         }
     }
 
-    public void watchFiles(File buildFile, File outputDirectory,
-            File testOutputDirectory, final ThreadPoolExecutor executor, List<String> artifactPaths,
-            boolean noConfigDir, File configFile) throws Exception {
+    public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
+            final ThreadPoolExecutor executor, List<String> artifactPaths, boolean noConfigDir, File configFile)
+            throws Exception {
 
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
-            Path srcPath = sourceDirectory.getAbsoluteFile().toPath(); 
-            Path testSrcPath = testSourceDirectory.getAbsoluteFile().toPath();  
-            Path configPath = configDirectory.getAbsoluteFile().toPath(); 
-            
+            Path srcPath = sourceDirectory.getAbsoluteFile().toPath();
+            Path testSrcPath = testSourceDirectory.getAbsoluteFile().toPath();
+            Path configPath = configDirectory.getAbsoluteFile().toPath();
+
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
             boolean configDirRegistered = false;
-            
-            if (this.sourceDirectory.exists()){
+
+            if (this.sourceDirectory.exists()) {
                 registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
                 sourceDirRegistered = true;
             }
-            if (this.testSourceDirectory.exists()){
+
+            if (this.testSourceDirectory.exists()) {
                 registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
                 testSourceDirRegistered = true;
             }
-            if (this.configDirectory.exists()){
+
+            if (this.configDirectory.exists()) {
                 registerAll(this.configDirectory.toPath(), configPath, watcher);
                 configDirRegistered = true;
             }
             for (File resourceDir : resourceDirs) {
-                if (resourceDir.exists()){
+                if (resourceDir.exists()) {
                     registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
-                } else {
-                    // add logic to  determine if resource dir should be watched
                 }
             }
 
@@ -297,126 +298,126 @@ public abstract class DevUtil {
                     watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                             StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                     SensitivityWatchEventModifier.HIGH);
-            debug("Watching directory: " + buildFile.getParentFile().toPath());
+            debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
             while (true) {
+                // check if configDirectory has been added
+                if (!configDirRegistered && this.configDirectory.exists()) {
+                    initialCompile(this.configDirectory);
+                    registerAll(this.configDirectory.toPath(), configPath, watcher);
+                    debug("Registering configuration directory: " + this.configDirectory);
+                    configDirRegistered = true;
+                } else if (!configDirRegistered && !this.configDirectory.exists()) {
+                    configDirRegistered = false;
+                }
+
                 // check if javaSourceDirectory has been added
-                if (!sourceDirRegistered && this.sourceDirectory.exists()){
+                if (!sourceDirRegistered && this.sourceDirectory.exists()) {
                     initialCompile(this.sourceDirectory);
                     registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
                     debug("Registering Java source directory: " + this.sourceDirectory);
                     sourceDirRegistered = true;
-                } else if (!sourceDirRegistered && !this.sourceDirectory.exists()){
+                } else if (!sourceDirRegistered && !this.sourceDirectory.exists()) {
                     sourceDirRegistered = false;
                 }
-                
+
                 // check if testSourceDirectory has been added
-                if (!testSourceDirRegistered && this.testSourceDirectory.exists()){
+                if (!testSourceDirRegistered && this.testSourceDirectory.exists()) {
                     initialCompile(this.testSourceDirectory);
                     registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
                     testSourceDirRegistered = true;
-                } else if (!testSourceDirRegistered && !this.testSourceDirectory.exists()){
+                } else if (!testSourceDirRegistered && !this.testSourceDirectory.exists()) {
                     testSourceDirRegistered = false;
                 }
-                
-                // check if config directory has been added
-                if (!configDirRegistered && this.configDirectory.exists()){
-                    registerAll(this.configDirectory.toPath(), configPath, watcher);
-                    debug("Registering configuration directory: " + this.configDirectory);
-                    configDirRegistered = true;
-                } else if (!configDirRegistered && !this.configDirectory.exists()){
-                    configDirRegistered = false;
-                }
-               
-                
 
-                // check if resource directories have been added
-                
-                
-                final WatchKey wk = watcher.take();
-                for (WatchEvent<?> event : wk.pollEvents()) {
-                    final Path changed = (Path) event.context();
+                try {
+                    final WatchKey wk = watcher.poll(1, TimeUnit.SECONDS);
+                    for (WatchEvent<?> event : wk.pollEvents()) {
+                        final Path changed = (Path) event.context();
 
-                    final Watchable watchable = wk.watchable();
-                    final Path directory = (Path) watchable;
-                    debug("Processing events for watched directory: " + directory);
+                        final Watchable watchable = wk.watchable();
+                        final Path directory = (Path) watchable;
+                        info("Processing events for watched directory: " + directory);
 
-                    File fileChanged = new File(directory.toString(), changed.toString());
-                    debug("Changed: " + changed + "; " + event.kind());
+                        File fileChanged = new File(directory.toString(), changed.toString());
+                        info("Changed: " + changed + "; " + event.kind());
 
-                    // resource file check
-                    File resourceParent = null;
-                    for (File resourceDir : resourceDirs) {
-                        if (directory.startsWith(resourceDir.toPath())) {
-                            resourceParent = resourceDir;
-                        }
-                    }
-
-                    // src/main/java directory
-                    if (directory.startsWith(this.sourceDirectory.toPath())) {
-                        ArrayList<File> javaFilesChanged = new ArrayList<File>();
-                        javaFilesChanged.add(fileChanged);
-                        if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
-                                && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                        || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            debug("Java source file modified: " + fileChanged.getName());
-                            recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
-                                    testOutputDirectory);
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            debug("Java file deleted: " + fileChanged.getName());
-                            deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
-                        }
-                    } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test 
-                        ArrayList<File> javaFilesChanged = new ArrayList<File>();
-                        javaFilesChanged.add(fileChanged);
-                        if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
-                                && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                        || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
-                                    testOutputDirectory);
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            debug("Java file deleted: " + fileChanged.getName());
-                            deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
-                        }
-                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config
-                                                                                      // files
-                        if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
-                                copyFile(fileChanged, this.configDirectory, serverDirectory);
-                                checkConfigFile(fileChanged);
+                        // resource file check
+                        File resourceParent = null;
+                        for (File resourceDir : resourceDirs) {
+                            if (directory.startsWith(resourceDir.toPath())) {
+                                resourceParent = resourceDir;
                             }
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
-                                info("Config file deleted: " + fileChanged.getName());
-                                deleteFile(fileChanged, this.configDirectory, serverDirectory);
-                            }
-                        }     
-                    } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
-                        debug("Resource dir: " + resourceParent.toString());
-                        debug("File within resource directory");
-                        if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            copyFile(fileChanged, resourceParent, outputDirectory);
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            debug("Resource file deleted: " + fileChanged.getName());
-                            deleteFile(fileChanged, resourceParent, outputDirectory);
                         }
-                    } else if (fileChanged.equals(buildFile) && directory.startsWith(buildFile.getParentFile().toPath())
-                            && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
-                        recompileBuildFile(buildFile, artifactPaths);
-                    }
+
+                        // src/main/java directory
+                        if (directory.startsWith(this.sourceDirectory.toPath())) {
+                            ArrayList<File> javaFilesChanged = new ArrayList<File>();
+                            javaFilesChanged.add(fileChanged);
+                            if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                                    && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                            || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                debug("Java source file modified: " + fileChanged.getName());
+                                recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                        testOutputDirectory);
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                debug("Java file deleted: " + fileChanged.getName());
+                                deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+                            }
+                        } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
+                            ArrayList<File> javaFilesChanged = new ArrayList<File>();
+                            javaFilesChanged.add(fileChanged);
+                            if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                                    && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                            || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                        testOutputDirectory);
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                debug("Java file deleted: " + fileChanged.getName());
+                                deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
+                            }
+                        } else if (directory.startsWith(this.configDirectory.toPath())) { // config
+                                                                                          // files
+                            if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                    || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                    copyFile(fileChanged, this.configDirectory, serverDirectory);
+                                    checkConfigFile(fileChanged);
+                                }
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                    info("Config file deleted: " + fileChanged.getName());
+                                    deleteFile(fileChanged, this.configDirectory, serverDirectory);
+                                }
+                            }
+                        } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
+                            debug("Resource dir: " + resourceParent.toString());
+                            debug("File within resource directory");
+                            if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                    || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                copyFile(fileChanged, resourceParent, outputDirectory);
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                debug("Resource file deleted: " + fileChanged.getName());
+                                deleteFile(fileChanged, resourceParent, outputDirectory);
+                            }
+                        } else if (fileChanged.equals(buildFile)
+                                && directory.startsWith(buildFile.getParentFile().toPath())
+                                && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
+                            recompileBuildFile(buildFile, artifactPaths);
+                        }
                     }
                     // reset the key
                     boolean valid = wk.reset();
                     if (!valid) {
                         info("WatchService key has been unregistered");
                     }
+                } catch (InterruptedException e) {
+                    // do nothing let loop continue
                 }
             }
         }
-    
+    }
 
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
@@ -453,6 +454,7 @@ public abstract class DevUtil {
                         new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                                 StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                         SensitivityWatchEventModifier.HIGH);
+
                 return FileVisitResult.CONTINUE;
             }
 
@@ -499,7 +501,7 @@ public abstract class DevUtil {
             }
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
-            
+
             List<String> optionList = new ArrayList<>();
             List<File> outputDirs = new ArrayList<File>();
 
@@ -516,7 +518,7 @@ public abstract class DevUtil {
 
             fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
             fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
-            
+
             Iterable<? extends JavaFileObject> compilationUnits = fileManager
                     .getJavaFileObjectsFromFiles(javaFilesChanged);
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
