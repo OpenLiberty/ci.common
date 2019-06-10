@@ -164,6 +164,8 @@ public abstract class DevUtil {
      * @param configFile
      */
     public abstract void checkConfigFile(File configFile);
+    
+    public abstract boolean initialCompile(File dir);
 
     public abstract boolean compile(File dir);
 
@@ -422,10 +424,12 @@ public abstract class DevUtil {
                     }
                 } catch (InterruptedException | NullPointerException e) {
                     // do nothing let loop continue
+
                 }
             }
         }
     }
+    
 
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
@@ -539,10 +543,10 @@ public abstract class DevUtil {
             boolean tests, File outputDirectory, File testOutputDirectory) {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
-
+            
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
-
+            
             List<String> optionList = new ArrayList<>();
             List<File> outputDirs = new ArrayList<File>();
 
@@ -559,7 +563,7 @@ public abstract class DevUtil {
 
             fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
             fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
-
+            
             Iterable<? extends JavaFileObject> compilationUnits = fileManager
                     .getJavaFileObjectsFromFiles(javaFilesChanged);
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
