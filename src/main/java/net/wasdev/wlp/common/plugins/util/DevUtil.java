@@ -307,6 +307,7 @@ public abstract class DevUtil {
                     debug("Registering Java source directory: " + this.sourceDirectory);
                     sourceDirRegistered = true;
                 } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
+                    cleanTargetDir(outputDirectory);
                     sourceDirRegistered = false;
                 }
 
@@ -315,8 +316,10 @@ public abstract class DevUtil {
                     compile(this.testSourceDirectory);
                     registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
+                    runTestThread(executor, null, null, -1);
                     testSourceDirRegistered = true;
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
+                    cleanTargetDir(testOutputDirectory);
                     testSourceDirRegistered = false;
                 }
 
@@ -399,7 +402,7 @@ public abstract class DevUtil {
                     // reset the key
                     boolean valid = wk.reset();
                     if (!valid) {
-                        info("WatchService key has been unregistered");
+                        debug("WatchService key has been unregistered");
                     }
                 } catch (InterruptedException | NullPointerException e) {
                     // do nothing let loop continue
@@ -431,6 +434,21 @@ public abstract class DevUtil {
             targetFile.delete();
             info("Deleted file: " + targetFile.getAbsolutePath());
         }
+    }
+    
+    protected void cleanTargetDir(File outputDirectory){
+        File[] fList = outputDirectory.listFiles();
+        if (fList != null) {
+            for (File file : fList) {
+                if (file.isFile() && file.getName().toLowerCase().endsWith(".class")) {
+                   file.delete();
+                   info("Deleted Java class file: " + file);
+                } else if (file.isDirectory()) {
+                    cleanTargetDir(file);
+                }
+            }
+        }
+        
     }
 
     protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
