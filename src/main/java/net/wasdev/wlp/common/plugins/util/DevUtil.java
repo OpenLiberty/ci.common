@@ -165,8 +165,6 @@ public abstract class DevUtil {
      */
     public abstract void checkConfigFile(File configFile);
 
-    public abstract boolean initialCompile(File dir);
-
     public abstract boolean compile(File dir);
 
     private List<String> jvmOptions;
@@ -329,6 +327,7 @@ public abstract class DevUtil {
                         final Watchable watchable = wk.watchable();
                         final Path directory = (Path) watchable;
                         debug("Processing events for watched directory: " + directory);
+
                         File fileChanged = new File(directory.toString(), changed.toString());
                         debug("Changed: " + changed + "; " + event.kind());
 
@@ -429,7 +428,6 @@ public abstract class DevUtil {
                     if (!valid) {
                         debug("WatchService key has been unregistered");
                     }
-
                 } catch (InterruptedException | NullPointerException e) {
                     // do nothing let loop continue
                 }
