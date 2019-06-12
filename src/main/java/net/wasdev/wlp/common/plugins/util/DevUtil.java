@@ -448,7 +448,9 @@ public abstract class DevUtil {
                 }
             }
         }
-        
+        if (outputDirectory.listFiles().length > 0){
+            outputDirectory.delete();
+        }
     }
 
     protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
