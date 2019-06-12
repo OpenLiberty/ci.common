@@ -135,8 +135,9 @@ public abstract class DevUtil {
      * 
      * @param buildFile
      * @param artifactPaths
+     * @return true if the build file was recompiled with changes
      */
-    public abstract void recompileBuildFile(File buildFile, List<String> artifactPaths);
+    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths);
 
     /**
      * Get the number of times the application updated message has appeared in the application log
@@ -290,6 +291,8 @@ public abstract class DevUtil {
                         }
                     }
 
+                    int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
+
                     // src/main/java directory
                     if (directory.startsWith(this.sourceDirectory.toPath())) {
                         ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -298,11 +301,14 @@ public abstract class DevUtil {
                                 && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                         || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                             debug("Java source file modified: " + fileChanged.getName());
+                            // tests are run in recompileJavaSource
                             recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                     testOutputDirectory);
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             debug("Java file deleted: " + fileChanged.getName());
                             deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+                            // run all tests since Java files were changed
+                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
                         }
                     } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
                         ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -310,11 +316,14 @@ public abstract class DevUtil {
                         if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                 && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                         || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                            // tests are run in recompileJavaTest
                             recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                     testOutputDirectory);
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             debug("Java file deleted: " + fileChanged.getName());
                             deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
+                            // run all tests without waiting for app update since only unit test source changed
+                            runTestThread(false, executor, -1, false);
                         }
                     } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
                         if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
@@ -322,11 +331,15 @@ public abstract class DevUtil {
                             if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                 checkConfigFile(fileChanged);
                                 copyFile(fileChanged, this.configDirectory, serverDirectory);
+                                // run integration tests only since config files changed
+                                runTestThread(true, executor, numApplicationUpdatedMessages, true);
                             }
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                 info("Config file deleted: " + fileChanged.getName());
                                 deleteFile(fileChanged, this.configDirectory, serverDirectory);
+                                // run integration tests only since config file changed
+                                runTestThread(true, executor, numApplicationUpdatedMessages, true);
                             }
                         }
                     } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
@@ -335,13 +348,21 @@ public abstract class DevUtil {
                         if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                             copyFile(fileChanged, resourceParent, outputDirectory);
+                            // run all tests on resource change
+                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
                         } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                             debug("Resource file deleted: " + fileChanged.getName());
                             deleteFile(fileChanged, resourceParent, outputDirectory);
+                            // run all tests on resource change
+                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
                         }
                     } else if (fileChanged.equals(buildFile) && directory.startsWith(buildFile.getParentFile().toPath())
                             && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
-                        recompileBuildFile(buildFile, artifactPaths);
+                        boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths);
+                        // run all tests on build file change
+                        if (recompiledBuild) {
+                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                        }
                     }
                 }
                 // reset the key
@@ -413,11 +434,31 @@ public abstract class DevUtil {
         }
     }
 
+    /**
+     * Recompile Java source files and run tests after application update
+     * 
+     * @param javaFilesChanged list of Java files changed
+     * @param artifactPaths list of project artifact paths for building the classpath
+     * @param executor the test thread executor
+     * @param outputDirectory the directory for compiled classes
+     * @param testOutputDirectory the directory for compiled test classes
+     * @throws Exception
+     */
     protected void recompileJavaSource(List<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
         recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
     }
 
+    /**
+     * Recompile test source files and run tests immediately
+     * 
+     * @param javaFilesChanged list of Java files changed
+     * @param artifactPaths list of project artifact paths for building the classpath
+     * @param executor the test thread executor
+     * @param outputDirectory the directory for compiled classes
+     * @param testOutputDirectory the directory for compiled test classes
+     * @throws Exception
+     */
     protected void recompileJavaTest(List<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
         recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
