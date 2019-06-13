@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -163,6 +164,8 @@ public abstract class DevUtil {
      */
     public abstract void checkConfigFile(File configFile);
 
+    public abstract boolean compile(File dir);
+
     private List<String> jvmOptions;
 
     private File serverDirectory;
@@ -253,122 +256,171 @@ public abstract class DevUtil {
         }
     }
 
-    public void watchFiles(Path srcPath, Path testSrcPath, Path configPath, File buildFile, File outputDirectory,
-            File testOutputDirectory, final ThreadPoolExecutor executor, List<String> artifactPaths,
-            boolean noConfigDir, File configFile) throws Exception {
+    public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
+            final ThreadPoolExecutor executor, List<String> artifactPaths, boolean noConfigDir, File configFile)
+            throws Exception {
 
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
-            registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
-            registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
-            registerAll(this.configDirectory.toPath(), configPath, watcher);
+            Path srcPath = sourceDirectory.getAbsoluteFile().toPath();
+            Path testSrcPath = testSourceDirectory.getAbsoluteFile().toPath();
+            Path configPath = configDirectory.getAbsoluteFile().toPath();
+
+            boolean sourceDirRegistered = false;
+            boolean testSourceDirRegistered = false;
+
+            if (this.sourceDirectory.exists()) {
+                registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
+                sourceDirRegistered = true;
+            }
+
+            if (this.testSourceDirectory.exists()) {
+                registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
+                testSourceDirRegistered = true;
+            }
+
+            if (this.configDirectory.exists()) {
+                registerAll(this.configDirectory.toPath(), configPath, watcher);
+            }
+            
             for (File resourceDir : resourceDirs) {
-                registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
+                if (resourceDir.exists()) {
+                    registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
+                }
             }
 
             buildFile.getParentFile().toPath().register(
                     watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                             StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                     SensitivityWatchEventModifier.HIGH);
-            debug("Registering watchservice directory: " + buildFile.getParentFile().toPath());
+            debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
             while (true) {
-                final WatchKey wk = watcher.take();
-                for (WatchEvent<?> event : wk.pollEvents()) {
-                    final Path changed = (Path) event.context();
-
-                    final Watchable watchable = wk.watchable();
-                    final Path directory = (Path) watchable;
-                    debug("Processing events for watched directory: " + directory);
-
-                    File fileChanged = new File(directory.toString(), changed.toString());
-                    debug("Changed: " + changed + "; " + event.kind());
-
-                    // resource file check
-                    File resourceParent = null;
-                    for (File resourceDir : resourceDirs) {
-                        if (directory.startsWith(resourceDir.toPath())) {
-                            resourceParent = resourceDir;
-                        }
-                    }
-
-                    int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-
-                    // src/main/java directory
-                    if (directory.startsWith(this.sourceDirectory.toPath())) {
-                        ArrayList<File> javaFilesChanged = new ArrayList<File>();
-                        javaFilesChanged.add(fileChanged);
-                        if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
-                                && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                        || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            debug("Java source file modified: " + fileChanged.getName());
-                            // tests are run in recompileJavaSource
-                            recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
-                                    testOutputDirectory);
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            debug("Java file deleted: " + fileChanged.getName());
-                            deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
-                            // run all tests since Java files were changed
-                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
-                        }
-                    } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
-                        ArrayList<File> javaFilesChanged = new ArrayList<File>();
-                        javaFilesChanged.add(fileChanged);
-                        if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
-                                && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                        || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            // tests are run in recompileJavaTest
-                            recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
-                                    testOutputDirectory);
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            debug("Java file deleted: " + fileChanged.getName());
-                            deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
-                            // run all tests without waiting for app update since only unit test source changed
-                            runTestThread(false, executor, -1, false);
-                        }
-                    } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
-                        if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
-                                checkConfigFile(fileChanged);
-                                copyFile(fileChanged, this.configDirectory, serverDirectory);
-                                // run integration tests only since config files changed
-                                runTestThread(true, executor, numApplicationUpdatedMessages, true);
-                            }
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
-                                info("Config file deleted: " + fileChanged.getName());
-                                deleteFile(fileChanged, this.configDirectory, serverDirectory);
-                                // run integration tests only since config file changed
-                                runTestThread(true, executor, numApplicationUpdatedMessages, true);
-                            }
-                        }
-                    } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
-                        debug("Resource dir: " + resourceParent.toString());
-                        debug("File within resource directory");
-                        if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                            copyFile(fileChanged, resourceParent, outputDirectory);
-                            // run all tests on resource change
-                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
-                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                            debug("Resource file deleted: " + fileChanged.getName());
-                            deleteFile(fileChanged, resourceParent, outputDirectory);
-                            // run all tests on resource change
-                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
-                        }
-                    } else if (fileChanged.equals(buildFile) && directory.startsWith(buildFile.getParentFile().toPath())
-                            && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
-                        boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths);
-                        // run all tests on build file change
-                        if (recompiledBuild) {
-                            runTestThread(true, executor, numApplicationUpdatedMessages, false);
-                        }
-                    }
+                // check if javaSourceDirectory has been added
+                if (!sourceDirRegistered && this.sourceDirectory.exists()) {
+                    compile(this.sourceDirectory);
+                    registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
+                    debug("Registering Java source directory: " + this.sourceDirectory);
+                    sourceDirRegistered = true;
+                } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
+                    cleanTargetDir(outputDirectory);
+                    sourceDirRegistered = false;
                 }
-                // reset the key
-                boolean valid = wk.reset();
-                if (!valid) {
-                    info("WatchService key has been unregistered");
+
+                // check if testSourceDirectory has been added
+                if (!testSourceDirRegistered && this.testSourceDirectory.exists()) {
+                    compile(this.testSourceDirectory);
+                    registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
+                    debug("Registering Java test directory: " + this.testSourceDirectory);
+                    runTestThread(false, executor, -1, false);
+                    testSourceDirRegistered = true;
+                } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
+                    cleanTargetDir(testOutputDirectory);
+                    testSourceDirRegistered = false;
+                }
+
+                try {
+                    final WatchKey wk = watcher.poll(1, TimeUnit.SECONDS);
+                    for (WatchEvent<?> event : wk.pollEvents()) {
+                        final Path changed = (Path) event.context();
+
+                        final Watchable watchable = wk.watchable();
+                        final Path directory = (Path) watchable;
+                        debug("Processing events for watched directory: " + directory);
+
+                        File fileChanged = new File(directory.toString(), changed.toString());
+                        debug("Changed: " + changed + "; " + event.kind());
+
+                        // resource file check
+                        File resourceParent = null;
+                        for (File resourceDir : resourceDirs) {
+                            if (directory.startsWith(resourceDir.toPath())) {
+                                resourceParent = resourceDir;
+                            }
+                        }
+                        
+                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
+
+                        // src/main/java directory
+                        if (directory.startsWith(this.sourceDirectory.toPath())) {
+                            ArrayList<File> javaFilesChanged = new ArrayList<File>();
+                            javaFilesChanged.add(fileChanged);
+                            if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                                    && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                            || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                debug("Java source file modified: " + fileChanged.getName());
+                                // tests are run in recompileJavaSource
+                                recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                        testOutputDirectory);
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                debug("Java file deleted: " + fileChanged.getName());
+                                deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+                                // run all tests since Java files were changed
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                            }
+                        } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
+                            ArrayList<File> javaFilesChanged = new ArrayList<File>();
+                            javaFilesChanged.add(fileChanged);
+                            if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                                    && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                            || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                // tests are run in recompileJavaTest
+                                recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                        testOutputDirectory);
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                debug("Java file deleted: " + fileChanged.getName());
+                                deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
+                                // run all tests without waiting for app update since only unit test source changed
+                                runTestThread(false, executor, -1, false);
+                            }
+                        } else if (directory.startsWith(this.configDirectory.toPath())) { // config
+                                                                                          // files
+                            if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                    || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                    copyFile(fileChanged, this.configDirectory, serverDirectory);
+                                    checkConfigFile(fileChanged);
+                                    // run integration tests only since config files changed
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, true);
+                                }
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                    info("Config file deleted: " + fileChanged.getName());
+                                    deleteFile(fileChanged, this.configDirectory, serverDirectory);
+                                    // run integration tests only since config file changed
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, true);
+                                }
+                            }
+                        } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
+                            debug("Resource dir: " + resourceParent.toString());
+                            debug("File within resource directory");
+                            if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                    || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                copyFile(fileChanged, resourceParent, outputDirectory);
+                                // run all tests on resource change
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                                debug("Resource file deleted: " + fileChanged.getName());
+                                deleteFile(fileChanged, resourceParent, outputDirectory);
+                                // run all tests on resource change
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                            }
+                        } else if (fileChanged.equals(buildFile)
+                                && directory.startsWith(buildFile.getParentFile().toPath())
+                                && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
+                                    boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths);
+                                    // run all tests on build file change
+                                    if (recompiledBuild) {
+                                        runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                                    }
+                        }
+                    }
+                    // reset the key
+                    boolean valid = wk.reset();
+                    if (!valid) {
+                        debug("WatchService key has been unregistered");
+                    }
+                } catch (InterruptedException | NullPointerException e) {
+                    // do nothing let loop continue
                 }
             }
         }
@@ -383,8 +435,8 @@ public abstract class DevUtil {
                 fileChanged.getAbsolutePath().indexOf(srcDir.getAbsolutePath()) + srcDir.getAbsolutePath().length());
 
         File targetResource = new File(targetDir.getAbsolutePath() + relPath);
-        info("Copying file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
         FileUtils.copyFile(fileChanged, targetResource);
+        info("Copied file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
     }
 
     protected void deleteFile(File deletedFile, File dir, File targetDir) {
@@ -398,17 +450,35 @@ public abstract class DevUtil {
             info("Deleted file: " + targetFile.getAbsolutePath());
         }
     }
+    
+    protected void cleanTargetDir(File outputDirectory){
+        File[] fList = outputDirectory.listFiles();
+        if (fList != null) {
+            for (File file : fList) {
+                if (file.isFile() && file.getName().toLowerCase().endsWith(".class")) {
+                   file.delete();
+                   info("Deleted Java class file: " + file);
+                } else if (file.isDirectory()) {
+                    cleanTargetDir(file);
+                }
+            }
+        }
+        if (outputDirectory.listFiles().length > 0){
+            outputDirectory.delete();
+        }
+    }
 
     protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                debug("Registering watchservice directory: " + dir.toString());
+                debug("Watching directory: " + dir.toString());
                 dir.register(watcher,
                         new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                                 StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                         SensitivityWatchEventModifier.HIGH);
+
                 return FileVisitResult.CONTINUE;
             }
 
@@ -491,7 +561,6 @@ public abstract class DevUtil {
 
             Iterable<? extends JavaFileObject> compilationUnits = fileManager
                     .getJavaFileObjectsFromFiles(javaFilesChanged);
-
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
                     compilationUnits);
             boolean didCompile = task.call();
