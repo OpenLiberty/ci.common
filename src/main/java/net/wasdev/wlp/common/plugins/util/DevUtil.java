@@ -44,6 +44,7 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.Attributes;
@@ -135,28 +136,26 @@ public abstract class DevUtil {
      * 
      * @param buildFile
      * @param artifactPaths
+     * @return true if the build file was recompiled with changes
      */
-    public abstract void recompileBuildFile(File buildFile, List<String> artifactPaths);
+    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths);
 
     /**
-     * Get the message occurrences for Java recompile
+     * Get the number of times the application updated message has appeared in the application log
      * 
-     * @param regexp
-     * @param logFile
-     * @return
+     * @return 
      */
-    public abstract int getMessageOccurrences(String regexp, File logFile);
+    public abstract int countApplicationUpdatedMessages();
 
     /**
-     * Run tests for Java recompile
+     * Run unit and/or integration tests
      * 
-     * @param executor
-     * @param regexp
-     * @param logFile
-     * @param messageOccurrences
+     * @param waitForApplicationUpdate Whether to wait for the application to update before running integration tests
+     * @param messageOccurrences The previous number of times the application updated message has appeared.
+     * @param executor The thread pool executor
+     * @param forceSkipUTs Whether to force skip the unit tests
      */
-    public abstract void runTestThread(ThreadPoolExecutor executor, String regexp, File logFile,
-            int messageOccurrences);
+    public abstract void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs);
 
     /**
      * Check the configuration file for new features
@@ -174,19 +173,15 @@ public abstract class DevUtil {
     private File testSourceDirectory;
     private File configDirectory;
     private List<File> resourceDirs;
-    boolean skipTests;
-    boolean skipITs;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs, boolean skipTests, boolean skipITs) {
+            File configDirectory, List<File> resourceDirs) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.resourceDirs = resourceDirs;
-        this.skipTests = skipTests;
-        this.skipITs = skipITs;
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
@@ -316,7 +311,7 @@ public abstract class DevUtil {
                     compile(this.testSourceDirectory);
                     registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
-                    runTestThread(executor, null, null, -1);
+                    runTestThread(false, executor, -1, false);
                     testSourceDirRegistered = true;
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
                     cleanTargetDir(testOutputDirectory);
@@ -343,6 +338,8 @@ public abstract class DevUtil {
                             }
                         }
                         
+                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
+
                         // src/main/java directory
                         if (directory.startsWith(this.sourceDirectory.toPath())) {
                             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -351,11 +348,14 @@ public abstract class DevUtil {
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 debug("Java source file modified: " + fileChanged.getName());
+                                // tests are run in recompileJavaSource
                                 recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
                                 deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+                                // run all tests since Java files were changed
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
                             }
                         } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
                             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -363,11 +363,14 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                // tests are run in recompileJavaTest
                                 recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
                                 deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
+                                // run all tests without waiting for app update since only unit test source changed
+                                runTestThread(false, executor, -1, false);
                             }
                         } else if (directory.startsWith(this.configDirectory.toPath())) { // config
                                                                                           // files
@@ -376,11 +379,15 @@ public abstract class DevUtil {
                                 if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                     copyFile(fileChanged, this.configDirectory, serverDirectory);
                                     checkConfigFile(fileChanged);
+                                    // run integration tests only since config files changed
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, true);
                                 }
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                     info("Config file deleted: " + fileChanged.getName());
                                     deleteFile(fileChanged, this.configDirectory, serverDirectory);
+                                    // run integration tests only since config file changed
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, true);
                                 }
                             }
                         } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
@@ -389,14 +396,22 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyFile(fileChanged, resourceParent, outputDirectory);
+                                // run all tests on resource change
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Resource file deleted: " + fileChanged.getName());
                                 deleteFile(fileChanged, resourceParent, outputDirectory);
+                                // run all tests on resource change
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
                             }
                         } else if (fileChanged.equals(buildFile)
                                 && directory.startsWith(buildFile.getParentFile().toPath())
                                 && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
-                            recompileBuildFile(buildFile, artifactPaths);
+                                    boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths);
+                                    // run all tests on build file change
+                                    if (recompiledBuild) {
+                                        runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                                    }
                         }
                     }
                     // reset the key
@@ -489,11 +504,31 @@ public abstract class DevUtil {
         }
     }
 
+    /**
+     * Recompile Java source files and run tests after application update
+     * 
+     * @param javaFilesChanged list of Java files changed
+     * @param artifactPaths list of project artifact paths for building the classpath
+     * @param executor the test thread executor
+     * @param outputDirectory the directory for compiled classes
+     * @param testOutputDirectory the directory for compiled test classes
+     * @throws Exception
+     */
     protected void recompileJavaSource(List<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
         recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
     }
 
+    /**
+     * Recompile test source files and run tests immediately
+     * 
+     * @param javaFilesChanged list of Java files changed
+     * @param artifactPaths list of project artifact paths for building the classpath
+     * @param executor the test thread executor
+     * @param outputDirectory the directory for compiled classes
+     * @param testOutputDirectory the directory for compiled test classes
+     * @throws Exception
+     */
     protected void recompileJavaTest(List<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
         recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
@@ -502,12 +537,8 @@ public abstract class DevUtil {
     protected void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
             boolean tests, File outputDirectory, File testOutputDirectory) {
         try {
-            File logFile = null;
-            String regexp = null;
-            int messageOccurrences = -1;
-            if (!(this.skipTests || this.skipITs)) {
-                getMessageOccurrences(regexp, logFile);
-            }
+            int messageOccurrences = countApplicationUpdatedMessages();
+
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
 
@@ -544,9 +575,9 @@ public abstract class DevUtil {
                 if (tests) {
                     // if only tests were compiled, don't need to wait for
                     // app to update
-                    runTestThread(executor, null, null, -1);
+                    runTestThread(false, executor, -1, false);
                 } else {
-                    runTestThread(executor, regexp, logFile, messageOccurrences);
+                    runTestThread(true, executor, messageOccurrences, false);
                 }
             } else {
                 if (tests) {
@@ -618,6 +649,41 @@ public abstract class DevUtil {
             }
         }
         return classPathElements;
+    }
+
+    /**
+     * Runt tests in a new thread.
+     * 
+     * @param waitForApplicationUpdate whether it should wait for the application to update before running integration tests
+     * @param executor the thread pool executor
+     * @param messageOccurrences how many times the application updated message has occurred in the log
+     * @param forceSkipUTs whether to force skip the unit tests
+     */
+    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences, boolean forceSkipUTs) {
+        try {
+            executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs));
+        } catch (RejectedExecutionException e) {
+            debug("Cannot add thread since max threads reached", e);
+        }
+    }
+
+    private class TestJob implements Runnable {
+        private boolean waitForApplicationUpdate;
+        private int messageOccurrences;
+        private ThreadPoolExecutor executor;
+        private boolean forceSkipUTs;
+
+        public TestJob(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs) {
+            this.waitForApplicationUpdate = waitForApplicationUpdate;
+            this.messageOccurrences = messageOccurrences;
+            this.executor = executor;
+            this.forceSkipUTs = forceSkipUTs;
+        }
+
+        @Override
+        public void run() {
+            runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs);
+        }
     }
 
 }
