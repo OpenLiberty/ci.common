@@ -420,8 +420,12 @@ public abstract class DevUtil {
                 fileChanged.getAbsolutePath().indexOf(srcDir.getAbsolutePath()) + srcDir.getAbsolutePath().length());
 
         File targetResource = new File(targetDir.getAbsolutePath() + relPath);
-        FileUtils.copyFile(fileChanged, targetResource);
-        info("Copied file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
+        try {
+            FileUtils.copyFile(fileChanged, targetResource);
+            info("Copied file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
+        } catch (Exception ex) {
+            info("Failed to copy file: " + fileChanged.getAbsolutePath());
+        }
     }
 
     protected void deleteFile(File deletedFile, File dir, File targetDir) {
