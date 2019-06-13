@@ -165,7 +165,18 @@ public abstract class DevUtil {
      */
     public abstract void checkConfigFile(File configFile);
 
+    /**
+     * Compile the specified directory
+     * @param dir
+     * @return
+     */
     public abstract boolean compile(File dir);
+    
+    /**
+     * Restart dev mode
+     * @param executor
+     */
+    public abstract void restartDevMode(ThreadPoolExecutor executor);
 
     private List<String> jvmOptions;
 
