@@ -18,6 +18,7 @@ package net.wasdev.wlp.common.plugins.util;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -423,8 +424,10 @@ public abstract class DevUtil {
         try {
             FileUtils.copyFile(fileChanged, targetResource);
             info("Copied file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
+        } catch (FileNotFoundException ex) {
+            debug("Failed to copy file: " + fileChanged.getAbsolutePath());
         } catch (Exception ex) {
-            info("Failed to copy file: " + fileChanged.getAbsolutePath());
+            error("Error occured while copying file: " + ex.getMessage());
         }
     }
 
