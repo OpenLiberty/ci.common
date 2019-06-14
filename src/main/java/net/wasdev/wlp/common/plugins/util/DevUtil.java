@@ -136,9 +136,10 @@ public abstract class DevUtil {
      * 
      * @param buildFile
      * @param artifactPaths
+     * @param executor The thread pool executor
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths);
+    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor);
 
     /**
      * Get the number of times the application updated message has appeared in the application log
@@ -427,7 +428,7 @@ public abstract class DevUtil {
                                 && directory.startsWith(buildFile.getParentFile().toPath())
                                 && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
 
-                                    boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths);
+                                    boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths, executor);
                                     // run all tests on build file change
                                     if (recompiledBuild) {
                                         runTestThread(true, executor, numApplicationUpdatedMessages, false);
