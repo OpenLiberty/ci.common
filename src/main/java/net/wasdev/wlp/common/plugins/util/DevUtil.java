@@ -341,13 +341,11 @@ public abstract class DevUtil {
                 
                 // check if defaultConfigDirectory has been added and restart dev mode if it has
                 if (noConfigDir && this.defaultConfigDirectory.exists()){
-                    noConfigDir = false;
                     restartDevMode(executor);
                 }
                 
                 // check if configDirectory has been added
                 if (!configDirRegistered && this.configDirectory.exists()){
-                    configDirRegistered = true;
                     restartDevMode(executor);
                 }
 
