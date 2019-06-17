@@ -185,16 +185,45 @@ public abstract class DevUtil {
     private File sourceDirectory;
     private File testSourceDirectory;
     private File configDirectory;
+    private File defaultConfigDirectory;
     private List<File> resourceDirs;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs) {
+            File configDirectory, File defaultConfigDirectory, List<File> resourceDirs) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
+        this.defaultConfigDirectory = defaultConfigDirectory;
         this.resourceDirs = resourceDirs;
+    }
+    
+    public void cleanUpJVMOptions() {
+        // cleaning up jvm.options files
+        if (jvmOptions == null || jvmOptions.isEmpty()) {
+            File jvmOptionsFile = new File(serverDirectory.getAbsolutePath() + "/jvm.options");
+            File jvmOptionsBackup = new File(serverDirectory.getAbsolutePath() + "/jvmBackup.options");
+            if (jvmOptionsFile.exists()) {
+                debug("Deleting liberty:dev jvm.options file");
+                if (jvmOptionsBackup.exists()) {
+                    try {
+                        Files.copy(jvmOptionsBackup.toPath(), jvmOptionsFile.toPath(),
+                                StandardCopyOption.REPLACE_EXISTING);
+                        boolean deleted = jvmOptionsBackup.delete();
+                    } catch (IOException e) {
+                        error("Could not restore jvm.options: " + e.getMessage());
+                    }
+                } else {
+                    boolean deleted = jvmOptionsFile.delete();
+                    if (deleted) {
+                        info("Sucessfully deleted liberty:dev jvm.options file");
+                    } else {
+                        error("Could not delete liberty:dev jvm.options file");
+                    }
+                }
+            }
+        }
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
@@ -204,30 +233,7 @@ public abstract class DevUtil {
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
 
-                // cleaning up jvm.options files
-                if (jvmOptions == null || jvmOptions.isEmpty()) {
-                    File jvmOptionsFile = new File(serverDirectory.getAbsolutePath() + "/jvm.options");
-                    File jvmOptionsBackup = new File(serverDirectory.getAbsolutePath() + "/jvmBackup.options");
-                    if (jvmOptionsFile.exists()) {
-                        debug("Deleting liberty:dev jvm.options file");
-                        if (jvmOptionsBackup.exists()) {
-                            try {
-                                Files.copy(jvmOptionsBackup.toPath(), jvmOptionsFile.toPath(),
-                                        StandardCopyOption.REPLACE_EXISTING);
-                                jvmOptionsBackup.delete();
-                            } catch (IOException e) {
-                                error("Could not restore jvm.options: " + e.getMessage());
-                            }
-                        } else {
-                            boolean deleted = jvmOptionsFile.delete();
-                            if (deleted) {
-                                info("Sucessfully deleted liberty:dev jvm.options file");
-                            } else {
-                                error("Could not delete liberty:dev jvm.options file");
-                            }
-                        }
-                    }
-                }
+                cleanUpJVMOptions();
 
                 // shutdown tests
                 executor.shutdown();
@@ -280,6 +286,7 @@ public abstract class DevUtil {
 
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
+            boolean configDirRegistered = false;
 
             if (this.sourceDirectory.exists()) {
                 registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
@@ -293,6 +300,7 @@ public abstract class DevUtil {
 
             if (this.configDirectory.exists()) {
                 registerAll(this.configDirectory.toPath(), configPath, watcher);
+                configDirRegistered = true;
             }
             
             for (File resourceDir : resourceDirs) {
@@ -329,6 +337,18 @@ public abstract class DevUtil {
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
                     cleanTargetDir(testOutputDirectory);
                     testSourceDirRegistered = false;
+                }
+                
+                // check if defaultConfigDirectory has been added and restart dev mode if it has
+                if (noConfigDir && this.defaultConfigDirectory.exists()){
+                    noConfigDir = false;
+                    restartDevMode(executor);
+                }
+                
+                // check if configDirectory has been added
+                if (!configDirRegistered && this.configDirectory.exists()){
+                    configDirRegistered = true;
+                    restartDevMode(executor);
                 }
 
                 try {
