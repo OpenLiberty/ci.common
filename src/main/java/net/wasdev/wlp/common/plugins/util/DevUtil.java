@@ -137,9 +137,10 @@ public abstract class DevUtil {
      * 
      * @param buildFile
      * @param artifactPaths
+     * @param executor The thread pool executor
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths);
+    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor);
 
     /**
      * Get the number of times the application updated message has appeared in the application log
@@ -158,6 +159,7 @@ public abstract class DevUtil {
      */
     public abstract void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs);
 
+
     /**
      * Check the configuration file for new features
      * 
@@ -165,7 +167,18 @@ public abstract class DevUtil {
      */
     public abstract void checkConfigFile(File configFile);
 
+    /**
+     * Compile the specified directory
+     * @param dir
+     * @return
+     */
     public abstract boolean compile(File dir);
+    
+    /**
+     * Restart dev mode
+     * @param executor
+     */
+    public abstract void restartDevMode(ThreadPoolExecutor executor);
 
     private List<String> jvmOptions;
 
@@ -173,16 +186,45 @@ public abstract class DevUtil {
     private File sourceDirectory;
     private File testSourceDirectory;
     private File configDirectory;
+    private File defaultConfigDirectory;
     private List<File> resourceDirs;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs) {
+            File configDirectory, File defaultConfigDirectory, List<File> resourceDirs) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
+        this.defaultConfigDirectory = defaultConfigDirectory;
         this.resourceDirs = resourceDirs;
+    }
+    
+    public void cleanUpJVMOptions() {
+        // cleaning up jvm.options files
+        if (jvmOptions == null || jvmOptions.isEmpty()) {
+            File jvmOptionsFile = new File(serverDirectory.getAbsolutePath() + "/jvm.options");
+            File jvmOptionsBackup = new File(serverDirectory.getAbsolutePath() + "/jvmBackup.options");
+            if (jvmOptionsFile.exists()) {
+                debug("Deleting liberty:dev jvm.options file");
+                if (jvmOptionsBackup.exists()) {
+                    try {
+                        Files.copy(jvmOptionsBackup.toPath(), jvmOptionsFile.toPath(),
+                                StandardCopyOption.REPLACE_EXISTING);
+                        boolean deleted = jvmOptionsBackup.delete();
+                    } catch (IOException e) {
+                        error("Could not restore jvm.options: " + e.getMessage());
+                    }
+                } else {
+                    boolean deleted = jvmOptionsFile.delete();
+                    if (deleted) {
+                        info("Sucessfully deleted liberty:dev jvm.options file");
+                    } else {
+                        error("Could not delete liberty:dev jvm.options file");
+                    }
+                }
+            }
+        }
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
@@ -192,30 +234,7 @@ public abstract class DevUtil {
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
 
-                // cleaning up jvm.options files
-                if (jvmOptions == null || jvmOptions.isEmpty()) {
-                    File jvmOptionsFile = new File(serverDirectory.getAbsolutePath() + "/jvm.options");
-                    File jvmOptionsBackup = new File(serverDirectory.getAbsolutePath() + "/jvmBackup.options");
-                    if (jvmOptionsFile.exists()) {
-                        debug("Deleting liberty:dev jvm.options file");
-                        if (jvmOptionsBackup.exists()) {
-                            try {
-                                Files.copy(jvmOptionsBackup.toPath(), jvmOptionsFile.toPath(),
-                                        StandardCopyOption.REPLACE_EXISTING);
-                                jvmOptionsBackup.delete();
-                            } catch (IOException e) {
-                                error("Could not restore jvm.options: " + e.getMessage());
-                            }
-                        } else {
-                            boolean deleted = jvmOptionsFile.delete();
-                            if (deleted) {
-                                info("Sucessfully deleted liberty:dev jvm.options file");
-                            } else {
-                                error("Could not delete liberty:dev jvm.options file");
-                            }
-                        }
-                    }
-                }
+                cleanUpJVMOptions();
 
                 // shutdown tests
                 executor.shutdown();
@@ -268,6 +287,7 @@ public abstract class DevUtil {
 
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
+            boolean configDirRegistered = false;
 
             if (this.sourceDirectory.exists()) {
                 registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
@@ -281,6 +301,7 @@ public abstract class DevUtil {
 
             if (this.configDirectory.exists()) {
                 registerAll(this.configDirectory.toPath(), configPath, watcher);
+                configDirRegistered = true;
             }
             
             for (File resourceDir : resourceDirs) {
@@ -318,6 +339,16 @@ public abstract class DevUtil {
                     cleanTargetDir(testOutputDirectory);
                     testSourceDirRegistered = false;
                 }
+                
+                // check if defaultConfigDirectory has been added and restart dev mode if it has
+                if (noConfigDir && this.defaultConfigDirectory.exists()){
+                    restartDevMode(executor);
+                }
+                
+                // check if configDirectory has been added
+                if (!configDirRegistered && this.configDirectory.exists()){
+                    restartDevMode(executor);
+                }
 
                 try {
                     final WatchKey wk = watcher.poll(1, TimeUnit.SECONDS);
@@ -349,12 +380,14 @@ public abstract class DevUtil {
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 debug("Java source file modified: " + fileChanged.getName());
+
                                 // tests are run in recompileJavaSource
                                 recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
                                 deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+
                                 // run all tests since Java files were changed
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false);
                             }
@@ -364,12 +397,14 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+
                                 // tests are run in recompileJavaTest
                                 recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
                                 deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
+
                                 // run all tests without waiting for app update since only unit test source changed
                                 runTestThread(false, executor, -1, false);
                             }
@@ -380,6 +415,7 @@ public abstract class DevUtil {
                                 if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                     copyFile(fileChanged, this.configDirectory, serverDirectory);
                                     checkConfigFile(fileChanged);
+
                                     // run integration tests only since config files changed
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true);
                                 }
@@ -387,6 +423,7 @@ public abstract class DevUtil {
                                 if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                     info("Config file deleted: " + fileChanged.getName());
                                     deleteFile(fileChanged, this.configDirectory, serverDirectory);
+
                                     // run integration tests only since config file changed
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true);
                                 }
@@ -397,6 +434,7 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyFile(fileChanged, resourceParent, outputDirectory);
+
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
@@ -408,7 +446,8 @@ public abstract class DevUtil {
                         } else if (fileChanged.equals(buildFile)
                                 && directory.startsWith(buildFile.getParentFile().toPath())
                                 && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
-                                    boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths);
+
+                                    boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths, executor);
                                     // run all tests on build file change
                                     if (recompiledBuild) {
                                         runTestThread(true, executor, numApplicationUpdatedMessages, false);
@@ -545,7 +584,7 @@ public abstract class DevUtil {
             boolean tests, File outputDirectory, File testOutputDirectory) {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
-
+            
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
 
