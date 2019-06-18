@@ -256,7 +256,7 @@ public abstract class DevUtil {
             @Override
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
-                
+
                 cleanUpJVMOptions();
                 cleanUpServerEnv();
 
