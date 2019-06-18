@@ -231,6 +231,8 @@ public abstract class DevUtil {
 					} catch (IOException e) {
 						error("Could not restore server.env: " + e.getMessage());
 					}
+                	
+                	serverEnvBackup.delete();
                 } else {
                 	// Delete server.env file
                 	serverEnvFile.delete();
