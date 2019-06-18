@@ -189,9 +189,10 @@ public abstract class DevUtil {
     private File configDirectory;
     private File defaultConfigDirectory;
     private List<File> resourceDirs;
+    private boolean hotTests;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, File defaultConfigDirectory, List<File> resourceDirs) {
+            File configDirectory, File defaultConfigDirectory, List<File> resourceDirs, boolean hotTests) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -199,6 +200,7 @@ public abstract class DevUtil {
         this.configDirectory = configDirectory;
         this.defaultConfigDirectory = defaultConfigDirectory;
         this.resourceDirs = resourceDirs;
+        this.hotTests = hotTests;
     }
     
     public void cleanUpJVMOptions() {
@@ -293,7 +295,11 @@ public abstract class DevUtil {
         if (hotkeyReader == null) {
             hotkeyReader = new HotkeyReader(executor);
             new Thread(hotkeyReader).start();
-            info("Press the Enter key to run tests on demand.");
+            if (hotTests) {
+                info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
+            } else {
+                info("Press the Enter key to run tests on demand.");
+            }
         }
     }
 
@@ -759,7 +765,9 @@ public abstract class DevUtil {
      */
     public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences, boolean forceSkipUTs, boolean manualInvocation) {
         try {
-            executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs, manualInvocation));
+            if (manualInvocation || hotTests) {
+                executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs, manualInvocation));
+            }
         } catch (RejectedExecutionException e) {
             debug("Cannot add thread since max threads reached", e);
         }
