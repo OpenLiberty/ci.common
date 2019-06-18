@@ -44,6 +44,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -236,6 +237,10 @@ public abstract class DevUtil {
 
                 cleanUpJVMOptions();
 
+                if (hotkeyReader != null) {
+                    hotkeyReader.shutdown();
+                }
+
                 // shutdown tests
                 executor.shutdown();
 
@@ -276,10 +281,56 @@ public abstract class DevUtil {
         }
     }
 
+    private HotkeyReader hotkeyReader = null;
+
+    /**
+     * Run a hotkey reader thread to run tests when pressing Enter.
+     * If the thread is already running, does nothing.
+     * 
+     * @param executor the test thread executor
+     */
+    public void runHotkeyReaderThread(ThreadPoolExecutor executor) {
+        if (hotkeyReader == null) {
+            hotkeyReader = new HotkeyReader(executor);
+            new Thread(hotkeyReader).start();
+            info("Press the Enter key to run tests on demand.");
+        }
+    }
+
+    private class HotkeyReader implements Runnable {
+        private Scanner scanner;
+        private ThreadPoolExecutor executor;
+        private boolean shutdown = false;
+
+        public HotkeyReader(ThreadPoolExecutor executor) {
+            this.executor = executor;
+        }
+    
+        @Override
+        public void run() {
+            debug("Running hotkey reader thread");
+            scanner = new Scanner(System.in);
+            readInput();
+        }
+
+        public void shutdown() {
+            shutdown = true;
+        }
+    
+        private void readInput() {
+            while (!shutdown) {
+                debug("Waiting for Enter key to run tests");
+                scanner.nextLine();
+                debug("Detected Enter key. Running tests...");
+                runTestThread(false, executor, -1, false, true);
+            }
+            debug("Hotkey reader thread was shut down");
+        }
+    }
+
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
             final ThreadPoolExecutor executor, List<String> artifactPaths, boolean noConfigDir, File configFile)
             throws Exception {
-
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
             Path srcPath = sourceDirectory.getAbsoluteFile().toPath();
             Path testSrcPath = testSourceDirectory.getAbsoluteFile().toPath();
@@ -333,7 +384,7 @@ public abstract class DevUtil {
                     compile(this.testSourceDirectory);
                     registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
-                    runTestThread(false, executor, -1, false);
+                    runTestThread(false, executor, -1, false, false);
                     testSourceDirRegistered = true;
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
                     cleanTargetDir(testOutputDirectory);
@@ -389,7 +440,7 @@ public abstract class DevUtil {
                                 deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
 
                                 // run all tests since Java files were changed
-                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             }
                         } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
                             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -406,7 +457,7 @@ public abstract class DevUtil {
                                 deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
 
                                 // run all tests without waiting for app update since only unit test source changed
-                                runTestThread(false, executor, -1, false);
+                                runTestThread(false, executor, -1, false, false);
                             }
                         } else if (directory.startsWith(this.configDirectory.toPath())) { // config
                                                                                           // files
@@ -417,7 +468,7 @@ public abstract class DevUtil {
                                     checkConfigFile(fileChanged);
 
                                     // run integration tests only since config files changed
-                                    runTestThread(true, executor, numApplicationUpdatedMessages, true);
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                                 }
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
@@ -425,7 +476,7 @@ public abstract class DevUtil {
                                     deleteFile(fileChanged, this.configDirectory, serverDirectory);
 
                                     // run integration tests only since config file changed
-                                    runTestThread(true, executor, numApplicationUpdatedMessages, true);
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                                 }
                             }
                         } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
@@ -436,12 +487,12 @@ public abstract class DevUtil {
                                 copyFile(fileChanged, resourceParent, outputDirectory);
 
                                 // run all tests on resource change
-                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Resource file deleted: " + fileChanged.getName());
                                 deleteFile(fileChanged, resourceParent, outputDirectory);
                                 // run all tests on resource change
-                                runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             }
                         } else if (fileChanged.equals(buildFile)
                                 && directory.startsWith(buildFile.getParentFile().toPath())
@@ -450,7 +501,7 @@ public abstract class DevUtil {
                                     boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths, executor);
                                     // run all tests on build file change
                                     if (recompiledBuild) {
-                                        runTestThread(true, executor, numApplicationUpdatedMessages, false);
+                                        runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                                     }
                         }
                     }
@@ -621,9 +672,9 @@ public abstract class DevUtil {
                 if (tests) {
                     // if only tests were compiled, don't need to wait for
                     // app to update
-                    runTestThread(false, executor, -1, false);
+                    runTestThread(false, executor, -1, false, false);
                 } else {
-                    runTestThread(true, executor, messageOccurrences, false);
+                    runTestThread(true, executor, messageOccurrences, false, false);
                 }
             } else {
                 if (tests) {
@@ -704,31 +755,38 @@ public abstract class DevUtil {
      * @param executor the thread pool executor
      * @param messageOccurrences how many times the application updated message has occurred in the log
      * @param forceSkipUTs whether to force skip the unit tests
+     * @param manualInvocation whether the tests were manually invoked
      */
-    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences, boolean forceSkipUTs) {
+    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences, boolean forceSkipUTs, boolean manualInvocation) {
         try {
-            executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs));
+            executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs, manualInvocation));
         } catch (RejectedExecutionException e) {
             debug("Cannot add thread since max threads reached", e);
         }
     }
 
-    private class TestJob implements Runnable {
+    public class TestJob implements Runnable {
         private boolean waitForApplicationUpdate;
         private int messageOccurrences;
         private ThreadPoolExecutor executor;
         private boolean forceSkipUTs;
+        private boolean manualInvocation;
 
-        public TestJob(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs) {
+        public TestJob(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs, boolean manualInvocation) {
             this.waitForApplicationUpdate = waitForApplicationUpdate;
             this.messageOccurrences = messageOccurrences;
             this.executor = executor;
             this.forceSkipUTs = forceSkipUTs;
+            this.manualInvocation = manualInvocation;
         }
 
         @Override
         public void run() {
             runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs);
+        }
+
+        public boolean isManualInvocation() {
+            return manualInvocation;
         }
     }
 
