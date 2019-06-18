@@ -228,6 +228,27 @@ public abstract class DevUtil {
             }
         }
     }
+    
+    public void cleanUpServerEnv() {
+    	// clean up server.env file
+        File serverEnvFile = new File(serverDirectory.getAbsolutePath() + "/server.env");
+        File serverEnvBackup = new File(serverDirectory.getAbsolutePath() + "/server.env.bak");
+        
+        if (serverEnvBackup.exists()) {
+        	// Restore original server.env file
+        	try {
+				Files.copy(serverEnvBackup.toPath(), serverEnvFile.toPath(),
+							StandardCopyOption.REPLACE_EXISTING);
+			} catch (IOException e) {
+				error("Could not restore server.env: " + e.getMessage());
+			}
+        	
+        	serverEnvBackup.delete();
+        } else {
+        	// Delete server.env file
+        	serverEnvFile.delete();
+        }
+    }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
         // shutdown hook to stop server when x mode is terminated
@@ -237,25 +258,7 @@ public abstract class DevUtil {
                 debug("Inside Shutdown Hook, shutting down server");
                 
                 cleanUpJVMOptions();
-                
-                // clean up server.env file
-                File serverEnvFile = new File(serverDirectory.getAbsolutePath() + "/server.env");
-                File serverEnvBackup = new File(serverDirectory.getAbsolutePath() + "/server.env.bak");
-                
-                if (serverEnvBackup.exists()) {
-                	// Restore original server.env file
-                	try {
-						Files.copy(serverEnvBackup.toPath(), serverEnvFile.toPath(),
-									StandardCopyOption.REPLACE_EXISTING);
-					} catch (IOException e) {
-						error("Could not restore server.env: " + e.getMessage());
-					}
-                	
-                	serverEnvBackup.delete();
-                } else {
-                	// Delete server.env file
-                	serverEnvFile.delete();
-                }
+                cleanUpServerEnv();
 
                 // shutdown tests
                 executor.shutdown();
