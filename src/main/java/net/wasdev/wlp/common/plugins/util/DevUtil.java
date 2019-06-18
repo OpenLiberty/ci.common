@@ -230,23 +230,22 @@ public abstract class DevUtil {
     }
     
     public void cleanUpServerEnv() {
-    	// clean up server.env file
+        // clean up server.env file
         File serverEnvFile = new File(serverDirectory.getAbsolutePath() + "/server.env");
         File serverEnvBackup = new File(serverDirectory.getAbsolutePath() + "/server.env.bak");
-        
+
         if (serverEnvBackup.exists()) {
-        	// Restore original server.env file
-        	try {
-				Files.copy(serverEnvBackup.toPath(), serverEnvFile.toPath(),
-							StandardCopyOption.REPLACE_EXISTING);
-			} catch (IOException e) {
-				error("Could not restore server.env: " + e.getMessage());
-			}
-        	
-        	serverEnvBackup.delete();
+            // Restore original server.env file
+            try {
+                Files.copy(serverEnvBackup.toPath(), serverEnvFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                error("Could not restore server.env: " + e.getMessage());
+            }
+
+            serverEnvBackup.delete();
         } else {
-        	// Delete server.env file
-        	serverEnvFile.delete();
+            // Delete server.env file
+            serverEnvFile.delete();
         }
     }
 
@@ -270,42 +269,42 @@ public abstract class DevUtil {
     }
 
     public void enableServerDebug(int libertyDebugPort) throws IOException {
-    	String serverEnvPath = serverDirectory.getAbsolutePath() + "/server.env";
-    	File serverEnvFile = new File(serverEnvPath);
-    	
-    	StringBuilder sb = new StringBuilder();
-    	if (serverEnvFile.exists()) {
-    		debug("server.env already exists");
-    		File serverEnvBackup = new File(serverEnvPath + ".bak");
-    		Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath());
-    		boolean deleted = serverEnvFile.delete();
-    		
-    		if (!deleted) {
-    			error("Could not move existing liberty:dev server.env file");
-    		}
-    		
-    		BufferedReader reader = new BufferedReader(new FileReader(serverEnvBackup));
-    		String line;
-    		while ((line = reader.readLine()) != null) {
-    			sb.append(line);
-    			sb.append("\n");
-    		}
-    		reader.close();
-    	}
-    	
-    	debug("Creating server.env file: " + serverEnvFile.getAbsolutePath());
-    	sb.append("WLP_DEBUG_SUSPEND=n\n");
-    	sb.append("WLP_DEBUG_ADDRESS=");
-    	sb.append(libertyDebugPort);
-    	sb.append("\n");
-    	
-    	BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvFile));
-    	writer.write(sb.toString());
-    	writer.close();
-    	
-    	if (serverEnvFile.exists()) {
-    		info("Successfully created liberty:dev server.env file");
-    	}
+        String serverEnvPath = serverDirectory.getAbsolutePath() + "/server.env";
+        File serverEnvFile = new File(serverEnvPath);
+
+        StringBuilder sb = new StringBuilder();
+        if (serverEnvFile.exists()) {
+            debug("server.env already exists");
+            File serverEnvBackup = new File(serverEnvPath + ".bak");
+            Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath());
+            boolean deleted = serverEnvFile.delete();
+
+            if (!deleted) {
+                error("Could not move existing liberty:dev server.env file");
+            }
+
+            BufferedReader reader = new BufferedReader(new FileReader(serverEnvBackup));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+                sb.append("\n");
+            }
+            reader.close();
+        }
+
+        debug("Creating server.env file: " + serverEnvFile.getAbsolutePath());
+        sb.append("WLP_DEBUG_SUSPEND=n\n");
+        sb.append("WLP_DEBUG_ADDRESS=");
+        sb.append(libertyDebugPort);
+        sb.append("\n");
+
+        BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvFile));
+        writer.write(sb.toString());
+        writer.close();
+
+        if (serverEnvFile.exists()) {
+            info("Successfully created liberty:dev server.env file");
+        }
     }
 
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
