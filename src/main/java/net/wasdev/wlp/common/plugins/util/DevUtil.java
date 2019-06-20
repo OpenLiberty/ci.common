@@ -176,12 +176,6 @@ public abstract class DevUtil {
      * @return
      */
     public abstract boolean compile(File dir);
-    
-    /**
-     * Restart dev mode
-     * @param executor
-     */
-    public abstract void restartDevMode(ThreadPoolExecutor executor);
 
     private List<String> jvmOptions;
 
@@ -440,14 +434,14 @@ public abstract class DevUtil {
                 if (!configDirRegistered && this.configDirectory.exists()){
                     configDirRegistered = true;
                     debug("Configuration directory has been added: " + this.configDirectory);
-                    restartDevMode(executor);
+                    info("Unhandled change detected in pom.xml. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 // check if configFile has been added
                 if (!configFileRegistered && configFile.exists()){
                     configFileRegistered = true;
                     debug("Configuration file has been added: " + configFile);
-                    restartDevMode(executor);
+                    info("Unhandled change detected in pom.xml. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 try {
@@ -590,7 +584,7 @@ public abstract class DevUtil {
         } catch (FileNotFoundException ex) {
             debug("Failed to copy file: " + fileChanged.getAbsolutePath());
         } catch (Exception ex) {
-            error("Error occured while copying file: " + ex.getMessage());
+            debug(ex);
         }
     }
 
