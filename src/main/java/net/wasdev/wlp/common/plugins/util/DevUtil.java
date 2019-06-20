@@ -189,18 +189,16 @@ public abstract class DevUtil {
     private File sourceDirectory;
     private File testSourceDirectory;
     private File configDirectory;
-    private File defaultConfigDirectory;
     private List<File> resourceDirs;
     private boolean hotTests;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, File defaultConfigDirectory, List<File> resourceDirs, boolean hotTests) {
+            File configDirectory, List<File> resourceDirs, boolean hotTests) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
-        this.defaultConfigDirectory = defaultConfigDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
     }
@@ -365,7 +363,7 @@ public abstract class DevUtil {
     }
 
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> artifactPaths, boolean noConfigDir, File configFile)
+            final ThreadPoolExecutor executor, List<String> artifactPaths, File configFile)
             throws Exception {
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
             
