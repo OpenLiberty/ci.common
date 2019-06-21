@@ -167,8 +167,9 @@ public abstract class DevUtil {
      * Check the configuration file for new features
      * 
      * @param configFile
+     * @param serverDir
      */
-    public abstract void checkConfigFile(File configFile, ThreadPoolExecutor executor);
+    public abstract void checkConfigFile(File configFile, File serverDir);
 
     /**
      * Compile the specified directory
@@ -183,16 +184,18 @@ public abstract class DevUtil {
     private File sourceDirectory;
     private File testSourceDirectory;
     private File configDirectory;
+    private File outputDirectory;
     private List<File> resourceDirs;
     private boolean hotTests;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs, boolean hotTests) {
+            File configDirectory, File outputDirectory, List<File> resourceDirs, boolean hotTests) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
+        this.outputDirectory = outputDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
     }
@@ -251,6 +254,18 @@ public abstract class DevUtil {
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
 
+                // clean up the temporary configuration folder
+                File tempConfig = new File(outputDirectory.getAbsolutePath() + "/tempConfig");
+                if (tempConfig.exists()){
+                    try {
+                        FileUtils.deleteDirectory(tempConfig);
+                        debug("Sucessfully deleted liberty:dev temporary configuration folder");
+                    } catch (IOException e) {
+                        error("Could not delete liberty:dev temporary configuration folder");
+                    }
+                    
+                }
+                
                 cleanUpJVMOptions();
                 cleanUpServerEnv();
 
@@ -356,7 +371,7 @@ public abstract class DevUtil {
         }
     }
 
-    public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
+    public void watchFiles(File buildFile, File testOutputDirectory,
             final ThreadPoolExecutor executor, List<String> artifactPaths, File configFile)
             throws Exception {
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
@@ -414,7 +429,7 @@ public abstract class DevUtil {
                     debug("Registering Java source directory: " + this.sourceDirectory);
                     sourceDirRegistered = true;
                 } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
-                    cleanTargetDir(outputDirectory);
+                    cleanTargetDir(this.outputDirectory);
                     sourceDirRegistered = false;
                 }
 
@@ -434,14 +449,14 @@ public abstract class DevUtil {
                 if (!configDirRegistered && this.configDirectory.exists()){
                     configDirRegistered = true;
                     debug("Configuration directory has been added: " + this.configDirectory);
-                    info("Unhandled change detected in pom.xml. Restart liberty:dev mode for it to take effect.");
+                    info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 // check if configFile has been added
                 if (!configFileRegistered && configFile.exists()){
                     configFileRegistered = true;
                     debug("Configuration file has been added: " + configFile);
-                    info("Unhandled change detected in pom.xml. Restart liberty:dev mode for it to take effect.");
+                    info("The server configuration file " + configFile + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 try {
@@ -476,11 +491,11 @@ public abstract class DevUtil {
                                 debug("Java source file modified: " + fileChanged.getName());
 
                                 // tests are run in recompileJavaSource
-                                recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                recompileJavaSource(javaFilesChanged, artifactPaths, executor, this.outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
-                                deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
+                                deleteJavaFile(fileChanged, this.outputDirectory, this.sourceDirectory);
 
                                 // run all tests since Java files were changed
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
@@ -493,7 +508,7 @@ public abstract class DevUtil {
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
 
                                 // tests are run in recompileJavaTest
-                                recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
+                                recompileJavaTest(javaFilesChanged, artifactPaths, executor, this.outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
@@ -505,9 +520,10 @@ public abstract class DevUtil {
                         } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                copyConfigFolder(this.outputDirectory, fileChanged, this.configDirectory, "server.xml");
                                 copyFile(fileChanged, this.configDirectory, serverDirectory, null);
-                                checkConfigFile(fileChanged, executor);
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 info("Config file deleted: " + fileChanged.getName());
                                 deleteFile(fileChanged, this.configDirectory, serverDirectory, null);
@@ -518,9 +534,12 @@ public abstract class DevUtil {
                                 if (fileChanged.exists() && fileChanged.getAbsolutePath().endsWith(configFile.getName())
                                         && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                    copyFile(fileChanged, configFileParent, serverDirectory, "server.xml");
-                                    checkConfigFile(fileChanged, executor);
+                                    copyConfigFolder(this.outputDirectory, fileChanged, configFileParent, "server.xml");
+                                    copyFile(fileChanged, configFileParent, serverDirectory,
+                                            "server.xml");
+
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+
                                 } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
                                         && fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
                                     info("Config file deleted: " + fileChanged.getName());
@@ -533,13 +552,13 @@ public abstract class DevUtil {
                             debug("File within resource directory");
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                copyFile(fileChanged, resourceParent, outputDirectory, null);
+                                copyFile(fileChanged, resourceParent, this.outputDirectory, null);
 
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Resource file deleted: " + fileChanged.getName());
-                                deleteFile(fileChanged, resourceParent, outputDirectory, null);
+                                deleteFile(fileChanged, resourceParent, this.outputDirectory, null);
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             }
@@ -569,15 +588,27 @@ public abstract class DevUtil {
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
     }
+    
+    public void copyConfigFolder(File outputDirectory, File fileChanged, File srcDir, String targetFileName)
+            throws IOException {
+        File tempConfig = new File(outputDirectory.getAbsolutePath() + "/tempConfig");
+        if (!tempConfig.exists()) {
+            boolean created = tempConfig.mkdir();
+            debug("Temporary configuration folder created: " + tempConfig);
+        }
+        FileUtils.copyDirectory(serverDirectory, tempConfig);
+        copyFile(fileChanged, srcDir, tempConfig, targetFileName);
+        checkConfigFile(fileChanged, tempConfig);
+    }
 
     public void copyFile(File fileChanged, File srcDir, File targetDir, String targetFileName) throws IOException {
         String relPath = fileChanged.getAbsolutePath().substring(
                 fileChanged.getAbsolutePath().indexOf(srcDir.getAbsolutePath()) + srcDir.getAbsolutePath().length());
-        if (targetFileName != null){
+        if (targetFileName != null) {
             relPath = relPath.substring(0, relPath.indexOf(fileChanged.getName())) + targetFileName;
         }
         File targetResource = new File(targetDir.getAbsolutePath() + relPath);
-        
+
         try {
             FileUtils.copyFile(fileChanged, targetResource);
             info("Copied file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
