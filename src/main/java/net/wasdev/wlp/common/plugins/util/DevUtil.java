@@ -184,18 +184,17 @@ public abstract class DevUtil {
     private File sourceDirectory;
     private File testSourceDirectory;
     private File configDirectory;
-    private File outputDirectory;
     private List<File> resourceDirs;
     private boolean hotTests;
+    private Path tempConfigPath;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, File outputDirectory, List<File> resourceDirs, boolean hotTests) {
+            File configDirectory, List<File> resourceDirs, boolean hotTests) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
-        this.outputDirectory = outputDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
     }
@@ -246,6 +245,20 @@ public abstract class DevUtil {
             serverEnvFile.delete();
         }
     }
+    
+    public void cleanUpTempConfig() {
+        if (this.tempConfigPath != null){
+            File tempConfig = this.tempConfigPath.toFile();
+            if (tempConfig.exists()){
+                try {
+                    FileUtils.deleteDirectory(tempConfig);
+                    info("Sucessfully deleted liberty:dev temporary configuration folder");
+                } catch (IOException e) {
+                    error("Could not delete liberty:dev jvm.options file");
+                }
+            }
+        }
+    }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
         // shutdown hook to stop server when x mode is terminated
@@ -253,19 +266,8 @@ public abstract class DevUtil {
             @Override
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
-
-                // clean up the temporary configuration folder
-                File tempConfig = new File(outputDirectory.getAbsolutePath() + "/tempConfig");
-                if (tempConfig.exists()){
-                    try {
-                        FileUtils.deleteDirectory(tempConfig);
-                        debug("Sucessfully deleted liberty:dev temporary configuration folder");
-                    } catch (IOException e) {
-                        error("Could not delete liberty:dev temporary configuration folder");
-                    }
-                    
-                }
                 
+                cleanUpTempConfig();
                 cleanUpJVMOptions();
                 cleanUpServerEnv();
 
@@ -371,7 +373,7 @@ public abstract class DevUtil {
         }
     }
 
-    public void watchFiles(File buildFile, File testOutputDirectory,
+    public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
             final ThreadPoolExecutor executor, List<String> artifactPaths, File configFile)
             throws Exception {
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
@@ -429,7 +431,7 @@ public abstract class DevUtil {
                     debug("Registering Java source directory: " + this.sourceDirectory);
                     sourceDirRegistered = true;
                 } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
-                    cleanTargetDir(this.outputDirectory);
+                    cleanTargetDir(outputDirectory);
                     sourceDirRegistered = false;
                 }
 
@@ -491,11 +493,11 @@ public abstract class DevUtil {
                                 debug("Java source file modified: " + fileChanged.getName());
 
                                 // tests are run in recompileJavaSource
-                                recompileJavaSource(javaFilesChanged, artifactPaths, executor, this.outputDirectory,
+                                recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
-                                deleteJavaFile(fileChanged, this.outputDirectory, this.sourceDirectory);
+                                deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
 
                                 // run all tests since Java files were changed
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
@@ -508,7 +510,7 @@ public abstract class DevUtil {
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
 
                                 // tests are run in recompileJavaTest
-                                recompileJavaTest(javaFilesChanged, artifactPaths, executor, this.outputDirectory,
+                                recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Java file deleted: " + fileChanged.getName());
@@ -520,7 +522,7 @@ public abstract class DevUtil {
                         } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                copyConfigFolder(this.outputDirectory, fileChanged, this.configDirectory, "server.xml");
+                                copyConfigFolder(outputDirectory, fileChanged, this.configDirectory, "server.xml");
                                 copyFile(fileChanged, this.configDirectory, serverDirectory, null);
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
@@ -534,7 +536,7 @@ public abstract class DevUtil {
                                 if (fileChanged.exists() && fileChanged.getAbsolutePath().endsWith(configFile.getName())
                                         && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                    copyConfigFolder(this.outputDirectory, fileChanged, configFileParent, "server.xml");
+                                    copyConfigFolder(outputDirectory, fileChanged, configFileParent, "server.xml");
                                     copyFile(fileChanged, configFileParent, serverDirectory,
                                             "server.xml");
 
@@ -552,13 +554,13 @@ public abstract class DevUtil {
                             debug("File within resource directory");
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                copyFile(fileChanged, resourceParent, this.outputDirectory, null);
+                                copyFile(fileChanged, resourceParent, outputDirectory, null);
 
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Resource file deleted: " + fileChanged.getName());
-                                deleteFile(fileChanged, resourceParent, this.outputDirectory, null);
+                                deleteFile(fileChanged, resourceParent, outputDirectory, null);
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             }
@@ -591,15 +593,22 @@ public abstract class DevUtil {
     
     public void copyConfigFolder(File outputDirectory, File fileChanged, File srcDir, String targetFileName)
             throws IOException {
-        File tempConfig = new File(outputDirectory.getAbsolutePath() + "/tempConfig");
+        this.tempConfigPath = Files.createTempDirectory("tempConfig");
+        File tempConfig = tempConfigPath.toFile();
         if (!tempConfig.exists()) {
             boolean created = tempConfig.mkdir();
-            debug("Temporary configuration folder created: " + tempConfig);
+            if (created){
+                debug("Temporary configuration folder created: " + tempConfig);
+            } else {
+                error("Could not create the liberty:dev temporary configuration folder");
+            }
         }
         FileUtils.copyDirectory(serverDirectory, tempConfig);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         checkConfigFile(fileChanged, tempConfig);
+        cleanUpTempConfig();
     }
+    
 
     public void copyFile(File fileChanged, File srcDir, File targetDir, String targetFileName) throws IOException {
         String relPath = fileChanged.getAbsolutePath().substring(
