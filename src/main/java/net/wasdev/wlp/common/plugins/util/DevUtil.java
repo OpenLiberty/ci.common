@@ -252,9 +252,9 @@ public abstract class DevUtil {
             if (tempConfig.exists()){
                 try {
                     FileUtils.deleteDirectory(tempConfig);
-                    info("Sucessfully deleted liberty:dev temporary configuration folder");
+                    debug("Sucessfully deleted liberty:dev temporary configuration folder");
                 } catch (IOException e) {
-                    error("Could not delete liberty:dev jvm.options file");
+                    error("Could not delete liberty:dev temporary configuration folder");
                 }
             }
         }
@@ -595,14 +595,8 @@ public abstract class DevUtil {
             throws IOException {
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
-        if (!tempConfig.exists()) {
-            boolean created = tempConfig.mkdir();
-            if (created){
-                debug("Temporary configuration folder created: " + tempConfig);
-            } else {
-                error("Could not create the liberty:dev temporary configuration folder");
-            }
-        }
+        debug("Temporary configuration folder created: " + tempConfig);
+        
         FileUtils.copyDirectory(serverDirectory, tempConfig);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         checkConfigFile(fileChanged, tempConfig);
