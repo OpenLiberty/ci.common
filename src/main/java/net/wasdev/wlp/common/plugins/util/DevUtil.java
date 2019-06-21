@@ -167,8 +167,9 @@ public abstract class DevUtil {
      * Check the configuration file for new features
      * 
      * @param configFile
+     * @param serverDir
      */
-    public abstract void checkConfigFile(File configFile);
+    public abstract void checkConfigFile(File configFile, File serverDir);
 
     /**
      * Compile the specified directory
@@ -176,12 +177,6 @@ public abstract class DevUtil {
      * @return
      */
     public abstract boolean compile(File dir);
-    
-    /**
-     * Restart dev mode
-     * @param executor
-     */
-    public abstract void restartDevMode(ThreadPoolExecutor executor);
 
     private List<String> jvmOptions;
 
@@ -189,18 +184,17 @@ public abstract class DevUtil {
     private File sourceDirectory;
     private File testSourceDirectory;
     private File configDirectory;
-    private File defaultConfigDirectory;
     private List<File> resourceDirs;
     private boolean hotTests;
+    private Path tempConfigPath;
 
     public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, File defaultConfigDirectory, List<File> resourceDirs, boolean hotTests) {
+            File configDirectory, List<File> resourceDirs, boolean hotTests) {
         this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
-        this.defaultConfigDirectory = defaultConfigDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
     }
@@ -251,6 +245,20 @@ public abstract class DevUtil {
             serverEnvFile.delete();
         }
     }
+    
+    public void cleanUpTempConfig() {
+        if (this.tempConfigPath != null){
+            File tempConfig = this.tempConfigPath.toFile();
+            if (tempConfig.exists()){
+                try {
+                    FileUtils.deleteDirectory(tempConfig);
+                    debug("Sucessfully deleted liberty:dev temporary configuration folder");
+                } catch (IOException e) {
+                    error("Could not delete liberty:dev temporary configuration folder");
+                }
+            }
+        }
+    }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
         // shutdown hook to stop server when x mode is terminated
@@ -258,7 +266,8 @@ public abstract class DevUtil {
             @Override
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
-
+                
+                cleanUpTempConfig();
                 cleanUpJVMOptions();
                 cleanUpServerEnv();
 
@@ -278,7 +287,6 @@ public abstract class DevUtil {
     public void enableServerDebug(int libertyDebugPort) throws IOException {
         String serverEnvPath = serverDirectory.getAbsolutePath() + "/server.env";
         File serverEnvFile = new File(serverEnvPath);
-
         StringBuilder sb = new StringBuilder();
         if (serverEnvFile.exists()) {
             debug("server.env already exists");
@@ -366,16 +374,21 @@ public abstract class DevUtil {
     }
 
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> artifactPaths, boolean noConfigDir, File configFile)
+            final ThreadPoolExecutor executor, List<String> artifactPaths, File configFile)
             throws Exception {
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
-            Path srcPath = sourceDirectory.getAbsoluteFile().toPath();
-            Path testSrcPath = testSourceDirectory.getAbsoluteFile().toPath();
-            Path configPath = configDirectory.getAbsoluteFile().toPath();
+            
+            File serverXML = getFileFromConfigDirectory("server.xml"); // server.xml in the config directory
+            File configFileParent = configFile.getParentFile();
+            
+            Path srcPath = this.sourceDirectory.getAbsoluteFile().toPath();
+            Path testSrcPath = this.testSourceDirectory.getAbsoluteFile().toPath();
+            Path configPath = this.configDirectory.getAbsoluteFile().toPath();
 
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
             boolean configDirRegistered = false;
+            boolean configFileRegistered = false;
 
             if (this.sourceDirectory.exists()) {
                 registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
@@ -390,6 +403,12 @@ public abstract class DevUtil {
             if (this.configDirectory.exists()) {
                 registerAll(this.configDirectory.toPath(), configPath, watcher);
                 configDirRegistered = true;
+            }
+            
+            if (configFile.exists() && configFileParent.exists()){
+                Path configFilePath = configFileParent.getAbsoluteFile().toPath();
+                registerAll(configFileParent.toPath(), configFilePath, watcher);
+                configFileRegistered = true;
             }
             
             for (File resourceDir : resourceDirs) {
@@ -428,16 +447,20 @@ public abstract class DevUtil {
                     testSourceDirRegistered = false;
                 }
                 
-                // check if defaultConfigDirectory has been added and restart dev mode if it has
-                if (noConfigDir && this.defaultConfigDirectory.exists()){
-                    restartDevMode(executor);
-                }
-                
                 // check if configDirectory has been added
                 if (!configDirRegistered && this.configDirectory.exists()){
-                    restartDevMode(executor);
+                    configDirRegistered = true;
+                    debug("Configuration directory has been added: " + this.configDirectory);
+                    info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
-
+                
+                // check if configFile has been added
+                if (!configFileRegistered && configFile.exists()){
+                    configFileRegistered = true;
+                    debug("Configuration file has been added: " + configFile);
+                    info("The server configuration file " + configFile + " has been added. Restart liberty:dev mode for it to take effect.");
+                }
+                
                 try {
                     final WatchKey wk = watcher.poll(1, TimeUnit.SECONDS);
                     for (WatchEvent<?> event : wk.pollEvents()) {
@@ -496,23 +519,33 @@ public abstract class DevUtil {
                                 // run all tests without waiting for app update since only unit test source changed
                                 runTestThread(false, executor, -1, false, false);
                             }
-                        } else if (directory.startsWith(this.configDirectory.toPath())) { // config
-                                                                                          // files
+                        } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
-                                    copyFile(fileChanged, this.configDirectory, serverDirectory);
-                                    checkConfigFile(fileChanged);
+                                copyConfigFolder(outputDirectory, fileChanged, this.configDirectory, "server.xml");
+                                copyFile(fileChanged, this.configDirectory, serverDirectory, null);
+                                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
-                                    // run integration tests only since config files changed
-                                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
-                                }
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                                if (!noConfigDir || fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
-                                    info("Config file deleted: " + fileChanged.getName());
-                                    deleteFile(fileChanged, this.configDirectory, serverDirectory);
+                                info("Config file deleted: " + fileChanged.getName());
+                                deleteFile(fileChanged, this.configDirectory, serverDirectory, null);
+                                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+                            }
+                        } else if (directory.startsWith(configFileParent.toPath())) {
+                            if (serverXML == null || !serverXML.exists()) {
+                                if (fileChanged.exists() && fileChanged.getAbsolutePath().endsWith(configFile.getName())
+                                        && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                    copyConfigFolder(outputDirectory, fileChanged, configFileParent, "server.xml");
+                                    copyFile(fileChanged, configFileParent, serverDirectory,
+                                            "server.xml");
 
-                                    // run integration tests only since config file changed
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+
+                                } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
+                                        && fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                    info("Config file deleted: " + fileChanged.getName());
+                                    deleteFile(fileChanged, this.configDirectory, serverDirectory, "server.xml");
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                                 }
                             }
@@ -521,13 +554,13 @@ public abstract class DevUtil {
                             debug("File within resource directory");
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                copyFile(fileChanged, resourceParent, outputDirectory);
+                                copyFile(fileChanged, resourceParent, outputDirectory, null);
 
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 debug("Resource file deleted: " + fileChanged.getName());
-                                deleteFile(fileChanged, resourceParent, outputDirectory);
+                                deleteFile(fileChanged, resourceParent, outputDirectory, null);
                                 // run all tests on resource change
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             }
@@ -557,26 +590,45 @@ public abstract class DevUtil {
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
     }
+    
+    public void copyConfigFolder(File outputDirectory, File fileChanged, File srcDir, String targetFileName)
+            throws IOException {
+        this.tempConfigPath = Files.createTempDirectory("tempConfig");
+        File tempConfig = tempConfigPath.toFile();
+        debug("Temporary configuration folder created: " + tempConfig);
+        
+        FileUtils.copyDirectory(serverDirectory, tempConfig);
+        copyFile(fileChanged, srcDir, tempConfig, targetFileName);
+        checkConfigFile(fileChanged, tempConfig);
+        cleanUpTempConfig();
+    }
+    
 
-    public void copyFile(File fileChanged, File srcDir, File targetDir) throws IOException {
+    public void copyFile(File fileChanged, File srcDir, File targetDir, String targetFileName) throws IOException {
         String relPath = fileChanged.getAbsolutePath().substring(
                 fileChanged.getAbsolutePath().indexOf(srcDir.getAbsolutePath()) + srcDir.getAbsolutePath().length());
-
+        if (targetFileName != null) {
+            relPath = relPath.substring(0, relPath.indexOf(fileChanged.getName())) + targetFileName;
+        }
         File targetResource = new File(targetDir.getAbsolutePath() + relPath);
+
         try {
             FileUtils.copyFile(fileChanged, targetResource);
             info("Copied file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
         } catch (FileNotFoundException ex) {
             debug("Failed to copy file: " + fileChanged.getAbsolutePath());
         } catch (Exception ex) {
-            error("Error occured while copying file: " + ex.getMessage());
+            debug(ex);
         }
     }
 
-    protected void deleteFile(File deletedFile, File dir, File targetDir) {
+    protected void deleteFile(File deletedFile, File dir, File targetDir, String targetFileName) {
         debug("File that was deleted: " + deletedFile.getAbsolutePath());
         String relPath = deletedFile.getAbsolutePath().substring(
                 deletedFile.getAbsolutePath().indexOf(dir.getAbsolutePath()) + dir.getAbsolutePath().length());
+        if (targetFileName != null){
+            relPath = relPath.substring(0, relPath.indexOf(deletedFile.getName())) + targetFileName;
+        }
         File targetFile = new File(targetDir.getAbsolutePath() + relPath);
         debug("Target file exists: " + targetFile.exists());
         if (targetFile.exists()) {
@@ -617,6 +669,18 @@ public abstract class DevUtil {
             }
 
         });
+    }
+    
+    /*
+     * Get the file from configDrectory if it exists; otherwise return def only
+     * if it exists, or null if not
+     */
+    protected File getFileFromConfigDirectory(String file) {
+        File f = new File(configDirectory, file);
+        if (configDirectory != null && f.exists()) {
+            return f;
+        }
+        return null;
     }
 
     protected void deleteJavaFile(File fileChanged, File classesDir, File compileSourceRoot) {
