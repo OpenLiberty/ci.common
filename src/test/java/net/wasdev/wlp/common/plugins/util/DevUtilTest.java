@@ -21,17 +21,37 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.nio.file.FileSystems;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.WatchService;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 public class DevUtilTest extends BaseDevUtilTest {
 
+    File serverDirectory;
+
+    @Before
+    public void setUp() throws IOException {
+        serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
+    }
+
+    @After
+    public void tearDown() {
+        if (serverDirectory != null && serverDirectory.exists()) {
+            try {
+                FileUtils.deleteDirectory(serverDirectory);
+            } catch (IOException e) {
+                // nothing else can be done
+            }
+        }
+    }
+
     @Test
     public void testCleanupServerEnv() throws Exception {
-        File serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
         DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
 
         File serverEnv = new File(serverDirectory, "server.env");
@@ -47,7 +67,6 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testCleanupServerEnvBak() throws Exception {
-        File serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
         DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
 
         File serverEnv = new File(serverDirectory, "server.env");
@@ -63,7 +82,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         // verify the backup env file was restored as server.env
         assertTrue(serverEnv.exists());
         String serverEnvContents = new String(Files.readAllBytes(serverEnv.toPath()));
-        assertEquals(serverEnvContents, "backup");
+        assertEquals("backup", serverEnvContents);
         assertFalse(serverEnvBak.exists());
     }
 
@@ -202,6 +221,4 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertFalse(javaClass.exists());
     }
     
-    
-
 }
