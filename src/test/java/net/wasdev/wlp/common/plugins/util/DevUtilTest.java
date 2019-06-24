@@ -20,10 +20,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.nio.file.FileSystems;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.WatchService;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
@@ -33,10 +31,12 @@ import org.junit.Test;
 public class DevUtilTest extends BaseDevUtilTest {
 
     File serverDirectory;
+    File configDirectory;
 
     @Before
     public void setUp() throws IOException {
         serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
+        configDirectory = Files.createTempDirectory("configDirectory").toFile();
     }
 
     @After
@@ -189,8 +189,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testGetFileFromConfigDirectory() throws Exception {
-        File configDirectory = Files.createTempDirectory("configDirectory").toFile();
-        DevUtil util = new DevTestUtil(null, null, null, configDirectory, null, false);
+        DevUtil util = new DevTestUtil(null, null, null, this.configDirectory, null, false);
         
         File tempTextFile = new File(configDirectory, "temp.txt");
         Files.write(tempTextFile.toPath(), "temp".getBytes());
