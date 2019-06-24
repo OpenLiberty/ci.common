@@ -20,15 +20,39 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.io.FileUtils;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 public class DevUtilTest extends BaseDevUtilTest {
 
+    File serverDirectory;
+
+    @Before
+    public void setUp() throws IOException {
+        serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
+    }
+
+    @After
+    public void tearDown() {
+        if (serverDirectory != null && serverDirectory.exists()) {
+            try {
+                FileUtils.deleteDirectory(serverDirectory);
+            } catch (IOException e) {
+                // nothing else can be done
+            }
+        }
+    }
+
     @Test
     public void testCleanupServerEnv() throws Exception {
-        File serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
         DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
 
         File serverEnv = new File(serverDirectory, "server.env");
@@ -44,7 +68,6 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testCleanupServerEnvBak() throws Exception {
-        File serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
         DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
 
         File serverEnv = new File(serverDirectory, "server.env");
@@ -60,7 +83,68 @@ public class DevUtilTest extends BaseDevUtilTest {
         // verify the backup env file was restored as server.env
         assertTrue(serverEnv.exists());
         String serverEnvContents = new String(Files.readAllBytes(serverEnv.toPath()));
-        assertEquals(serverEnvContents, "backup");
+        assertEquals("backup", serverEnvContents);
         assertFalse(serverEnvBak.exists());
     }
+
+    private class RunTestThreadUtil extends DevTestUtil {
+        public int counter = 0;
+
+        public RunTestThreadUtil(File serverDirectory, boolean hotTests) {
+            super(serverDirectory, null, null, null, null, hotTests);
+        }
+
+        @Override
+        public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
+                boolean forceSkipUTs) {
+            counter++;
+        }
+    }
+
+    @Test
+    public void testRunManualTestThread() throws Exception {
+        RunTestThreadUtil util = new RunTestThreadUtil(serverDirectory, false);
+
+        assertEquals(0, util.counter);
+
+        final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
+        assertEquals(0, executor.getPoolSize());
+
+        // manualInvocation=false should not start a thread
+        util.runTestThread(false, executor, -1, false, false);
+        assertEquals(0, executor.getPoolSize());
+
+        // manualInvocation=true should start a thread
+        util.runTestThread(false, executor, -1, false, true);
+        assertEquals(1, executor.getPoolSize());
+        
+        // shutdown executor
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+
+        // verify that runTests() was called once
+        assertEquals(1, util.counter);
+    }
+
+    @Test
+    public void testRunHotTestThread() throws Exception {
+        RunTestThreadUtil util = new RunTestThreadUtil(serverDirectory, true);
+
+        assertEquals(0, util.counter);
+
+        final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
+        assertEquals(0, executor.getPoolSize());
+
+        // manualInvocation=false and hotTests=true should start a thread
+        util.runTestThread(false, executor, -1, false, false);
+        assertEquals(1, executor.getPoolSize());
+
+        // shutdown executor
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+
+        // verify that runTests() was called once
+        assertEquals(1, util.counter);
+    }
+
 }
