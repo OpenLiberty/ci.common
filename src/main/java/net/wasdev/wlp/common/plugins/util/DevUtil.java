@@ -491,7 +491,7 @@ public abstract class DevUtil {
                         } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                copyConfigFolder(outputDirectory, fileChanged, this.configDirectory, "server.xml");
+                                copyConfigFolder(fileChanged, this.configDirectory, "server.xml");
                                 copyFile(fileChanged, this.configDirectory, serverDirectory, null);
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
@@ -505,7 +505,7 @@ public abstract class DevUtil {
                                 if (fileChanged.exists() && fileChanged.getAbsolutePath().endsWith(configFile.getName())
                                         && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                    copyConfigFolder(outputDirectory, fileChanged, configFileParent, "server.xml");
+                                    copyConfigFolder(fileChanged, configFileParent, "server.xml");
                                     copyFile(fileChanged, configFileParent, serverDirectory,
                                             "server.xml");
 
@@ -560,7 +560,7 @@ public abstract class DevUtil {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
     }
     
-    public void copyConfigFolder(File outputDirectory, File fileChanged, File srcDir, String targetFileName)
+    public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName)
             throws IOException {
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
@@ -571,7 +571,6 @@ public abstract class DevUtil {
         checkConfigFile(fileChanged, tempConfig);
         cleanUpTempConfig();
     }
-    
 
     public void copyFile(File fileChanged, File srcDir, File targetDir, String targetFileName) throws IOException {
         String relPath = fileChanged.getAbsolutePath().substring(
@@ -618,7 +617,7 @@ public abstract class DevUtil {
                 }
             }
         }
-        if (outputDirectory.listFiles().length > 0){
+        if (outputDirectory.listFiles().length == 0){
             outputDirectory.delete();
         }
     }
