@@ -178,8 +178,6 @@ public abstract class DevUtil {
      */
     public abstract boolean compile(File dir);
 
-    private List<String> jvmOptions;
-
     private File serverDirectory;
     private File sourceDirectory;
     private File testSourceDirectory;
@@ -188,42 +186,14 @@ public abstract class DevUtil {
     private boolean hotTests;
     private Path tempConfigPath;
 
-    public DevUtil(List<String> jvmOptions, File serverDirectory, File sourceDirectory, File testSourceDirectory,
+    public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests) {
-        this.jvmOptions = jvmOptions;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
-    }
-    
-    public void cleanUpJVMOptions() {
-        // cleaning up jvm.options files
-        if (jvmOptions == null || jvmOptions.isEmpty()) {
-            File jvmOptionsFile = new File(serverDirectory.getAbsolutePath() + "/jvm.options");
-            File jvmOptionsBackup = new File(serverDirectory.getAbsolutePath() + "/jvmBackup.options");
-            if (jvmOptionsFile.exists()) {
-                debug("Deleting liberty:dev jvm.options file");
-                if (jvmOptionsBackup.exists()) {
-                    try {
-                        Files.copy(jvmOptionsBackup.toPath(), jvmOptionsFile.toPath(),
-                                StandardCopyOption.REPLACE_EXISTING);
-                        boolean deleted = jvmOptionsBackup.delete();
-                    } catch (IOException e) {
-                        error("Could not restore jvm.options: " + e.getMessage());
-                    }
-                } else {
-                    boolean deleted = jvmOptionsFile.delete();
-                    if (deleted) {
-                        info("Sucessfully deleted liberty:dev jvm.options file");
-                    } else {
-                        error("Could not delete liberty:dev jvm.options file");
-                    }
-                }
-            }
-        }
     }
     
     public void cleanUpServerEnv() {
@@ -268,7 +238,6 @@ public abstract class DevUtil {
                 debug("Inside Shutdown Hook, shutting down server");
                 
                 cleanUpTempConfig();
-                cleanUpJVMOptions();
                 cleanUpServerEnv();
 
                 if (hotkeyReader != null) {
