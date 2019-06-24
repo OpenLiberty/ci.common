@@ -41,6 +41,13 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @After
     public void tearDown() {
+        if (configDirectory != null && configDirectory.exists()) {
+            try {
+                FileUtils.deleteDirectory(configDirectory);
+            } catch (IOException e) {
+                // nothing else can be done
+            }
+        }
         if (serverDirectory != null && serverDirectory.exists()) {
             try {
                 FileUtils.deleteDirectory(serverDirectory);
@@ -196,10 +203,6 @@ public class DevUtilTest extends BaseDevUtilTest {
         
         File configFile = util.getFileFromConfigDirectory("temp.txt");
         assertTrue(configFile.exists());
-        
-        if (configDirectory.exists()){
-            FileUtils.deleteDirectory(configDirectory);
-        }
     }
     
     @Test
@@ -218,6 +221,14 @@ public class DevUtilTest extends BaseDevUtilTest {
         
         util.deleteJavaFile(javaFile, classesDir, compileSourceRoot);
         assertFalse(javaClass.exists());
+        
+        if (compileSourceRoot.exists()) {
+            FileUtils.deleteDirectory(compileSourceRoot);
+        }
+        if (classesDir.exists()) {
+            FileUtils.deleteDirectory(classesDir);
+        }
+        
     }
     
 }
