@@ -16,7 +16,10 @@
 package net.wasdev.wlp.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -83,6 +86,49 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
 
         // verify that runTests() was called once
         assertEquals(1, util.counter);
+    }
+
+    @Test
+    public void testRunHotkeyReaderThread() throws Exception {
+        RunTestThreadUtil util = new RunTestThreadUtil(false);
+
+        assertEquals(0, util.counter);
+
+        final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
+        assertEquals(0, executor.getPoolSize());
+
+        InputStream previousSystemIn = System.in;
+        try {
+            // replace system input with a newline string
+            String enter = "\n";
+            System.setIn(new ByteArrayInputStream(enter.getBytes()));
+        
+            // run test on newline input
+            util.runHotkeyReaderThread(executor);
+
+            // wait for executor to pickup test job
+            int timeout = 5000;
+            int waited = 0;
+            while (executor.getPoolSize() == 0 && waited <= timeout) {
+                int sleep = 10;
+                Thread.sleep(sleep);
+                waited += sleep;
+            }
+            if (waited > timeout) {
+                fail("Timed out waiting for new line input");
+            }
+            assertEquals(1, executor.getPoolSize());
+
+            // shutdown executor
+            executor.shutdown();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+
+            // verify that runTests() was called once
+            assertEquals(1, util.counter);
+        } finally {
+            System.setIn(previousSystemIn);
+        }
+
     }
 
 }
