@@ -491,7 +491,7 @@ public abstract class DevUtil {
                         } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                copyConfigFolder(outputDirectory, fileChanged, this.configDirectory, "server.xml");
+                                copyConfigFolder(fileChanged, this.configDirectory, "server.xml");
                                 copyFile(fileChanged, this.configDirectory, serverDirectory, null);
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
@@ -505,7 +505,7 @@ public abstract class DevUtil {
                                 if (fileChanged.exists() && fileChanged.getAbsolutePath().endsWith(configFile.getName())
                                         && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                    copyConfigFolder(outputDirectory, fileChanged, configFileParent, "server.xml");
+                                    copyConfigFolder(fileChanged, configFileParent, "server.xml");
                                     copyFile(fileChanged, configFileParent, serverDirectory,
                                             "server.xml");
 
@@ -556,11 +556,28 @@ public abstract class DevUtil {
         }
     }
 
+    /**
+     * Reads the file to a String
+     * 
+     * @param file
+     * @return String representation of the file
+     * @throws IOException
+     */
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
     }
-    
-    public void copyConfigFolder(File outputDirectory, File fileChanged, File srcDir, String targetFileName)
+
+    /**
+     * Creates a temporary copy of the configuration file and checks the
+     * configFile in the temporary directory to avoid install-feature timing
+     * issues
+     * 
+     * @param fileChanged the file that was changed
+     * @param srcDir the directory of the file changed
+     * @param targetFileName if not null renames the fileChanged to targetFileName in the targetDir
+     * @throws IOException
+     */
+    public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName)
             throws IOException {
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
@@ -571,8 +588,16 @@ public abstract class DevUtil {
         checkConfigFile(fileChanged, tempConfig);
         cleanUpTempConfig();
     }
-    
 
+    /**
+     * Copies the fileChanged from the srcDir to the targetDir.
+     * 
+     * @param fileChanged the file that was changed
+     * @param srcDir the directory of the file changed
+     * @param targetDir the target directory
+     * @param targetFileName if not null renames the fileChanged to targetFileName in the targetDir
+     * @throws IOException
+     */
     public void copyFile(File fileChanged, File srcDir, File targetDir, String targetFileName) throws IOException {
         String relPath = fileChanged.getAbsolutePath().substring(
                 fileChanged.getAbsolutePath().indexOf(srcDir.getAbsolutePath()) + srcDir.getAbsolutePath().length());
@@ -591,11 +616,19 @@ public abstract class DevUtil {
         }
     }
 
+    /**
+     * Deletes the corresponding file in the targetDir.
+     * 
+     * @param deletedFile the file that was deleted
+     * @param dir the directory of the deletedFile
+     * @param targetDir the corresponding targetDir of the deletedFile
+     * @param targetFileName if not null deletes the targetFile with this name
+     */
     protected void deleteFile(File deletedFile, File dir, File targetDir, String targetFileName) {
         debug("File that was deleted: " + deletedFile.getAbsolutePath());
         String relPath = deletedFile.getAbsolutePath().substring(
                 deletedFile.getAbsolutePath().indexOf(dir.getAbsolutePath()) + dir.getAbsolutePath().length());
-        if (targetFileName != null){
+        if (targetFileName != null) {
             relPath = relPath.substring(0, relPath.indexOf(deletedFile.getName())) + targetFileName;
         }
         File targetFile = new File(targetDir.getAbsolutePath() + relPath);
@@ -605,7 +638,13 @@ public abstract class DevUtil {
             info("Deleted file: " + targetFile.getAbsolutePath());
         }
     }
-    
+
+    /**
+     * Delete all the Java class files within the specified directory.
+     * If the directory is empty, deletes the directory as well.
+     *  
+     * @param outputDirectory the directory for compiled classes
+     */
     protected void cleanTargetDir(File outputDirectory){
         File[] fList = outputDirectory.listFiles();
         if (fList != null) {
@@ -618,11 +657,19 @@ public abstract class DevUtil {
                 }
             }
         }
-        if (outputDirectory.listFiles().length > 0){
+        if (outputDirectory.listFiles().length == 0){
             outputDirectory.delete();
         }
     }
 
+    /**
+     * Register the parent directory and all sub-directories with the WatchService
+     * 
+     * @param start parent directory
+     * @param dir path of parent directory
+     * @param watcher WatchService
+     * @throws IOException
+     */
     protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
@@ -640,9 +687,11 @@ public abstract class DevUtil {
         });
     }
     
-    /*
-     * Get the file from configDrectory if it exists; otherwise return def only
-     * if it exists, or null if not
+    /**
+     * Get the file from the configDirectory if it exists
+     * 
+     * @param file 
+     * @return file or null if it does not exist
      */
     protected File getFileFromConfigDirectory(String file) {
         File f = new File(configDirectory, file);
@@ -652,6 +701,13 @@ public abstract class DevUtil {
         return null;
     }
 
+    /**
+     * Given the fileChanged delete the corresponding Java class
+     * 
+     * @param fileChanged Java file changed
+     * @param classesDir the directory for compiled classes
+     * @param compileSourceRoot the source directory for the Java classes
+     */
     protected void deleteJavaFile(File fileChanged, File classesDir, File compileSourceRoot) {
         if (fileChanged.getName().endsWith(".java")) {
             String fileName = fileChanged.getName().substring(0, fileChanged.getName().indexOf(".java"));
@@ -701,6 +757,16 @@ public abstract class DevUtil {
         recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
     }
 
+    /**
+     * Recompile source files
+     * 
+     * @param javaFilesChanged list of Java files changed
+     * @param artifactPaths list of project artifact paths for building the classpath
+     * @param executor the test thread executor
+     * @param tests indicates whether the files changed were test files
+     * @param outputDirectory the directory for compiled classes
+     * @param testOutputDirectory the directory for compiled test classes
+     */
     protected void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
             boolean tests, File outputDirectory, File testOutputDirectory) {
         try {
@@ -758,6 +824,13 @@ public abstract class DevUtil {
         }
     }
 
+    /**
+     * Gets the class path for the specified artifactPaths and outputDirs.
+     * 
+     * @param artifactPaths list of artifacts for the current project
+     * @param outputDirs list of output directories for the current project
+     * @return set of classpath files
+     */
     protected Set<File> getClassPath(List<String> artifactPaths, List<File> outputDirs) {
         List<URL> urls = new ArrayList<>();
         ClassLoader c = Thread.currentThread().getContextClassLoader();
@@ -819,7 +892,7 @@ public abstract class DevUtil {
     }
 
     /**
-     * Runt tests in a new thread.
+     * Run tests in a new thread.
      * 
      * @param waitForApplicationUpdate whether it should wait for the application to update before running integration tests
      * @param executor the thread pool executor
