@@ -31,10 +31,16 @@ import org.junit.Test;
 public class DevUtilTest extends BaseDevUtilTest {
 
     File serverDirectory;
+    File configDirectory;
+    File srcDir;
+    File targetDir;
 
     @Before
     public void setUp() throws IOException {
         serverDirectory = Files.createTempDirectory("serverDirectory").toFile();
+        configDirectory = Files.createTempDirectory("configDirectory").toFile();
+        srcDir = Files.createTempDirectory("src").toFile();
+        targetDir = Files.createTempDirectory("target").toFile();
     }
 
     @After
@@ -42,6 +48,27 @@ public class DevUtilTest extends BaseDevUtilTest {
         if (serverDirectory != null && serverDirectory.exists()) {
             try {
                 FileUtils.deleteDirectory(serverDirectory);
+            } catch (IOException e) {
+                // nothing else can be done
+            }
+        }
+        if (configDirectory != null && configDirectory.exists()) {
+            try {
+                FileUtils.deleteDirectory(configDirectory);
+            } catch (IOException e) {
+                // nothing else can be done
+            }
+        }
+        if (srcDir != null && srcDir.exists()) {
+            try {
+                FileUtils.deleteDirectory(srcDir);
+            } catch (IOException e) {
+                // nothing else can be done
+            }
+        }
+        if (targetDir != null && targetDir.exists()) {
+            try {
+                FileUtils.deleteDirectory(targetDir);
             } catch (IOException e) {
                 // nothing else can be done
             }
@@ -76,12 +103,110 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertTrue(serverEnvBak.exists());
 
         util.cleanUpServerEnv();
-        
+
         // verify the backup env file was restored as server.env
         assertTrue(serverEnv.exists());
         String serverEnvContents = new String(Files.readAllBytes(serverEnv.toPath()));
-        assertEquals("backup", serverEnvContents);
+        assertEquals(serverEnvContents, "backup");
         assertFalse(serverEnvBak.exists());
+    }
+
+    @Test
+    public void testReadFileToString() throws Exception {
+        DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
+
+        File tempFile = new File(serverDirectory, "temp.txt");
+        Files.write(tempFile.toPath(), "temp".getBytes());
+        String fileString = util.readFile(tempFile);
+
+        assertTrue(fileString.equals("temp"));
+    }
+
+    @Test
+    public void testCopyFile() throws Exception {
+        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+
+        File configFile = new File(srcDir, "config.xml");
+        Files.write(configFile.toPath(), "temp".getBytes());
+
+        util.copyFile(configFile, srcDir, targetDir, "server.xml");
+
+        File targetFile = new File(targetDir, "server.xml");
+        assertTrue(targetFile.exists());
+    }
+
+    @Test
+    public void testDeleteFile() throws Exception {
+        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+
+        File tempSrcFile = new File(srcDir, "temp.txt");
+        Files.write(tempSrcFile.toPath(), "temp".getBytes());
+        File tempTargetFile = new File(targetDir, "server.xml");
+        Files.write(tempTargetFile.toPath(), "temp".getBytes());
+
+        // verify that files have been properly created
+        assertTrue(tempSrcFile.exists());
+        assertTrue(tempTargetFile.exists());
+
+        util.deleteFile(tempSrcFile, srcDir, targetDir, "server.xml");
+
+        // verify that the target file has been deleted
+        assertFalse(tempTargetFile.exists());
+    }
+
+    @Test
+    public void testCleanTargetDir() throws Exception {
+        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+
+        File tempClass = new File(targetDir, "temp.class");
+        Files.write(tempClass.toPath(), "temp".getBytes());
+
+        assertTrue(tempClass.exists());
+
+        util.cleanTargetDir(targetDir);
+
+        // verify that the targetDir has been deleted
+        assertFalse(targetDir.exists());
+
+        File tempTextFile = new File(srcDir, "temp.txt");
+        Files.write(tempTextFile.toPath(), "temp".getBytes());
+
+        assertTrue(tempTextFile.exists());
+
+        util.cleanTargetDir(srcDir);
+
+        // verify that the srcDir still exists as it contained files other than
+        // java classes
+        assertTrue(srcDir.exists());
+    }
+
+    @Test
+    public void testGetFileFromConfigDirectory() throws Exception {
+        DevUtil util = new DevTestUtil(null, null, null, this.configDirectory, null, false);
+
+        File tempTextFile = new File(configDirectory, "temp.txt");
+        Files.write(tempTextFile.toPath(), "temp".getBytes());
+
+        File configFile = util.getFileFromConfigDirectory("temp.txt");
+        assertTrue(configFile.exists());
+    }
+
+    @Test
+    public void testDeleteJavaFile() throws Exception {
+        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+
+        File javaFile = new File(srcDir, "temp.java");
+        Files.write(javaFile.toPath(), "temp".getBytes());
+        File javaClass = new File(targetDir, "temp.class");
+        Files.write(javaClass.toPath(), "temp".getBytes());
+
+        assertTrue(javaFile.exists());
+        assertTrue(javaClass.exists());
+
+        util.deleteJavaFile(javaFile, targetDir, srcDir);
+
+        // verify that the corresponding class file has been deleted
+        assertFalse(javaClass.exists());
     }
 
 }
