@@ -45,11 +45,9 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
     @Test
     public void testRunManualTestThread() throws Exception {
         RunTestThreadUtil util = new RunTestThreadUtil(false);
-
         assertEquals(0, util.counter);
 
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
-        assertEquals(0, executor.getPoolSize());
 
         // manualInvocation=false should not start a thread
         util.runTestThread(false, executor, -1, false, false);
@@ -70,11 +68,9 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
     @Test
     public void testRunHotTestThread() throws Exception {
         RunTestThreadUtil util = new RunTestThreadUtil(true);
-
         assertEquals(0, util.counter);
 
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
-        assertEquals(0, executor.getPoolSize());
 
         // manualInvocation=false and hotTests=true should start a thread
         util.runTestThread(false, executor, -1, false, false);
@@ -91,11 +87,9 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
     @Test
     public void testRunHotkeyReaderThread() throws Exception {
         RunTestThreadUtil util = new RunTestThreadUtil(false);
-
         assertEquals(0, util.counter);
 
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
-        assertEquals(0, executor.getPoolSize());
 
         InputStream previousSystemIn = System.in;
         try {
