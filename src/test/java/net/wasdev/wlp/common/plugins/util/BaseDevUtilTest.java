@@ -31,8 +31,8 @@ public class BaseDevUtilTest {
     public class DevTestUtil extends DevUtil {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory,
-                File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests) {
-            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, resourceDirs, hotTests);
+                File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
+            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, resourceDirs, hotTests, skipTests);
         }
 
         @Override
@@ -128,7 +128,7 @@ public class BaseDevUtilTest {
         
     }
     
-    public DevUtil getNewDevUtil()  {
-        return new DevTestUtil(null, null, null, null, null, false);
+    public DevUtil getNewDevUtil(File serverDirectory)  {
+        return new DevTestUtil(serverDirectory, null, null, null, null, false, false);
     }
 }

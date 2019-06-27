@@ -185,15 +185,17 @@ public abstract class DevUtil {
     private List<File> resourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
+    private boolean skipTests;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs, boolean hotTests) {
+            File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
+        this.skipTests = skipTests;
     }
     
     public void cleanUpServerEnv() {
@@ -294,7 +296,7 @@ public abstract class DevUtil {
     private HotkeyReader hotkeyReader = null;
 
     /**
-     * Run a hotkey reader thread to run tests when pressing Enter.
+     * Run a hotkey reader thread.
      * If the thread is already running, does nothing.
      * 
      * @param executor the test thread executor
@@ -303,10 +305,14 @@ public abstract class DevUtil {
         if (hotkeyReader == null) {
             hotkeyReader = new HotkeyReader(executor);
             new Thread(hotkeyReader).start();
-            if (hotTests) {
-                info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
-            } else {
-                info("Press the Enter key to run tests on demand.");
+            debug("Started hotkey reader.");
+
+            if (!skipTests) {
+                if (hotTests) {
+                    info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
+                } else {
+                    info("Press the Enter key to run tests on demand.");
+                }
             }
         }
     }
@@ -334,9 +340,14 @@ public abstract class DevUtil {
         private void readInput() {
             while (!shutdown) {
                 debug("Waiting for Enter key to run tests");
-                scanner.nextLine();
-                debug("Detected Enter key. Running tests...");
-                runTestThread(false, executor, -1, false, true);
+                String line = scanner.nextLine();
+                if (line != null && line.trim().equalsIgnoreCase("exit")) {
+                    debug("Detected exit command");
+                    System.exit(0);
+                } else {
+                    debug("Detected Enter key. Running tests...");
+                    runTestThread(false, executor, -1, false, true);    
+                }
             }
             debug("Hotkey reader thread was shut down");
         }
