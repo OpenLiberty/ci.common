@@ -115,7 +115,6 @@ public class DevUtilTest extends BaseDevUtilTest {
     
     @Test
     public void testEnableServerDebug() throws Exception {
-        DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
         util.enableServerDebug(5438);
         
         File serverEnv = new File(serverDirectory, "server.env");
@@ -129,7 +128,6 @@ public class DevUtilTest extends BaseDevUtilTest {
     
     @Test
     public void testEnableServerDebugBackup() throws Exception {
-        DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
         String serverEnvContent = "abc=123\nxyz=321";
         
         File serverEnv = new File(serverDirectory, "server.env");
