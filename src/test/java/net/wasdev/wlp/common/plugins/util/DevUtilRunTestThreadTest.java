@@ -32,7 +32,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         public int counter = 0;
 
         public RunTestThreadUtil(boolean hotTests) {
-            super(null, null, null, null, null, hotTests);
+            super(null, null, null, null, null, hotTests, false);
         }
 
         @Override
@@ -98,7 +98,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
             System.setIn(new ByteArrayInputStream(enter.getBytes()));
         
             // run test on newline input
-            util.runHotkeyReaderThread(executor, false);
+            util.runHotkeyReaderThread(executor);
 
             // wait for executor to pickup test job
             int timeout = 5000;

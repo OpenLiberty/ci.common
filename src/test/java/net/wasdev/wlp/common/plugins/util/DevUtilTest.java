@@ -77,7 +77,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testCleanupServerEnv() throws Exception {
-        DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
+        DevUtil util = getNewDevUtil(serverDirectory);
 
         File serverEnv = new File(serverDirectory, "server.env");
         Files.write(serverEnv.toPath(), "temp".getBytes());
@@ -92,7 +92,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testCleanupServerEnvBak() throws Exception {
-        DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
+        DevUtil util = getNewDevUtil(serverDirectory);
 
         File serverEnv = new File(serverDirectory, "server.env");
         Files.write(serverEnv.toPath(), "temp".getBytes());
@@ -113,7 +113,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testReadFileToString() throws Exception {
-        DevUtil util = new DevTestUtil(serverDirectory, null, null, null, null, false);
+        DevUtil util = getNewDevUtil(serverDirectory);
 
         File tempFile = new File(serverDirectory, "temp.txt");
         Files.write(tempFile.toPath(), "temp".getBytes());
@@ -124,7 +124,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testCopyFile() throws Exception {
-        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+        DevUtil util = getNewDevUtil(serverDirectory);
 
         File configFile = new File(srcDir, "config.xml");
         Files.write(configFile.toPath(), "temp".getBytes());
@@ -137,7 +137,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testDeleteFile() throws Exception {
-        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+        DevUtil util = getNewDevUtil(serverDirectory);
 
         File tempSrcFile = new File(srcDir, "temp.txt");
         Files.write(tempSrcFile.toPath(), "temp".getBytes());
@@ -156,7 +156,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testCleanTargetDir() throws Exception {
-        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+        DevUtil util = getNewDevUtil(serverDirectory);
 
         File tempClass = new File(targetDir, "temp.class");
         Files.write(tempClass.toPath(), "temp".getBytes());
@@ -182,7 +182,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testGetFileFromConfigDirectory() throws Exception {
-        DevUtil util = new DevTestUtil(null, null, null, this.configDirectory, null, false);
+        DevUtil util = new DevTestUtil(null, null, null, this.configDirectory, null, false, false);
 
         File tempTextFile = new File(configDirectory, "temp.txt");
         Files.write(tempTextFile.toPath(), "temp".getBytes());
@@ -193,7 +193,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testDeleteJavaFile() throws Exception {
-        DevUtil util = new DevTestUtil(null, null, null, null, null, false);
+        DevUtil util = getNewDevUtil(null);
 
         File javaFile = new File(srcDir, "temp.java");
         Files.write(javaFile.toPath(), "temp".getBytes());
