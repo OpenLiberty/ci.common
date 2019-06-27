@@ -98,7 +98,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
             System.setIn(new ByteArrayInputStream(enter.getBytes()));
         
             // run test on newline input
-            util.runHotkeyReaderThread(executor);
+            util.runHotkeyReaderThread(executor, false);
 
             // wait for executor to pickup test job
             int timeout = 5000;
