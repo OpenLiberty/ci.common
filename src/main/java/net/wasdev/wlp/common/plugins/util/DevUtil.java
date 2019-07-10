@@ -576,7 +576,7 @@ public abstract class DevUtil {
      * 
      * @param file
      * @return String representation of the file
-     * @throws IOException
+     * @throws IOException unable to read file to string
      */
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
@@ -590,7 +590,7 @@ public abstract class DevUtil {
      * @param fileChanged the file that was changed
      * @param srcDir the directory of the file changed
      * @param targetFileName if not null renames the fileChanged to targetFileName in the targetDir
-     * @throws IOException
+     * @throws IOException creating and copying to tempConfig directory
      */
     public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName)
             throws IOException {
@@ -611,7 +611,7 @@ public abstract class DevUtil {
      * @param srcDir the directory of the file changed
      * @param targetDir the target directory
      * @param targetFileName if not null renames the fileChanged to targetFileName in the targetDir
-     * @throws IOException
+     * @throws IOException unable to resolve canonical path
      */
     public void copyFile(File fileChanged, File srcDir, File targetDir, String targetFileName) throws IOException {
         String relPath = fileChanged.getCanonicalPath().substring(
@@ -638,7 +638,7 @@ public abstract class DevUtil {
      * @param dir the directory of the deletedFile
      * @param targetDir the corresponding targetDir of the deletedFile
      * @param targetFileName if not null deletes the targetFile with this name
-     * @throws IOException 
+     * @throws IOException unable to resolve canonical path
      */
     protected void deleteFile(File deletedFile, File dir, File targetDir, String targetFileName) throws IOException {
         debug("File that was deleted: " + deletedFile.getCanonicalPath());
@@ -684,7 +684,7 @@ public abstract class DevUtil {
      * @param start parent directory
      * @param dir path of parent directory
      * @param watcher WatchService
-     * @throws IOException
+     * @throws IOException unable to walk through file tree 
      */
     protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
         // register directory and sub-directories
@@ -723,7 +723,7 @@ public abstract class DevUtil {
      * @param fileChanged Java file changed
      * @param classesDir the directory for compiled classes
      * @param compileSourceRoot the source directory for the Java classes
-     * @throws IOException 
+     * @throws IOException unable to resolve canonical path
      */
     protected void deleteJavaFile(File fileChanged, File classesDir, File compileSourceRoot) throws IOException {
         if (fileChanged.getName().endsWith(".java")) {
@@ -847,7 +847,7 @@ public abstract class DevUtil {
      * @param artifactPaths list of artifacts for the current project
      * @param outputDirs list of output directories for the current project
      * @return set of classpath files
-     * @throws IOException 
+     * @throws IOException unable to resolve canonical path
      */
     protected Set<File> getClassPath(List<String> artifactPaths, List<File> outputDirs) throws IOException {
         List<URL> urls = new ArrayList<>();
