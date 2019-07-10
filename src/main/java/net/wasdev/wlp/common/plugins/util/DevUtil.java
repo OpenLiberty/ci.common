@@ -200,21 +200,25 @@ public abstract class DevUtil {
     
     public void cleanUpServerEnv() {
         // clean up server.env file
-        File serverEnvFile = new File(serverDirectory.getAbsolutePath() + "/server.env");
-        File serverEnvBackup = new File(serverDirectory.getAbsolutePath() + "/server.env.bak");
-
-        if (serverEnvBackup.exists()) {
-            // Restore original server.env file
-            try {
-                Files.copy(serverEnvBackup.toPath(), serverEnvFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                error("Could not restore server.env: " + e.getMessage());
+        File serverEnvFile;
+        File serverEnvBackup;
+        try {
+            serverEnvBackup = new File(serverDirectory.getCanonicalPath() + "/server.env.bak");
+            serverEnvFile = new File(serverDirectory.getCanonicalPath() + "/server.env");
+            if (serverEnvBackup.exists()) {
+                // Restore original server.env file
+                try {
+                    Files.copy(serverEnvBackup.toPath(), serverEnvFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    error("Could not restore server.env: " + e.getMessage());
+                }
+                serverEnvBackup.delete();
+            } else {
+                // Delete server.env file
+                serverEnvFile.delete();
             }
-
-            serverEnvBackup.delete();
-        } else {
-            // Delete server.env file
-            serverEnvFile.delete();
+        } catch (IOException e) {
+            error("Could not retrieve server.env: " + e.getMessage());
         }
     }
     
@@ -256,7 +260,7 @@ public abstract class DevUtil {
     }
 
     public void enableServerDebug(int libertyDebugPort) throws IOException {
-        String serverEnvPath = serverDirectory.getAbsolutePath() + "/server.env";
+        String serverEnvPath = serverDirectory.getCanonicalPath() + "/server.env";
         File serverEnvFile = new File(serverEnvPath);
         StringBuilder sb = new StringBuilder();
         if (serverEnvFile.exists()) {
@@ -278,7 +282,7 @@ public abstract class DevUtil {
             reader.close();
         }
 
-        debug("Creating server.env file: " + serverEnvFile.getAbsolutePath());
+        debug("Creating server.env file: " + serverEnvFile.getCanonicalPath());
         sb.append("WLP_DEBUG_SUSPEND=n\n");
         sb.append("WLP_DEBUG_ADDRESS=");
         sb.append(libertyDebugPort);
@@ -361,9 +365,9 @@ public abstract class DevUtil {
             File serverXML = getFileFromConfigDirectory("server.xml"); // server.xml in the config directory
             File configFileParent = configFile.getParentFile();
             
-            Path srcPath = this.sourceDirectory.getAbsoluteFile().toPath();
-            Path testSrcPath = this.testSourceDirectory.getAbsoluteFile().toPath();
-            Path configPath = this.configDirectory.getAbsoluteFile().toPath();
+            Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
+            Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
+            Path configPath = this.configDirectory.getCanonicalFile().toPath();
 
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
@@ -386,14 +390,14 @@ public abstract class DevUtil {
             }
             
             if (configFile.exists() && configFileParent.exists()){
-                Path configFilePath = configFileParent.getAbsoluteFile().toPath();
+                Path configFilePath = configFileParent.getCanonicalFile().toPath();
                 registerAll(configFileParent.toPath(), configFilePath, watcher);
                 configFileRegistered = true;
             }
             
             for (File resourceDir : resourceDirs) {
                 if (resourceDir.exists()) {
-                    registerAll(resourceDir.toPath(), resourceDir.getAbsoluteFile().toPath(), watcher);
+                    registerAll(resourceDir.toPath(), resourceDir.getCanonicalFile().toPath(), watcher);
                 }
             }
 
@@ -513,7 +517,7 @@ public abstract class DevUtil {
                             }
                         } else if (directory.startsWith(configFileParent.toPath())) {
                             if (serverXML == null || !serverXML.exists()) {
-                                if (fileChanged.exists() && fileChanged.getAbsolutePath().endsWith(configFile.getName())
+                                if (fileChanged.exists() && fileChanged.getCanonicalPath().endsWith(configFile.getName())
                                         && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                                 || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                     copyConfigFolder(fileChanged, configFileParent, "server.xml");
@@ -523,7 +527,7 @@ public abstract class DevUtil {
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
                                 } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
-                                        && fileChanged.getAbsolutePath().endsWith(configFile.getName())) {
+                                        && fileChanged.getCanonicalPath().endsWith(configFile.getName())) {
                                     info("Config file deleted: " + fileChanged.getName());
                                     deleteFile(fileChanged, this.configDirectory, serverDirectory, "server.xml");
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
@@ -572,7 +576,7 @@ public abstract class DevUtil {
      * 
      * @param file
      * @return String representation of the file
-     * @throws IOException
+     * @throws IOException unable to read file to string
      */
     public String readFile(File file) throws IOException {
         return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
@@ -586,7 +590,7 @@ public abstract class DevUtil {
      * @param fileChanged the file that was changed
      * @param srcDir the directory of the file changed
      * @param targetFileName if not null renames the fileChanged to targetFileName in the targetDir
-     * @throws IOException
+     * @throws IOException creating and copying to tempConfig directory
      */
     public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName)
             throws IOException {
@@ -607,21 +611,21 @@ public abstract class DevUtil {
      * @param srcDir the directory of the file changed
      * @param targetDir the target directory
      * @param targetFileName if not null renames the fileChanged to targetFileName in the targetDir
-     * @throws IOException
+     * @throws IOException unable to resolve canonical path
      */
     public void copyFile(File fileChanged, File srcDir, File targetDir, String targetFileName) throws IOException {
-        String relPath = fileChanged.getAbsolutePath().substring(
-                fileChanged.getAbsolutePath().indexOf(srcDir.getAbsolutePath()) + srcDir.getAbsolutePath().length());
+        String relPath = fileChanged.getCanonicalPath().substring(
+                fileChanged.getCanonicalPath().indexOf(srcDir.getCanonicalPath()) + srcDir.getCanonicalPath().length());
         if (targetFileName != null) {
             relPath = relPath.substring(0, relPath.indexOf(fileChanged.getName())) + targetFileName;
         }
-        File targetResource = new File(targetDir.getAbsolutePath() + relPath);
+        File targetResource = new File(targetDir.getCanonicalPath() + relPath);
 
         try {
             FileUtils.copyFile(fileChanged, targetResource);
-            info("Copied file: " + fileChanged.getAbsolutePath() + " to: " + targetResource.getAbsolutePath());
+            info("Copied file: " + fileChanged.getCanonicalPath() + " to: " + targetResource.getCanonicalPath());
         } catch (FileNotFoundException ex) {
-            debug("Failed to copy file: " + fileChanged.getAbsolutePath());
+            debug("Failed to copy file: " + fileChanged.getCanonicalPath());
         } catch (Exception ex) {
             debug(ex);
         }
@@ -634,19 +638,20 @@ public abstract class DevUtil {
      * @param dir the directory of the deletedFile
      * @param targetDir the corresponding targetDir of the deletedFile
      * @param targetFileName if not null deletes the targetFile with this name
+     * @throws IOException unable to resolve canonical path
      */
-    protected void deleteFile(File deletedFile, File dir, File targetDir, String targetFileName) {
-        debug("File that was deleted: " + deletedFile.getAbsolutePath());
-        String relPath = deletedFile.getAbsolutePath().substring(
-                deletedFile.getAbsolutePath().indexOf(dir.getAbsolutePath()) + dir.getAbsolutePath().length());
+    protected void deleteFile(File deletedFile, File dir, File targetDir, String targetFileName) throws IOException {
+        debug("File that was deleted: " + deletedFile.getCanonicalPath());
+        String relPath = deletedFile.getCanonicalPath().substring(
+                deletedFile.getCanonicalPath().indexOf(dir.getCanonicalPath()) + dir.getCanonicalPath().length());
         if (targetFileName != null) {
             relPath = relPath.substring(0, relPath.indexOf(deletedFile.getName())) + targetFileName;
         }
-        File targetFile = new File(targetDir.getAbsolutePath() + relPath);
+        File targetFile = new File(targetDir.getCanonicalPath() + relPath);
         debug("Target file exists: " + targetFile.exists());
         if (targetFile.exists()) {
             targetFile.delete();
-            info("Deleted file: " + targetFile.getAbsolutePath());
+            info("Deleted file: " + targetFile.getCanonicalPath());
         }
     }
 
@@ -679,7 +684,7 @@ public abstract class DevUtil {
      * @param start parent directory
      * @param dir path of parent directory
      * @param watcher WatchService
-     * @throws IOException
+     * @throws IOException unable to walk through file tree 
      */
     protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
         // register directory and sub-directories
@@ -718,20 +723,21 @@ public abstract class DevUtil {
      * @param fileChanged Java file changed
      * @param classesDir the directory for compiled classes
      * @param compileSourceRoot the source directory for the Java classes
+     * @throws IOException unable to resolve canonical path
      */
-    protected void deleteJavaFile(File fileChanged, File classesDir, File compileSourceRoot) {
+    protected void deleteJavaFile(File fileChanged, File classesDir, File compileSourceRoot) throws IOException {
         if (fileChanged.getName().endsWith(".java")) {
             String fileName = fileChanged.getName().substring(0, fileChanged.getName().indexOf(".java"));
             File parentFile = fileChanged.getParentFile();
-            String relPath = parentFile.getAbsolutePath()
-                    .substring(parentFile.getAbsolutePath().indexOf(compileSourceRoot.getAbsolutePath())
-                            + compileSourceRoot.getAbsolutePath().length())
+            String relPath = parentFile.getCanonicalPath()
+                    .substring(parentFile.getCanonicalPath().indexOf(compileSourceRoot.getCanonicalPath())
+                            + compileSourceRoot.getCanonicalPath().length())
                     + "/" + fileName + ".class";
-            File targetFile = new File(classesDir.getAbsolutePath() + relPath);
+            File targetFile = new File(classesDir.getCanonicalPath() + relPath);
 
             if (targetFile.exists()) {
                 targetFile.delete();
-                info("Java class deleted: " + targetFile.getAbsolutePath());
+                info("Java class deleted: " + targetFile.getCanonicalPath());
             }
         } else {
             debug("File deleted but was not a java file: " + fileChanged.getName());
@@ -841,8 +847,9 @@ public abstract class DevUtil {
      * @param artifactPaths list of artifacts for the current project
      * @param outputDirs list of output directories for the current project
      * @return set of classpath files
+     * @throws IOException unable to resolve canonical path
      */
-    protected Set<File> getClassPath(List<String> artifactPaths, List<File> outputDirs) {
+    protected Set<File> getClassPath(List<String> artifactPaths, List<File> outputDirs) throws IOException {
         List<URL> urls = new ArrayList<>();
         ClassLoader c = Thread.currentThread().getContextClassLoader();
         while (c != null) {
@@ -855,11 +862,11 @@ public abstract class DevUtil {
         Set<String> parsedFiles = new HashSet<>();
         Deque<String> toParse = new ArrayDeque<>();
         for (URL url : urls) {
-            toParse.add(new File(url.getPath()).getAbsolutePath());
+            toParse.add(new File(url.getPath()).getCanonicalPath());
         }
 
         for (String artifactPath : artifactPaths) {
-            toParse.add(new File(artifactPath).getAbsolutePath());
+            toParse.add(new File(artifactPath).getCanonicalPath());
         }
 
         Set<File> classPathElements = new HashSet<>();
@@ -888,7 +895,7 @@ public abstract class DevUtil {
                                         f = new File(file.getParentFile(), i);
                                     }
                                     if (f.exists()) {
-                                        toParse.add(f.getAbsolutePath());
+                                        toParse.add(f.getCanonicalPath());
                                     }
                                 }
                             }
