@@ -376,23 +376,23 @@ public abstract class DevUtil {
             boolean configFileRegistered = false;
 
             if (this.sourceDirectory.exists()) {
-                registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
+                registerAll(srcPath, watcher);
                 sourceDirRegistered = true;
             }
 
             if (this.testSourceDirectory.exists()) {
-                registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
+                registerAll(testSrcPath,watcher);
                 testSourceDirRegistered = true;
             }
 
             if (this.configDirectory.exists()) {
-                registerAll(this.configDirectory.toPath(), configPath, watcher);
+                registerAll(configPath, watcher);
                 configDirRegistered = true;
             }
             
             if (configFile.exists() && configFileParent.exists()){
                 Path configFilePath = configFileParent.getCanonicalFile().toPath();
-                registerAll(configFileParent.toPath(), configFilePath, watcher);
+                registerAll(configFilePath, watcher);
                 configFileRegistered = true;
             }
             
@@ -400,7 +400,7 @@ public abstract class DevUtil {
             for (File resourceDir : resourceDirs) {
                 resourceMap.put(resourceDir, false);
                 if (resourceDir.exists()) {
-                    registerAll(resourceDir.toPath(), resourceDir.getCanonicalFile().toPath(), watcher);
+                    registerAll(resourceDir.getCanonicalFile().toPath(), watcher);
                     resourceMap.put(resourceDir, true);
                 }
             }
@@ -416,7 +416,7 @@ public abstract class DevUtil {
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
                         && this.sourceDirectory.listFiles().length > 0) {
                     compile(this.sourceDirectory);
-                    registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
+                    registerAll(srcPath, watcher);
                     debug("Registering Java source directory: " + this.sourceDirectory);
                     sourceDirRegistered = true;
                 } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
@@ -428,7 +428,7 @@ public abstract class DevUtil {
                 if (!testSourceDirRegistered && this.testSourceDirectory.exists()
                         && this.testSourceDirectory.listFiles().length > 0) {
                     compile(this.testSourceDirectory);
-                    registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
+                    registerAll(testSrcPath, watcher);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
                     runTestThread(false, executor, -1, false, false);
                     testSourceDirRegistered = true;
@@ -478,7 +478,7 @@ public abstract class DevUtil {
                         // resource file check
                         File resourceParent = null;
                         for (File resourceDir : resourceDirs) {
-                            if (directory.startsWith(resourceDir.toPath())) {
+                            if (directory.startsWith(resourceDir.getCanonicalFile().toPath())) {
                                 resourceParent = resourceDir;
                             }
                         }
@@ -486,7 +486,7 @@ public abstract class DevUtil {
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
 
                         // src/main/java directory
-                        if (directory.startsWith(this.sourceDirectory.toPath())) {
+                        if (directory.startsWith(srcPath)) {
                             ArrayList<File> javaFilesChanged = new ArrayList<File>();
                             javaFilesChanged.add(fileChanged);
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
@@ -504,7 +504,7 @@ public abstract class DevUtil {
                                 // run all tests since Java files were changed
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             }
-                        } else if (directory.startsWith(this.testSourceDirectory.toPath())) { // src/main/test
+                        } else if (directory.startsWith(testSrcPath)) { // src/main/test
                             ArrayList<File> javaFilesChanged = new ArrayList<File>();
                             javaFilesChanged.add(fileChanged);
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
@@ -521,7 +521,7 @@ public abstract class DevUtil {
                                 // run all tests without waiting for app update since only unit test source changed
                                 runTestThread(false, executor, -1, false, false);
                             }
-                        } else if (directory.startsWith(this.configDirectory.toPath())) { // config files
+                        } else if (directory.startsWith(configPath)) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyConfigFolder(fileChanged, this.configDirectory, "server.xml");
@@ -533,7 +533,7 @@ public abstract class DevUtil {
                                 deleteFile(fileChanged, this.configDirectory, serverDirectory, null);
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             }
-                        } else if (directory.startsWith(configFileParent.toPath())) {
+                        } else if (directory.startsWith(configFileParent.getCanonicalFile().toPath())) {
                             if (serverXML == null || !serverXML.exists()) {
                                 if (fileChanged.exists() && fileChanged.getCanonicalPath().endsWith(configFile.getName())
                                         && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
@@ -551,7 +551,7 @@ public abstract class DevUtil {
                                     runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                                 }
                             }
-                        } else if (resourceParent != null && directory.startsWith(resourceParent.toPath())) { // resources
+                        } else if (resourceParent != null && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
                             debug("Resource dir: " + resourceParent.toString());
                             debug("File within resource directory");
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
@@ -567,7 +567,7 @@ public abstract class DevUtil {
                                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                             }
                         } else if (fileChanged.equals(buildFile)
-                                && directory.startsWith(buildFile.getParentFile().toPath())
+                                && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                                 && event.kind() == StandardWatchEventKinds.ENTRY_MODIFY) { // pom.xml
 
                                     boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths, executor);
@@ -704,7 +704,7 @@ public abstract class DevUtil {
      * @param watcher WatchService
      * @throws IOException unable to walk through file tree 
      */
-    protected void registerAll(final Path start, final Path dir, final WatchService watcher) throws IOException {
+    protected void registerAll(final Path start, final WatchService watcher) throws IOException {
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
             @Override
