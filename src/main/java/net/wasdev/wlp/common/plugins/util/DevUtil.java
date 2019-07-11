@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
@@ -133,7 +134,7 @@ public abstract class DevUtil {
     /**
      * Updates artifacts of current project
      */
-    public abstract void getArtifacts(List<String> artifactPaths);
+    public abstract List<String> getArtifacts();
 
     /**
      * Recompile the build file
@@ -395,9 +396,12 @@ public abstract class DevUtil {
                 configFileRegistered = true;
             }
             
+            HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
             for (File resourceDir : resourceDirs) {
+                resourceMap.put(resourceDir, false);
                 if (resourceDir.exists()) {
                     registerAll(resourceDir.toPath(), resourceDir.getCanonicalFile().toPath(), watcher);
+                    resourceMap.put(resourceDir, true);
                 }
             }
 
@@ -409,7 +413,8 @@ public abstract class DevUtil {
 
             while (true) {
                 // check if javaSourceDirectory has been added
-                if (!sourceDirRegistered && this.sourceDirectory.exists()) {
+                if (!sourceDirRegistered && this.sourceDirectory.exists()
+                        && this.sourceDirectory.listFiles().length > 0) {
                     compile(this.sourceDirectory);
                     registerAll(this.sourceDirectory.toPath(), srcPath, watcher);
                     debug("Registering Java source directory: " + this.sourceDirectory);
@@ -420,12 +425,14 @@ public abstract class DevUtil {
                 }
 
                 // check if testSourceDirectory has been added
-                if (!testSourceDirRegistered && this.testSourceDirectory.exists()) {
+                if (!testSourceDirRegistered && this.testSourceDirectory.exists()
+                        && this.testSourceDirectory.listFiles().length > 0) {
                     compile(this.testSourceDirectory);
                     registerAll(this.testSourceDirectory.toPath(), testSrcPath, watcher);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
                     runTestThread(false, executor, -1, false, false);
                     testSourceDirRegistered = true;
+
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
                     cleanTargetDir(testOutputDirectory);
                     testSourceDirRegistered = false;
@@ -445,6 +452,17 @@ public abstract class DevUtil {
                     info("The server configuration file " + configFile + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
                 
+                // check if resourceDirectory has been added
+                for (File resourceDir : resourceDirs){
+                    if (!resourceMap.get(resourceDir)) {
+                        if (resourceDir.exists()) {
+                            resourceMap.put(resourceDir, true);
+                            debug("Resource directory has been added: " + resourceDir);
+                            info("The resource directory " + resourceDir + "has been added. Restart liberty:dev mode for it to take effect.");
+                        }
+                    }
+                }
+
                 try {
                     final WatchKey wk = watcher.poll(1, TimeUnit.SECONDS);
                     for (WatchEvent<?> event : wk.pollEvents()) {
@@ -492,7 +510,7 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-
+                                
                                 // tests are run in recompileJavaTest
                                 recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
                                         testOutputDirectory);
