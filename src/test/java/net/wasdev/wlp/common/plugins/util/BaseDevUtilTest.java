@@ -90,12 +90,6 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void getArtifacts(List<String> artifactPaths) {
-            // TODO Auto-generated method stub
-            
-        }
-
-        @Override
         public boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor) {
             // TODO Auto-generated method stub
             return false;
@@ -124,6 +118,12 @@ public class BaseDevUtilTest {
         public boolean compile(File dir) {
             // TODO Auto-generated method stub
             return false;
+        }
+
+        @Override
+        public List<String> getArtifacts() {
+            // TODO Auto-generated method stub
+            return null;
         }
         
     }
