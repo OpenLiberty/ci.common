@@ -401,7 +401,7 @@ public abstract class DevUtil {
                 resourceMap.put(resourceDir, false);
                 if (resourceDir.exists()) {
                     registerAll(resourceDir.toPath(), resourceDir.getCanonicalFile().toPath(), watcher);
-                    resourceMap.replace(resourceDir, true);
+                    resourceMap.put(resourceDir, true);
                 }
             }
 
@@ -456,7 +456,7 @@ public abstract class DevUtil {
                 for (File resourceDir : resourceDirs){
                     if (!resourceMap.get(resourceDir)) {
                         if (resourceDir.exists()) {
-                            resourceMap.replace(resourceDir, true);
+                            resourceMap.put(resourceDir, true);
                             debug("Resource directory has been added: " + resourceDir);
                             info("The resource directory " + resourceDir + "has been added. Restart liberty:dev mode for it to take effect.");
                         }
