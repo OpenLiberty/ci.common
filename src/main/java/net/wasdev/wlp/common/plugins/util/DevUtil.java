@@ -275,12 +275,15 @@ public abstract class DevUtil {
             }
 
             BufferedReader reader = new BufferedReader(new FileReader(serverEnvBackup));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-                sb.append("\n");
+            try {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                    sb.append("\n");
+                }
+            } finally {
+                reader.close();
             }
-            reader.close();
         }
 
         debug("Creating server.env file: " + serverEnvFile.getCanonicalPath());
@@ -290,8 +293,11 @@ public abstract class DevUtil {
         sb.append("\n");
 
         BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvFile));
-        writer.write(sb.toString());
-        writer.close();
+        try {
+            writer.write(sb.toString());
+        } finally {
+            writer.close();
+        }
 
         if (serverEnvFile.exists()) {
             info("Successfully created liberty:dev server.env file");
@@ -480,6 +486,7 @@ public abstract class DevUtil {
                         for (File resourceDir : resourceDirs) {
                             if (directory.startsWith(resourceDir.getCanonicalFile().toPath())) {
                                 resourceParent = resourceDir;
+                                break;
                             }
                         }
                         
@@ -668,8 +675,11 @@ public abstract class DevUtil {
         File targetFile = new File(targetDir.getCanonicalPath() + relPath);
         debug("Target file exists: " + targetFile.exists());
         if (targetFile.exists()) {
-            targetFile.delete();
-            info("Deleted file: " + targetFile.getCanonicalPath());
+            if (targetFile.delete()){
+                info("Deleted file" + targetFile.getCanonicalPath());
+            } else {
+                error("Error deleting file " + targetFile.getCanonicalPath());
+            }
         }
     }
 
@@ -896,7 +906,7 @@ public abstract class DevUtil {
                 File file = new File(s);
                 if (file.exists() && file.getName().endsWith(".jar")) {
                     classPathElements.add(file);
-                    if (!file.isDirectory() && file.getName().endsWith(".jar")) {
+                    if (!file.isDirectory()) {
                         try (JarFile jar = new JarFile(file)) {
                             Manifest mf = jar.getManifest();
                             if (mf == null || mf.getMainAttributes() == null) {
