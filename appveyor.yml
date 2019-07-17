@@ -9,6 +9,14 @@ install:
         where mvn
         cd C:\projects\ci-common
 
+before_build:
+    - cmd: |
+        echo "Installing ci.ant lib..."
+        git clone -b devMode https://github.com/wasdev/ci.ant.git ci.ant
+        cd ci.ant
+        mvn clean install
+        cd..
+
 build_script:
       - "mvn clean install"
 
