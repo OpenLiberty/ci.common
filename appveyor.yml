@@ -12,7 +12,7 @@ install:
 before_build:
     - cmd: |
         echo "Installing ci.ant lib..."
-        git clone -b devMode https://github.com/wasdev/ci.ant.git ci.ant
+        git clone https://github.com/wasdev/ci.ant.git ci.ant
         cd ci.ant
         mvn clean install
         cd..
