@@ -121,6 +121,14 @@ public abstract class DevUtil {
     public abstract void error(String msg);
 
     /**
+     * Log error
+     * 
+     * @param msg
+     * @param e
+     */
+    public abstract void error(String msg, Throwable e);
+
+    /**
      * Returns whether debug is enabled by the current logger
      * 
      * @return whether debug is enabled
@@ -143,15 +151,20 @@ public abstract class DevUtil {
     public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor);
 
     /**
-     * Run unit and/or integration tests
+     * Run the unit tests
      * 
-     * @param waitForApplicationUpdate Whether to wait for the application to update before running integration tests
-     * @param messageOccurrences The previous number of times the application updated message has appeared.
-     * @param executor The thread pool executor
-     * @param forceSkipUTs Whether to force skip the unit tests
+     * @throws PluginScenarioException if unit tests failed
+     * @throws PluginExecutionException if unit tests could not be run
      */
-    public abstract void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs);
+    public abstract void runUnitTests() throws PluginScenarioException, PluginExecutionException;
 
+    /**
+     * Run the integration tests
+     * 
+     * @throws PluginScenarioException if integration tests failed
+     * @throws PluginExecutionException if integration tests could not be run
+     */
+    public abstract void runIntegrationTests() throws PluginScenarioException, PluginExecutionException;
 
     /**
      * Check the configuration file for new features
@@ -189,12 +202,14 @@ public abstract class DevUtil {
     private boolean hotTests;
     private Path tempConfigPath;
     private boolean skipTests;
+    private boolean skipUTs;
     private boolean skipITs;
     private String applicationId;
+    private int appUpdateTimeout;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
-            boolean skipITs, String applicationId) {
+            boolean skipUTs, boolean skipITs, String applicationId, int appUpdateTimeout) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -202,8 +217,109 @@ public abstract class DevUtil {
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
+        this.skipUTs = skipUTs;
         this.skipITs = skipITs;
         this.applicationId = applicationId;
+        this.appUpdateTimeout = appUpdateTimeout;
+    }
+
+    /**
+     * Run unit and/or integration tests
+     * 
+     * @param waitForApplicationUpdate Whether to wait for the application to update before running integration tests
+     * @param messageOccurrences The previous number of times the application updated message has appeared.
+     * @param executor The thread pool executor
+     * @param forceSkipUTs Whether to force skip the unit tests
+     */
+    public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
+            boolean forceSkipUTs) {
+        if (!skipTests) {
+            ServerTask serverTask = null;
+            try {
+                serverTask = getDebugServerTask();
+            } catch (IOException e) {
+                // not expected since server should already have been started
+                error("Could not get the server task for running tests.", e);
+            }
+            File logFile = serverTask.getLogFile();
+            String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;    
+
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                debug("Thread interrupted while waiting to start unit tests.", e);
+            }
+
+            // if queue size >= 1, it means a newer test has been queued so we
+            // should skip this and let that run instead
+            if (executor.getQueue().size() >= 1) {
+                Runnable head = executor.getQueue().peek();
+                boolean manualInvocation = ((TestJob) head).isManualInvocation();
+
+                if (manualInvocation) {
+                    debug("Tests were re-invoked before previous tests began. Cancelling previous tests and resubmitting them.");
+                } else {
+                    debug("Changes were detected before tests began. Cancelling tests and resubmitting them.");
+                }
+                return;
+            }
+
+            if (!(skipUTs || forceSkipUTs)) {
+                info("Running unit tests...");
+                try {
+                    runUnitTests();
+                    info("Unit tests finished.");
+                } catch (PluginScenarioException e) {
+                    debug(e);
+                    error(e.getMessage());
+                    // if unit tests failed, don't run integration tests
+                    return;
+                } catch (PluginExecutionException e) {
+                    error(e.getMessage());
+                }
+            }
+
+            // if queue size >= 1, it means a newer test has been queued so we
+            // should skip this and let that run instead
+            if (executor.getQueue().size() >= 1) {
+                Runnable head = executor.getQueue().peek();
+                boolean manualInvocation = ((TestJob) head).isManualInvocation();
+
+                if (manualInvocation) {
+                    info("Tests were invoked while previous tests were running. Restarting tests.");
+                } else {
+                    info("Changes were detected while tests were running. Restarting tests.");
+                }
+                return;
+            }
+
+            if (!skipITs) {
+                if (waitForApplicationUpdate) {
+                    // wait until application has been updated
+                    if (appUpdateTimeout < 0) {
+                        appUpdateTimeout = 5;
+                    }
+                    long timeout = appUpdateTimeout * 1000;
+                    serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
+                }
+
+                info("Running integration tests...");
+                try {
+                    runIntegrationTests();
+                    info("Integration tests finished.");
+                } catch (PluginScenarioException e) {
+                    debug(e);
+                    error(e.getMessage());
+                    // if unit tests failed, don't run integration tests
+                    return;
+                } catch (PluginExecutionException e) {
+                    error(e.getMessage());
+                }
+            }
+        }
+
+        // finally, start watching for hotkey presses if not already started
+        runHotkeyReaderThread(executor);
     }
 
     /**

@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2019.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package net.wasdev.wlp.common.plugins.util;
 
 /**
- * Generic exception for invalid scenario. This should not fail the build but instead be handled gracefully.
+ * Generic exception that should not fail the build but instead be handled gracefully.
  *
  */
 public class PluginScenarioException extends Exception {
@@ -26,5 +26,13 @@ public class PluginScenarioException extends Exception {
 
     public PluginScenarioException(String message) {
         super(message);
+    }
+    
+    public PluginScenarioException(String message, Throwable e) {
+        super(message, e);
+    }
+    
+    public PluginScenarioException(Throwable e) {
+        super(e);
     }
 }

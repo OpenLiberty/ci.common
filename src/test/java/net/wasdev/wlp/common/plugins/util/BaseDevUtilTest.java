@@ -35,7 +35,7 @@ public class BaseDevUtilTest {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory,
                 File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, resourceDirs, hotTests, skipTests, false, null);
+            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, resourceDirs, hotTests, skipTests, false, false, null, 5);
         }
 
         @Override
@@ -70,6 +70,12 @@ public class BaseDevUtilTest {
 
         @Override
         public void error(String msg) {
+            // not needed for tests
+            
+        }
+
+        @Override
+        public void error(String msg, Throwable e) {
             // not needed for tests
             
         }
@@ -127,6 +133,16 @@ public class BaseDevUtilTest {
         public List<String> getArtifacts() {
             // not needed for tests
             return null;
+        }
+
+        @Override
+        public void runUnitTests() throws PluginScenarioException, PluginExecutionException {
+            // not needed for tests
+        }
+
+        @Override
+        public void runIntegrationTests() throws PluginScenarioException, PluginExecutionException {
+            // not needed for tests
         }
         
     }
