@@ -74,7 +74,8 @@ import com.sun.nio.file.SensitivityWatchEventModifier;
  */
 public abstract class DevUtil {
 
-    protected static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
+    private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
+    private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I.*";
 
     /**
      * Log debug
@@ -142,13 +143,6 @@ public abstract class DevUtil {
     public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor);
 
     /**
-     * Get the number of times the application updated message has appeared in the application log
-     * 
-     * @return 
-     */
-    public abstract int countApplicationUpdatedMessages();
-
-    /**
      * Run unit and/or integration tests
      * 
      * @param waitForApplicationUpdate Whether to wait for the application to update before running integration tests
@@ -195,9 +189,12 @@ public abstract class DevUtil {
     private boolean hotTests;
     private Path tempConfigPath;
     private boolean skipTests;
+    private boolean skipITs;
+    private String applicationId;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
+            File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
+            boolean skipITs, String applicationId) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -205,6 +202,29 @@ public abstract class DevUtil {
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
+        this.skipITs = skipITs;
+        this.applicationId = applicationId;
+    }
+
+    /**
+     * Get the number of times the application updated message has appeared in the application log
+     * 
+     * @return the number of times the application has updated
+     */
+    public int countApplicationUpdatedMessages() {
+        int messageOccurrences = -1;
+        if (!(skipTests || skipITs)) {
+            try {
+                ServerTask serverTask = getDebugServerTask();
+                File logFile = serverTask.getLogFile();
+                String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
+                messageOccurrences = serverTask.countStringOccurrencesInFile(regexp, logFile);
+                debug("Message occurrences before compile: " + messageOccurrences);
+            } catch (Exception e) {
+                debug("Failed to get message occurrences before compile", e);
+            }
+        }
+        return messageOccurrences;
     }
 
     /**
