@@ -5,6 +5,13 @@ jdk:
     - oraclejdk8
     - openjdk10
     - oraclejdk11
-
+before_install:
+    - echo "Deleting old .m2 artifacts..."
+    - rm -rf $HOME/.m2/repository/net/wasdev
+    - echo 'Installing ci.ant lib...'
+    - git clone https://github.com/wasdev/ci.ant.git ./ci.ant
+    - cd ./ci.ant
+    - mvn clean install
+    - cd ..
 script:
 - mvn clean install
