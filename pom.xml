@@ -58,7 +58,7 @@
         <dependency>
             <groupId>net.wasdev.wlp.ant</groupId>
             <artifactId>wlp-anttasks</artifactId>
-            <version>1.8-SNAPSHOT</version>
+            <version>1.8</version>
         </dependency>
 	</dependencies>
 </project>
