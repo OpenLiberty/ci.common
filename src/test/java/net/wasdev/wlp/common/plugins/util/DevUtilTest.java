@@ -29,8 +29,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 
 import org.apache.commons.io.FileUtils;
@@ -121,16 +119,32 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testFindAvailablePort() throws Exception {
-        int availablePort = util.findAvailablePort(5438);
+        // prefer a port that is known to be available
+        int preferredPort = getRandomPort();
+
+        // verify that findAvailablePort gets the preferred port
+        int availablePort = util.findAvailablePort(preferredPort);
+        assertEquals(preferredPort, availablePort);
+
+        // bind to it
         ServerSocket serverSocket = null;
         try {
             serverSocket = new ServerSocket();
             serverSocket.setReuseAddress(false);
             serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), availablePort), 1);
 
-            // previous port is bound, so it should find another port
-            int availablePort2 = util.findAvailablePort(5438);
+            // previous port is bound, so calling findAvailablePort again should get another port
+            int availablePort2 = util.findAvailablePort(preferredPort);
             assertNotEquals(availablePort, availablePort2);
+        } finally {
+            serverSocket.close();
+        }
+    }
+
+    private int getRandomPort() throws IOException {
+        ServerSocket serverSocket = new ServerSocket(0);
+        try {
+            return serverSocket.getLocalPort();
         } finally {
             serverSocket.close();
         }
@@ -138,13 +152,14 @@ public class DevUtilTest extends BaseDevUtilTest {
     
     @Test
     public void testEnableServerDebug() throws Exception {
-        util.enableServerDebug(5438);
+        int port = getRandomPort();
+        util.enableServerDebug(port);
         
         File serverEnv = new File(serverDirectory, "server.env");
         BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
         
         assertEquals("WLP_DEBUG_SUSPEND=n", reader.readLine());
-        assertEquals("WLP_DEBUG_ADDRESS=5438", reader.readLine());
+        assertEquals("WLP_DEBUG_ADDRESS=" + port, reader.readLine());
         
         reader.close();
     }
@@ -159,7 +174,8 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.write(serverEnvContent);
         writer.close();
         
-        util.enableServerDebug(5438);
+        int port = getRandomPort();
+        util.enableServerDebug(port);
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
         
@@ -168,7 +184,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertEquals("abc=123", reader.readLine());
         assertEquals("xyz=321", reader.readLine());
         assertEquals("WLP_DEBUG_SUSPEND=n", reader.readLine());
-        assertEquals("WLP_DEBUG_ADDRESS=5438", reader.readLine());
+        assertEquals("WLP_DEBUG_ADDRESS=" + port, reader.readLine());
         
         reader.close();
     }
