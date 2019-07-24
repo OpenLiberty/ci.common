@@ -536,10 +536,12 @@ public abstract class DevUtil {
     }
 
     /**
+     * Finds an available port.
+     * 
      * @return The specified preferred port is available. If not, returns a random available port.
      * @throws IOException if it could not find any available port, or there was an error when opening a server socket regardless of port.
      */
-    private int findAvailablePort(int preferredPort) throws IOException {
+    public int findAvailablePort(int preferredPort) throws IOException {
         ServerSocket serverSocket = null;
         try {
             serverSocket = new ServerSocket();

@@ -17,6 +17,7 @@ package net.wasdev.wlp.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
@@ -25,6 +26,11 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 
 import org.apache.commons.io.FileUtils;
@@ -111,6 +117,23 @@ public class DevUtilTest extends BaseDevUtilTest {
         String serverEnvContents = new String(Files.readAllBytes(serverEnv.toPath()));
         assertEquals(serverEnvContents, "backup");
         assertFalse(serverEnvBak.exists());
+    }
+
+    @Test
+    public void testFindAvailablePort() throws Exception {
+        int availablePort = util.findAvailablePort(5438);
+        ServerSocket serverSocket = null;
+        try {
+            serverSocket = new ServerSocket();
+            serverSocket.setReuseAddress(false);
+            serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), availablePort), 1);
+
+            // previous port is bound, so it should find another port
+            int availablePort2 = util.findAvailablePort(5438);
+            assertNotEquals(availablePort, availablePort2);
+        } finally {
+            serverSocket.close();
+        }
     }
     
     @Test
