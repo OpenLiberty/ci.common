@@ -23,7 +23,10 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.ServerSocket;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -63,11 +66,11 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
 
+import com.sun.nio.file.SensitivityWatchEventModifier;
+
 import org.apache.commons.io.FileUtils;
 
 import net.wasdev.wlp.ant.ServerTask;
-
-import com.sun.nio.file.SensitivityWatchEventModifier;
 
 /**
  * Utility class for dev mode.
@@ -513,11 +516,11 @@ public abstract class DevUtil {
                 reader.close();
             }
         }
-
+        
         debug("Creating server.env file: " + serverEnvFile.getCanonicalPath());
         sb.append("WLP_DEBUG_SUSPEND=n\n");
         sb.append("WLP_DEBUG_ADDRESS=");
-        sb.append(libertyDebugPort);
+        sb.append(findAvailablePort(libertyDebugPort));
         sb.append("\n");
 
         BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvFile));
@@ -529,6 +532,37 @@ public abstract class DevUtil {
 
         if (serverEnvFile.exists()) {
             info("Successfully created liberty:dev server.env file");
+        }
+    }
+
+    /**
+     * Finds an available port.
+     * 
+     * @return The specified preferred port is available. If not, returns a random available port.
+     * @throws IOException if it could not find any available port, or there was an error when opening a server socket regardless of port.
+     */
+    public int findAvailablePort(int preferredPort) throws IOException {
+        ServerSocket serverSocket = null;
+        try {
+            serverSocket = new ServerSocket();
+            serverSocket.setReuseAddress(false);
+            // try binding to the loopback address at the preferred port
+            serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), preferredPort), 1);
+            return serverSocket.getLocalPort();
+        } catch (IOException e) {
+            if (serverSocket != null) {
+                // if binding failed, try binding to a random port
+                serverSocket.bind(null, 1);
+                int availablePort = serverSocket.getLocalPort();
+                warn("The debug port " + preferredPort + " is not available.  Using " + availablePort + " as the debug port instead.");
+                return availablePort;
+            } else {
+                throw new IOException("Could not create a server socket for debugging.", e);
+            }
+        } finally {
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
         }
     }
 
