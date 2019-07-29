@@ -16,12 +16,14 @@
 
 package net.wasdev.wlp.common.plugins.util;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.AccessController;
@@ -35,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
@@ -61,7 +64,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
-    private static final int COPY_FILE_TIMEOUT_MILLIS = 5 * 60 * 1000;
     private String openLibertyVersion;
     
     /**
@@ -709,77 +711,54 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * Runs the productInfo command and returns the output
      * 
      * @param installDirectory The directory of the installed runtime
-     * @param action The action to perform for the productInfo command
+     * @param action           The action to perform for the productInfo command
      * @return The command output
      * @throws PluginExecutionException if the exit value of the command was not 0
      */
-    public static String productInfo(File installDirectory, String action) throws PluginExecutionException {
+    private String productInfo(File installDirectory, String action) throws PluginExecutionException {
         Process pr = null;
-        InputStream is = null;
-        Scanner s = null;
-        Worker worker = null;
+        BufferedReader in = null;
+        StringBuilder sb = new StringBuilder();
         try {
-            String command;
+            String productInfoFile;
             if (OSUtil.isWindows()) {
-                command = installDirectory + "\\bin\\productInfo.bat " + action;
+                productInfoFile = installDirectory + "\\bin\\productInfo.bat";
             } else {
-                command = installDirectory + "/bin/productInfo " + action;
+                productInfoFile = installDirectory + "/bin/productInfo";
             }
-            pr = Runtime.getRuntime().exec(command);
-            worker = new Worker(pr);
-            worker.start();
-            worker.join(300000);
-            if (worker.exit == null) {
+            ProcessBuilder pb = new ProcessBuilder(productInfoFile, action);
+            pr = pb.start();
+
+            in = new BufferedReader(new InputStreamReader(pr.getInputStream()));
+            String line;
+            while ((line = in.readLine()) != null) {
+                sb.append(line);
+            }
+
+            boolean exited = pr.waitFor(300, TimeUnit.SECONDS);
+            if(!exited) { // Command did not exit in time
                 throw new PluginExecutionException("productInfo command timed out");
             }
+
             int exitValue = pr.exitValue();
             if (exitValue != 0) {
                 throw new PluginExecutionException("productInfo exited with return code " + exitValue);
             }
-            
-            is = pr.getInputStream();
-            s = new Scanner(is);
-            // use regex to match the beginning of the input
-            s.useDelimiter("\\A");
-            if (s.hasNext()) {
-                return s.next();
-            }
-            return null;
+            return sb.toString();
         } catch (IOException ex) {
             throw new PluginExecutionException("productInfo error: " + ex);
         } catch (InterruptedException ex) {
-            worker.interrupt();
             Thread.currentThread().interrupt();
             throw new PluginExecutionException("productInfo error: " + ex);
         } finally {
-            if (s != null) {
-                s.close();
-            }
-            if (is != null) {
+            if (in != null) {
                 try {
-                    is.close();
+                    in.close();
                 } catch (IOException e) {
                 }
             }
             if (pr != null) {
                 pr.destroy();
-            }
-        }
-    }
-
-    private static class Worker extends Thread {
-        private final Process process;
-        private Integer exit;
-
-        private Worker(Process process) {
-            this.process = process;
-        }
-
-        public void run() {
-            try {
-                exit = process.waitFor();
-            } catch (InterruptedException ignore) {
-                return;
             }
         }
     }
