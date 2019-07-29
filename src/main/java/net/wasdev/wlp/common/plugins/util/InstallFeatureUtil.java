@@ -709,13 +709,14 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     
     /**
      * Runs the productInfo command and returns the output
+     * Made public static for tests to use in LMP/LGP
      * 
      * @param installDirectory The directory of the installed runtime
      * @param action           The action to perform for the productInfo command
      * @return The command output
      * @throws PluginExecutionException if the exit value of the command was not 0
      */
-    private String productInfo(File installDirectory, String action) throws PluginExecutionException {
+    public static String productInfo(File installDirectory, String action) throws PluginExecutionException {
         Process pr = null;
         BufferedReader in = null;
         StringBuilder sb = new StringBuilder();
@@ -732,7 +733,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             in = new BufferedReader(new InputStreamReader(pr.getInputStream()));
             String line;
             while ((line = in.readLine()) != null) {
-                sb.append(line);
+                sb.append(line).append(System.lineSeparator());
             }
 
             boolean exited = pr.waitFor(300, TimeUnit.SECONDS);
