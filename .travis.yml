@@ -2,9 +2,8 @@ language: java
 
 jdk:
     - openjdk7
-    - oraclejdk8
-    - openjdk10
-    - oraclejdk11
+    - openjdk8
+    - openjdk11
 before_install:
     - echo "Deleting old .m2 artifacts..."
     - rm -rf $HOME/.m2/repository/net/wasdev
