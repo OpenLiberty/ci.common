@@ -793,7 +793,7 @@ public abstract class DevUtil {
                         } else if (directory.startsWith(configPath)) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                copyConfigFolder(fileChanged, this.configDirectory, "server.xml");
+                                copyConfigFolder(fileChanged, this.configDirectory, null);
                                 copyFile(fileChanged, this.configDirectory, serverDirectory, null);
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
