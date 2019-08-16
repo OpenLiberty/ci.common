@@ -209,6 +209,7 @@ public abstract class DevUtil {
     private boolean skipITs;
     private String applicationId;
     private int appUpdateTimeout;
+    private Thread serverThread;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
@@ -376,7 +377,7 @@ public abstract class DevUtil {
             }
 
             // Start server
-            Thread serverThread = new Thread(new Runnable() {
+            serverThread = new Thread(new Runnable() {
 
                 @Override
                 public void run() {
@@ -680,6 +681,10 @@ public abstract class DevUtil {
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
             while (true) {
+                if (serverThread.getState().equals(Thread.State.TERMINATED)){
+                    System.exit(0);
+                }
+
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
                         && this.sourceDirectory.listFiles().length > 0) {
