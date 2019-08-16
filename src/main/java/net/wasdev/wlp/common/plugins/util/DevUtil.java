@@ -682,7 +682,7 @@ public abstract class DevUtil {
 
             while (true) {
                 if (serverThread.getState().equals(Thread.State.TERMINATED)){
-                    System.exit(0);
+                    throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
                 }
 
                 // check if javaSourceDirectory has been added
