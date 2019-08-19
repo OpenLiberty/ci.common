@@ -79,6 +79,7 @@ public abstract class DevUtil {
 
     private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
     private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I.*";
+    private static final String PORT_IN_USE_MESSAGE_REGEXP = "CWWKO0221E:";
 
     /**
      * Log debug
@@ -423,10 +424,19 @@ public abstract class DevUtil {
                 stopServer();
                 throw new PluginExecutionException(
                         "Unable to verify if the server was started after " + verifyTimeout + " seconds.");
+                
+            } 
+            
+            // Check for port already in use error
+            int portErrorCount = serverTask.countStringOccurrencesInFile(PORT_IN_USE_MESSAGE_REGEXP, messagesLogFile);
+            if (portErrorCount > 0) {
+            	String portError = serverTask.waitForStringInLog(PORT_IN_USE_MESSAGE_REGEXP, timeout, messagesLogFile);
+                stopServer();
+                throw new PluginExecutionException(portError.split(PORT_IN_USE_MESSAGE_REGEXP)[1]);
             }
-
+            
             timeout = endTime - System.currentTimeMillis();
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
             debug("Error starting server", e);
         }
     }
