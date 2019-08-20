@@ -211,6 +211,7 @@ public abstract class DevUtil {
     private String applicationId;
     private int appUpdateTimeout;
     private Thread serverThread;
+    private boolean devStop;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
@@ -226,6 +227,7 @@ public abstract class DevUtil {
         this.skipITs = skipITs;
         this.applicationId = applicationId;
         this.appUpdateTimeout = appUpdateTimeout;
+        this.devStop = false;
     }
 
     /**
@@ -421,16 +423,17 @@ public abstract class DevUtil {
             // Wait for the app started message in messages.log
             String startMessage = serverTask.waitForStringInLog(START_APP_MESSAGE_REGEXP, timeout, messagesLogFile);
             if (startMessage == null) {
+                setDevStop(true);
                 stopServer();
                 throw new PluginExecutionException(
                         "Unable to verify if the server was started after " + verifyTimeout + " seconds.");
-                
             } 
             
             // Check for port already in use error
             int portErrorCount = serverTask.countStringOccurrencesInFile(PORT_IN_USE_MESSAGE_REGEXP, messagesLogFile);
             if (portErrorCount > 0) {
-            	String portError = serverTask.waitForStringInLog(PORT_IN_USE_MESSAGE_REGEXP, timeout, messagesLogFile);
+                String portError = serverTask.waitForStringInLog(PORT_IN_USE_MESSAGE_REGEXP, timeout, messagesLogFile);
+                setDevStop(true);
                 stopServer();
                 throw new PluginExecutionException(portError.split(PORT_IN_USE_MESSAGE_REGEXP)[1]);
             }
@@ -478,9 +481,13 @@ public abstract class DevUtil {
             }
         }
     }
+    
+    public void setDevStop(boolean devStop) {
+        this.devStop = devStop;
+    }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
-        // shutdown hook to stop server when x mode is terminated
+        // shutdown hook to stop server when dev mode is terminated
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -488,6 +495,7 @@ public abstract class DevUtil {
                 
                 cleanUpTempConfig();
                 cleanUpServerEnv();
+                setDevStop(true);
 
                 if (hotkeyReader != null) {
                     hotkeyReader.shutdown();
@@ -691,7 +699,9 @@ public abstract class DevUtil {
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
             while (true) {
-                if (serverThread.getState().equals(Thread.State.TERMINATED)){
+
+                // stop dev mode if the server has been stopped by another process
+                if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop == false)) {
                     throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
                 }
 
