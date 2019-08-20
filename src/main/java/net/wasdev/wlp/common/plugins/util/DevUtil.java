@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -211,7 +212,7 @@ public abstract class DevUtil {
     private String applicationId;
     private int appUpdateTimeout;
     private Thread serverThread;
-    private boolean devStop;
+    private AtomicBoolean devStop;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
@@ -227,7 +228,7 @@ public abstract class DevUtil {
         this.skipITs = skipITs;
         this.applicationId = applicationId;
         this.appUpdateTimeout = appUpdateTimeout;
-        this.devStop = false;
+        this.devStop = new AtomicBoolean(false);
     }
 
     /**
@@ -483,7 +484,7 @@ public abstract class DevUtil {
     }
     
     public void setDevStop(boolean devStop) {
-        this.devStop = devStop;
+        this.devStop.set(devStop);
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
@@ -701,7 +702,7 @@ public abstract class DevUtil {
             while (true) {
 
                 // stop dev mode if the server has been stopped by another process
-                if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop == false)) {
+                if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop.get() == false)) {
                     throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
                 }
 
