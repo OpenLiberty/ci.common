@@ -477,7 +477,12 @@ public abstract class DevUtil {
 
     protected void parseHttpPort(String webAppMessage, int portPrefixIndex) {
         int portIndex = portPrefixIndex + 1;
-        httpPort = webAppMessage.substring(portIndex, webAppMessage.indexOf("/", portIndex));
+        int portEndIndex = webAppMessage.indexOf("/", portIndex);
+        if (portEndIndex < 0) {
+            // if no ending slash, the port ends at the end of the message
+            portEndIndex = webAppMessage.length();
+        }
+        httpPort = webAppMessage.substring(portIndex, portEndIndex);
         debug("Parsed http port: " + httpPort);
     }
 
