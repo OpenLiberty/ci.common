@@ -1344,14 +1344,26 @@ public abstract class DevUtil {
         }
     }
 
+    /**
+     * Gets the Liberty server's host name.
+     * @return hostName the host name, or null if the server is not started
+     */
     public String getHostName() {
         return hostName;
     }
 
+    /**
+     * Gets the Liberty server's http port.
+     * @return httpPort the http port, or null if the server is not started or there is no http port bound
+     */
     public String getHttpPort() {
         return httpPort;
     }
 
+    /**
+     * Gets the Liberty server's https port.
+     * @return httpsPort the https port, or null if the server is not started or there is no https port bound
+     */
     public String getHttpsPort() {
         return httpsPort;
     }
