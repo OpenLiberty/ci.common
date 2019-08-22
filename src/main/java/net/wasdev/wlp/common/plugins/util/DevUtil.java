@@ -80,7 +80,10 @@ public abstract class DevUtil {
 
     private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
     private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I.*";
-    private static final String PORT_IN_USE_MESSAGE_REGEXP = "CWWKO0221E:";
+    private static final String PORT_IN_USE_MESSAGE_PREFIX = "CWWKO0221E:";
+    private static final String WEB_APP_AVAILABLE_MESSAGE_PREFIX = "CWWKT0016I:";
+    private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
+    private static final String HTTP_PREFIX = "http://";
 
     /**
      * Log debug
@@ -213,6 +216,9 @@ public abstract class DevUtil {
     private int appUpdateTimeout;
     private Thread serverThread;
     private AtomicBoolean devStop;
+    private String hostName;
+    private String httpPort;
+    private String httpsPort;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
@@ -419,7 +425,6 @@ public abstract class DevUtil {
                 verifyTimeout = 30;
             }
             long timeout = verifyTimeout * 1000;
-            long endTime = System.currentTimeMillis() + timeout;
 
             // Wait for the app started message in messages.log
             String startMessage = serverTask.waitForStringInLog(START_APP_MESSAGE_REGEXP, timeout, messagesLogFile);
@@ -431,18 +436,99 @@ public abstract class DevUtil {
             } 
             
             // Check for port already in use error
-            int portErrorCount = serverTask.countStringOccurrencesInFile(PORT_IN_USE_MESSAGE_REGEXP, messagesLogFile);
-            if (portErrorCount > 0) {
-                String portError = serverTask.waitForStringInLog(PORT_IN_USE_MESSAGE_REGEXP, timeout, messagesLogFile);
-                setDevStop(true);
+            String portError = serverTask.findStringInFile(PORT_IN_USE_MESSAGE_PREFIX, messagesLogFile);
+            if (portError != null) {
                 stopServer();
-                throw new PluginExecutionException(portError.split(PORT_IN_USE_MESSAGE_REGEXP)[1]);
+                throw new PluginExecutionException(portError.split(PORT_IN_USE_MESSAGE_PREFIX)[1]);
             }
             
-            timeout = endTime - System.currentTimeMillis();
+            // Parse hostname, http, https ports for integration tests to use
+            parseHostNameAndPorts(serverTask, messagesLogFile);
+
         } catch (IOException | InterruptedException e) {
             debug("Error starting server", e);
         }
+    }
+
+    private void parseHostNameAndPorts(final ServerTask serverTask, File messagesLogFile) throws PluginExecutionException {
+        String webAppMessage = serverTask.findStringInFile(WEB_APP_AVAILABLE_MESSAGE_PREFIX, messagesLogFile);
+        debug("Web app available message: " + webAppMessage);
+        if (webAppMessage != null) {
+            int portPrefixIndex = parseHostName(webAppMessage);
+            parseHttpPort(webAppMessage, portPrefixIndex);
+        }
+        List<String> listeningOnPortMessages = serverTask.findStringsInFile(LISTENING_ON_PORT_MESSAGE_PREFIX, messagesLogFile);
+        if (listeningOnPortMessages != null) {
+            parseHttpsPort(listeningOnPortMessages);
+        }
+    }
+
+    protected int parseHostName(String webAppMessage) throws PluginExecutionException {
+        int httpPrefixIndex = webAppMessage.indexOf(HTTP_PREFIX);
+        if (httpPrefixIndex < 0) {
+            throw new PluginExecutionException("Could not parse the host name from the log message: " + webAppMessage);
+        }
+        int hostNameIndex = httpPrefixIndex + HTTP_PREFIX.length();
+        int portPrefixIndex = webAppMessage.indexOf(":", hostNameIndex);
+        if (portPrefixIndex < 0) {
+            throw new PluginExecutionException("Could not parse the http port number from the log message: " + webAppMessage);
+        }
+        hostName = webAppMessage.substring(hostNameIndex, portPrefixIndex);
+        debug("Parsed host name: " + hostName);
+        return portPrefixIndex;
+    }
+
+    protected void parseHttpPort(String webAppMessage, int portPrefixIndex) {
+        int portIndex = portPrefixIndex + 1;
+        int portEndIndex = webAppMessage.indexOf("/", portIndex);
+        if (portEndIndex < 0) {
+            // if no ending slash, the port ends at the end of the message
+            portEndIndex = webAppMessage.length();
+        }
+        httpPort = webAppMessage.substring(portIndex, portEndIndex);
+        debug("Parsed http port: " + httpPort);
+    }
+
+    protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
+        for (String message : messages) {
+            debug("Looking for https port in message: " + message);
+            String httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            String[] messageTokens = httpsMessageContents.split(" ");
+            // Look for endpoint with name containing "-ssl"
+            for (String token : messageTokens) {
+                if (token.contains("-ssl")) {
+                    String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
+                    if (parsedHttpsPort != null) {
+                        debug("Parsed https port: " + parsedHttpsPort);
+                        httpsPort = parsedHttpsPort;
+                        return;
+                    } else {
+                        throw new PluginExecutionException("Could not parse the https port number from the log message: " + message);
+                    }
+                }
+            }
+        }
+        debug("Could not find https port. The server might not be configured for https.");
+    }
+
+    private String getPortFromMessageTokens(String[] messageTokens) throws PluginExecutionException {
+        // For each space-separated token, keep only the numeric parts.
+        // The port is the last numeric token which is a number <= 65535.
+        for (int i = messageTokens.length - 1; i >= 0; i--) {
+            String numericToken = messageTokens[i].replaceAll("[^\\d]", "" );
+            if (numericToken.length() > 0) {
+                try {
+                    int parsedPort = Integer.parseInt(numericToken);
+                    if (parsedPort <= 65535) {
+                        return numericToken;
+                    }
+                } catch (NumberFormatException e) {
+                    // If the token is not parseable for some reason, then it's probably not a port number
+                    debug("Could not parse integer from numeric token " + numericToken + " from message token " + messageTokens[i], e);
+                }
+            }
+        }
+        return null;
     }
     
     public void cleanUpServerEnv() {
@@ -1267,6 +1353,30 @@ public abstract class DevUtil {
         public boolean isManualInvocation() {
             return manualInvocation;
         }
+    }
+
+    /**
+     * Gets the Liberty server's host name.
+     * @return hostName the host name, or null if the server is not started
+     */
+    public String getHostName() {
+        return hostName;
+    }
+
+    /**
+     * Gets the Liberty server's http port.
+     * @return httpPort the http port, or null if the server is not started or there is no http port bound
+     */
+    public String getHttpPort() {
+        return httpPort;
+    }
+
+    /**
+     * Gets the Liberty server's https port.
+     * @return httpsPort the https port, or null if the server is not started or there is no https port bound
+     */
+    public String getHttpsPort() {
+        return httpsPort;
     }
 
 }
