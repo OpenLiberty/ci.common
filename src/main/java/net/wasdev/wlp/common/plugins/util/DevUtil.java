@@ -195,12 +195,12 @@ public abstract class DevUtil {
     public abstract void stopServer();
 
     /**
-     * Get the ServerTask for debug mode
+     * Get the ServerTask to start the server, which can be in either "run" or "debug" mode
      * 
-     * @return ServerTask for debug mode
+     * @return ServerTask the task to start the server
      * @throws IOException if there was an error copying config files
      */
-    public abstract ServerTask getDebugServerTask() throws IOException;
+    public abstract ServerTask getServerTask() throws IOException;
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -250,7 +250,7 @@ public abstract class DevUtil {
         if (!skipTests) {
             ServerTask serverTask = null;
             try {
-                serverTask = getDebugServerTask();
+                serverTask = getServerTask();
             } catch (IOException e) {
                 // not expected since server should already have been started
                 error("Could not get the server task for running tests.", e);
@@ -345,7 +345,7 @@ public abstract class DevUtil {
         int messageOccurrences = -1;
         if (!(skipTests || skipITs)) {
             try {
-                ServerTask serverTask = getDebugServerTask();
+                ServerTask serverTask = getServerTask();
                 File logFile = serverTask.getLogFile();
                 String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
                 messageOccurrences = serverTask.countStringOccurrencesInFile(regexp, logFile);
@@ -358,13 +358,13 @@ public abstract class DevUtil {
     }
 
     /**
-     * Start the server in debug mode and keep it running in a background thread.
+     * Start the server and keep it running in a background thread.
      * 
      * @throws PluginExecutionException If the server startup could not be verified within the timeout
      */
     public void startServer(long serverStartTimeout, long verifyTimeout) throws PluginExecutionException {
         try {
-            final ServerTask serverTask = getDebugServerTask();
+            final ServerTask serverTask = getServerTask();
 
             String logsDirectory = serverTask.getOutputDir() + "/" + serverTask.getServerName() + "/logs";
             File messagesLogFile = new File(logsDirectory + "/messages.log");
