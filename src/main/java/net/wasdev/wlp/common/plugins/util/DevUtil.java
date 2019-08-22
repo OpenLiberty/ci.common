@@ -508,23 +508,24 @@ public abstract class DevUtil {
         debug("Could not find https port. The server might not be configured for https.");
     }
 
-    private String getPortFromMessageTokens(String[] messageTokens) {
-        String port = null;
+    private String getPortFromMessageTokens(String[] messageTokens) throws PluginExecutionException {
         // For each space-separated token, keep only the numeric parts.
         // The port is the last numeric token which is a number <= 65535.
         for (int i = messageTokens.length - 1; i >= 0; i--) {
             String numericToken = messageTokens[i].replaceAll("[^\\d]", "" );
-            try {
-                int parsedPort = Integer.parseInt(numericToken);
-                if (parsedPort <= 65535) {
-                    port = numericToken;
-                    break;
+            if (numericToken.length() > 0) {
+                try {
+                    int parsedPort = Integer.parseInt(numericToken);
+                    if (parsedPort <= 65535) {
+                        return numericToken;
+                    }
+                } catch (NumberFormatException e) {
+                    // If the token is not parseable for some reason, then it's probably not a port number
+                    debug("Could not parse integer from numeric token " + numericToken + " from message token " + messageTokens[i], e);
                 }
-            } catch (NumberFormatException e) {
-                // ignore
-            }                    
+            }
         }
-        return port;
+        return null;
     }
     
     public void cleanUpServerEnv() {
