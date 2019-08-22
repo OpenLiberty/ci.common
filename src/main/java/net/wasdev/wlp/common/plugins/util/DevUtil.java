@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -214,6 +215,7 @@ public abstract class DevUtil {
     private String applicationId;
     private int appUpdateTimeout;
     private Thread serverThread;
+    private AtomicBoolean devStop;
     private String hostName;
     private String httpPort;
     private String httpsPort;
@@ -232,6 +234,7 @@ public abstract class DevUtil {
         this.skipITs = skipITs;
         this.applicationId = applicationId;
         this.appUpdateTimeout = appUpdateTimeout;
+        this.devStop = new AtomicBoolean(false);
     }
 
     /**
@@ -426,10 +429,10 @@ public abstract class DevUtil {
             // Wait for the app started message in messages.log
             String startMessage = serverTask.waitForStringInLog(START_APP_MESSAGE_REGEXP, timeout, messagesLogFile);
             if (startMessage == null) {
+                setDevStop(true);
                 stopServer();
                 throw new PluginExecutionException(
                         "Unable to verify if the server was started after " + verifyTimeout + " seconds.");
-                
             } 
             
             // Check for port already in use error
@@ -565,9 +568,13 @@ public abstract class DevUtil {
             }
         }
     }
+    
+    public void setDevStop(boolean devStop) {
+        this.devStop.set(devStop);
+    }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
-        // shutdown hook to stop server when x mode is terminated
+        // shutdown hook to stop server when dev mode is terminated
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -575,6 +582,7 @@ public abstract class DevUtil {
                 
                 cleanUpTempConfig();
                 cleanUpServerEnv();
+                setDevStop(true);
 
                 if (hotkeyReader != null) {
                     hotkeyReader.shutdown();
@@ -778,7 +786,9 @@ public abstract class DevUtil {
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
             while (true) {
-                if (serverThread.getState().equals(Thread.State.TERMINATED)){
+
+                // stop dev mode if the server has been stopped by another process
+                if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop.get() == false)) {
                     throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
                 }
 
