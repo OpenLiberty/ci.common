@@ -93,7 +93,7 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public ServerTask getDebugServerTask() throws IOException {
+        public ServerTask getServerTask() throws IOException {
             // not needed for tests
             return null;            
         }
