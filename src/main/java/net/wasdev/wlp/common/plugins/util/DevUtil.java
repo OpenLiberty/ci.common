@@ -69,9 +69,9 @@ import javax.tools.ToolProvider;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import org.apache.commons.io.FileUtils;
+import io.openliberty.tools.ant.ServerTask;
 
-import net.wasdev.wlp.ant.ServerTask;
+import org.apache.commons.io.FileUtils;
 
 /**
  * Utility class for dev mode.
