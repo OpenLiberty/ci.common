@@ -24,7 +24,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
-import net.wasdev.wlp.ant.ServerTask;
+import io.openliberty.tools.ant.ServerTask;
 
 public class BaseDevUtilTest {
     

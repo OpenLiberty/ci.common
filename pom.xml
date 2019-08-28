@@ -8,9 +8,9 @@
 		<relativePath />
 	</parent>
 
-	<groupId>net.wasdev.wlp.common</groupId>
+	<groupId>io.openliberty.tools</groupId>
 	<artifactId>ci.common</artifactId>
-	<version>1.5-SNAPSHOT</version>
+	<version>1.6-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>ci.common</name>
@@ -18,15 +18,15 @@
 	<licenses>
 		<license>
 			<name>The Apache Software License, Version 2.0</name>
-			<url>https://raw.github.com/WASdev/ci.common/master/LICENSE</url>
+			<url>https://raw.github.com/openliberty/ci.common/master/LICENSE</url>
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
 
 	<scm>
-		<connection>scm:git:git@github.com:WASdev/ci.maven.git</connection>
-		<developerConnection>scm:git:git@github.com:WASdev/ci.common.git</developerConnection>
-		<url>git@github.com:WASdev/ci.common.git</url>
+		<connection>scm:git:git@github.com:openliberty/ci.maven.git</connection>
+		<developerConnection>scm:git:git@github.com:openliberty/ci.common.git</developerConnection>
+		<url>git@github.com:openliberty/ci.common.git</url>
 		<tag>HEAD</tag>
 	</scm>
 
@@ -56,9 +56,9 @@
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>net.wasdev.wlp.ant</groupId>
-            <artifactId>wlp-anttasks</artifactId>
-            <version>1.9-SNAPSHOT</version>
+            <groupId>io.openliberty.tools</groupId>
+            <artifactId>liberty-ant-tasks</artifactId>
+            <version>1.9</version>
         </dependency>
 	</dependencies>
 </project>
