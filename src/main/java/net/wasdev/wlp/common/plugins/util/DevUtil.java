@@ -825,7 +825,7 @@ public abstract class DevUtil {
                 // check if configDirectory has been added
                 if (!configDirRegistered && this.configDirectory.exists()){
                     configDirRegistered = true;
-                    if (!serverXmlFile.exists()) {
+                    if (serverXmlFile != null && !serverXmlFile.exists()) {
                         registerAll(configPath, watcher);
                         debug("Registering configuration directory: " + this.configDirectory);
                     } else {
