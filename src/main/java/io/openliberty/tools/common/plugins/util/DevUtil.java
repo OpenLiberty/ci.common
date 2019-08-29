@@ -728,6 +728,9 @@ public abstract class DevUtil {
                         debug("Detected Enter key. Running tests...");
                         runTestThread(false, executor, -1, false, true);
                     }
+                } else {
+                    debug("Cannot read user input, setting hot testing to true.");
+                    hotTests = true;
                 }
             }
             debug("Hotkey reader thread was shut down");
