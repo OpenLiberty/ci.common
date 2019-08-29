@@ -825,8 +825,12 @@ public abstract class DevUtil {
                 // check if configDirectory has been added
                 if (!configDirRegistered && this.configDirectory.exists()){
                     configDirRegistered = true;
-                    debug("Configuration directory has been added: " + this.configDirectory);
-                    info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
+                    if (serverXmlFile != null && !serverXmlFile.exists()) {
+                        registerAll(configPath, watcher);
+                        debug("Registering configuration directory: " + this.configDirectory);
+                    } else {
+                        info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
+                    }
                 }
                 
                 // check if serverXmlFile has been added
@@ -840,9 +844,8 @@ public abstract class DevUtil {
                 for (File resourceDir : resourceDirs){
                     if (!resourceMap.get(resourceDir)) {
                         if (resourceDir.exists()) {
+                            registerAll(resourceDir.getCanonicalFile().toPath(), watcher);
                             resourceMap.put(resourceDir, true);
-                            debug("Resource directory has been added: " + resourceDir);
-                            info("The resource directory " + resourceDir + "has been added. Restart liberty:dev mode for it to take effect.");
                         }
                     }
                 }
