@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.wasdev.wlp.common.plugins.config;
+package io.openliberty.tools.common.plugins.config;
 
 import java.io.File;
 import java.io.IOException;

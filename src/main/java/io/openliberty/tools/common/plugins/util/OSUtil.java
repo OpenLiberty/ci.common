@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018, 2019.
+ * (C) Copyright IBM Corporation 2018.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,18 @@
  * limitations under the License.
  */
 
-package net.wasdev.wlp.common.plugins.util;
+package io.openliberty.tools.common.plugins.util;
 
-/**
- * Generic exception that should not fail the build but instead be handled gracefully.
- *
- */
-public class PluginScenarioException extends Exception {
-
-    private static final long serialVersionUID = 1L;
-
-    public PluginScenarioException(String message) {
-        super(message);
-    }
+public class OSUtil {
     
-    public PluginScenarioException(String message, Throwable e) {
-        super(message, e);
+    /**
+     * Determines if the current OS is a Windows OS.
+     * 
+     * @return true if running on Windows, false otherwise
+     */
+    public static boolean isWindows() {
+        String osName = System.getProperty("os.name", "unknown").toLowerCase();
+        return osName.indexOf("windows") >= 0;
     }
-    
-    public PluginScenarioException(Throwable e) {
-        super(e);
-    }
+
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.wasdev.wlp.common.plugins.config;
+package io.openliberty.tools.common.plugins.config;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -45,7 +45,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NamedNodeMap;
 import org.xml.sax.SAXException;
 
-import net.wasdev.wlp.common.CommonLoggerI;
+import io.openliberty.tools.common.CommonLoggerI;
 
 // Moved from ci.maven/liberty-maven-plugin/src/main/java/net/wasdev/wlp/maven/plugins/ServerConfigDocument.java
 public class ServerConfigDocument {

@@ -25,6 +25,9 @@ import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
 import io.openliberty.tools.ant.ServerTask;
+import io.openliberty.tools.common.plugins.util.DevUtil;
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
+import io.openliberty.tools.common.plugins.util.PluginScenarioException;
 
 public class BaseDevUtilTest {
     

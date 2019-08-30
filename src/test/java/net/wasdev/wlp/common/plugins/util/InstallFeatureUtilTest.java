@@ -28,6 +28,10 @@ import java.util.Set;
 
 import org.junit.Test;
 
+import io.openliberty.tools.common.plugins.util.InstallFeatureUtil;
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
+import io.openliberty.tools.common.plugins.util.PluginScenarioException;
+
 public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     
     private static final String RESOLVER_JAR_PATH = "resolver/io/openliberty/features/repository-resolver/18.0.0.2/repository-resolver-18.0.0.2.jar";

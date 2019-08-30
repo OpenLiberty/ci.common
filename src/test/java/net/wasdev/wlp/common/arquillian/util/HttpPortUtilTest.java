@@ -24,6 +24,9 @@ import java.util.Properties;
 import org.junit.Test;
 import org.xml.sax.SAXParseException;
 
+import io.openliberty.tools.common.arquillian.util.ArquillianConfigurationException;
+import io.openliberty.tools.common.arquillian.util.HttpPortUtil;
+
 public class HttpPortUtilTest {
 	
 	private static final String SERVER_XML_BEGIN = 

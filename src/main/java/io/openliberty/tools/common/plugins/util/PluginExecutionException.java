@@ -14,18 +14,26 @@
  * limitations under the License.
  */
 
-package net.wasdev.wlp.common.plugins.util;
+package io.openliberty.tools.common.plugins.util;
 
-public class OSUtil {
+/**
+ * Generic exception that should fail the build execution. 
+ *
+ */
+public class PluginExecutionException extends Exception {
+
+    private static final long serialVersionUID = 1L;
+
+    public PluginExecutionException(String message) {
+        super(message);
+    }
     
-    /**
-     * Determines if the current OS is a Windows OS.
-     * 
-     * @return true if running on Windows, false otherwise
-     */
-    public static boolean isWindows() {
-        String osName = System.getProperty("os.name", "unknown").toLowerCase();
-        return osName.indexOf("windows") >= 0;
+    public PluginExecutionException(String message, Throwable e) {
+        super(message, e);
+    }
+    
+    public PluginExecutionException(Throwable e) {
+        super(e);
     }
 
 }

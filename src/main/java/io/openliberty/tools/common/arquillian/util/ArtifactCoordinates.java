@@ -1,4 +1,4 @@
-package net.wasdev.wlp.common.arquillian.util;
+package io.openliberty.tools.common.arquillian.util;
 
 public class ArtifactCoordinates {
 

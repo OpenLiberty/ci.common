@@ -1,4 +1,4 @@
-package net.wasdev.wlp.common.plugins.config;
+package io.openliberty.tools.common.plugins.config;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -10,7 +10,7 @@ import org.apache.commons.io.FileUtils;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
 
-import net.wasdev.wlp.common.plugins.util.PluginExecutionException;
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 
 public abstract class LooseApplication {
     

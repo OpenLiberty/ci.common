@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.wasdev.wlp.common.arquillian.objects;
+package io.openliberty.tools.common.arquillian.objects;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import net.wasdev.wlp.common.arquillian.util.Constants;
+import io.openliberty.tools.common.arquillian.util.Constants;
 
 /**
  * Data object for the arquillian.xml configuration for the WLP managed

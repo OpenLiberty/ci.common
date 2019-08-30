@@ -25,6 +25,10 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
+import io.openliberty.tools.common.plugins.util.InstallFeatureUtil;
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
+import io.openliberty.tools.common.plugins.util.PluginScenarioException;
+
 public class BaseInstallFeatureUtilTest {
 
     public static final String RESOURCES_DIR = "src/test/resources";

@@ -33,6 +33,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import io.openliberty.tools.common.plugins.util.InstallFeatureUtil;
+
 public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureUtilTest {
     private static File serverDirectory = null;
     private static File src = null;

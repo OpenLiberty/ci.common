@@ -28,6 +28,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 
+import io.openliberty.tools.common.plugins.util.DevUtil;
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
+
 public class DevUtilHostnamePortTest extends BaseDevUtilTest {
 
     @Test

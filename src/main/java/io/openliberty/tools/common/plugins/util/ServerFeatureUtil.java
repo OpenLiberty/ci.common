@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.wasdev.wlp.common.plugins.util;
+package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -37,7 +37,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import net.wasdev.wlp.common.plugins.config.XmlDocument;
+import io.openliberty.tools.common.plugins.config.XmlDocument;
 
 /**
  * Utility class to determine server features

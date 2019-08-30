@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.wasdev.wlp.common.arquillian.objects;
+package io.openliberty.tools.common.arquillian.objects;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import net.wasdev.wlp.common.arquillian.util.ArquillianConfigurationException;
+import io.openliberty.tools.common.arquillian.util.ArquillianConfigurationException;
 
 public class LibertyProperty {
 

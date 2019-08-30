@@ -36,6 +36,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import io.openliberty.tools.common.plugins.util.DevUtil;
+
 public class DevUtilTest extends BaseDevUtilTest {
 
     File serverDirectory;
