@@ -733,13 +733,16 @@ public abstract class DevUtil {
         }
     }
 
+    // The serverXmlFile parameter can be null when using the server.xml from the configDirectory, which has a default value.
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> artifactPaths, File configFile)
+            final ThreadPoolExecutor executor, List<String> artifactPaths, File serverXmlFile)
             throws Exception {
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
             
-            File serverXML = getFileFromConfigDirectory("server.xml"); // server.xml in the config directory
-            File configFileParent = configFile.getParentFile();
+            File serverXmlFileParent = null;
+            if (serverXmlFile != null && serverXmlFile.exists()) {
+                serverXmlFileParent = serverXmlFile.getParentFile();
+            }
             
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
@@ -748,7 +751,7 @@ public abstract class DevUtil {
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
             boolean configDirRegistered = false;
-            boolean configFileRegistered = false;
+            boolean serverXmlFileRegistered = false;
 
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, watcher);
@@ -765,10 +768,10 @@ public abstract class DevUtil {
                 configDirRegistered = true;
             }
             
-            if (configFile.exists() && configFileParent.exists()){
-                Path configFilePath = configFileParent.getCanonicalFile().toPath();
-                registerAll(configFilePath, watcher);
-                configFileRegistered = true;
+            if (serverXmlFile != null && serverXmlFile.exists() && serverXmlFileParent.exists()){
+                Path serverXmlFilePath = serverXmlFileParent.getCanonicalFile().toPath();
+                registerAll(serverXmlFilePath, watcher);
+                serverXmlFileRegistered = true;
             }
             
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
@@ -822,24 +825,27 @@ public abstract class DevUtil {
                 // check if configDirectory has been added
                 if (!configDirRegistered && this.configDirectory.exists()){
                     configDirRegistered = true;
-                    debug("Configuration directory has been added: " + this.configDirectory);
-                    info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
+                    if (serverXmlFile != null && !serverXmlFile.exists()) {
+                        registerAll(configPath, watcher);
+                        debug("Registering configuration directory: " + this.configDirectory);
+                    } else {
+                        info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
+                    }
                 }
                 
-                // check if configFile has been added
-                if (!configFileRegistered && configFile.exists()){
-                    configFileRegistered = true;
-                    debug("Configuration file has been added: " + configFile);
-                    info("The server configuration file " + configFile + " has been added. Restart liberty:dev mode for it to take effect.");
+                // check if serverXmlFile has been added
+                if (!serverXmlFileRegistered && serverXmlFile != null && serverXmlFile.exists()){
+                    serverXmlFileRegistered = true;
+                    debug("Server configuration file has been added: " + serverXmlFile);
+                    info("The server configuration file " + serverXmlFile + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 // check if resourceDirectory has been added
                 for (File resourceDir : resourceDirs){
                     if (!resourceMap.get(resourceDir)) {
                         if (resourceDir.exists()) {
+                            registerAll(resourceDir.getCanonicalFile().toPath(), watcher);
                             resourceMap.put(resourceDir, true);
-                            debug("Resource directory has been added: " + resourceDir);
-                            info("The resource directory " + resourceDir + "has been added. Restart liberty:dev mode for it to take effect.");
                         }
                     }
                 }
@@ -915,23 +921,21 @@ public abstract class DevUtil {
                                 deleteFile(fileChanged, this.configDirectory, serverDirectory, null);
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             }
-                        } else if (directory.startsWith(configFileParent.getCanonicalFile().toPath())) {
-                            if (serverXML == null || !serverXML.exists()) {
-                                if (fileChanged.exists() && fileChanged.getCanonicalPath().endsWith(configFile.getName())
-                                        && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                                || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                    copyConfigFolder(fileChanged, configFileParent, "server.xml");
-                                    copyFile(fileChanged, configFileParent, serverDirectory,
-                                            "server.xml");
+                        } else if (serverXmlFileParent != null && directory.startsWith(serverXmlFileParent.getCanonicalFile().toPath())) {
+                            if (fileChanged.exists() && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())
+                                    && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                                            || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
+                                copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
+                                copyFile(fileChanged, serverXmlFileParent, serverDirectory,
+                                        "server.xml");
 
-                                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+                                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
-                                } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
-                                        && fileChanged.getCanonicalPath().endsWith(configFile.getName())) {
-                                    info("Config file deleted: " + fileChanged.getName());
-                                    deleteFile(fileChanged, this.configDirectory, serverDirectory, "server.xml");
-                                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
-                                }
+                            } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
+                                    && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
+                                info("Config file deleted: " + fileChanged.getName());
+                                deleteFile(fileChanged, this.configDirectory, serverDirectory, "server.xml");
+                                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             }
                         } else if (resourceParent != null && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
                             debug("Resource dir: " + resourceParent.toString());
