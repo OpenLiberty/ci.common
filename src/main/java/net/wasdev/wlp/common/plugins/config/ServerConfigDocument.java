@@ -116,7 +116,12 @@ public class ServerConfigDocument {
 
     public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile) {
-        initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile);
+        this(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true);
+    }
+
+    public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
+            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) {
+        initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence);
     }
 
     private static DocumentBuilder getDocumentBuilder() {
@@ -146,16 +151,21 @@ public class ServerConfigDocument {
     
     public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile) throws IOException {
+        return getInstance(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true);
+    }
+
+    public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
+            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) throws IOException {
         // Initialize if instance is not created yet, or source server xml file
         // location has been changed.
         if (instance == null || !serverXML.getCanonicalPath().equals(getServerXML().getCanonicalPath())) {
-            instance = new ServerConfigDocument(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile);
+            instance = new ServerConfigDocument(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence);
         }
         return instance;
     }
 
     private static void initializeAppsLocation(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile) {
+            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) {
         try {
             ServerConfigDocument.log = log;
             serverXMLFile = serverXML;
@@ -183,17 +193,15 @@ public class ServerConfigDocument {
             // 7. variables from configDropins/overrides/<file_name>
 
             // get variables from server.env
-            File cfgDirFile = getFileFromConfigDirectory("server.env");
+            File cfgFile = findConfigFile("server.env", serverEnvFile, giveConfigDirPrecedence);
 
-            if (cfgDirFile != null) {
-                parseProperties(new FileInputStream(cfgDirFile));
-            } else if (serverEnvFile != null && serverEnvFile.exists()) {
-                parseProperties(new FileInputStream(serverEnvFile));
+            if (cfgFile != null) {
+                parseProperties(new FileInputStream(cfgFile));
             }
 
-            cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
+            File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
 
-            if (cfgDirFile != null) {
+            if (giveConfigDirPrecedence && cfgDirFile != null) {
                 parseProperties(new FileInputStream(cfgDirFile));
             } else if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
                 for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
@@ -203,6 +211,8 @@ public class ServerConfigDocument {
                 }
             } else if (bootstrapFile != null && bootstrapFile.exists()) {
                 parseProperties(new FileInputStream(bootstrapFile));
+            } else if (cfgDirFile != null) {
+                parseProperties(new FileInputStream(cfgDirFile));
             }
 
             parseIncludeVariables(doc);
@@ -580,21 +590,41 @@ public class ServerConfigDocument {
     }
 
     /*
-     * Get the file from configDrectory if it exists; otherwise return def only
-     * if it exists, or null if not
+     * If giveConfigDirPrecedence is set to true, return the file from the configDirectory if it exists;
+     * otherwise return specificFile if it exists, or null if not.
+     * If giveConfigDirPrecedence is set to false, return specificFile if it exists;
+     * otherwise return the file from the configDirectory if it exists, or null if not.
      */
-    private static File getFileFromConfigDirectory(String file, File def) {
+    private static File findConfigFile(String fileName, File specificFile, boolean giveConfigDirPrecedence) {
+        File f = new File(configDirectory, fileName);
+
+        if (giveConfigDirPrecedence) {
+            if (configDirectory != null && f.exists()) {
+                return f;
+            }
+            if (specificFile != null && specificFile.exists()) {
+                return specificFile;
+            }
+        } else {
+            if (specificFile != null && specificFile.exists()) {
+                return specificFile;
+            }
+            if (configDirectory != null && f.exists()) {
+                return f;
+            }
+        }
+
+        return null;
+    }
+
+    /*
+     * Get the file from configDrectory if it exists, or null if not
+     */
+    private static File getFileFromConfigDirectory(String file) {
         File f = new File(configDirectory, file);
         if (configDirectory != null && f.exists()) {
             return f;
         }
-        if (def != null && def.exists()) {
-            return def;
-        }
         return null;
-    }
-
-    private static File getFileFromConfigDirectory(String file) {
-        return getFileFromConfigDirectory(file, null);
     }
 }
