@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.wasdev.wlp.common.plugins.util;
+package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.io.IOException;
