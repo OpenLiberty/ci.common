@@ -17,6 +17,7 @@
 package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -27,7 +28,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -86,10 +90,11 @@ public abstract class ServerFeatureUtil {
      * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      */
     public Set<String> getServerFeatures(File serverDirectory) {
-        Set<String> result = getConfigDropinsFeatures(null, serverDirectory, "defaults");
-        result = getServerXmlFeatures(result, new File(serverDirectory, "server.xml"), null);
+        Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
+        Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults");
+        result = getServerXmlFeatures(result, new File(serverDirectory, "server.xml"), bootstrapProperties, null);
         // add the overrides at the end since they should not be replaced by any previous content
-        return getConfigDropinsFeatures(result, serverDirectory, "overrides");
+        return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides");
     }
     
     /**
@@ -107,7 +112,7 @@ public abstract class ServerFeatureUtil {
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    private Set<String> getConfigDropinsFeatures(Set<String> origResult, File serverDirectory, String folderName) {
+    private Set<String> getConfigDropinsFeatures(Set<String> origResult, File serverDirectory, Properties bootstrapProperties, String folderName) {
         Set<String> result = origResult;
         File configDropinsFolder;
         try {
@@ -137,7 +142,7 @@ public abstract class ServerFeatureUtil {
         Collections.sort(Arrays.asList(configDropinsXmls), comparator);
 
         for (File xml : configDropinsXmls) {
-            Set<String> features = getServerXmlFeatures(result, xml, null);
+            Set<String> features = getServerXmlFeatures(result, xml, bootstrapProperties,null);
             if (features != null) {
                 result = features;
             }
@@ -160,7 +165,7 @@ public abstract class ServerFeatureUtil {
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    private Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
+    private Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
         Set<String> result = origResult;
         List<File> updatedParsedXmls = parsedXmls != null ? parsedXmls : new ArrayList<File>();
         File canonicalServerFile;
@@ -193,7 +198,7 @@ public abstract class ServerFeatureUtil {
                             }
                             result.addAll(parseFeatureManagerNode(child));
                         } else if ("include".equals(child.getNodeName())){
-                            result = parseIncludeNode(result, canonicalServerFile, child, updatedParsedXmls);
+                            result = parseIncludeNode(result, canonicalServerFile, bootstrapProperties, child, updatedParsedXmls);
                         }
                     }
                 }
@@ -250,13 +255,15 @@ public abstract class ServerFeatureUtil {
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    private Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Element node,
+    private Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Properties bootstrapProperties, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
-        String includeFileName = node.getAttribute("location");
+        String includeFileName = evaluateExpression(bootstrapProperties, node.getAttribute("location"));
+
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
             return result;
         }
+
         File includeFile = null;
         if (isURL(includeFileName)) {
             try {
@@ -287,7 +294,7 @@ public abstract class ServerFeatureUtil {
         }
         if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
-            Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+            Set<String> features = getServerXmlFeatures(null, includeFile, bootstrapProperties, updatedParsedXmls);
             result = handleOnConflict(result, onConflict, features);
         }
         return result;
@@ -322,9 +329,39 @@ public abstract class ServerFeatureUtil {
                 } else {
                     result.addAll(features);
                 }
-            }  
+            }
         }
         return result;
+    }
+
+    private Properties getBootstrapProperties(File bootstrapProperties) {
+        Properties prop = new Properties();
+        if (bootstrapProperties != null && bootstrapProperties.exists()) {
+            try {
+                prop.load(new FileInputStream(bootstrapProperties));
+            } catch (IOException e) {
+                warn("The bootstrap.properties file " + bootstrapProperties + " could not be loaded. Skipping the bootstrap.properties file.");
+                debug(e);
+            }
+        }
+        return prop;
+    }
+
+    private String evaluateExpression(Properties properties, String expression) {
+        String value = expression;
+        if (expression != null) {
+            Pattern p = Pattern.compile("\\$\\{([^\\}]*)\\}");
+            Matcher m = p.matcher(expression);
+            StringBuffer sb = new StringBuffer();
+            while (m.find()) {
+                String variable = m.group(1);
+                String propertyValue = properties.getProperty(variable, "\\$\\{" + variable + "\\}");
+                m.appendReplacement(sb, propertyValue);
+            }
+            m.appendTail(sb);
+            value = sb.toString();
+        }
+        return value;
     }
     
 }

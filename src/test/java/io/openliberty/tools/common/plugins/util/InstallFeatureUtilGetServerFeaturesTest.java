@@ -496,12 +496,32 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         verifyServerFeatures(expected);
     }
 
+    @Test
+    public void testIncludeUrlFromVariable() throws Exception {
+        replaceIncludeUrlFromVariable();
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+
+        verifyServerFeatures(expected);
+    }
+
     private void replaceIncludeUrl(String includeFileName) throws Exception {
+        File includeFile = new File(src, includeFileName);
+        replaceIncludeLocation(includeFile.toURI().toURL().toString());
+    }
+
+    private void replaceIncludeUrlFromVariable() throws Exception {
+        copy("bootstrap.properties");
+        replaceIncludeLocation(src.toURI().toURL() + "\\$\\{extras.filename\\}");
+    }
+
+    private void replaceIncludeLocation(String includeLocation) throws Exception {
         copyAsName("server_url.xml", "server.xml");
 
-        File includeFile = new File(src, includeFileName);
-        String includeReplacement = "<include location=\"" + includeFile.toURI().toURL() + "\" onConflict=\"MERGE\"/>\n";
-        
+        String includeReplacement = "<include location=\"" + includeLocation + "\" onConflict=\"MERGE\"/>\n";
+
         Path serverXmlPath = Paths.get(new File(serverDirectory, "server.xml").toURI());
         Charset charset = StandardCharsets.UTF_8;
         String content = new String(Files.readAllBytes(serverXmlPath), StandardCharsets.UTF_8);
