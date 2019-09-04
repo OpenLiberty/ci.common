@@ -1282,7 +1282,7 @@ public abstract class DevUtil {
                         compilationUnits.add(o);
                     }    
                 } else {
-                    debug("The java file " + file + " does not exist and will not be compiled.");
+                    debug("The Java file " + file + " does not exist and will not be compiled.");
                 }
             }
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
