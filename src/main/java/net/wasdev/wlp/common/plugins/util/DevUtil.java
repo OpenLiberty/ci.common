@@ -85,7 +85,6 @@ public abstract class DevUtil {
     private static final String WEB_APP_AVAILABLE_MESSAGE_PREFIX = "CWWKT0016I:";
     private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
     private static final String HTTP_PREFIX = "http://";
-    private static final long COMPILE_TIMEOUT_MILLIS = 500;
 
     /**
      * Log debug
@@ -221,10 +220,12 @@ public abstract class DevUtil {
     private String hostName;
     private String httpPort;
     private String httpsPort;
+    private final long compileWaitMillis;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
-            boolean skipUTs, boolean skipITs, String applicationId, int appUpdateTimeout) {
+            boolean skipUTs, boolean skipITs, String applicationId, int appUpdateTimeout,
+            long compileWaitMillis) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -237,6 +238,7 @@ public abstract class DevUtil {
         this.applicationId = applicationId;
         this.appUpdateTimeout = appUpdateTimeout;
         this.devStop = new AtomicBoolean(false);
+        this.compileWaitMillis = compileWaitMillis;
     }
 
     /**
@@ -805,9 +807,9 @@ public abstract class DevUtil {
                     throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
                 }
 
-                // process java source files if no changes detected after a timeout
-                boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + COMPILE_TIMEOUT_MILLIS;
-                boolean processTests = System.currentTimeMillis() > lastJavaTestChange + COMPILE_TIMEOUT_MILLIS;
+                // process java source files if no changes detected after the compile wait time
+                boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
+                boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
                 if (processSources) {
                     // delete before recompiling, so if a file is in both lists, its class will be deleted then recompiled
                     if (!deleteJavaSources.isEmpty()) {
