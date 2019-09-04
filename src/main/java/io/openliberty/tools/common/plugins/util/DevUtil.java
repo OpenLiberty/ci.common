@@ -915,7 +915,7 @@ public abstract class DevUtil {
                 }
 
                 try {
-                    final WatchKey wk = watcher.poll(1, TimeUnit.SECONDS);
+                    final WatchKey wk = watcher.poll(100, TimeUnit.MILLISECONDS);
                     final Watchable watchable = wk.watchable();
                     final Path directory = (Path) watchable;
 
