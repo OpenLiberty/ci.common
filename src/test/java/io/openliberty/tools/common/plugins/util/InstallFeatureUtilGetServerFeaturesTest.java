@@ -519,8 +519,6 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         copyAsName("server_user_features.xml", "server.xml");
 
         Set<String> expected = new HashSet<String>();
-        expected.add("feature1");
-        expected.add("feature2");
         expected.add("feature3");
 
         verifyServerFeatures(expected);

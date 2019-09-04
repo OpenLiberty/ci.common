@@ -215,7 +215,7 @@ public abstract class ServerFeatureUtil {
      *            The featureManager node
      * @return Set of trimmed lowercase feature names
      */
-    private static Set<String> parseFeatureManagerNode(Element node) {
+    private Set<String> parseFeatureManagerNode(Element node) {
         Set<String> result = new HashSet<String>();
         NodeList features = node.getElementsByTagName("feature");
         if (features != null) {
@@ -223,8 +223,7 @@ public abstract class ServerFeatureUtil {
                 String content = features.item(j).getTextContent();
                 if (content != null) {
                     if (content.contains(":")) {
-                        String[] split = content.split(":", 2);
-                        result.add(split[1].trim().toLowerCase());
+                        debug("The feature " + content + " in the server.xml file is a user feature and its installation will be skipped.");
                     } else {
                         result.add(content.trim().toLowerCase());
                     }
