@@ -51,7 +51,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
@@ -793,8 +792,8 @@ public abstract class DevUtil {
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
             List<File> recompileJavaSources = new ArrayList<File>();
-            List<File> deleteJavaSources = new ArrayList<File>();
             List<File> recompileJavaTests = new ArrayList<File>();
+            List<File> deleteJavaSources = new ArrayList<File>();
             List<File> deleteJavaTests = new ArrayList<File>();
             long lastJavaSourceChange = System.currentTimeMillis();
             long lastJavaTestChange = System.currentTimeMillis();
@@ -810,52 +809,48 @@ public abstract class DevUtil {
                 boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + COMPILE_TIMEOUT_MILLIS;
                 boolean processTests = System.currentTimeMillis() > lastJavaTestChange + COMPILE_TIMEOUT_MILLIS;
                 if (processSources) {
-                    if (!recompileJavaSources.isEmpty()) {
-                        debug("Recompiling Java source files: " + recompileJavaSources);
-                        recompileJavaSource(recompileJavaSources, artifactPaths, executor, outputDirectory, testOutputDirectory);
-
-                        // in case a file was both deleted and modified in the same processing batch, then it should probably still exist
-                        deleteJavaSources.removeAll(recompileJavaSources);
-                    }
+                    // delete before recompiling, so if a file is in both lists, its class will be deleted then recompiled
                     if (!deleteJavaSources.isEmpty()) {
                         debug("Deleting Java source files: " + deleteJavaSources);
                         for (File file : deleteJavaSources) {
                             deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                         }
                     }
+                    if (!recompileJavaSources.isEmpty()) {
+                        debug("Recompiling Java source files: " + recompileJavaSources);
+                        recompileJavaSource(recompileJavaSources, artifactPaths, executor, outputDirectory, testOutputDirectory);
+                    }
                     // additionally, process java test files if no changes detected after a different timeout
                     // (but source timeout takes precedence i.e. don't recompile tests if someone keeps changing the source)
                     if (processTests) {
-                        if (!recompileJavaTests.isEmpty()) {
-                            debug("Recompiling Java test files: " + recompileJavaTests);
-                            recompileJavaTest(recompileJavaTests, artifactPaths, executor, outputDirectory, testOutputDirectory);
-
-                            // in case a file was both deleted and modified in the same processing batch, then it should probably still exist
-                            deleteJavaTests.removeAll(recompileJavaTests);
-                        }
+                        // delete before recompiling, so if a file is in both lists, its class will be deleted then recompiled
                         if (!deleteJavaTests.isEmpty()) {
                             debug("Deleting Java test files: " + deleteJavaTests);
                             for (File file : deleteJavaSources) {
                                 deleteJavaFile(file, testOutputDirectory, this.testSourceDirectory);
                             }
                         }
+                        if (!recompileJavaTests.isEmpty()) {
+                            debug("Recompiling Java test files: " + recompileJavaTests);
+                            recompileJavaTest(recompileJavaTests, artifactPaths, executor, outputDirectory, testOutputDirectory);
+                        }
                     }
 
                     // run tests if files were deleted without any other changes, since recompileJavaSource won't run (which normally handles tests)
-                    if (recompileJavaSources.isEmpty() && !deleteJavaSources.isEmpty()) {
+                    if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
                         // run tests after waiting for app update since app changed
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
-                    } else if (processTests && recompileJavaTests.isEmpty() && !deleteJavaTests.isEmpty()) {
+                    } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
                         // run all tests without waiting for app update since only tests changed
                         runTestThread(false, executor, -1, false, false);
                     }
 
-                    recompileJavaSources.clear();
                     deleteJavaSources.clear();
+                    recompileJavaSources.clear();
                     if (processTests) {
-                        recompileJavaTests.clear();
                         deleteJavaTests.clear();    
+                        recompileJavaTests.clear();
                     }
                 }
 
