@@ -936,6 +936,16 @@ public abstract class DevUtil {
                                 break;
                             }
                         }
+
+                        if (fileChanged.isDirectory()) {
+                            // if new directory added, watch the entire directory
+                            if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                registerAll(fileChanged.toPath(), watcher);
+                            }
+                            // otherwise if a directory was modified, just ignore
+                            // (if delete, can't tell if it was a directory since it doesn't exist anymore)
+                            break;
+                        }
                         
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
 
@@ -1218,10 +1228,10 @@ public abstract class DevUtil {
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
-     * @throws Exception
+     * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected void recompileJavaSource(List<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
     }
 
@@ -1233,10 +1243,10 @@ public abstract class DevUtil {
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
-     * @throws Exception
+     * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected void recompileJavaTest(List<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws Exception {
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
     }
 
@@ -1249,14 +1259,19 @@ public abstract class DevUtil {
      * @param tests indicates whether the files changed were test files
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
+     * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
-            boolean tests, File outputDirectory, File testOutputDirectory) {
+            boolean tests, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
+
+            if (!classesDir.exists() && !classesDir.mkdirs()) {
+                throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath() + " does not exist and cannot be created.");
+            }
 
             List<String> optionList = new ArrayList<>();
             List<File> outputDirs = new ArrayList<File>();
@@ -1277,7 +1292,7 @@ public abstract class DevUtil {
 
             Collection<JavaFileObject> compilationUnits = new HashSet<JavaFileObject>();
             for (File file : javaFilesChanged) {
-                if (file.exists()) {
+                if (file.exists() && file.isFile()) {
                     for (JavaFileObject o : fileManager.getJavaFileObjects(file)) {
                         compilationUnits.add(o);
                     }    
