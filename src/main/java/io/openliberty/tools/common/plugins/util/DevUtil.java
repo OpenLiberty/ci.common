@@ -46,6 +46,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -219,10 +220,12 @@ public abstract class DevUtil {
     private String hostName;
     private String httpPort;
     private String httpsPort;
+    private final long compileWaitMillis;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
-            boolean skipUTs, boolean skipITs, String applicationId, int appUpdateTimeout) {
+            boolean skipUTs, boolean skipITs, String applicationId, int appUpdateTimeout,
+            long compileWaitMillis) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -235,6 +238,7 @@ public abstract class DevUtil {
         this.applicationId = applicationId;
         this.appUpdateTimeout = appUpdateTimeout;
         this.devStop = new AtomicBoolean(false);
+        this.compileWaitMillis = compileWaitMillis;
     }
 
     /**
@@ -793,11 +797,67 @@ public abstract class DevUtil {
                     SensitivityWatchEventModifier.HIGH);
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
+            List<File> recompileJavaSources = new ArrayList<File>();
+            List<File> recompileJavaTests = new ArrayList<File>();
+            List<File> deleteJavaSources = new ArrayList<File>();
+            List<File> deleteJavaTests = new ArrayList<File>();
+            long lastJavaSourceChange = System.currentTimeMillis();
+            long lastJavaTestChange = System.currentTimeMillis();
+
             while (true) {
 
                 // stop dev mode if the server has been stopped by another process
                 if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop.get() == false)) {
                     throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
+                }
+
+                // process java source files if no changes detected after the compile wait time
+                boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
+                boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
+                if (processSources) {
+                    // delete before recompiling, so if a file is in both lists, its class will be deleted then recompiled
+                    if (!deleteJavaSources.isEmpty()) {
+                        debug("Deleting Java source files: " + deleteJavaSources);
+                        for (File file : deleteJavaSources) {
+                            deleteJavaFile(file, outputDirectory, this.sourceDirectory);
+                        }
+                    }
+                    if (!recompileJavaSources.isEmpty()) {
+                        debug("Recompiling Java source files: " + recompileJavaSources);
+                        recompileJavaSource(recompileJavaSources, artifactPaths, executor, outputDirectory, testOutputDirectory);
+                    }
+                    // additionally, process java test files if no changes detected after a different timeout
+                    // (but source timeout takes precedence i.e. don't recompile tests if someone keeps changing the source)
+                    if (processTests) {
+                        // delete before recompiling, so if a file is in both lists, its class will be deleted then recompiled
+                        if (!deleteJavaTests.isEmpty()) {
+                            debug("Deleting Java test files: " + deleteJavaTests);
+                            for (File file : deleteJavaSources) {
+                                deleteJavaFile(file, testOutputDirectory, this.testSourceDirectory);
+                            }
+                        }
+                        if (!recompileJavaTests.isEmpty()) {
+                            debug("Recompiling Java test files: " + recompileJavaTests);
+                            recompileJavaTest(recompileJavaTests, artifactPaths, executor, outputDirectory, testOutputDirectory);
+                        }
+                    }
+
+                    // run tests if files were deleted without any other changes, since recompileJavaSource won't run (which normally handles tests)
+                    if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
+                        // run tests after waiting for app update since app changed
+                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                    } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
+                        // run all tests without waiting for app update since only tests changed
+                        runTestThread(false, executor, -1, false, false);
+                    }
+
+                    deleteJavaSources.clear();
+                    recompileJavaSources.clear();
+                    if (processTests) {
+                        deleteJavaTests.clear();    
+                        recompileJavaTests.clear();
+                    }
                 }
 
                 // check if javaSourceDirectory has been added
@@ -855,12 +915,14 @@ public abstract class DevUtil {
                 }
 
                 try {
-                    final WatchKey wk = watcher.poll(1, TimeUnit.SECONDS);
-                    for (WatchEvent<?> event : wk.pollEvents()) {
-                        final Path changed = (Path) event.context();
+                    final WatchKey wk = watcher.poll(100, TimeUnit.MILLISECONDS);
+                    final Watchable watchable = wk.watchable();
+                    final Path directory = (Path) watchable;
 
-                        final Watchable watchable = wk.watchable();
-                        final Path directory = (Path) watchable;
+                    List<WatchEvent<?>> events = wk.pollEvents();
+
+                    for (WatchEvent<?> event : events) {
+                        final Path changed = (Path) event.context();
                         debug("Processing events for watched directory: " + directory);
 
                         File fileChanged = new File(directory.toString(), changed.toString());
@@ -884,17 +946,13 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                debug("Java source file modified: " + fileChanged.getName());
-
-                                // tests are run in recompileJavaSource
-                                recompileJavaSource(javaFilesChanged, artifactPaths, executor, outputDirectory,
-                                        testOutputDirectory);
+                                debug("Java source file modified: " + fileChanged.getName() + ". Adding to list for processing.");
+                                lastJavaSourceChange = System.currentTimeMillis();
+                                recompileJavaSources.add(fileChanged);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                                debug("Java file deleted: " + fileChanged.getName());
-                                deleteJavaFile(fileChanged, outputDirectory, this.sourceDirectory);
-
-                                // run all tests since Java files were changed
-                                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                                debug("Java file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
+                                lastJavaSourceChange = System.currentTimeMillis();
+                                deleteJavaSources.add(fileChanged);
                             }
                         } else if (directory.startsWith(testSrcPath)) { // src/main/test
                             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -902,16 +960,13 @@ public abstract class DevUtil {
                             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                                     && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                             || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
-                                
-                                // tests are run in recompileJavaTest
-                                recompileJavaTest(javaFilesChanged, artifactPaths, executor, outputDirectory,
-                                        testOutputDirectory);
+                                debug("Java test file modified: " + fileChanged.getName() + ". Adding to list for processing.");
+                                lastJavaTestChange = System.currentTimeMillis();
+                                recompileJavaTests.add(fileChanged);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
-                                debug("Java file deleted: " + fileChanged.getName());
-                                deleteJavaFile(fileChanged, testOutputDirectory, this.testSourceDirectory);
-
-                                // run all tests without waiting for app update since only unit test source changed
-                                runTestThread(false, executor, -1, false, false);
+                                debug("Java test file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
+                                lastJavaTestChange = System.currentTimeMillis();
+                                deleteJavaTests.add(fileChanged);
                             }
                         } else if (directory.startsWith(configPath)) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
@@ -1220,8 +1275,16 @@ public abstract class DevUtil {
             fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
             fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
 
-            Iterable<? extends JavaFileObject> compilationUnits = fileManager
-                    .getJavaFileObjectsFromFiles(javaFilesChanged);
+            Collection<JavaFileObject> compilationUnits = new HashSet<JavaFileObject>();
+            for (File file : javaFilesChanged) {
+                if (file.exists()) {
+                    for (JavaFileObject o : fileManager.getJavaFileObjects(file)) {
+                        compilationUnits.add(o);
+                    }    
+                } else {
+                    debug("The Java file " + file + " does not exist and will not be compiled.");
+                }
+            }
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
                     compilationUnits);
             boolean didCompile = task.call();
