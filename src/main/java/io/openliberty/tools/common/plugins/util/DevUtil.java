@@ -832,7 +832,7 @@ public abstract class DevUtil {
                         // delete before recompiling, so if a file is in both lists, its class will be deleted then recompiled
                         if (!deleteJavaTests.isEmpty()) {
                             debug("Deleting Java test files: " + deleteJavaTests);
-                            for (File file : deleteJavaSources) {
+                            for (File file : deleteJavaTests) {
                                 deleteJavaFile(file, testOutputDirectory, this.testSourceDirectory);
                             }
                         }
