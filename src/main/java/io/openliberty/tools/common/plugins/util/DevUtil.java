@@ -829,10 +829,10 @@ public abstract class DevUtil {
                     SensitivityWatchEventModifier.HIGH);
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
-            List<File> recompileJavaSources = new ArrayList<File>();
-            List<File> recompileJavaTests = new ArrayList<File>();
-            List<File> deleteJavaSources = new ArrayList<File>();
-            List<File> deleteJavaTests = new ArrayList<File>();
+            Collection<File> recompileJavaSources = new HashSet<File>();
+            Collection<File> recompileJavaTests = new HashSet<File>();
+            Collection<File> deleteJavaSources = new HashSet<File>();
+            Collection<File> deleteJavaTests = new HashSet<File>();
             long lastJavaSourceChange = System.currentTimeMillis();
             long lastJavaTestChange = System.currentTimeMillis();
 
@@ -1255,14 +1255,14 @@ public abstract class DevUtil {
     /**
      * Recompile Java source files and run tests after application update
      * 
-     * @param javaFilesChanged list of Java files changed
+     * @param javaFilesChanged collection of Java files changed
      * @param artifactPaths list of project artifact paths for building the classpath
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected void recompileJavaSource(List<File> javaFilesChanged, List<String> artifactPaths,
+    protected void recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
     }
@@ -1270,14 +1270,14 @@ public abstract class DevUtil {
     /**
      * Recompile test source files and run tests immediately
      * 
-     * @param javaFilesChanged list of Java files changed
+     * @param javaFilesChanged collection of Java files changed
      * @param artifactPaths list of project artifact paths for building the classpath
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected void recompileJavaTest(List<File> javaFilesChanged, List<String> artifactPaths,
+    protected void recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
     }
@@ -1285,7 +1285,7 @@ public abstract class DevUtil {
     /**
      * Recompile source files
      * 
-     * @param javaFilesChanged list of Java files changed
+     * @param javaFilesChanged collection of Java files changed
      * @param artifactPaths list of project artifact paths for building the classpath
      * @param executor the test thread executor
      * @param tests indicates whether the files changed were test files
@@ -1293,7 +1293,7 @@ public abstract class DevUtil {
      * @param testOutputDirectory the directory for compiled test classes
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected void recompileJava(List<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
+    protected void recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
             boolean tests, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
