@@ -221,6 +221,7 @@ public abstract class DevUtil {
     private String httpPort;
     private String httpsPort;
     private final long compileWaitMillis;
+    private AtomicBoolean inputUnavailable;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
@@ -239,6 +240,7 @@ public abstract class DevUtil {
         this.appUpdateTimeout = appUpdateTimeout;
         this.devStop = new AtomicBoolean(false);
         this.compileWaitMillis = compileWaitMillis;
+        this.inputUnavailable = new AtomicBoolean(false);
     }
 
     /**
@@ -335,9 +337,6 @@ public abstract class DevUtil {
                 }
             }
         }
-
-        // finally, start watching for hotkey presses if not already started
-        runHotkeyReaderThread(executor);
     }
 
     /**
@@ -681,21 +680,42 @@ public abstract class DevUtil {
 
     /**
      * Run a hotkey reader thread.
-     * If the thread is already running, does nothing.
+     * If the thread is already running, re-prints the message about pressing enter to run tests.
      * 
      * @param executor the test thread executor
      */
     public void runHotkeyReaderThread(ThreadPoolExecutor executor) {
+        if (inputUnavailable.get()) {
+            return;
+        }
+        boolean startedNewHotkeyReader = false;
         if (hotkeyReader == null) {
             hotkeyReader = new HotkeyReader(executor);
             new Thread(hotkeyReader).start();
             debug("Started hotkey reader.");
+            startedNewHotkeyReader = true;
         }
-        if (hotkeyReader != null && !skipTests) {
-            if (hotTests) {
-                info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
-            } else {
-                info("Press the Enter key to run tests on demand.");
+        if (!skipTests) {
+            synchronized(inputUnavailable) {
+                try {
+                    if (startedNewHotkeyReader) {
+                        // if new hotkey reader started, wait for it to try getting the input to see if it's available
+                        inputUnavailable.wait(500);
+                    }
+                    if (!inputUnavailable.get()) {
+                        if (hotTests) {
+                            info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
+                        } else {
+                            info("Press the Enter key to run tests on demand.");
+                        }
+                    } else {    
+                        debug("Cannot read user input, setting hotTests to true.");
+                        info("Tests will run automatically when changes are detected.");
+                        hotTests = true;    
+                    }
+                } catch (InterruptedException e) {
+                    debug("Interrupted while waiting to determine whether input can be read", e);
+                }
             }
         }
     }
@@ -713,7 +733,11 @@ public abstract class DevUtil {
         public void run() {
             debug("Running hotkey reader thread");
             scanner = new Scanner(System.in);
-            readInput();
+            try {
+                readInput();
+            } finally {
+                scanner.close();
+            }
         }
 
         public void shutdown() {
@@ -721,9 +745,15 @@ public abstract class DevUtil {
         }
     
         private void readInput() {
-            while (!shutdown) {
-                debug("Waiting for Enter key to run tests");
-                if (scanner.hasNextLine()) {
+            if (scanner.hasNextLine()) {
+                synchronized(inputUnavailable) {
+                    inputUnavailable.notify();
+                }
+                while (!shutdown) {
+                    debug("Waiting for Enter key to run tests");
+                    if (!scanner.hasNextLine()) {
+                        break;
+                    }
                     String line = scanner.nextLine();
                     if (line != null && line.trim().equalsIgnoreCase("exit")) {
                         debug("Detected exit command");
@@ -731,10 +761,12 @@ public abstract class DevUtil {
                     } else {
                         debug("Detected Enter key. Running tests...");
                         runTestThread(false, executor, -1, false, true);
-                    }
-                } else {
-                    debug("Cannot read user input, setting hot testing to true.");
-                    hotTests = true;
+                    }    
+                }
+            } else {
+                synchronized(inputUnavailable) {
+                    inputUnavailable.set(true);
+                    inputUnavailable.notify();
                 }
             }
             debug("Hotkey reader thread was shut down");
@@ -1434,7 +1466,12 @@ public abstract class DevUtil {
 
         @Override
         public void run() {
-            runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs);
+            try {
+                runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs);
+            } finally {
+                // start watching for hotkey presses if not already started, or re-print message if thread already running
+                runHotkeyReaderThread(executor);
+            }
         }
 
         public boolean isManualInvocation() {
