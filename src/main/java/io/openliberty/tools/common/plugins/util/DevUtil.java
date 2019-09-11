@@ -608,11 +608,11 @@ public abstract class DevUtil {
         if (serverEnvFile.exists()) {
             debug("server.env already exists");
             File serverEnvBackup = new File(serverEnvPath + ".bak");
-            Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath());
-            boolean deleted = serverEnvFile.delete();
 
+            Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            boolean deleted = serverEnvFile.delete();
             if (!deleted) {
-                error("Could not move existing liberty:dev server.env file");
+                error("Could not move existing server.env file");
             }
 
             BufferedReader reader = new BufferedReader(new FileReader(serverEnvBackup));
