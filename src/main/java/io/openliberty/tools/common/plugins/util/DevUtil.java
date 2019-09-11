@@ -609,14 +609,10 @@ public abstract class DevUtil {
             debug("server.env already exists");
             File serverEnvBackup = new File(serverEnvPath + ".bak");
 
-            if (!serverEnvBackup.exists()) {
-                debug("Backing up server.env");
-                Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath());
-            } // else backup already exists, so just delete the server.env
-
+            Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath(), StandardCopyOption.REPLACE_EXISTING);
             boolean deleted = serverEnvFile.delete();
             if (!deleted) {
-                error("Could not delete existing server.env file from " + serverEnvFile.getCanonicalPath());
+                error("Could not move existing server.env file");
             }
 
             BufferedReader reader = new BufferedReader(new FileReader(serverEnvBackup));

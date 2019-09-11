@@ -194,6 +194,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testEnableServerDebugBackupAlreadyExists() throws Exception {
+        // create initial server.env
         String serverEnvContent = "abc=123\nxyz=321";
         
         File serverEnv = new File(serverDirectory, "server.env");
@@ -202,31 +203,40 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.write(serverEnvContent);
         writer.close();
         
+        // enable debug which makes a backup of the original .env
         int port = getRandomPort();
         util.enableServerDebug(port);
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
+
+        // overwrite server.env with new content
+        String serverEnvContent2 = "efg=456\njkl=654";
+        writer = new BufferedWriter(new FileWriter(serverEnv));
+        writer.write(serverEnvContent2);
+        writer.close();
         
         // enable debug again while backup already exists from above
         int newPort = getRandomPort();
         util.enableServerDebug(newPort);
         assertTrue(serverEnvBackup.exists());
         
+        // server.env should have the new content plus debug variables
         BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
         try {
-            assertEquals("abc=123", reader.readLine());
-            assertEquals("xyz=321", reader.readLine());
+            assertEquals("efg=456", reader.readLine());
+            assertEquals("jkl=654", reader.readLine());
             assertEquals("WLP_DEBUG_SUSPEND=n", reader.readLine());
             assertEquals("WLP_DEBUG_ADDRESS=" + newPort, reader.readLine());    
         } finally {
             reader.close();
         }
 
+        // .bak should have the new content
         BufferedReader readerBak = new BufferedReader(new FileReader(serverEnvBackup));
         try {
-            assertEquals("abc=123", readerBak.readLine());
-            assertEquals("xyz=321", readerBak.readLine());
-            assertNotEquals("WLP_DEBUG_SUSPEND=n", readerBak.readLine());    
+            assertEquals("efg=456", readerBak.readLine());
+            assertEquals("jkl=654", readerBak.readLine());
+            assertEquals(null, readerBak.readLine());    
         } finally {
             readerBak.close();
         }
