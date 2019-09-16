@@ -755,7 +755,8 @@ public abstract class DevUtil {
                         break;
                     }
                     String line = scanner.nextLine();
-                    if (line != null && line.trim().equalsIgnoreCase("exit")) {
+                    if (line != null && (line.trim().equalsIgnoreCase("q") || line.trim().equalsIgnoreCase("quit")
+                            || line.trim().equalsIgnoreCase("exit"))) {
                         debug("Detected exit command");
                         System.exit(0);
                     } else {
