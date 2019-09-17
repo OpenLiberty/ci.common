@@ -33,13 +33,17 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.io.FileUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 import io.openliberty.tools.common.plugins.config.XmlDocument;
 
@@ -184,12 +188,24 @@ public abstract class ServerFeatureUtil {
             debug("The server file " + canonicalServerFile + " is empty.");
         } else {
             try {
-                Document doc = new XmlDocument() {
-                    public Document getDocument(File file) throws IOException, ParserConfigurationException, SAXException {
-                        createDocument(file);
-                        return doc;
+                DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+                db.setErrorHandler(new ErrorHandler() {
+                    @Override
+                    public void warning(SAXParseException e) throws SAXException {
+                        debug(e);
                     }
-                }.getDocument(canonicalServerFile);
+                
+                    @Override
+                    public void fatalError(SAXParseException e) throws SAXException {
+                        throw e;
+                    }
+                
+                    @Override
+                    public void error(SAXParseException e) throws SAXException {
+                        throw e;
+                    }
+                });
+	            Document doc = db.parse(canonicalServerFile);
                 Element root = doc.getDocumentElement();
                 NodeList nodes = root.getChildNodes();
 
