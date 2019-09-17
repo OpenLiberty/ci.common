@@ -178,7 +178,11 @@ public abstract class ServerFeatureUtil {
             return result;
         }
         updatedParsedXmls.add(canonicalServerFile);
-        if (canonicalServerFile.exists()) {
+        if (!canonicalServerFile.exists()) {
+            debug("The server file " + canonicalServerFile + " does not exist.");
+        } else if (canonicalServerFile.length() == 0) {
+            debug("The server file " + canonicalServerFile + " is empty.");
+        } else {
             try {
                 Document doc = new XmlDocument() {
                     public Document getDocument(File file) throws IOException, ParserConfigurationException, SAXException {
@@ -204,7 +208,7 @@ public abstract class ServerFeatureUtil {
                 }
             } catch (IOException | ParserConfigurationException | SAXException e) {
                 // just skip this server.xml if it cannot be parsed
-                warn("The server file " + serverFile + " cannot be parsed. Skipping its features.");
+                warn("The server file " + canonicalServerFile + " cannot be parsed. Skipping its features.");
                 debug(e);
                 return result;
             }
