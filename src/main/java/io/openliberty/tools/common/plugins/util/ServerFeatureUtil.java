@@ -205,7 +205,7 @@ public abstract class ServerFeatureUtil {
                         throw e;
                     }
                 });
-	            Document doc = db.parse(canonicalServerFile);
+                Document doc = db.parse(canonicalServerFile);
                 Element root = doc.getDocumentElement();
                 NodeList nodes = root.getChildNodes();
 
