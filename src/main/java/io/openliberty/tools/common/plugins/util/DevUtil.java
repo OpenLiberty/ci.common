@@ -19,6 +19,7 @@ package io.openliberty.tools.common.plugins.util;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -1104,7 +1105,13 @@ public abstract class DevUtil {
         File tempConfig = tempConfigPath.toFile();
         debug("Temporary configuration folder created: " + tempConfig);
         
-        FileUtils.copyDirectory(serverDirectory, tempConfig);
+        FileUtils.copyDirectory(serverDirectory, tempConfig, new FileFilter() {
+            public boolean accept(File pathname) {
+                String name = pathname.getName();
+                // ignore workarea and logs dirs from the server directory, since those can be changing
+                return !((name.equals("workarea") || name.equals("logs")) && pathname.isDirectory());
+            }
+        }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         checkConfigFile(fileChanged, tempConfig);
         cleanUpTempConfig();
