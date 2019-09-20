@@ -24,15 +24,17 @@ public class ServerStatusUtil {
     /**
      * Determines if the server is running.
      * 
+     * @param installDirectory
      * @param outputDirectory
      * @param serverName
      * 
      * @return true if running, false otherwise
      */
-    public static boolean isServerRunning(File outputDirectory, String serverName) {
+    public static boolean isServerRunning(File installDirectory, File outputDirectory, String serverName) {
         File sLock = new File(outputDirectory, serverName + "/workarea/.sLock");
         File sCommand = new File(outputDirectory, serverName + "/workarea/.sCommand");
         File pidFile = new File(outputDirectory, ".pid/" + serverName +".pid");
+        String serverStatusCmd = installDirectory.getAbsolutePath() + "/bin/server";
         
         // for windows, check .sLock file
         if (OSUtil.isWindows()) {
@@ -54,12 +56,20 @@ public class ServerStatusUtil {
                     e.printStackTrace();
                 }
             }
-            if (sLock.exists()) {
-                if (!sCommand.exists()) {
-                    return false;
-                }
-            } else {
+            if (!sLock.exists() || !sCommand.exists()) {
                 return false;
+            } else {
+                try {
+                    String env[] = { "WLP_OUTPUT_DIR=" + outputDirectory };
+                    String cmd[] = { serverStatusCmd, "status", serverName };
+                    Process p = Runtime.getRuntime().exec(cmd, env);
+                    p.waitFor(10, TimeUnit.SECONDS);
+                    if (p.exitValue() != 0) {
+                        return false;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
         return true;
