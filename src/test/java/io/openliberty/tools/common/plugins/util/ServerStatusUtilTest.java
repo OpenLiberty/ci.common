@@ -50,6 +50,7 @@ public class ServerStatusUtilTest {
         installDir = temp.newFolder();
         File src = new File(RESOURCES_INSTALL_DIR);
         FileUtils.copyDirectory(src, installDir);
+        new File(installDir, "bin/server").setExecutable(true);
         if (OSUtil.isWindows()) {
             sLock = new RandomAccessFile(installDir.getPath() + 
                      "/outputDir/defaultServer/workarea/.sLock", "rw");
@@ -68,12 +69,18 @@ public class ServerStatusUtilTest {
     @Test
     public void testRunningServerStatus() throws Exception {
         File outputDir = new File(installDir, "outputDir");
-        assertTrue(ServerStatusUtil.isServerRunning(outputDir, "defaultServer"));
+        assertTrue(ServerStatusUtil.isServerRunning(installDir, outputDir, "defaultServer"));
+    }
+    
+    @Test
+    public void testKilledServerStatus() throws Exception {
+        File outputDir = new File(installDir, "outputDir");
+        assertFalse(ServerStatusUtil.isServerRunning(installDir, outputDir, "stoppedServer"));
     }
     
     @Test
     public void testStoppedServerStatus() throws Exception {
         File outputDir = new File(installDir, "usr/servers");
-        assertFalse(ServerStatusUtil.isServerRunning(outputDir, "defaultServer"));
+        assertFalse(ServerStatusUtil.isServerRunning(installDir, outputDir, "defaultServer"));
     }
 }
