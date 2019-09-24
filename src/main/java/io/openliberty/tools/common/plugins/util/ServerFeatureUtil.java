@@ -356,11 +356,22 @@ public abstract class ServerFeatureUtil {
     private Properties getBootstrapProperties(File bootstrapProperties) {
         Properties prop = new Properties();
         if (bootstrapProperties != null && bootstrapProperties.exists()) {
+            FileInputStream stream = null;
             try {
-                prop.load(new FileInputStream(bootstrapProperties));
+                stream = new FileInputStream(bootstrapProperties);
+                prop.load(stream);
             } catch (IOException e) {
-                warn("The bootstrap.properties file " + bootstrapProperties + " could not be loaded. Skipping the bootstrap.properties file.");
+                warn("The bootstrap.properties file " + bootstrapProperties.getAbsolutePath()
+                        + " could not be loaded. Skipping the bootstrap.properties file.");
                 debug(e);
+            } finally {
+                if (stream != null) {
+                    try {
+                        stream.close();
+                    } catch (IOException e) {
+                        debug("Could not close input stream for file " + bootstrapProperties.getAbsolutePath(), e);
+                    }
+                }
             }
         }
         return prop;
