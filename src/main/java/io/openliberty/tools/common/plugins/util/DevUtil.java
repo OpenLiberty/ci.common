@@ -87,6 +87,9 @@ public abstract class DevUtil {
     private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
     private static final String HTTP_PREFIX = "http://";
 
+    private static final String[] IGNORE_FILE_PREFIXES = new String[]{ "." };
+    private static final String[] IGNORE_FILE_POSTFIXES = new String[] { "~" };
+
     /**
      * Log debug
      * 
@@ -960,6 +963,10 @@ public abstract class DevUtil {
                         debug("Processing events for watched directory: " + directory);
 
                         File fileChanged = new File(directory.toString(), changed.toString());
+                        if (ignoreFileName(fileChanged.getName())) {
+                            // skip this file and continue to the next file
+                            continue;
+                        }
                         debug("Changed: " + changed + "; " + event.kind());
 
                         // resource file check
@@ -1108,13 +1115,34 @@ public abstract class DevUtil {
         FileUtils.copyDirectory(serverDirectory, tempConfig, new FileFilter() {
             public boolean accept(File pathname) {
                 String name = pathname.getName();
-                // ignore workarea and logs dirs from the server directory, since those can be changing
-                return !((name.equals("workarea") || name.equals("logs")) && pathname.isDirectory());
+                // ignore:
+                // - ignore list
+                // - core dump files
+                // - workarea and logs dirs from the server directory, since those can be changing
+                boolean result = !ignoreFileName(name) && !name.endsWith(".dmp")
+                        && !((name.equals("workarea") || name.equals("logs")) && pathname.isDirectory());
+                return result;
             }
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         checkConfigFile(fileChanged, tempConfig);
         cleanUpTempConfig();
+    }
+
+    private boolean ignoreFileName(String name) {
+        for (String prefix : IGNORE_FILE_PREFIXES) {
+            if (name.startsWith(prefix)) {
+                debug("Ignoring " + name);
+                return true;
+            }
+        }
+        for (String postfix : IGNORE_FILE_POSTFIXES) {
+            if (name.endsWith(postfix)) {
+                debug("Ignoring " + name);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
