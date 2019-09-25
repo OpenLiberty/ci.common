@@ -398,7 +398,10 @@ public abstract class DevUtil {
                     try {
                         serverTask.execute();
                     } catch (Exception e) {
-                        debug("Error starting server", e);
+                        long serverStartTimeout = Long.parseLong(serverTask.getTimeout());
+                        debug("Error starting server after " + (serverStartTimeout / 1000)
+                                + " seconds. Consider increasing the serverStartTimeout value if this continues to occur.",
+                                e);
                     }
                 }
 
@@ -426,7 +429,7 @@ public abstract class DevUtil {
             }
 
             if (verifyTimeout < 0) {
-                verifyTimeout = 30;
+                verifyTimeout = 60;
             }
             long timeout = verifyTimeout * 1000;
 
@@ -435,10 +438,10 @@ public abstract class DevUtil {
             if (startMessage == null) {
                 setDevStop(true);
                 stopServer();
-                throw new PluginExecutionException(
-                        "Unable to verify if the server was started after " + verifyTimeout + " seconds.");
-            } 
-            
+                throw new PluginExecutionException("Unable to verify if the application was started after " + verifyTimeout
+                        + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
+            }
+
             // Check for port already in use error
             String portError = serverTask.findStringInFile(PORT_IN_USE_MESSAGE_PREFIX, messagesLogFile);
             if (portError != null) {
