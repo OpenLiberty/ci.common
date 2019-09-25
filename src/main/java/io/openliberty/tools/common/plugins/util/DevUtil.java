@@ -87,6 +87,16 @@ public abstract class DevUtil {
     private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
     private static final String HTTP_PREFIX = "http://";
 
+    private static final String[] IGNORE_DIRECTORY_PREFIXES = new String[]{ "." };
+    private static final String[] IGNORE_FILE_PREFIXES = new String[]{ "." };
+    private static final String[] IGNORE_FILE_POSTFIXES = new String[] {
+            // core dumps
+            ".dmp",
+            // vim
+            "~",
+            // intellij
+            "___jb_tmp___", "___jb_old___" };
+
     /**
      * Log debug
      * 
@@ -963,6 +973,10 @@ public abstract class DevUtil {
                         debug("Processing events for watched directory: " + directory);
 
                         File fileChanged = new File(directory.toString(), changed.toString());
+                        if (ignoreFileOrDir(fileChanged)) {
+                            // skip this file or directory, and continue to the next file or directory
+                            continue;
+                        }
                         debug("Changed: " + changed + "; " + event.kind());
 
                         // resource file check
@@ -1111,13 +1125,49 @@ public abstract class DevUtil {
         FileUtils.copyDirectory(serverDirectory, tempConfig, new FileFilter() {
             public boolean accept(File pathname) {
                 String name = pathname.getName();
-                // ignore workarea and logs dirs from the server directory, since those can be changing
-                return !((name.equals("workarea") || name.equals("logs")) && pathname.isDirectory());
+                // skip:
+                // - ignore list
+                // - workarea and logs dirs from the server directory, since those can be changing
+                boolean skip = ignoreFileOrDir(pathname)
+                        || (pathname.isDirectory() && (name.equals("workarea") || name.equals("logs")));
+                return !skip;
             }
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         checkConfigFile(fileChanged, tempConfig);
         cleanUpTempConfig();
+    }
+
+    /**
+     * Whether dev mode should ignore a file or directory.
+     * 
+     * @param file File or directory
+     * @return true if the file or directory should be ignored, false otherwise
+     */
+    private boolean ignoreFileOrDir(File file) {
+        String name = file.getName();
+        if (file.isDirectory()) {
+            for (String prefix : IGNORE_DIRECTORY_PREFIXES) {
+                if (name.startsWith(prefix)) {
+                    debug("Ignoring " + name);
+                    return true;
+                }
+            }
+        } else {
+            for (String prefix : IGNORE_FILE_PREFIXES) {
+                if (name.startsWith(prefix)) {
+                    debug("Ignoring " + name);
+                    return true;
+                }
+            }
+            for (String postfix : IGNORE_FILE_POSTFIXES) {
+                if (name.endsWith(postfix)) {
+                    debug("Ignoring " + name);
+                    return true;
+                }
+            }    
+        }
+        return false;
     }
 
     /**
