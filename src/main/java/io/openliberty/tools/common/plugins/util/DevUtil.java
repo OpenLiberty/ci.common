@@ -88,7 +88,11 @@ public abstract class DevUtil {
     private static final String HTTP_PREFIX = "http://";
 
     private static final String[] IGNORE_FILE_PREFIXES = new String[]{ "." };
-    private static final String[] IGNORE_FILE_POSTFIXES = new String[] { "~" };
+    private static final String[] IGNORE_FILE_POSTFIXES = new String[] {
+            // vim
+            "~",
+            // intellij
+            "___jb_tmp___", "___jb_old___" };
 
     /**
      * Log debug
