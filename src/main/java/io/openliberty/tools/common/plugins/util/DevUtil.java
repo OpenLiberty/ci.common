@@ -210,9 +210,9 @@ public abstract class DevUtil {
      * Get the ServerTask to start the server, which can be in either "run" or "debug" mode
      * 
      * @return ServerTask the task to start the server
-     * @throws IOException if there was an error copying config files
+     * @throws Exception if there was an error copying/creating config files
      */
-    public abstract ServerTask getServerTask() throws IOException;
+    public abstract ServerTask getServerTask() throws Exception;
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -268,7 +268,7 @@ public abstract class DevUtil {
             ServerTask serverTask = null;
             try {
                 serverTask = getServerTask();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 // not expected since server should already have been started
                 error("Could not get the server task for running tests.", e);
             }
@@ -463,7 +463,7 @@ public abstract class DevUtil {
             // Parse hostname, http, https ports for integration tests to use
             parseHostNameAndPorts(serverTask, messagesLogFile);
 
-        } catch (IOException | InterruptedException e) {
+        } catch (Exception e) {
             debug("Error starting server", e);
         }
     }
