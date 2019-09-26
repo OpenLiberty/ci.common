@@ -234,6 +234,7 @@ public abstract class DevUtil {
     private String httpsPort;
     private final long compileWaitMillis;
     private AtomicBoolean inputUnavailable;
+    private int alternativeDebugPort = -1;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
@@ -673,25 +674,38 @@ public abstract class DevUtil {
     }
 
     /**
-     * Finds an available port.
+     * Finds an available port. If the preferred port is not available, returns a
+     * random available port and caches the result, which will override the
+     * preferredPort if this method is called again.
      * 
-     * @return The specified preferred port is available. If not, returns a random available port.
-     * @throws IOException if it could not find any available port, or there was an error when opening a server socket regardless of port.
+     * @return An available port.
+     * @throws IOException if it could not find any available port, or there was an
+     *                     error when opening a server socket regardless of port.
      */
     public int findAvailablePort(int preferredPort) throws IOException {
+        int portToTry = preferredPort;
+        if (alternativeDebugPort != -1) {
+            portToTry = alternativeDebugPort;
+        }
+
         ServerSocket serverSocket = null;
         try {
             serverSocket = new ServerSocket();
             serverSocket.setReuseAddress(false);
-            // try binding to the loopback address at the preferred port
-            serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), preferredPort), 1);
+            // try binding to the loopback address at the port to try
+            serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), portToTry), 1);
             return serverSocket.getLocalPort();
         } catch (IOException e) {
             if (serverSocket != null) {
                 // if binding failed, try binding to a random port
                 serverSocket.bind(null, 1);
                 int availablePort = serverSocket.getLocalPort();
-                warn("The debug port " + preferredPort + " is not available.  Using " + availablePort + " as the debug port instead.");
+                if (portToTry == preferredPort) {
+                    warn("The debug port " + preferredPort + " is not available.  Using " + availablePort + " as the debug port instead.");
+                } else {
+                    debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using " + availablePort + " as the debug port instead.");
+                }
+                alternativeDebugPort = availablePort;
                 return availablePort;
             } else {
                 throw new IOException("Could not create a server socket for debugging.", e);
