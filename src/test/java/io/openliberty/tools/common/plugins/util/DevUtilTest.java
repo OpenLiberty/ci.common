@@ -30,6 +30,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
@@ -130,6 +131,7 @@ public class DevUtilTest extends BaseDevUtilTest {
 
         // bind to it
         ServerSocket serverSocket = null;
+        ServerSocket serverSocket2 = null;
         try {
             serverSocket = new ServerSocket();
             serverSocket.setReuseAddress(false);
@@ -138,8 +140,29 @@ public class DevUtilTest extends BaseDevUtilTest {
             // previous port is bound, so calling findAvailablePort again should get another port
             int availablePort2 = util.findAvailablePort(preferredPort);
             assertNotEquals(availablePort, availablePort2);
-        } finally {
+
+            // unbind the port
             serverSocket.close();
+
+            // calling findAvailablePort again should return the previous port which was cached, even though the preferred port is available
+            int availablePort3 = util.findAvailablePort(preferredPort);
+            assertEquals(availablePort2, availablePort3);
+
+            // bind to the previous port
+            serverSocket2 = new ServerSocket();
+            serverSocket2.setReuseAddress(false);
+            serverSocket2.bind(new InetSocketAddress(InetAddress.getByName(null), availablePort2), 1);
+
+            // previous port is also bound, so calling findAvailablePort again should get another port
+            int availablePort4 = util.findAvailablePort(preferredPort);
+            assertNotEquals(availablePort2, availablePort4);
+        } finally {
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
+            if (serverSocket2 != null) {
+                serverSocket2.close();
+            }
         }
     }
 
@@ -150,6 +173,14 @@ public class DevUtilTest extends BaseDevUtilTest {
         } finally {
             serverSocket.close();
         }
+    }
+
+    @Test
+    public void testGetDebugEnvironmentVariables() throws Exception {
+        int port = getRandomPort();
+        Map<String, String> map = util.getDebugEnvironmentVariables(port);
+        assertEquals("n", map.get("WLP_DEBUG_SUSPEND"));
+        assertEquals(String.valueOf(port), map.get("WLP_DEBUG_ADDRESS"));
     }
     
     @Test
