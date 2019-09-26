@@ -30,6 +30,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
@@ -150,6 +151,14 @@ public class DevUtilTest extends BaseDevUtilTest {
         } finally {
             serverSocket.close();
         }
+    }
+
+    @Test
+    public void testGetDebugEnvironmentVariables() throws Exception {
+        int port = getRandomPort();
+        Map<String, String> map = util.getDebugEnvironmentVariables(port);
+        assertEquals("n", map.get("WLP_DEBUG_SUSPEND"));
+        assertEquals(String.valueOf(port), map.get("WLP_DEBUG_ADDRESS"));
     }
     
     @Test

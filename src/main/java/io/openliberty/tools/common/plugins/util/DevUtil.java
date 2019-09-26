@@ -53,6 +53,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
@@ -548,7 +549,7 @@ public abstract class DevUtil {
         }
         return null;
     }
-    
+
     public void cleanUpServerEnv() {
         // clean up server.env file
         File serverEnvFile;
@@ -572,7 +573,7 @@ public abstract class DevUtil {
             error("Could not retrieve server.env: " + e.getMessage());
         }
     }
-    
+
     public void cleanUpTempConfig() {
         if (this.tempConfigPath != null){
             File tempConfig = this.tempConfigPath.toFile();
@@ -613,6 +614,18 @@ public abstract class DevUtil {
                 stopServer();
             }
         });
+    }
+
+    /**
+     * Gets a map of the environment variables to set for debug mode.
+     * 
+     * @param libertyDebugPort the debug port to use
+     */
+    public Map<String, String> getDebugEnvironmentVariables(int libertyDebugPort) throws IOException {
+        Map<String, String> map = new HashMap<String, String>();
+        map.put("WLP_DEBUG_SUSPEND", "n");
+        map.put("WLP_DEBUG_ADDRESS", String.valueOf(findAvailablePort(libertyDebugPort)));
+        return map;
     }
 
     public void enableServerDebug(int libertyDebugPort) throws IOException {
