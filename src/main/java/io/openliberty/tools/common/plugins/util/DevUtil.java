@@ -1057,7 +1057,7 @@ public abstract class DevUtil {
                                 lastJavaTestChange = System.currentTimeMillis();
                                 deleteJavaTests.add(fileChanged);
                             }
-                        } else if (directory.startsWith(configPath) && !isGeneratedTargetFile(fileChanged, configDirectory, serverDirectory)) { // config files
+                        } else if (directory.startsWith(configPath) && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config files
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyConfigFolder(fileChanged, configDirectory, null);
@@ -1121,6 +1121,11 @@ public abstract class DevUtil {
                 }
             }
         }
+    }
+
+    private boolean isGeneratedConfigFile(File fileChanged, File srcDir, File targetDir) throws IOException {
+        return (fileChanged.getName().equals("bootstrap.properties") || fileChanged.getName().equals("jvm.options"))
+                && isGeneratedTargetFile(fileChanged, srcDir, targetDir);
     }
 
     /**
