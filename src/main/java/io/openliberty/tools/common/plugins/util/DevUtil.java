@@ -216,6 +216,11 @@ public abstract class DevUtil {
      * @throws Exception if there was an error copying/creating config files
      */
     public abstract ServerTask getServerTask() throws Exception;
+    
+    /**
+     * Redeploy the application
+     */
+    public abstract void redeployApp() throws Exception;
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -1471,9 +1476,14 @@ public abstract class DevUtil {
             
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
-
-            if (!classesDir.exists() && !classesDir.mkdirs()) {
-                throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath() + " does not exist and cannot be created.");
+            if (!classesDir.exists()) {
+                if (!classesDir.mkdirs()) {
+                    throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath()
+                            + " does not exist and cannot be created.");
+                } else {
+                    // redeploy application when class directory has been created
+                    redeployApp();
+                }
             }
 
             List<String> optionList = new ArrayList<>();

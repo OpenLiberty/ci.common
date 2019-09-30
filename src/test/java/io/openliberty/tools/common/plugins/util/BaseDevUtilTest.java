@@ -147,6 +147,11 @@ public class BaseDevUtilTest {
         public void runIntegrationTests() throws PluginScenarioException, PluginExecutionException {
             // not needed for tests
         }
+
+        @Override
+        public void redeployApp() throws Exception {
+            // not needed for tests
+        }
         
     }
     
