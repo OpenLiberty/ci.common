@@ -1021,7 +1021,7 @@ public abstract class DevUtil {
                         registerAll(configPath, watcher);
                         debug("Registering configuration directory: " + this.configDirectory);
                     } else {
-                        info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
+                        warn("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
                     }
                 }
                 
@@ -1029,7 +1029,7 @@ public abstract class DevUtil {
                 if (!serverXmlFileRegistered && serverXmlFile != null && serverXmlFile.exists()){
                     serverXmlFileRegistered = true;
                     debug("Server configuration file has been added: " + serverXmlFile);
-                    info("The server configuration file " + serverXmlFile + " has been added. Restart liberty:dev mode for it to take effect.");
+                    warn("The server configuration file " + serverXmlFile + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 // check if resourceDirectory has been added
@@ -1119,6 +1119,9 @@ public abstract class DevUtil {
                                     // re-enable debug variables in server.env
                                     enableServerDebug(false);
                                 }
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    redeployApp();
+                                }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 info("Config file deleted: " + fileChanged.getName());
@@ -1136,7 +1139,9 @@ public abstract class DevUtil {
                                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                                 copyFile(fileChanged, serverXmlFileParent, serverDirectory,
                                         "server.xml");
-
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    redeployApp();
+                                }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
