@@ -387,8 +387,10 @@ public class ServerConfigDocument {
 
             // check if absolute file
             if (locFile.isAbsolute()) {
-                InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
-                doc = parseDocument(inputStream);
+                if (locFile.exists()) {
+                    InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
+                    doc = parseDocument(inputStream);
+                }
             } else {
                 // check configDirectory first if exists
                 if (configDirectory != null && configDirectory.exists()) {
