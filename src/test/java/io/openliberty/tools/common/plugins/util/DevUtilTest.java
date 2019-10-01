@@ -178,7 +178,8 @@ public class DevUtilTest extends BaseDevUtilTest {
     @Test
     public void testGetDebugEnvironmentVariables() throws Exception {
         int port = getRandomPort();
-        Map<String, String> map = util.getDebugEnvironmentVariables(port);
+        util.setLibertyDebugPort(port);
+        Map<String, String> map = util.getDebugEnvironmentVariables();
         assertEquals("n", map.get("WLP_DEBUG_SUSPEND"));
         assertEquals(String.valueOf(port), map.get("WLP_DEBUG_ADDRESS"));
     }
@@ -186,7 +187,8 @@ public class DevUtilTest extends BaseDevUtilTest {
     @Test
     public void testEnableServerDebug() throws Exception {
         int port = getRandomPort();
-        util.enableServerDebug(port);
+        util.setLibertyDebugPort(port);
+        util.enableServerDebug();
         
         File serverEnv = new File(serverDirectory, "server.env");
         BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
@@ -208,7 +210,8 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.close();
         
         int port = getRandomPort();
-        util.enableServerDebug(port);
+        util.setLibertyDebugPort(port);
+        util.enableServerDebug();
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
         
@@ -236,7 +239,8 @@ public class DevUtilTest extends BaseDevUtilTest {
         
         // enable debug which makes a backup of the original .env
         int port = getRandomPort();
-        util.enableServerDebug(port);
+        util.setLibertyDebugPort(port);
+        util.enableServerDebug();
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
 
@@ -248,7 +252,8 @@ public class DevUtilTest extends BaseDevUtilTest {
         
         // enable debug again while backup already exists from above
         int newPort = getRandomPort();
-        util.enableServerDebug(newPort);
+        util.setLibertyDebugPort(newPort);
+        util.enableServerDebug();
         assertTrue(serverEnvBackup.exists());
         
         // server.env should have the new content plus debug variables
