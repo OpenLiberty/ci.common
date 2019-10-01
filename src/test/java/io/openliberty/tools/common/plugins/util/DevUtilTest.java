@@ -184,11 +184,16 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertEquals(String.valueOf(port), map.get("WLP_DEBUG_ADDRESS"));
     }
     
-    @Test
-    public void testEnableServerDebug() throws Exception {
+    private int enableServerDebugAtRandomPort() throws IOException {
         int port = getRandomPort();
         util.setLibertyDebugPort(port);
         util.enableServerDebug();
+        return port;
+    }
+
+    @Test
+    public void testEnableServerDebug() throws Exception {
+        int port = enableServerDebugAtRandomPort();
         
         File serverEnv = new File(serverDirectory, "server.env");
         BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
@@ -209,9 +214,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.write(serverEnvContent);
         writer.close();
         
-        int port = getRandomPort();
-        util.setLibertyDebugPort(port);
-        util.enableServerDebug();
+        int port = enableServerDebugAtRandomPort();
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
         
@@ -238,9 +241,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.close();
         
         // enable debug which makes a backup of the original .env
-        int port = getRandomPort();
-        util.setLibertyDebugPort(port);
-        util.enableServerDebug();
+        enableServerDebugAtRandomPort();
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
 
@@ -251,9 +252,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.close();
         
         // enable debug again while backup already exists from above
-        int newPort = getRandomPort();
-        util.setLibertyDebugPort(newPort);
-        util.enableServerDebug();
+        int newPort = enableServerDebugAtRandomPort();
         assertTrue(serverEnvBackup.exists());
         
         // server.env should have the new content plus debug variables
