@@ -227,6 +227,7 @@ public abstract class DevUtil {
     private boolean skipUTs;
     private boolean skipITs;
     private String applicationId;
+    private int appStartupTimeout;
     private int appUpdateTimeout;
     private Thread serverThread;
     private AtomicBoolean devStop;
@@ -238,10 +239,11 @@ public abstract class DevUtil {
     private int alternativeDebugPort = -1;
     private boolean libertyDebug;
     private int libertyDebugPort;
+    private AtomicBoolean detectedAppStarted;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
-            boolean skipUTs, boolean skipITs, String applicationId, int appUpdateTimeout,
+            boolean skipUTs, boolean skipITs, String applicationId, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -253,11 +255,13 @@ public abstract class DevUtil {
         this.skipUTs = skipUTs;
         this.skipITs = skipITs;
         this.applicationId = applicationId;
+        this.appStartupTimeout = appStartupTimeout;
         this.appUpdateTimeout = appUpdateTimeout;
         this.devStop = new AtomicBoolean(false);
         this.compileWaitMillis = compileWaitMillis;
         this.inputUnavailable = new AtomicBoolean(false);
         this.libertyDebug = libertyDebug;
+        this.detectedAppStarted = new AtomicBoolean(false);
     }
 
     /**
@@ -331,6 +335,27 @@ public abstract class DevUtil {
             }
 
             if (!skipITs) {
+
+                if (!detectedAppStarted.get()) {
+                    if (appStartupTimeout < 0) {
+                        appStartupTimeout = 30;
+                    }
+                    long timeout = appStartupTimeout * 1000;
+        
+                    String logsDirectory = serverTask.getOutputDir() + "/" + serverTask.getServerName() + "/logs";
+                    File messagesLogFile = new File(logsDirectory + "/messages.log");
+
+                    // Wait for the app started message in messages.log
+                    info("Waiting up to " + appStartupTimeout + " seconds for the application to start up...");
+                    String startMessage = serverTask.waitForStringInLog(START_APP_MESSAGE_REGEXP, timeout, messagesLogFile);
+                    if (startMessage == null) {
+                        error("Unable to verify if the application was started after " + appStartupTimeout
+                                + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
+                    } else {
+                        detectedAppStarted.set(true);
+                    }
+                }
+
                 if (waitForApplicationUpdate) {
                     // wait until application has been updated
                     if (appUpdateTimeout < 0) {
@@ -382,7 +407,7 @@ public abstract class DevUtil {
      * 
      * @throws PluginExecutionException If the server startup could not be verified within the timeout
      */
-    public void startServer(long serverStartTimeout, long verifyTimeout) throws PluginExecutionException {
+    public void startServer(long serverStartTimeout) throws PluginExecutionException {
         try {
             final ServerTask serverTask = getServerTask();
 
@@ -442,20 +467,6 @@ public abstract class DevUtil {
                         break;
                     }
                 }
-            }
-
-            if (verifyTimeout < 0) {
-                verifyTimeout = 60;
-            }
-            long timeout = verifyTimeout * 1000;
-
-            // Wait for the app started message in messages.log
-            String startMessage = serverTask.waitForStringInLog(START_APP_MESSAGE_REGEXP, timeout, messagesLogFile);
-            if (startMessage == null) {
-                setDevStop(true);
-                stopServer();
-                throw new PluginExecutionException("Unable to verify if the application was started after " + verifyTimeout
-                        + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
             }
 
             // Check for port already in use error
