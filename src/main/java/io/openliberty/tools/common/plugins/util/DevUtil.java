@@ -1086,7 +1086,7 @@ public abstract class DevUtil {
                                 copyFile(fileChanged, configDirectory, serverDirectory, null);
                                 if (fileChanged.getName().equals("server.env")) {
                                     // re-enable debug variables in server.env
-                                    enableServerDebug();
+                                    enableServerDebug(false);
                                 }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
@@ -1094,7 +1094,7 @@ public abstract class DevUtil {
                                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
                                 if (fileChanged.getName().equals("server.env")) {
                                     // re-enable debug variables in server.env
-                                    enableServerDebug();
+                                    enableServerDebug(false);
                                 }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             }
