@@ -271,6 +271,31 @@ public class ServerConfigDocument {
         }
     }
 
+    public static String findNameForLocation(String location) {
+        try {
+            Document doc = parseDocument(new FileInputStream(serverXMLFile));
+            // parse server.xml
+            XPath xPath = XPathFactory.newInstance().newXPath();
+            NodeList nodeList = (NodeList) xPath.compile("/server/application | /server/webApplication | /server/enterpriseApplication")
+                                                    .evaluate(doc, XPathConstants.NODESET);
+            //Checking for application element configured with resolved location
+            //Will return the element's resolved name property if one exists, otherwise a name derived from the location parameter will be returned
+            for (int i = 0; i < nodeList.getLength(); i++) {
+                if (resolveVariables(nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue(), null).equals(location)) {
+                    Node nameNode = nodeList.item(i).getAttributes().getNamedItem("name");
+                    if (nameNode != null && !nameNode.getNodeValue().isEmpty()) {    
+                        return resolveVariables(nameNode.getNodeValue(), null);
+                    } else {
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return location.substring(0, location.lastIndexOf('.'));
+    }
+
     private static void parseApplication(Document doc, XPathExpression expression) throws XPathExpressionException {
 
         NodeList nodeList = (NodeList) expression.evaluate(doc, XPathConstants.NODESET);
