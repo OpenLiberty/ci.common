@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
 
@@ -275,6 +276,32 @@ public class DevUtilTest extends BaseDevUtilTest {
         } finally {
             readerBak.close();
         }
+    }
+
+    @Test
+    public void testEnableServerDebugWithOnlyBackup() throws Exception {
+        File serverEnv = new File(serverDirectory, "server.env");
+        File serverEnvBackup = new File(serverDirectory, "server.env.bak");
+
+        // create server.env.bak without server.env
+        String serverEnvBackupContent = "backup=123";
+        serverEnvBackup.createNewFile();
+        BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvBackup));
+        writer.write(serverEnvBackupContent);
+        writer.close();
+        assertFalse(serverEnv.exists());
+        assertTrue(serverEnvBackup.exists());
+        
+        // assert .bak content
+        assertEquals(serverEnvBackupContent, FileUtils.readFileToString(serverEnvBackup, StandardCharsets.UTF_8));
+
+        // enable debug
+        enableServerDebugAtRandomPort();
+        assertTrue(serverEnv.exists());
+        assertFalse(serverEnvBackup.exists());
+
+        // assert .env does not have .bak content
+        assertNotEquals(serverEnvBackupContent, FileUtils.readFileToString(serverEnv, StandardCharsets.UTF_8));
     }
 
     @Test
