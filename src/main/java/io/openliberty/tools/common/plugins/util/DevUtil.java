@@ -652,9 +652,9 @@ public abstract class DevUtil {
         String serverEnvPath = serverDirectory.getCanonicalPath() + "/server.env";
         File serverEnvFile = new File(serverEnvPath);
         StringBuilder sb = new StringBuilder();
+        File serverEnvBackup = new File(serverEnvPath + ".bak");
         if (serverEnvFile.exists()) {
             debug("server.env already exists");
-            File serverEnvBackup = new File(serverEnvPath + ".bak");
 
             Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath(), StandardCopyOption.REPLACE_EXISTING);
             boolean deleted = serverEnvFile.delete();
@@ -672,6 +672,9 @@ public abstract class DevUtil {
             } finally {
                 reader.close();
             }
+        } else {
+            // if server.env does not exist, clean up any backup file
+            serverEnvBackup.delete();
         }
         
         debug("Creating server.env file: " + serverEnvFile.getCanonicalPath());
