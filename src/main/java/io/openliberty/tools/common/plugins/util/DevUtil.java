@@ -237,11 +237,14 @@ public abstract class DevUtil {
     private final long compileWaitMillis;
     private AtomicBoolean inputUnavailable;
     private int alternativeDebugPort = -1;
+    private boolean libertyDebug;
+    private int libertyDebugPort;
     private AtomicBoolean detectedAppStarted;
 
-    public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
-            List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
-            String applicationId, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis) {
+    public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory,
+            File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
+            boolean skipUTs, boolean skipITs, String applicationId, int appStartupTimeout, int appUpdateTimeout,
+            long compileWaitMillis, boolean libertyDebug) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -257,6 +260,7 @@ public abstract class DevUtil {
         this.devStop = new AtomicBoolean(false);
         this.compileWaitMillis = compileWaitMillis;
         this.inputUnavailable = new AtomicBoolean(false);
+        this.libertyDebug = libertyDebug;
         this.detectedAppStarted = new AtomicBoolean(false);
     }
 
@@ -633,20 +637,35 @@ public abstract class DevUtil {
      * 
      * @param libertyDebugPort the debug port to use
      */
-    public Map<String, String> getDebugEnvironmentVariables(int libertyDebugPort) throws IOException {
+    public Map<String, String> getDebugEnvironmentVariables() throws IOException {
         Map<String, String> map = new HashMap<String, String>();
         map.put("WLP_DEBUG_SUSPEND", "n");
         map.put("WLP_DEBUG_ADDRESS", String.valueOf(findAvailablePort(libertyDebugPort)));
         return map;
     }
 
-    public void enableServerDebug(int libertyDebugPort) throws IOException {
+    /**
+     * Enable server debug variables in server.env, using the user specified debug
+     * port if it's available, otherwise uses a random available port.
+     * 
+     * @throws IOException if there was an IO exception when reading or writing the
+     *                     server.env
+     */
+    public void enableServerDebug() throws IOException {
+        enableServerDebug(true);
+    }
+
+    private void enableServerDebug(boolean findAvailablePort) throws IOException {
+        if (!libertyDebug) {
+            return;
+        }
+
         String serverEnvPath = serverDirectory.getCanonicalPath() + "/server.env";
         File serverEnvFile = new File(serverEnvPath);
         StringBuilder sb = new StringBuilder();
+        File serverEnvBackup = new File(serverEnvPath + ".bak");
         if (serverEnvFile.exists()) {
             debug("server.env already exists");
-            File serverEnvBackup = new File(serverEnvPath + ".bak");
 
             Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath(), StandardCopyOption.REPLACE_EXISTING);
             boolean deleted = serverEnvFile.delete();
@@ -664,12 +683,19 @@ public abstract class DevUtil {
             } finally {
                 reader.close();
             }
+        } else {
+            // if server.env does not exist, clean up any backup file
+            serverEnvBackup.delete();
         }
         
         debug("Creating server.env file: " + serverEnvFile.getCanonicalPath());
         sb.append("WLP_DEBUG_SUSPEND=n\n");
         sb.append("WLP_DEBUG_ADDRESS=");
-        sb.append(findAvailablePort(libertyDebugPort));
+        if (findAvailablePort) {
+            sb.append(findAvailablePort(libertyDebugPort));
+        } else {
+            sb.append(alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+        }
         sb.append("\n");
 
         BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvFile));
@@ -680,7 +706,7 @@ public abstract class DevUtil {
         }
 
         if (serverEnvFile.exists()) {
-            info("Successfully created liberty:dev server.env file");
+            debug("Successfully created liberty:dev server.env file");
         }
     }
 
@@ -1072,11 +1098,18 @@ public abstract class DevUtil {
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyConfigFolder(fileChanged, configDirectory, null);
                                 copyFile(fileChanged, configDirectory, serverDirectory, null);
+                                if (fileChanged.getName().equals("server.env")) {
+                                    // re-enable debug variables in server.env
+                                    enableServerDebug(false);
+                                }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
-
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 info("Config file deleted: " + fileChanged.getName());
                                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
+                                if (fileChanged.getName().equals("server.env")) {
+                                    // re-enable debug variables in server.env
+                                    enableServerDebug(false);
+                                }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             }
                         } else if (serverXmlFileParent != null && directory.startsWith(serverXmlFileParent.getCanonicalFile().toPath())) {
@@ -1627,6 +1660,15 @@ public abstract class DevUtil {
      */
     public String getHttpsPort() {
         return httpsPort;
+    }
+
+    /**
+     * Sets the preferred debug port.
+     * 
+     * @param libertyDebugPort the preferred debug port
+     */
+    public void setLibertyDebugPort(int libertyDebugPort) {
+        this.libertyDebugPort = libertyDebugPort;
     }
 
 }

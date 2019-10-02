@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
 
@@ -178,15 +179,22 @@ public class DevUtilTest extends BaseDevUtilTest {
     @Test
     public void testGetDebugEnvironmentVariables() throws Exception {
         int port = getRandomPort();
-        Map<String, String> map = util.getDebugEnvironmentVariables(port);
+        util.setLibertyDebugPort(port);
+        Map<String, String> map = util.getDebugEnvironmentVariables();
         assertEquals("n", map.get("WLP_DEBUG_SUSPEND"));
         assertEquals(String.valueOf(port), map.get("WLP_DEBUG_ADDRESS"));
     }
     
+    private int enableServerDebugAtRandomPort() throws IOException {
+        int port = getRandomPort();
+        util.setLibertyDebugPort(port);
+        util.enableServerDebug();
+        return port;
+    }
+
     @Test
     public void testEnableServerDebug() throws Exception {
-        int port = getRandomPort();
-        util.enableServerDebug(port);
+        int port = enableServerDebugAtRandomPort();
         
         File serverEnv = new File(serverDirectory, "server.env");
         BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
@@ -207,8 +215,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.write(serverEnvContent);
         writer.close();
         
-        int port = getRandomPort();
-        util.enableServerDebug(port);
+        int port = enableServerDebugAtRandomPort();
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
         
@@ -235,8 +242,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.close();
         
         // enable debug which makes a backup of the original .env
-        int port = getRandomPort();
-        util.enableServerDebug(port);
+        enableServerDebugAtRandomPort();
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
 
@@ -247,8 +253,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         writer.close();
         
         // enable debug again while backup already exists from above
-        int newPort = getRandomPort();
-        util.enableServerDebug(newPort);
+        int newPort = enableServerDebugAtRandomPort();
         assertTrue(serverEnvBackup.exists());
         
         // server.env should have the new content plus debug variables
@@ -271,6 +276,32 @@ public class DevUtilTest extends BaseDevUtilTest {
         } finally {
             readerBak.close();
         }
+    }
+
+    @Test
+    public void testEnableServerDebugWithOnlyBackup() throws Exception {
+        File serverEnv = new File(serverDirectory, "server.env");
+        File serverEnvBackup = new File(serverDirectory, "server.env.bak");
+
+        // create server.env.bak without server.env
+        String serverEnvBackupContent = "backup=123";
+        serverEnvBackup.createNewFile();
+        BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvBackup));
+        writer.write(serverEnvBackupContent);
+        writer.close();
+        assertFalse(serverEnv.exists());
+        assertTrue(serverEnvBackup.exists());
+        
+        // assert .bak content
+        assertEquals(serverEnvBackupContent, FileUtils.readFileToString(serverEnvBackup, StandardCharsets.UTF_8));
+
+        // enable debug
+        enableServerDebugAtRandomPort();
+        assertTrue(serverEnv.exists());
+        assertFalse(serverEnvBackup.exists());
+
+        // assert .env does not have .bak content
+        assertNotEquals(serverEnvBackupContent, FileUtils.readFileToString(serverEnv, StandardCharsets.UTF_8));
     }
 
     @Test
