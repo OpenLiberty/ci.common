@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
@@ -1485,7 +1486,7 @@ public abstract class DevUtil {
                 if (!classesDir.mkdirs()) {
                     throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath()
                             + " does not exist and cannot be created.");
-                } else {
+                } else if (classesDir.exists() && Objects.equals(classesDir.getCanonicalFile(), outputDirectory.getCanonicalFile())) {
                     // redeploy application when class directory has been created
                     redeployApp();
                 }
