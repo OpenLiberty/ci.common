@@ -253,14 +253,14 @@ public class ServerConfigDocument {
                     if (resolvedName == null) {
                         if (!names.contains(nameValue)) {
                             names.add(nameValue);
-                            if (resolvedLocation != null) {
-                                locationsAndNames.put(resolvedLocation, nameValue);
-                            }
                         }
                     } else if (!names.contains(resolvedName)) {
                         names.add(resolvedName);
-                        
-                        if (resolvedLocation != null) {
+                    }
+                    if (resolvedLocation != null) {
+                        if (resolvedName == null) {
+                            locationsAndNames.put(resolvedLocation, nameValue);
+                        } else {
                             locationsAndNames.put(resolvedLocation, resolvedName);
                         }
                     }
