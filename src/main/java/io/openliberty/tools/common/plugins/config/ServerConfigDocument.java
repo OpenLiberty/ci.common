@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Map;
@@ -62,6 +63,7 @@ public class ServerConfigDocument {
     private static Set<String> names;
     private static Set<String> namelessLocations;
     private static Set<String> locations;
+    private static HashMap<String, String> locationsAndNames;
     private static Properties props;
     private static Properties defaultProps;
 
@@ -174,6 +176,7 @@ public class ServerConfigDocument {
             locations = new HashSet<String>();
             names = new HashSet<String>();
             namelessLocations = new HashSet<String>();
+            locationsAndNames = new HashMap<String, String>();
             props = new Properties();
             defaultProps = new Properties();
 
@@ -240,17 +243,26 @@ public class ServerConfigDocument {
 
         for (int i = 0; i < nodeList.getLength(); i++) {
             if (nodeList.item(i).getAttributes().getNamedItem("name") != null) {
-                String nodeValue = nodeList.item(i).getAttributes().getNamedItem("name").getNodeValue();
+                String nameValue = nodeList.item(i).getAttributes().getNamedItem("name").getNodeValue();
+                String locationValue = nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue();
 
                 // add unique values only
-                if (!nodeValue.isEmpty()) {
-                    String resolved = resolveVariables(nodeValue, null);
-                    if (resolved == null) {
-                        if (!names.contains(nodeValue)) {
-                            names.add(nodeValue);
+                if (!nameValue.isEmpty()) {
+                    String resolvedName = resolveVariables(nameValue, null);
+                    String resolvedLocation = resolveVariables(locationValue, null);
+                    if (resolvedName == null) {
+                        if (!names.contains(nameValue)) {
+                            names.add(nameValue);
                         }
-                    } else if (!names.contains(resolved)) {
-                        names.add(resolved);
+                    } else if (!names.contains(resolvedName)) {
+                        names.add(resolvedName);
+                    }
+                    if (resolvedLocation != null) {
+                        if (resolvedName == null) {
+                            locationsAndNames.put(resolvedLocation, nameValue);
+                        } else {
+                            locationsAndNames.put(resolvedLocation, resolvedName);
+                        }
                     }
                 }
             } else {
@@ -269,6 +281,16 @@ public class ServerConfigDocument {
                 }
             }
         }
+    }
+
+    public static String findNameForLocation(String location) {
+        String appName = locationsAndNames.get(location);
+
+        if (appName == null || appName.isEmpty()) {
+            appName = location.substring(0, location.lastIndexOf('.'));
+        }
+
+        return appName;
     }
 
     private static void parseApplication(Document doc, XPathExpression expression) throws XPathExpressionException {
