@@ -1116,12 +1116,12 @@ public abstract class DevUtil {
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyConfigFolder(fileChanged, configDirectory, null);
                                 copyFile(fileChanged, configDirectory, serverDirectory, null);
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    redeployApp();
+                                }
                                 if (fileChanged.getName().equals("server.env")) {
                                     // re-enable debug variables in server.env
                                     enableServerDebug(false);
-                                }
-                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
-                                    redeployApp();
                                 }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
