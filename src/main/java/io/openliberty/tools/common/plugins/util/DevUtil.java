@@ -410,7 +410,12 @@ public abstract class DevUtil {
      */
     public void startServer(long serverStartTimeout) throws PluginExecutionException {
         try {
-            final ServerTask serverTask = getServerTask();
+            final ServerTask serverTask;
+            try {
+                serverTask = getServerTask();
+            } catch (Exception e) {
+                throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+            }
 
             String logsDirectory = serverTask.getOutputDir() + "/" + serverTask.getServerName() + "/logs";
             File messagesLogFile = new File(logsDirectory + "/messages.log");
@@ -490,8 +495,8 @@ public abstract class DevUtil {
             // Parse hostname, http, https ports for integration tests to use
             parseHostNameAndPorts(serverTask, messagesLogFile);
 
-        } catch (Exception e) {
-            debug("Error starting server", e);
+        } catch (IOException | InterruptedException e) {
+            throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
         }
     }
 
