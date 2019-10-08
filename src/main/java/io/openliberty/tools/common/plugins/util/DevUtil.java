@@ -81,6 +81,7 @@ import org.apache.commons.io.FileUtils;
  */
 public abstract class DevUtil {
 
+    private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
     private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
     private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I.*";
     private static final String PORT_IN_USE_MESSAGE_PREFIX = "CWWKO0221E:";
@@ -414,12 +415,6 @@ public abstract class DevUtil {
             String logsDirectory = serverTask.getOutputDir() + "/" + serverTask.getServerName() + "/logs";
             File messagesLogFile = new File(logsDirectory + "/messages.log");
 
-            // Set server start timeout
-            if (serverStartTimeout < 0) {
-                serverStartTimeout = 30;
-            }
-            serverTask.setTimeout(Long.toString(serverStartTimeout * 1000));
-
             // Watch logs directory if it already exists
             WatchService watchService = FileSystems.getDefault().newWatchService();
             boolean logsExist = new File(logsDirectory).isDirectory();
@@ -467,6 +462,21 @@ public abstract class DevUtil {
                         break;
                     }
                 }
+            }
+
+            // Set server start timeout
+            if (serverStartTimeout < 0) {
+                serverStartTimeout = 30;
+            }
+            long serverStartTimeoutMillis = serverStartTimeout * 1000;
+
+            // Wait for the server started message in messages.log
+            String startMessage = serverTask.waitForStringInLog(START_SERVER_MESSAGE_PREFIX, serverStartTimeoutMillis, messagesLogFile);
+            if (startMessage == null) {
+                setDevStop(true);
+                stopServer();
+                throw new PluginExecutionException("Unable to verify if the server was started after " + serverStartTimeoutMillis
+                        + " seconds.  Consider increasing the serverStartTimeout value if this continues to occur.");
             }
 
             // Check for port already in use error
