@@ -487,9 +487,7 @@ public abstract class DevUtil {
             // Check for port already in use error
             String portError = serverTask.findStringInFile(PORT_IN_USE_MESSAGE_PREFIX, messagesLogFile);
             if (portError != null) {
-                setDevStop(true);
-                stopServer();
-                throw new PluginExecutionException(portError.split(PORT_IN_USE_MESSAGE_PREFIX)[1]);
+                error(portError.split(PORT_IN_USE_MESSAGE_PREFIX)[1]);
             }
             
             // Parse hostname, http, https ports for integration tests to use
