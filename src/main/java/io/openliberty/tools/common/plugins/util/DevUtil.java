@@ -438,11 +438,10 @@ public abstract class DevUtil {
                 public void run() {
                     try {
                         serverTask.execute();
-                    } catch (Exception e) {
-                        long serverStartTimeout = Long.parseLong(serverTask.getTimeout());
-                        debug("Error starting server after " + (serverStartTimeout / 1000)
-                                + " seconds. Consider increasing the serverStartTimeout value if this continues to occur.",
-                                e);
+                    } catch (RuntimeException e) {
+                        // If a runtime exception occurred in the server task, log and rethrow
+                        error("An error occurred while starting the server: " + e.getMessage(), e);
+                        throw e;
                     }
                 }
 
