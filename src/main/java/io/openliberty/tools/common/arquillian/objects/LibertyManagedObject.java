@@ -44,6 +44,7 @@ public class LibertyManagedObject {
         appDeployTimeout, 
         appUndeployTimeout, 
         sharedLib, 
+        apiTypeVisibility,
         deployType, 
         javaVmArguments, 
         addLocalConnector, 
