@@ -149,7 +149,7 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void redeployApp() throws Exception {
+        public void redeployApp() throws PluginExecutionException {
             // not needed for tests
         }
         

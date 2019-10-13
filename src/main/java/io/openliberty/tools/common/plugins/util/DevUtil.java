@@ -221,7 +221,7 @@ public abstract class DevUtil {
     /**
      * Redeploy the application
      */
-    public abstract void redeployApp() throws Exception;
+    public abstract void redeployApp() throws PluginExecutionException;
 
     private File serverDirectory;
     private File sourceDirectory;
