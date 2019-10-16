@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
@@ -216,6 +217,11 @@ public abstract class DevUtil {
      * @throws Exception if there was an error copying/creating config files
      */
     public abstract ServerTask getServerTask() throws Exception;
+    
+    /**
+     * Redeploy the application
+     */
+    public abstract void redeployApp() throws PluginExecutionException;
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -1016,7 +1022,7 @@ public abstract class DevUtil {
                         registerAll(configPath, watcher);
                         debug("Registering configuration directory: " + this.configDirectory);
                     } else {
-                        info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
+                        warn("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
                     }
                 }
                 
@@ -1024,7 +1030,7 @@ public abstract class DevUtil {
                 if (!serverXmlFileRegistered && serverXmlFile != null && serverXmlFile.exists()){
                     serverXmlFileRegistered = true;
                     debug("Server configuration file has been added: " + serverXmlFile);
-                    info("The server configuration file " + serverXmlFile + " has been added. Restart liberty:dev mode for it to take effect.");
+                    warn("The server configuration file " + serverXmlFile + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 // check if resourceDirectory has been added
@@ -1110,6 +1116,9 @@ public abstract class DevUtil {
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyConfigFolder(fileChanged, configDirectory, null);
                                 copyFile(fileChanged, configDirectory, serverDirectory, null);
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    redeployApp();
+                                }
                                 if (fileChanged.getName().equals("server.env")) {
                                     // re-enable debug variables in server.env
                                     enableServerDebug(false);
@@ -1131,7 +1140,9 @@ public abstract class DevUtil {
                                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                                 copyFile(fileChanged, serverXmlFileParent, serverDirectory,
                                         "server.xml");
-
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    redeployApp();
+                                }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
@@ -1471,9 +1482,14 @@ public abstract class DevUtil {
             
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
-
-            if (!classesDir.exists() && !classesDir.mkdirs()) {
-                throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath() + " does not exist and cannot be created.");
+            if (!classesDir.exists()) {
+                if (!classesDir.mkdirs()) {
+                    throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath()
+                            + " does not exist and cannot be created.");
+                } else if (classesDir.exists() && Objects.equals(classesDir.getCanonicalFile(), outputDirectory.getCanonicalFile())) {
+                    // redeploy application when class directory has been created
+                    redeployApp();
+                }
             }
 
             List<String> optionList = new ArrayList<>();
