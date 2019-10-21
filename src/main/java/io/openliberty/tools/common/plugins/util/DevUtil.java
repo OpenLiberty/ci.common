@@ -445,9 +445,13 @@ public abstract class DevUtil {
                     try {
                         serverTask.execute();
                     } catch (RuntimeException e) {
-                        // If a runtime exception occurred in the server task, log and rethrow
-                        error("An error occurred while starting the server: " + e.getMessage(), e);
-                        throw e;
+                        // If devStop is true server was stopped with Ctl-c, do not throw exception
+                        AtomicBoolean devStop = getDevStop();
+                        if (devStop.get() == false) {
+                            // If a runtime exception occurred in the server task, log and rethrow
+                            error("An error occurred while starting the server: " + e.getMessage(), e);
+                            throw e;
+                        }
                     }
                 }
 
@@ -624,6 +628,10 @@ public abstract class DevUtil {
     
     public void setDevStop(boolean devStop) {
         this.devStop.set(devStop);
+    }
+
+    public AtomicBoolean getDevStop() {
+        return this.devStop;
     }
 
     public void addShutdownHook(final ThreadPoolExecutor executor) {
