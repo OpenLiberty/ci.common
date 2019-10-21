@@ -641,9 +641,9 @@ public abstract class DevUtil {
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
                 
+                setDevStop(true);
                 cleanUpTempConfig();
                 cleanUpServerEnv();
-                setDevStop(true);
 
                 if (hotkeyReader != null) {
                     hotkeyReader.shutdown();
