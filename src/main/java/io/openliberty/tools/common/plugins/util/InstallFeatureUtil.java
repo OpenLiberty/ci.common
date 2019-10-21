@@ -723,7 +723,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         try {
             String productInfoFile;
             if (OSUtil.isWindows()) {
-                productInfoFile = installDirectory + "\\bin\\productInfo.bat";
+                // quote the entire productInfo command to guard against special characters like parentheses in the path
+                productInfoFile = "\"" + installDirectory + "\\bin\\productInfo.bat\"";
             } else {
                 productInfoFile = installDirectory + "/bin/productInfo";
             }
@@ -743,7 +744,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
             int exitValue = pr.exitValue();
             if (exitValue != 0) {
-                throw new PluginExecutionException("productInfo exited with return code " + exitValue);
+                throw new PluginExecutionException("productInfo exited with return code " + exitValue +". The productInfo command run was `"+productInfoFile+" "+action+"`");
             }
             return sb.toString();
         } catch (IOException ex) {
