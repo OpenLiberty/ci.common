@@ -73,9 +73,9 @@ import javax.tools.ToolProvider;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import io.openliberty.tools.ant.ServerTask;
-
 import org.apache.commons.io.FileUtils;
+
+import io.openliberty.tools.ant.ServerTask;
 
 /**
  * Utility class for dev mode.
@@ -488,7 +488,7 @@ public abstract class DevUtil {
             if (startMessage == null) {
                 setDevStop(true);
                 stopServer();
-                throw new PluginExecutionException("Unable to verify if the server was started after " + serverStartTimeoutMillis
+                throw new PluginExecutionException("Unable to verify if the server was started after " + serverStartTimeout
                         + " seconds.  Consider increasing the serverStartTimeout value if this continues to occur.");
             }
 
