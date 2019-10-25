@@ -25,9 +25,6 @@ import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
 import io.openliberty.tools.ant.ServerTask;
-import io.openliberty.tools.common.plugins.util.DevUtil;
-import io.openliberty.tools.common.plugins.util.PluginExecutionException;
-import io.openliberty.tools.common.plugins.util.PluginScenarioException;
 
 public class BaseDevUtilTest {
     
@@ -38,7 +35,7 @@ public class BaseDevUtilTest {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory,
                 File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, resourceDirs, hotTests, skipTests, false, false, null, 60, 5, 500, true);
+            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, resourceDirs, hotTests, skipTests, false, false, null, 30, 30, 5, 500, true);
         }
 
         @Override
@@ -145,6 +142,21 @@ public class BaseDevUtilTest {
 
         @Override
         public void runIntegrationTests() throws PluginScenarioException, PluginExecutionException {
+            // not needed for tests
+        }
+
+        @Override
+        public void libertyCreate() {
+            // not needed for tests
+        }
+
+        @Override
+        public void libertyDeploy() {
+            // not needed for tests
+        }
+
+        @Override
+        public void libertyInstallFeature() {
             // not needed for tests
         }
 
