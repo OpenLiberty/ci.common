@@ -437,7 +437,7 @@ public abstract class DevUtil {
             // Set debug variables in server.env if debug enabled
             enableServerDebug();
 
-            String logsDirectory = serverTask.getOutputDir() + "/" + serverTask.getServerName() + "/logs";
+            String logsDirectory = serverDirectory.getCanonicalPath() + "/" + "/logs";
             File messagesLogFile = new File(logsDirectory + "/messages.log");
 
             // Watch logs directory if it already exists
