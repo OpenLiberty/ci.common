@@ -356,8 +356,7 @@ public abstract class DevUtil {
                     }
                     long timeout = appStartupTimeout * 1000;
 
-                    String logsDirectory = serverTask.getOutputDir() + "/" + serverTask.getServerName() + "/logs";
-                    File messagesLogFile = new File(logsDirectory + "/messages.log");
+                    File messagesLogFile = serverTask.getLogFile();
 
                     // Wait for the app started message in messages.log
                     info("Waiting up to " + appStartupTimeout + " seconds for the application to start up...");
@@ -437,7 +436,7 @@ public abstract class DevUtil {
             // Set debug variables in server.env if debug enabled
             enableServerDebug();
 
-            String logsDirectory = serverDirectory.getCanonicalPath() + "/" + "/logs";
+            String logsDirectory = serverDirectory.getCanonicalPath() + "/logs";
             File messagesLogFile = new File(logsDirectory + "/messages.log");
 
             // Watch logs directory if it already exists
