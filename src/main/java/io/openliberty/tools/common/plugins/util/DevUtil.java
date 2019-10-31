@@ -1341,7 +1341,13 @@ public abstract class DevUtil {
         debug("Target file exists: " + targetFile.exists());
         if (targetFile.exists()) {
             if (targetFile.isDirectory()) {
-                FileUtils.deleteDirectory(targetFile);
+                try {
+                    FileUtils.deleteDirectory(targetFile);
+                } catch (IllegalArgumentException e) {
+                    debug("Could not delete directory " + e.getMessage());
+                } catch (IOException e) {
+                    error("Error deleting directory " + e.getMessage());
+                }
                 info("Directory deleted " + targetFile.getCanonicalPath());
             } else {
                 if (targetFile.delete()){
@@ -1445,8 +1451,14 @@ public abstract class DevUtil {
         File targetFile = new File(classesDir.getCanonicalPath() + relPath);
         if (targetFile.exists()) {
             if (targetFile.isDirectory()) {
-                FileUtils.deleteDirectory(targetFile);
-                info("Target directory deleted: " + targetFile.getCanonicalPath());
+                try {
+                    FileUtils.deleteDirectory(targetFile);
+                    info("Target directory deleted: " + targetFile.getCanonicalPath());
+                } catch (IllegalArgumentException e) {
+                    debug("Could not delete directory " + e.getMessage());
+                } catch (IOException e) {
+                    error("Error deleting directory " + e.getMessage());
+                }
             } else {
                 if (targetFile.delete()) {
                     info("Java class deleted: " + targetFile.getCanonicalPath());
