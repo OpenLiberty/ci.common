@@ -1336,24 +1336,23 @@ public abstract class DevUtil {
      * @throws IOException unable to resolve canonical path
      */
     protected void deleteFile(File deletedFile, File dir, File targetDir, String targetFileName) throws IOException {
-        debug("File that was deleted: " + deletedFile.getCanonicalPath());
         File targetFile = getTargetFile(deletedFile, dir, targetDir, targetFileName);
-        debug("Target file exists: " + targetFile.exists());
         if (targetFile.exists()) {
             if (targetFile.isDirectory()) {
                 try {
                     FileUtils.deleteDirectory(targetFile);
+                    info("The directory " + targetFile.getCanonicalPath() + " was deleted.");
                 } catch (IllegalArgumentException e) {
-                    debug("Could not delete directory " + e.getMessage());
+                    debug("Could not delete the directory " + targetFile.getCanonicalPath() + ". " + e.getMessage());
                 } catch (IOException e) {
-                    error("Error deleting directory " + e.getMessage());
+                    error("There was an error encountered while deleting the directory " + targetFile.getCanonicalPath()
+                            + ". " + e.getMessage());
                 }
-                info("Directory deleted " + targetFile.getCanonicalPath());
             } else {
                 if (targetFile.delete()){
-                    info("Deleted file " + targetFile.getCanonicalPath());
+                    info("The file " + targetFile.getCanonicalPath() + " was deleted.");
                 } else {
-                    error("Error deleting file " + targetFile.getCanonicalPath());
+                    error("Could not delete the file " + targetFile.getCanonicalPath() + ".");
                 }
             }
         }
@@ -1453,22 +1452,23 @@ public abstract class DevUtil {
             if (targetFile.isDirectory()) {
                 try {
                     FileUtils.deleteDirectory(targetFile);
-                    info("Target directory deleted: " + targetFile.getCanonicalPath());
+                    info("The target directory " + targetFile.getCanonicalPath() + " was deleted.");
                 } catch (IllegalArgumentException e) {
-                    debug("Could not delete directory " + e.getMessage());
+                    debug("Could not delete directory " + targetFile.getCanonicalPath() + ". " + e.getMessage());
                 } catch (IOException e) {
-                    error("Error deleting directory " + e.getMessage());
+                    error("There was an error encountered while deleting the directory " + targetFile.getCanonicalPath()
+                            + ". " + e.getMessage());
                 }
             } else {
                 if (targetFile.delete()) {
-                    info("Java class deleted: " + targetFile.getCanonicalPath());
+                    info("The java class " + targetFile.getCanonicalPath() + " was deleted.");
                 } else {
-                    error("Error deleting file " + targetFile.getCanonicalPath());
+                    error("Could not delete the file " + targetFile.getCanonicalPath() + ". ");
                 }
             }
         } else {
-            warn("File deleted but could not find corresponding file or folder in target directory: "
-                    + fileChanged.getCanonicalPath());
+            warn("File deleted but could not find corresponding file or folder in the target directory: "
+                    + fileChanged.getCanonicalPath() + ".");
         }
     }
 
