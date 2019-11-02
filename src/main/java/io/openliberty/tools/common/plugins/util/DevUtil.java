@@ -1388,14 +1388,24 @@ public abstract class DevUtil {
      * @throws IOException unable to resolve canonical path
      */
     protected void deleteFile(File deletedFile, File dir, File targetDir, String targetFileName) throws IOException {
-        debug("File that was deleted: " + deletedFile.getCanonicalPath());
         File targetFile = getTargetFile(deletedFile, dir, targetDir, targetFileName);
-        debug("Target file exists: " + targetFile.exists());
         if (targetFile.exists()) {
-            if (targetFile.delete()){
-                info("Deleted file" + targetFile.getCanonicalPath());
+            if (targetFile.isDirectory()) {
+                try {
+                    FileUtils.deleteDirectory(targetFile);
+                    info("The directory " + targetFile.getCanonicalPath() + " was deleted.");
+                } catch (IllegalArgumentException e) {
+                    debug("Could not delete the directory " + targetFile.getCanonicalPath() + ". " + e.getMessage());
+                } catch (IOException e) {
+                    error("There was an error encountered while deleting the directory " + targetFile.getCanonicalPath()
+                            + ". " + e.getMessage());
+                }
             } else {
-                error("Error deleting file " + targetFile.getCanonicalPath());
+                if (targetFile.delete()){
+                    info("The file " + targetFile.getCanonicalPath() + " was deleted.");
+                } else {
+                    error("Could not delete the file " + targetFile.getCanonicalPath() + ".");
+                }
             }
         }
     }
@@ -1462,29 +1472,54 @@ public abstract class DevUtil {
     }
 
     /**
-     * Given the fileChanged delete the corresponding Java class
+     * Given the fileChanged delete the corresponding Java class or directory
      * 
-     * @param fileChanged Java file changed
-     * @param classesDir the directory for compiled classes
+     * @param fileChanged       Java file changed
+     * @param classesDir        the directory for compiled classes
      * @param compileSourceRoot the source directory for the Java classes
      * @throws IOException unable to resolve canonical path
      */
     protected void deleteJavaFile(File fileChanged, File classesDir, File compileSourceRoot) throws IOException {
-        if (fileChanged.getName().endsWith(".java")) {
-            String fileName = fileChanged.getName().substring(0, fileChanged.getName().indexOf(".java"));
-            File parentFile = fileChanged.getParentFile();
-            String relPath = parentFile.getCanonicalPath()
+        String fileName = fileChanged.getName();
+        File parentFile = fileChanged.getParentFile();
+
+        boolean javaFile = fileName.endsWith(".java");
+        String relPath;
+        if (javaFile) {
+            fileName = fileName.substring(0, fileChanged.getName().indexOf(".java"));
+            relPath = parentFile.getCanonicalPath()
                     .substring(parentFile.getCanonicalPath().indexOf(compileSourceRoot.getCanonicalPath())
                             + compileSourceRoot.getCanonicalPath().length())
                     + "/" + fileName + ".class";
-            File targetFile = new File(classesDir.getCanonicalPath() + relPath);
+        } else {
+            relPath = parentFile.getCanonicalPath()
+                    .substring(parentFile.getCanonicalPath().indexOf(compileSourceRoot.getCanonicalPath())
+                            + compileSourceRoot.getCanonicalPath().length())
+                    + "/" + fileName;
+        }
 
-            if (targetFile.exists()) {
-                targetFile.delete();
-                info("Java class deleted: " + targetFile.getCanonicalPath());
+        File targetFile = new File(classesDir.getCanonicalPath() + relPath);
+        if (targetFile.exists()) {
+            if (targetFile.isDirectory()) {
+                try {
+                    FileUtils.deleteDirectory(targetFile);
+                    info("The target directory " + targetFile.getCanonicalPath() + " was deleted.");
+                } catch (IllegalArgumentException e) {
+                    debug("Could not delete directory " + targetFile.getCanonicalPath() + ". " + e.getMessage());
+                } catch (IOException e) {
+                    error("There was an error encountered while deleting the directory " + targetFile.getCanonicalPath()
+                            + ". " + e.getMessage());
+                }
+            } else {
+                if (targetFile.delete()) {
+                    info("The java class " + targetFile.getCanonicalPath() + " was deleted.");
+                } else {
+                    error("Could not delete the file " + targetFile.getCanonicalPath() + ". ");
+                }
             }
         } else {
-            debug("File deleted but was not a java file: " + fileChanged.getName());
+            warn("File deleted but could not find corresponding file or folder in the target directory: "
+                    + fileChanged.getCanonicalPath() + ".");
         }
     }
 
