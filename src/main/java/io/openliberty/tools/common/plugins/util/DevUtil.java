@@ -985,11 +985,14 @@ public abstract class DevUtil {
             Collection<File> recompileJavaTests = new HashSet<File>();
             Collection<File> deleteJavaSources = new HashSet<File>();
             Collection<File> deleteJavaTests = new HashSet<File>();
+            Collection<File> failedCompilationJavaSources = new HashSet<File>();
+            Collection<File> failedCompilationJavaTests = new HashSet<File>();
             long lastJavaSourceChange = System.currentTimeMillis();
             long lastJavaTestChange = System.currentTimeMillis();
+            boolean triggerJavaSourceRecompile = false;
+            boolean triggerJavaTestRecompile = false;
 
             while (true) {
-
                 // stop dev mode if the server has been stopped by another process
                 if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop.get() == false)) {
                     throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
@@ -1006,9 +1009,18 @@ public abstract class DevUtil {
                             deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                         }
                     }
-                    if (!recompileJavaSources.isEmpty()) {
-                        debug("Recompiling Java source files: " + recompileJavaSources);
-                        recompileJavaSource(recompileJavaSources, artifactPaths, executor, outputDirectory, testOutputDirectory);
+                    if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+                        // try to recompile java files that previously did not compile successfully
+                        if (!failedCompilationJavaSources.isEmpty()) {
+                            recompileJavaSources.addAll(failedCompilationJavaSources);
+                        }
+                        if (recompileJavaSource(recompileJavaSources, artifactPaths, executor,
+                                outputDirectory, testOutputDirectory)) {
+                            // successful compilation so we can clear failedCompilation list
+                            failedCompilationJavaSources.clear();
+                        } else {
+                            failedCompilationJavaSources.addAll(recompileJavaSources);
+                        }
                     }
                     // additionally, process java test files if no changes detected after a different timeout
                     // (but source timeout takes precedence i.e. don't recompile tests if someone keeps changing the source)
@@ -1020,9 +1032,17 @@ public abstract class DevUtil {
                                 deleteJavaFile(file, testOutputDirectory, this.testSourceDirectory);
                             }
                         }
-                        if (!recompileJavaTests.isEmpty()) {
+                        if (!recompileJavaTests.isEmpty() || triggerJavaTestRecompile) {
                             debug("Recompiling Java test files: " + recompileJavaTests);
-                            recompileJavaTest(recompileJavaTests, artifactPaths, executor, outputDirectory, testOutputDirectory);
+                            if (!failedCompilationJavaTests.isEmpty()) {
+                                recompileJavaTests.addAll(failedCompilationJavaTests);
+                            }
+                            if (recompileJavaTest(recompileJavaTests, artifactPaths, executor, outputDirectory, testOutputDirectory)) {
+                                // successful compilation so we can clear failedCompilation list
+                                failedCompilationJavaTests.clear();
+                            } else {
+                                failedCompilationJavaTests.addAll(recompileJavaTests);
+                            }
                         }
                     }
 
@@ -1038,8 +1058,11 @@ public abstract class DevUtil {
 
                     deleteJavaSources.clear();
                     recompileJavaSources.clear();
+                    triggerJavaTestRecompile = false;
+                    triggerJavaSourceRecompile = false;
+
                     if (processTests) {
-                        deleteJavaTests.clear();    
+                        deleteJavaTests.clear();
                         recompileJavaTests.clear();
                     }
                 }
@@ -1228,6 +1251,14 @@ public abstract class DevUtil {
                                     boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths, executor);
                                     // run all tests on build file change
                                     if (recompiledBuild) {
+                                        // trigger java source recompile if there are compilation errors
+                                        if (!failedCompilationJavaSources.isEmpty()) {
+                                            triggerJavaSourceRecompile = true;
+                                        }
+                                        // trigger java test recompile if there are compilation errors
+                                        if (!failedCompilationJavaTests.isEmpty()) {
+                                            triggerJavaTestRecompile = true;
+                                        }
                                         runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                                     }
                         }
@@ -1533,9 +1564,9 @@ public abstract class DevUtil {
      * @param testOutputDirectory the directory for compiled test classes
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected void recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
+    protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
+        return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
     }
 
     /**
@@ -1548,9 +1579,9 @@ public abstract class DevUtil {
      * @param testOutputDirectory the directory for compiled test classes
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected void recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
+    protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
+        return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
     }
 
     /**
@@ -1564,7 +1595,7 @@ public abstract class DevUtil {
      * @param testOutputDirectory the directory for compiled test classes
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected void recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
+    protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
             boolean tests, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
@@ -1608,6 +1639,7 @@ public abstract class DevUtil {
                     debug("The Java file " + file + " does not exist and will not be compiled.");
                 }
             }
+
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
                     compilationUnits);
             boolean didCompile = task.call();
@@ -1626,15 +1658,18 @@ public abstract class DevUtil {
                 } else {
                     runTestThread(true, executor, messageOccurrences, false, false);
                 }
+                return true;
             } else {
                 if (tests) {
                     info("Tests compilation had errors.");
                 } else {
                     info("Source compilation had errors.");
                 }
+                return false;
             }
         } catch (Exception e) {
             debug("Error compiling java files", e);
+            return false;
         }
     }
 
