@@ -992,6 +992,15 @@ public abstract class DevUtil {
             boolean triggerJavaSourceRecompile = false;
             boolean triggerJavaTestRecompile = false;
 
+            // initial source and test compile
+            Collection<File> allJavaSources = FileUtils.listFiles(this.sourceDirectory.getCanonicalFile(),
+                    new String[] { "java" }, true);
+            recompileJavaSources.addAll(allJavaSources);
+
+            Collection<File> allJavaTestSources = FileUtils.listFiles(this.testSourceDirectory.getCanonicalFile(),
+                    new String[] { "java" }, true);
+            recompileJavaTests.addAll(allJavaTestSources);
+
             while (true) {
                 // stop dev mode if the server has been stopped by another process
                 if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop.get() == false)) {
