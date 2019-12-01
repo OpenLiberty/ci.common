@@ -993,13 +993,16 @@ public abstract class DevUtil {
             boolean triggerJavaTestRecompile = false;
 
             // initial source and test compile
-            Collection<File> allJavaSources = FileUtils.listFiles(this.sourceDirectory.getCanonicalFile(),
-                    new String[] { "java" }, true);
-            recompileJavaSources.addAll(allJavaSources);
-
-            Collection<File> allJavaTestSources = FileUtils.listFiles(this.testSourceDirectory.getCanonicalFile(),
-                    new String[] { "java" }, true);
-            recompileJavaTests.addAll(allJavaTestSources);
+            if (this.sourceDirectory.exists()) {
+                Collection<File> allJavaSources = FileUtils.listFiles(this.sourceDirectory.getCanonicalFile(),
+                        new String[] { "java" }, true);
+                recompileJavaSources.addAll(allJavaSources);
+            }
+            if (this.testSourceDirectory.exists()) {
+                Collection<File> allJavaTestSources = FileUtils.listFiles(this.testSourceDirectory.getCanonicalFile(),
+                        new String[] { "java" }, true);
+                recompileJavaTests.addAll(allJavaTestSources);
+            }
 
             while (true) {
                 // stop dev mode if the server has been stopped by another process
