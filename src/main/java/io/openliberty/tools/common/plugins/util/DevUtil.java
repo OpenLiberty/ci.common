@@ -251,11 +251,12 @@ public abstract class DevUtil {
     private int libertyDebugPort;
     private AtomicBoolean detectedAppStarted;
     private long serverStartTimeout;
+    private boolean useBuildRecompile;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug) {
+            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -274,6 +275,7 @@ public abstract class DevUtil {
         this.inputUnavailable = new AtomicBoolean(false);
         this.libertyDebug = libertyDebug;
         this.detectedAppStarted = new AtomicBoolean(false);
+        this.useBuildRecompile = useBuildRecompile;
     }
 
     /**
@@ -1611,51 +1613,57 @@ public abstract class DevUtil {
             boolean tests, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
+            boolean compileResult;
             
-            // source root is src/main/java or src/test/java
-            File classesDir = tests ? testOutputDirectory : outputDirectory;
-            if (!classesDir.exists()) {
-                if (!classesDir.mkdirs()) {
-                    throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath()
-                            + " does not exist and cannot be created.");
-                } else if (classesDir.exists() && Objects.equals(classesDir.getCanonicalFile(), outputDirectory.getCanonicalFile())) {
-                    // redeploy application when class directory has been created
-                    redeployApp();
-                }
-            }
-
-            List<String> optionList = new ArrayList<>();
-            List<File> outputDirs = new ArrayList<File>();
-
-            if (tests) {
-                outputDirs.add(outputDirectory);
-                outputDirs.add(testOutputDirectory);
+            if (useBuildRecompile) {
+                compileResult = compile(tests ? testSourceDirectory : sourceDirectory);
             } else {
-                outputDirs.add(outputDirectory);
-            }
-            Set<File> classPathElems = getClassPath(artifactPaths, outputDirs);
-
-            JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-            StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
-
-            fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
-            fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
-
-            Collection<JavaFileObject> compilationUnits = new HashSet<JavaFileObject>();
-            for (File file : javaFilesChanged) {
-                if (file.exists() && file.isFile()) {
-                    for (JavaFileObject o : fileManager.getJavaFileObjects(file)) {
-                        compilationUnits.add(o);
-                    }    
-                } else {
-                    debug("The Java file " + file + " does not exist and will not be compiled.");
+                // source root is src/main/java or src/test/java
+                File classesDir = tests ? testOutputDirectory : outputDirectory;
+                if (!classesDir.exists()) {
+                    if (!classesDir.mkdirs()) {
+                        throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath()
+                                + " does not exist and cannot be created.");
+                    } else if (classesDir.exists() && Objects.equals(classesDir.getCanonicalFile(), outputDirectory.getCanonicalFile())) {
+                        // redeploy application when class directory has been created
+                        redeployApp();
+                    }
                 }
-            }
 
-            JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
-                    compilationUnits);
-            boolean didCompile = task.call();
-            if (didCompile) {
+                List<String> optionList = new ArrayList<>();
+                List<File> outputDirs = new ArrayList<File>();
+
+                if (tests) {
+                    outputDirs.add(outputDirectory);
+                    outputDirs.add(testOutputDirectory);
+                } else {
+                    outputDirs.add(outputDirectory);
+                }
+                Set<File> classPathElems = getClassPath(artifactPaths, outputDirs);
+
+                JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+                StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
+
+                fileManager.setLocation(StandardLocation.CLASS_PATH, classPathElems);
+                fileManager.setLocation(StandardLocation.CLASS_OUTPUT, Collections.singleton(classesDir));
+
+                Collection<JavaFileObject> compilationUnits = new HashSet<JavaFileObject>();
+                for (File file : javaFilesChanged) {
+                    if (file.exists() && file.isFile()) {
+                        for (JavaFileObject o : fileManager.getJavaFileObjects(file)) {
+                            compilationUnits.add(o);
+                        }    
+                    } else {
+                        debug("The Java file " + file + " does not exist and will not be compiled.");
+                    }
+                }
+
+                JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
+                        compilationUnits);
+
+                compileResult = task.call();
+            }
+            if (compileResult) {
                 if (tests) {
                     info("Tests compilation was successful.");
                 } else {
