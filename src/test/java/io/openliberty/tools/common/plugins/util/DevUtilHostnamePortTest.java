@@ -35,20 +35,31 @@ public class DevUtilHostnamePortTest extends BaseDevUtilTest {
 
     @Test
     public void testParseHostnameHttpPort() throws Exception {
-        testHostnameAndHttpsPort("Web application available (default_host): http://myhostname:9085/myapp/");
+        testHostnameAndHttpPort("Web application available (default_host): http://myhostname:9085/myapp/");
     }
 
     @Test
     public void testParseHostnameHttpPort2() throws Exception {
-        testHostnameAndHttpsPort("Web application available (default_host): http://myhostname:9085/");
+        testHostnameAndHttpPort("Web application available (default_host): http://myhostname:9085/");
     }
 
     @Test
     public void testParseHostnameHttpPort3() throws Exception {
-        testHostnameAndHttpsPort("Web application available (default_host): http://myhostname:9085");
+        testHostnameAndHttpPort("Web application available (default_host): http://myhostname:9085");
     }
 
-    private void testHostnameAndHttpsPort(String message) throws PluginExecutionException {
+    @Test
+    public void testParseHostnameHttpPortFromHttps() throws Exception {
+        String message = "Web application available (default_host): https://myhostname:9085/myapp/";
+
+        DevUtil util = getNewDevUtil(null);
+        int portPrefixIndex = util.parseHostName(message);
+        util.parseHttpPort(message, portPrefixIndex);
+        assertEquals("myhostname", util.getHostName());
+        assertEquals(null, util.getHttpPort());
+    }
+
+    private void testHostnameAndHttpPort(String message) throws PluginExecutionException {
         DevUtil util = getNewDevUtil(null);
         int portPrefixIndex = util.parseHostName(message);
         util.parseHttpPort(message, portPrefixIndex);
