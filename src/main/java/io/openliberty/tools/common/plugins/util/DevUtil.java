@@ -1142,6 +1142,9 @@ public abstract class DevUtil {
                             registerAll(resourceDir.getCanonicalFile().toPath(), watcher);
                             resourceMap.put(resourceDir, true);
                         }
+                    } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
+                        warn("The resource directory " + resourceDir + "was deleted.  Restart liberty:dev mode for it to take effect.");
+                        resourceMap.put(resourceDir, false);
                     }
                 }
 
@@ -1255,7 +1258,6 @@ public abstract class DevUtil {
                             }
                         } else if (resourceParent != null && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
                             debug("Resource dir: " + resourceParent.toString());
-                            debug("File within resource directory");
                             if (fileChanged.exists() && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyFile(fileChanged, resourceParent, outputDirectory, null);
@@ -1290,7 +1292,7 @@ public abstract class DevUtil {
                     // reset the key
                     boolean valid = wk.reset();
                     if (!valid) {
-                        debug("WatchService key has been unregistered");
+                        debug("WatchService key has been unregistered for " + directory);
                     }
                 } catch (InterruptedException | NullPointerException e) {
                     // do nothing let loop continue
