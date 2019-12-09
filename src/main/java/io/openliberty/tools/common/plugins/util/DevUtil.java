@@ -20,10 +20,12 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -55,6 +57,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
@@ -253,6 +256,7 @@ public abstract class DevUtil {
     private AtomicBoolean detectedAppStarted;
     private long serverStartTimeout;
     private boolean useBuildRecompile;
+    private Map<File, Properties> propertyFilesMap;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -993,6 +997,16 @@ public abstract class DevUtil {
                     SensitivityWatchEventModifier.HIGH);
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
+            if (propertyFilesMap != null) {
+                for (File f : propertyFilesMap.keySet()) {
+                    f.getParentFile().toPath().register(
+                        watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+                                StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
+                        SensitivityWatchEventModifier.HIGH);
+                    debug("Watching property file directory: " + f.getParentFile().toPath());
+                }
+            }
+
             Collection<File> recompileJavaSources = new HashSet<File>();
             Collection<File> recompileJavaTests = new HashSet<File>();
             Collection<File> deleteJavaSources = new HashSet<File>();
@@ -1285,6 +1299,12 @@ public abstract class DevUtil {
                                         }
                                         runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                                     }
+                        } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)) { // properties file
+                            boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
+                            // run all tests on properties file change
+                            if (reloadedPropertyFile) {
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                            }
                         }
                     }
                     // reset the key
@@ -1851,6 +1871,74 @@ public abstract class DevUtil {
      */
     public void setLibertyDebugPort(int libertyDebugPort) {
         this.libertyDebugPort = libertyDebugPort;
+    }
+
+    /**
+     * Reload the property file by restarting the server if there were changes.
+     * 
+     * @param propertyFile The property file that was changed.
+     * @throws PluginExecutionException if there was an error when reloading the file
+     * @return true if the property file was reloaded with changes
+     */
+    private boolean reloadPropertyFile(File propertyFile) throws PluginExecutionException {
+        Properties properties = readPropertiesFromFile(propertyFile);
+        if (!Objects.equals(properties, propertyFilesMap.get(propertyFile))) {
+            debug("Properties file " + propertyFile.getAbsolutePath() + " has changed. Restarting server...");
+            propertyFilesMap.put(propertyFile, properties);    
+            restartServer();
+            return true;
+        } else {
+            debug("No changes detected in properties file " + propertyFile.getAbsolutePath());
+            return false;
+        }
+    }
+
+    /**
+     * This is needed for Gradle only.
+     * 
+     * Sets additional property files that may be used by the build.
+     * Loads the properties for later comparison of changes.
+     * 
+     * @param propertyFiles list of property files
+     */
+    public void setPropertyFiles(List<File> propertyFiles) {
+        if (propertyFiles == null) {
+            return;
+        }
+        if (propertyFilesMap == null) {
+            propertyFilesMap = new HashMap<File, Properties>(propertyFiles.size());
+        }
+        for (File propertyFile : propertyFiles) {
+            Properties properties = readPropertiesFromFile(propertyFile);
+            propertyFilesMap.put(propertyFile, properties);
+        }
+    }
+
+    /**
+     * Read properties from file.  If file does not exist or an IO exception occurred, returns null.
+     */
+    private Properties readPropertiesFromFile(File propertyFile) {
+        Properties properties = null;
+        if (propertyFile.exists()) {
+            InputStream inputStream = null;
+            try {
+                debug("Loading properties from file: " + propertyFile);
+                inputStream = new FileInputStream(propertyFile);
+                properties = new Properties();
+                properties.load(inputStream);
+            } catch (IOException e) {
+                error("Could not read properties file " + propertyFile.getAbsolutePath(), e);
+            } finally {
+                if (inputStream != null) {
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        // nothing to do
+                    }
+                }
+            }
+        }
+        return properties;
     }
 
 }
