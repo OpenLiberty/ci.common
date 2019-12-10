@@ -1136,13 +1136,13 @@ public abstract class DevUtil {
                 }
                 
                 // check if resourceDirectory has been added
-                for (File resourceDir : resourceDirs){
-                    if (!resourceMap.get(resourceDir)) {
-                        if (resourceDir.exists()) {
-                            registerAll(resourceDir.getCanonicalFile().toPath(), watcher);
-                            resourceMap.put(resourceDir, true);
-                        }
-                    } else {
+                for (File resourceDir : resourceDirs) {
+                    if (!resourceMap.get(resourceDir) && resourceDir.exists()) {
+                        // added resource directory
+                        registerAll(resourceDir.getCanonicalFile().toPath(), watcher);
+                        resourceMap.put(resourceDir, true);
+                    } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
+                        // deleted resource directory
                         warn("The resource directory " + resourceDir
                                 + " was deleted.  Restart liberty:dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
