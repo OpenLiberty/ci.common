@@ -1142,8 +1142,9 @@ public abstract class DevUtil {
                             registerAll(resourceDir.getCanonicalFile().toPath(), watcher);
                             resourceMap.put(resourceDir, true);
                         }
-                    } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
-                        warn("The resource directory " + resourceDir + "was deleted.  Restart liberty:dev mode for it to take effect.");
+                    } else {
+                        warn("The resource directory " + resourceDir
+                                + " was deleted.  Restart liberty:dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
                     }
                 }
