@@ -24,6 +24,9 @@ public class PluginScenarioException extends Exception {
 
     private static final long serialVersionUID = 1L;
 
+    public PluginScenarioException() {
+    }
+
     public PluginScenarioException(String message) {
         super(message);
     }
