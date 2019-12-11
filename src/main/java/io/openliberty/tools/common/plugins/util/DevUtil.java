@@ -257,6 +257,7 @@ public abstract class DevUtil {
     private long serverStartTimeout;
     private boolean useBuildRecompile;
     private Map<File, Properties> propertyFilesMap;
+    private AtomicBoolean calledShutdownHook;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -281,6 +282,7 @@ public abstract class DevUtil {
         this.libertyDebug = libertyDebug;
         this.detectedAppStarted = new AtomicBoolean(false);
         this.useBuildRecompile = useBuildRecompile;
+        this.calledShutdownHook = new AtomicBoolean(false);
     }
 
     /**
@@ -702,23 +704,29 @@ public abstract class DevUtil {
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
-                debug("Inside Shutdown Hook, shutting down server");
-                
-                setDevStop(true);
-                cleanUpTempConfig();
-                cleanUpServerEnv();
-
-                if (hotkeyReader != null) {
-                    hotkeyReader.shutdown();
-                }
-
-                // shutdown tests
-                executor.shutdown();
-
-                // stopping server
-                stopServer();
+                runShutdownHook(executor);
             }
         });
+    }
+
+    private void runShutdownHook(final ThreadPoolExecutor executor) {
+        if (!calledShutdownHook.getAndSet(true)) {
+            debug("Inside Shutdown Hook, shutting down server");
+        
+            setDevStop(true);
+            cleanUpTempConfig();
+            cleanUpServerEnv();
+    
+            if (hotkeyReader != null) {
+                hotkeyReader.shutdown();
+            }
+    
+            // shutdown tests
+            executor.shutdown();
+    
+            // stopping server
+            stopServer();
+        }
     }
 
     /**
@@ -925,7 +933,7 @@ public abstract class DevUtil {
                     if (line != null && (line.trim().equalsIgnoreCase("q") || line.trim().equalsIgnoreCase("quit")
                             || line.trim().equalsIgnoreCase("exit"))) {
                         debug("Detected exit command");
-                        System.exit(0);
+                        runShutdownHook(executor);
                     } else {
                         debug("Detected Enter key. Running tests...");
                         runTestThread(false, executor, -1, false, true);
@@ -1032,8 +1040,14 @@ public abstract class DevUtil {
 
             while (true) {
                 // stop dev mode if the server has been stopped by another process
-                if (serverThread.getState().equals(Thread.State.TERMINATED) && (this.devStop.get() == false)) {
-                    throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
+                if (serverThread.getState().equals(Thread.State.TERMINATED)) {
+                    if (!this.devStop.get()) {
+                        // server was stopped outside of dev mode
+                        throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
+                    } else {
+                        // server was stopped by dev mode
+                        throw new PluginScenarioException();
+                    }
                 }
 
                 // process java source files if no changes detected after the compile wait time
