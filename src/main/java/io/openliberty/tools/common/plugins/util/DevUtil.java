@@ -361,6 +361,7 @@ public abstract class DevUtil {
 
                 if (!detectedAppStarted.get()) {
                     if (appStartupTimeout < 0) {
+                        warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
                         appStartupTimeout = 30;
                     }
                     long timeout = appStartupTimeout * 1000;
@@ -503,6 +504,7 @@ public abstract class DevUtil {
 
             // Set server start timeout
             if (serverStartTimeout < 0) {
+                warn("The serverStartTimeout value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
                 serverStartTimeout = 30;
             }
             long serverStartTimeoutMillis = serverStartTimeout * 1000;
