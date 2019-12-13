@@ -258,11 +258,12 @@ public abstract class DevUtil {
     private boolean useBuildRecompile;
     private Map<File, Properties> propertyFilesMap;
     private AtomicBoolean calledShutdownHook;
+    private boolean gradle;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile) {
+            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -283,6 +284,7 @@ public abstract class DevUtil {
         this.detectedAppStarted = new AtomicBoolean(false);
         this.useBuildRecompile = useBuildRecompile;
         this.calledShutdownHook = new AtomicBoolean(false);
+        this.gradle = gradle;
     }
 
     /**
@@ -311,7 +313,7 @@ public abstract class DevUtil {
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
-                debug("Thread interrupted while waiting to start unit tests.", e);
+                debug("Thread interrupted while waiting to start tests.", e);
             }
 
             // if queue size >= 1, it means a newer test has been queued so we
@@ -328,7 +330,8 @@ public abstract class DevUtil {
                 return;
             }
 
-            if (!(skipUTs || forceSkipUTs)) {
+            // skip unit tests if invoked by Gradle
+            if (!gradle && !(skipUTs || forceSkipUTs)) {
                 info("Running unit tests...");
                 try {
                     runUnitTests();
@@ -386,11 +389,18 @@ public abstract class DevUtil {
                     long timeout = appUpdateTimeout * 1000;
                     serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
                 }
-
-                info("Running integration tests...");
+                if (gradle) {
+                    info("Running tests...");
+                } else {
+                    info("Running integration tests...");
+                }
                 try {
                     runIntegrationTests();
-                    info("Integration tests finished.");
+                    if (gradle) {
+                        info("Tests finished.");
+                    } else {
+                        info("Integration tests finished.");
+                    }
                 } catch (PluginScenarioException e) {
                     debug(e);
                     error(e.getMessage());
@@ -1813,16 +1823,20 @@ public abstract class DevUtil {
     /**
      * Run tests in a new thread.
      * 
-     * @param waitForApplicationUpdate whether it should wait for the application to update before running integration tests
-     * @param executor the thread pool executor
-     * @param messageOccurrences how many times the application updated message has occurred in the log
-     * @param forceSkipUTs whether to force skip the unit tests
-     * @param manualInvocation whether the tests were manually invoked
+     * @param waitForApplicationUpdate whether it should wait for the application to
+     *                                 update before running integration tests
+     * @param executor                 the thread pool executor
+     * @param messageOccurrences       how many times the application updated
+     *                                 message has occurred in the log
+     * @param forceSkipUTs             whether to force skip the unit tests
+     * @param manualInvocation         whether the tests were manually invoked
      */
-    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences, boolean forceSkipUTs, boolean manualInvocation) {
+    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences,
+            boolean forceSkipUTs, boolean manualInvocation) {
         try {
             if (manualInvocation || hotTests) {
-                executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs, manualInvocation));
+                executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs,
+                        manualInvocation));
             }
         } catch (RejectedExecutionException e) {
             debug("Cannot add thread since max threads reached", e);
