@@ -24,6 +24,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.AccessController;
@@ -46,37 +47,42 @@ import java.util.regex.MatchResult;
  * Utility class to install features from Maven repositories.
  */
 public abstract class InstallFeatureUtil extends ServerFeatureUtil {
-    
+
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
-    
+
     private final File installDirectory;
-    
+
     private final File installJarFile;
-    
+
     private final List<ProductProperties> propertiesList;
-    
+
     private final String to;
-    
+
     private final Set<File> downloadedJsons;
-    
+
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
     private String openLibertyVersion;
-    
+
     /**
      * Initialize the utility and check for unsupported scenarios.
      * 
      * @param installDirectory The install directory
-     * @param from The "from" parameter specified in the plugin configuration, or null if not specified
-     * @param to The "to" parameter specified in the plugin configuration, or null if not specified
-     * @param pluginListedEsas The list of ESAs specified in the plugin configuration, or null if not specified
-     * @throws PluginScenarioException If the current scenario is not supported
-     * @throws PluginExecutionException If properties files cannot be found in the installDirectory/lib/versions
+     * @param from             The "from" parameter specified in the plugin
+     *                         configuration, or null if not specified
+     * @param to               The "to" parameter specified in the plugin
+     *                         configuration, or null if not specified
+     * @param pluginListedEsas The list of ESAs specified in the plugin
+     *                         configuration, or null if not specified
+     * @throws PluginScenarioException  If the current scenario is not supported
+     * @throws PluginExecutionException If properties files cannot be found in the
+     *                                  installDirectory/lib/versions
      */
-    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
+    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)
+            throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
         this.to = to;
         propertiesList = loadProperties(new File(installDirectory, "lib/versions"));
@@ -86,10 +92,12 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         downloadedJsons = downloadProductJsons();
         if (downloadedJsons.isEmpty()) {
-            throw new PluginScenarioException("Cannot find JSONs for to the installed runtime from the Maven repository.");
+            throw new PluginScenarioException(
+                    "Cannot find JSONs for to the installed runtime from the Maven repository.");
         }
         if (hasUnsupportedParameters(from, pluginListedEsas)) {
-            throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
+            throw new PluginScenarioException(
+                    "Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
         }
     }
 
@@ -102,15 +110,17 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         return getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
     }
-    
+
     /**
      * Log debug
+     * 
      * @param msg
      */
     public abstract void debug(String msg);
 
     /**
      * Log debug
+     * 
      * @param msg
      * @param e
      */
@@ -118,45 +128,50 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     /**
      * Log debug
+     * 
      * @param e
      */
     public abstract void debug(Throwable e);
 
     /**
      * Log warning
+     * 
      * @param msg
      */
     public abstract void warn(String msg);
 
     /**
      * Log info
+     * 
      * @param msg
      */
     public abstract void info(String msg);
 
     /**
      * Returns whether debug is enabled by the current logger
+     * 
      * @return whether debug is enabled
      */
     public abstract boolean isDebugEnabled();
 
     /**
-     * Download the artifact from the specified Maven coordinates, or retrieve it from the cache if it already exists.
+     * Download the artifact from the specified Maven coordinates, or retrieve it
+     * from the cache if it already exists.
      * 
-     * @param groupId The group ID
+     * @param groupId    The group ID
      * @param artifactId The artifact ID
-     * @param type The type e.g. esa
-     * @param version The version
+     * @param type       The type e.g. esa
+     * @param version    The version
      * @return The file corresponding to the downloaded artifact
      * @throws PluginExecutionException If the artifact could not be downloaded
      */
     public abstract File downloadArtifact(String groupId, String artifactId, String type, String version)
             throws PluginExecutionException;
-    
+
     /**
-     * Combine the given String collections into a set using case-insensitive matching.
-     * If there are multiple instances of the same string but with different capitalization, 
-     * only the first one found will be included.
+     * Combine the given String collections into a set using case-insensitive
+     * matching. If there are multiple instances of the same string but with
+     * different capitalization, only the first one found will be included.
      * 
      * @param collections a collection of strings
      * @return the combined set of strings, ignoring case
@@ -177,13 +192,16 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         return result;
     }
-    
+
     /**
-     * Get the JSON files corresponding to the product properties from the lib/versions/*.properties files
+     * Get the JSON files corresponding to the product properties from the
+     * lib/versions/*.properties files
+     * 
      * @return the set of JSON files for the product
-     * @throws PluginExecutionException if properties files could not be found from lib/versions
+     * @throws PluginExecutionException if properties files could not be found from
+     *                                  lib/versions
      */
-    private Set<File> downloadProductJsons() throws PluginExecutionException {        
+    private Set<File> downloadProductJsons() throws PluginExecutionException {
         // download JSONs
         Set<File> downloadedJsons = new HashSet<File>();
         for (ProductProperties properties : propertiesList) {
@@ -194,16 +212,16 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         return downloadedJsons;
     }
-    
+
     /**
      * Download the JSON file for the given product.
      * 
-     * @param productId The product ID from the runtime's properties file
+     * @param productId      The product ID from the runtime's properties file
      * @param productVersion The product version from the runtime's properties file
      * @return The JSON file, or null if not found
      */
     private File downloadJsons(String productId, String productVersion) {
-        String jsonGroupId = productId + ".features";        
+        String jsonGroupId = productId + ".features";
         try {
             return downloadArtifact(jsonGroupId, "features", "json", productVersion);
         } catch (PluginExecutionException e) {
@@ -211,7 +229,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             return null;
         }
     }
-    
+
     private List<ProductProperties> loadProperties(File dir) throws PluginExecutionException {
         List<ProductProperties> list = new ArrayList<ProductProperties>();
 
@@ -248,7 +266,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     }
                     list.add(new ProductProperties(productId, productVersion));
                 } catch (IOException e) {
-                    throw new PluginExecutionException("Cannot read the product properties file " + propertiesFile.getAbsolutePath(), e);
+                    throw new PluginExecutionException(
+                            "Cannot read the product properties file " + propertiesFile.getAbsolutePath(), e);
                 } finally {
                     if (input != null) {
                         try {
@@ -259,7 +278,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 }
             }
         }
-        
+
         if (list.isEmpty()) {
             throw new PluginExecutionException("Could not find any properties file in the " + dir
                     + " directory. Ensure the directory " + installDirectory + " contains a Liberty installation.");
@@ -267,16 +286,16 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         return list;
     }
-    
+
     private class ProductProperties {
         private String id;
         private String version;
-        
+
         public ProductProperties(String id, String version) {
             this.id = id;
             this.version = version;
         }
-        
+
         public String getId() {
             return id;
         }
@@ -285,17 +304,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             return version;
         }
     }
-    
+
     /**
      * Returns true if this scenario is not supported for installing from Maven
      * repository, which is one of the following conditions: "from" parameter is
-     * specified (don't need Maven repositories), or esa files are specified in
-     * the configuration (not supported with Maven for now)
+     * specified (don't need Maven repositories), or esa files are specified in the
+     * configuration (not supported with Maven for now)
      * 
-     * @param from
-     *            the "from" parameter specified in the plugin
-     * @param pluginListedEsas
-     *            the ESA files specified in the plugin configuration
+     * @param from             the "from" parameter specified in the plugin
+     * @param pluginListedEsas the ESA files specified in the plugin configuration
      * @return true if the fallback scenario occurred, false otherwise
      */
     private boolean hasUnsupportedParameters(String from, Set<String> pluginListedEsas) {
@@ -305,7 +322,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         debug("hasPluginListedEsas: " + hasPluginListedEsas);
         return hasFrom || hasPluginListedEsas;
     }
-    
+
     private File downloadEsaArtifact(String mavenCoordinates) throws PluginExecutionException {
         String[] mavenCoordinateArray = mavenCoordinates.split(":");
         String groupId = mavenCoordinateArray[0];
@@ -313,15 +330,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         String version = mavenCoordinateArray[2];
         return downloadArtifact(groupId, artifactId, "esa", version);
     }
-    
-    private List<File> downloadEsas(Collection<?> mavenCoordsList) throws PluginExecutionException{
+
+    private List<File> downloadEsas(Collection<?> mavenCoordsList) throws PluginExecutionException {
         List<File> repoPaths = new ArrayList<File>();
         for (Object coordinate : mavenCoordsList) {
             repoPaths.add(downloadEsaArtifact((String) coordinate));
         }
         return repoPaths;
     }
-    
+
     /**
      * Gets the set of all Open Liberty features by scanning the product JSONs.
      * 
@@ -335,7 +352,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             Scanner s = null;
             try {
                 s = new Scanner(file);
-                // scan Maven coordinates for artifactIds that belong to the Open Liberty groupId
+                // scan Maven coordinates for artifactIds that belong to the Open Liberty
+                // groupId
                 while (s.findWithinHorizon(OPEN_LIBERTY_GROUP_ID + ":([^:]*):", 0) != null) {
                     MatchResult match = s.match();
                     if (match.groupCount() >= 1) {
@@ -352,25 +370,27 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         return libertyFeatures;
     }
-    
+
     /**
      * Returns true if all features in featuresToInstall are Open Liberty features.
      * 
      * @param featuresToInstall list of features to check
      * @return true if featureToInstall has only Open Liberty features
-     * @throws PluginExecutionException if any of the downloaded JSONs could not be found
+     * @throws PluginExecutionException if any of the downloaded JSONs could not be
+     *                                  found
      */
     private boolean isOnlyOpenLibertyFeatures(List<String> featuresToInstall) throws PluginExecutionException {
         boolean result = containsIgnoreCase(getOpenLibertyFeatureSet(downloadedJsons), featuresToInstall);
         debug("Is installing only Open Liberty features? " + result);
         return result;
     }
-    
+
     /**
-     * Returns whether the reference collection contains all of the strings in the target collection, ignoring case.
+     * Returns whether the reference collection contains all of the strings in the
+     * target collection, ignoring case.
      * 
      * @param reference The reference collection
-     * @param target The target collection
+     * @param target    The target collection
      * @return true if reference contains all Strings from target, ignoring case
      */
     public static boolean containsIgnoreCase(Collection<String> reference, Collection<String> target) {
@@ -384,32 +404,38 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         return result;
     }
-    
+
     /**
-     * Resolve, download, and install features from a Maven repository. This
-     * method calls the resolver with the given JSONs and feature list,
-     * downloads the ESAs corresponding to the resolved features, then installs
-     * those features.
+     * Resolve, download, and install features from a Maven repository. This method
+     * calls the resolver with the given JSONs and feature list, downloads the ESAs
+     * corresponding to the resolved features, then installs those features.
      * 
-     * @param jsonRepos
-     *            JSON files, each containing an array of metadata for all
-     *            features in a Liberty release.
-     * @param featuresToInstall
-     *            The list of features to install.
-     * @throws PluginExecutionException
-     *             if any of the features could not be installed
+     * @param jsonRepos         JSON files, each containing an array of metadata for
+     *                          all features in a Liberty release.
+     * @param featuresToInstall The list of features to install.
+     * @throws PluginExecutionException if any of the features could not be
+     *                                  installed
      */
     @SuppressWarnings("unchecked")
-    public void installFeatures(boolean isAcceptLicense, List<String> featuresToInstall) throws PluginExecutionException {
+    public void installFeatures(boolean isAcceptLicense, List<String> featuresToInstall)
+            throws PluginExecutionException {
         List<File> jsonRepos = new ArrayList<File>(downloadedJsons);
         debug("JSON repos: " + jsonRepos);
         info("Installing features: " + featuresToInstall);
-        
+
         // override license acceptance if installing only Open Liberty features
         boolean acceptLicenseMapValue = isOnlyOpenLibertyFeatures(featuresToInstall) ? true : isAcceptLicense;
 
+        URL installJarURL = null;
         try {
-            Map<String, Object> mapBasedInstallKernel = createMapBasedInstallKernelInstance(installDirectory);
+            installJarURL = installJarFile.toURI().toURL();
+        } catch (MalformedURLException e) {
+            throw new PluginExecutionException("Could not resolve URL from file " + installJarFile, e);
+        }
+        Map<String, Object> mapBasedInstallKernel = null;
+
+        try (final URLClassLoader loader = new URLClassLoader(new URL[] { installJarURL }, getClass().getClassLoader())) {
+            mapBasedInstallKernel = createMapBasedInstallKernelInstance(loader, installDirectory);
             mapBasedInstallKernel.put("install.local.esa", true);
             mapBasedInstallKernel.put("single.json.file", jsonRepos);
             mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
@@ -421,11 +447,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
             Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
             if (resolvedFeatures == null) {
-                debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
+                debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
                 throw new PluginExecutionException(exceptionMessage);
             } else if (resolvedFeatures.isEmpty()) {
-                debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
+                debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
                 if (exceptionMessage == null) {
                     debug("resolvedFeatures was empty but the install kernel did not issue any messages");
@@ -443,7 +469,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
             StringBuilder installedFeaturesBuilder = new StringBuilder();
             Collection<String> actionReturnResult = new ArrayList<String>();
-            for (File esaFile: artifacts ){
+            for (File esaFile : artifacts) {
                 mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
                 mapBasedInstallKernel.put("action.install", esaFile);
                 if (to != null) {
@@ -451,10 +477,10 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     debug("Installing to extension: " + to);
                 }
                 Integer ac = (Integer) mapBasedInstallKernel.get("action.result");
-                debug("action.result: "+ac);
-                debug("action.error.message: "+mapBasedInstallKernel.get("action.error.message"));
+                debug("action.result: " + ac);
+                debug("action.error.message: " + mapBasedInstallKernel.get("action.error.message"));
                 if (mapBasedInstallKernel.get("action.error.message") != null) {
-                    debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
+                    debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
                     String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
                     debug(exceptionMessage);
                     throw new PluginExecutionException(exceptionMessage);
@@ -469,20 +495,33 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             info("The following features have been installed: " + installedFeaturesBuilder.toString());
         } catch (PrivilegedActionException e) {
             throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
+        } catch (IOException e) {
+            throw new PluginExecutionException("Could not close the jar " + installJarFile.getAbsolutePath() + " after installing features.", e);
+        } finally {
+            if (mapBasedInstallKernel != null) {
+                try {
+                    mapBasedInstallKernel.clear();
+                } catch (UnsupportedOperationException e) {
+                    debug("This version of the install map does not support the clear operation.", e);
+                } catch (RuntimeException e) {
+                    throw new PluginExecutionException("Could not close resources after installing features.", e);
+                }
+            }
         }
     }
-    
-    private Map<String, Object> createMapBasedInstallKernelInstance(File installDirectory) throws PrivilegedActionException, PluginExecutionException {
+
+    private Map<String, Object> createMapBasedInstallKernelInstance(final ClassLoader loader, File installDirectory)
+            throws PrivilegedActionException, PluginExecutionException {
         Map<String, Object> mapBasedInstallKernel = AccessController.doPrivileged(new PrivilegedExceptionAction<Map<String, Object>>() {
-            @SuppressWarnings({ "unchecked", "resource" })
-            @Override
-            public Map<String, Object> run() throws Exception {
-                ClassLoader loader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, getClass().getClassLoader());
-                Class<Map<String, Object>> clazz;
-                clazz = (Class<Map<String, Object>>) loader.loadClass("com.ibm.ws.install.map.InstallMap");
-                return clazz.newInstance();
-            }
-        });
+                @SuppressWarnings({ "unchecked" })
+                @Override
+                public Map<String, Object> run() throws Exception {
+                    
+                    Class<Map<String, Object>> clazz;
+                    clazz = (Class<Map<String, Object>>) loader.loadClass("com.ibm.ws.install.map.InstallMap");
+                    return clazz.newInstance();
+                }
+            });
         if (mapBasedInstallKernel == null){
             throw new PluginExecutionException("Cannot run install jar file " + installJarFile);
         }
