@@ -20,6 +20,7 @@ import java.io.IOException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.commons.io.FileUtils;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
 
@@ -49,9 +50,27 @@ public class LooseConfigData extends XmlDocument {
     }
     
     public void addFile(Element parent, File src, String target) throws DOMException, IOException {
+        addFile(parent, src, target, null);
+    }
+    
+    public void addFile(Element parent, File src, String target, File copyDirectory) throws DOMException, IOException {
         if (src != null && src.exists() && src.isFile()) {
             Element child = doc.createElement("file");
-            addElement(parent, child, src, target);
+            if(copyDirectory != null && copyDirectory.exists() && copyDirectory.isDirectory() &&
+                    !src.getCanonicalPath().contains(copyDirectory.getCanonicalPath())) {
+                // Create a unique subdirectory based on timestamp so we don't get any overwritten files
+                File copyFileDirectory = new File(copyDirectory, Long.toString(System.nanoTime()));
+                copyFileDirectory.mkdir();
+                
+                // Copy the file into the directory
+                File copyFile = new File(copyFileDirectory, src.getName());
+                FileUtils.copyFile(src, copyFile);
+                
+                addElement(parent, child, copyFile, target);
+            }
+            else {
+                addElement(parent, child, src, target);
+            }
         }
     }
     
