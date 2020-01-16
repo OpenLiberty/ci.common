@@ -893,7 +893,7 @@ public abstract class DevUtil {
                         if (hotTests) {
                             info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
                         } else {
-                            info("Press the Enter key to run tests on demand.");
+                            info("Press the Enter key to run tests on demand. To stop the server and quit dev mode, use Ctrl-C or type 'q' and press the Enter key.");
                         }
                     } else {    
                         debug("Cannot read user input, setting hotTests to true.");
