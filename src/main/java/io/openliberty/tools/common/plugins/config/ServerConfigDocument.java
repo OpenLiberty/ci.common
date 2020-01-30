@@ -484,11 +484,7 @@ public class ServerConfigDocument {
         }
 
         for (String nextVariable : variablesToResolve) {
-            String value = getProperties().getProperty(nextVariable);
-            if (value == null) {
-                // Check for default value since no other value found.
-                value = getDefaultProperties().getProperty(nextVariable);
-            }
+            String value = getPropertyValue(nextVariable);
 
             if (value != null && !value.isEmpty()) {
                 Collection<String> thisVariableChain = new HashSet<String> ();
@@ -515,6 +511,24 @@ public class ServerConfigDocument {
         }
 
         return resolved;
+    }
+
+    private static String getPropertyValue(String propertyName) {
+        String value = getProperties().getProperty(propertyName);
+        if (value == null) {
+            // Check for default value since no other value found.
+            value = getDefaultProperties().getProperty(propertyName);
+        }
+        if (value == null && propertyName.startsWith("env.") && propertyName.length() > 4) {
+            // Look for property without the 'env.' prefix
+            String newPropName = propertyName.substring(4);
+            value = getProperties().getProperty(newPropName);
+            if (value == null) {
+                // Check for default value since no other value found.
+                value = getDefaultProperties().getProperty(newPropName);
+            }
+        }
+        return value;
     }
 
     private static void parseVariables(Document doc) throws XPathExpressionException {
