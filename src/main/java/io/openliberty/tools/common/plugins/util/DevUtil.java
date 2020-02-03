@@ -370,8 +370,8 @@ public abstract class DevUtil {
                     long timeout = appStartupTimeout * 1000;
 
                     // Wait for the app started message in messages.log
-                    info("Waiting up to " + appStartupTimeout + " seconds for the application to start up...");
-                    String startMessage = serverTask.waitForStringInLog(START_APP_MESSAGE_REGEXP, timeout,
+                    info("Waiting up to " + appStartupTimeout + " seconds to find the application start up or update message...");
+                    String startMessage = serverTask.waitForStringInLog("(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + ")", timeout,
                             logFile);
                     if (startMessage == null) {
                         error("Unable to verify if the application was started after " + appStartupTimeout
