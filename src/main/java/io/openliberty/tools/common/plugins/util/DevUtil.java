@@ -370,9 +370,9 @@ public abstract class DevUtil {
                     long timeout = appStartupTimeout * 1000;
 
                     // Wait for the app started message in messages.log
-                    info("Waiting up to " + appStartupTimeout + " seconds for the application to start up...");
-                    String startMessage = serverTask.waitForStringInLog(START_APP_MESSAGE_REGEXP, timeout,
-                            logFile);
+                    info("Waiting up to " + appStartupTimeout + " seconds to find the application start up or update message...");
+                    String startMessage = serverTask.waitForStringInLog("(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
+                            timeout, logFile);
                     if (startMessage == null) {
                         error("Unable to verify if the application was started after " + appStartupTimeout
                                 + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
@@ -380,8 +380,7 @@ public abstract class DevUtil {
                         detectedAppStarted.set(true);
                     }
                 }
-
-                if (waitForApplicationUpdate) {
+                else if (waitForApplicationUpdate) {
                     // wait until application has been updated
                     if (appUpdateTimeout < 0) {
                         appUpdateTimeout = 5;
@@ -389,6 +388,7 @@ public abstract class DevUtil {
                     long timeout = appUpdateTimeout * 1000;
                     serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
                 }
+
                 if (gradle) {
                     info("Running tests...");
                 } else {
