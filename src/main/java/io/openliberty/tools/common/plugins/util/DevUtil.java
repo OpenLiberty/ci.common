@@ -230,6 +230,15 @@ public abstract class DevUtil {
      */
     public abstract void redeployApp() throws PluginExecutionException;
 
+    /**
+     * Get an example command using the server start timeout parameter.
+     * The example command is unique to each plugin.
+     *
+     * @return String containing the example command
+     */
+    public abstract String getServerStartTimeoutExample();
+
+
     private File serverDirectory;
     private File sourceDirectory;
     private File testSourceDirectory;
@@ -524,8 +533,9 @@ public abstract class DevUtil {
             if (startMessage == null) {
                 setDevStop(true);
                 stopServer();
-                throw new PluginExecutionException("Unable to verify if the server was started after " + serverStartTimeout
-                        + " seconds.  Consider increasing the serverStartTimeout value if this continues to occur.");
+                throw new PluginExecutionException("The server has not started within " + serverStartTimeout + " seconds. " +
+                        "Consider increasing the server start timeout if this continues to occur. " +
+                        "For example, " + getServerStartTimeoutExample());
             }
 
             // Check for port already in use error
