@@ -164,6 +164,12 @@ public class BaseDevUtilTest {
         public void redeployApp() throws PluginExecutionException {
             // not needed for tests
         }
+
+        @Override
+        public String getServerStartTimeoutExample() {
+            // not needed for tests
+            return null;
+        }
         
     }
     
