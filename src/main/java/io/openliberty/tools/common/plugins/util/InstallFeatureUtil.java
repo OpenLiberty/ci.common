@@ -525,8 +525,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 Method disableCaching = java.net.URLConnection.class.getMethod("setDefaultUseCaches", String.class, boolean.class);
                 disableCaching.invoke(null, "jar", false); // null = static method, false = do not cache
             }
-        } catch (Exception e) {  // ignore the exceptions if this does not work. E.g. no method found in Java 8.
-            info(e.getClass().getName() + " trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in disable");
+        } catch (NoSuchMethodException e) {  // ignore the exception in Java 8.
+            debug("NoSuchMethodException trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in disable");
+        } catch (Exception e) {  // warn if some other exception occurred
+            warn("Could not disable caching for URLConnection: " + e.getMessage());
+            debug("Exception trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in disable", e);
         }
     }
 
@@ -539,8 +542,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 Method disableCaching = java.net.URLConnection.class.getMethod("setDefaultUseCaches", String.class, boolean.class);
                 disableCaching.invoke(null, "jar", saveURLCacheStatus.booleanValue()); // null = static method
             }
-        } catch (Exception e) {  // ignore the exceptions if this does not work. E.g. no method found in Java 8.
-            info(e.getClass().getName() + " trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in restore");
+        } catch (NoSuchMethodException e) {  // ignore the exception in Java 8.
+            debug("NoSuchMethodException trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in restore");
+        } catch (Exception e) {  // warn if some other exception occurred
+            warn("Could not enable caching for URLConnection: " + e.getMessage());
+            debug("Exception trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in restore", e);
         } finally {
             saveURLCacheStatus = null;
         }
