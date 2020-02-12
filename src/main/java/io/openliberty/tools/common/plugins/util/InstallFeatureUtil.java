@@ -24,6 +24,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -66,6 +67,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String INSTALL_MAP_SUFFIX = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
     private String openLibertyVersion;
+    private static Boolean saveURLCacheStatus = null;
 
     /**
      * Initialize the utility and check for unsupported scenarios.
@@ -434,6 +436,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         Map<String, Object> mapBasedInstallKernel = null;
 
+        disableCacheInURLClassLoader();
         try (final URLClassLoader loader = new URLClassLoader(new URL[] { installJarURL }, getClass().getClassLoader())) {
             mapBasedInstallKernel = createMapBasedInstallKernelInstance(loader, installDirectory);
             mapBasedInstallKernel.put("install.local.esa", true);
@@ -507,6 +510,45 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     throw new PluginExecutionException("Could not close resources after installing features.", e);
                 }
             }
+            restoreCacheInURLClassLoader();
+        }
+    }
+
+    // Attempt to disable connection caching in the URLClassLoader so that the jar files will
+    // all close when we close the class loader. Use reflection because this is not supported
+    // in Java 8. Save the current value to restore it later for performance reasons.
+    private synchronized void disableCacheInURLClassLoader() {
+        try {
+            if (saveURLCacheStatus == null) {
+                Method getDefaultCaching = java.net.URLConnection.class.getMethod("getDefaultUseCaches", String.class);
+                saveURLCacheStatus = Boolean.valueOf((boolean) getDefaultCaching.invoke(null, "jar")); // null = static method
+                Method disableCaching = java.net.URLConnection.class.getMethod("setDefaultUseCaches", String.class, boolean.class);
+                disableCaching.invoke(null, "jar", false); // null = static method, false = do not cache
+            }
+        } catch (NoSuchMethodException e) {  // ignore the exception in Java 8.
+            debug("NoSuchMethodException trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in disable");
+        } catch (Exception e) {  // warn if some other exception occurred
+            warn("Could not disable caching for URLConnection: " + e.getMessage());
+            debug("Exception trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in disable", e);
+        }
+    }
+
+    // Attempt to restore the connection caching value in the URLClassLoader so that the jar files
+    // will be cached or not as previously set. Use reflection because this is not supported
+    // in Java 8.
+    private synchronized void restoreCacheInURLClassLoader() {
+        try {
+            if (saveURLCacheStatus != null) {
+                Method disableCaching = java.net.URLConnection.class.getMethod("setDefaultUseCaches", String.class, boolean.class);
+                disableCaching.invoke(null, "jar", saveURLCacheStatus.booleanValue()); // null = static method
+            }
+        } catch (NoSuchMethodException e) {  // ignore the exception in Java 8.
+            debug("NoSuchMethodException trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in restore");
+        } catch (Exception e) {  // warn if some other exception occurred
+            warn("Could not enable caching for URLConnection: " + e.getMessage());
+            debug("Exception trying to invoke java.net.URLConnection.setDefaultUseCaches(S,b) in restore", e);
+        } finally {
+            saveURLCacheStatus = null;
         }
     }
 
