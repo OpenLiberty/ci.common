@@ -30,7 +30,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -38,7 +37,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardWatchEventKinds;
@@ -236,13 +234,12 @@ public abstract class DevUtil {
     public abstract void redeployApp() throws PluginExecutionException;
 
     /**
-     * Get an example command using the server start timeout parameter.
-     * The example command is unique to each plugin.
+     * Get an example command using the server start timeout parameter. The example
+     * command is unique to each plugin.
      *
      * @return String containing the example command
      */
     public abstract String getServerStartTimeoutExample();
-
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -281,8 +278,8 @@ public abstract class DevUtil {
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, 
-            boolean polling, long pollingInterval) {
+            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean polling,
+            long pollingInterval) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -307,7 +304,13 @@ public abstract class DevUtil {
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.polling = polling;
-        this.pollingInterval = pollingInterval;
+
+        if (polling && pollingInterval < 0) {
+            warn("The pollingInterval value needs to be an integer greater than or equal to 0.  The default value of 100 milliseconds will be used.");
+            this.pollingInterval = 100;
+        } else {
+            this.pollingInterval = pollingInterval;
+        }
     }
 
     /**
@@ -393,8 +396,10 @@ public abstract class DevUtil {
                     long timeout = appStartupTimeout * 1000;
 
                     // Wait for the app started message in messages.log
-                    info("Waiting up to " + appStartupTimeout + " seconds to find the application start up or update message...");
-                    String startMessage = serverTask.waitForStringInLog("(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
+                    info("Waiting up to " + appStartupTimeout
+                            + " seconds to find the application start up or update message...");
+                    String startMessage = serverTask.waitForStringInLog(
+                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
                             timeout, logFile);
                     if (startMessage == null) {
                         error("Unable to verify if the application was started after " + appStartupTimeout
@@ -402,8 +407,7 @@ public abstract class DevUtil {
                     } else {
                         detectedAppStarted.set(true);
                     }
-                }
-                else if (waitForApplicationUpdate) {
+                } else if (waitForApplicationUpdate) {
                     // wait until application has been updated
                     if (appUpdateTimeout < 0) {
                         appUpdateTimeout = 5;
@@ -478,18 +482,10 @@ public abstract class DevUtil {
             enableServerDebug();
 
             String logsDirectory = serverDirectory.getCanonicalPath() + "/logs";
-            File messagesLogFile = new File(logsDirectory + "/messages.log");
+            final File messagesLogFile = new File(logsDirectory + "/messages.log");
 
             // Watch logs directory if it already exists
-            WatchService watchService = FileSystems.getDefault().newWatchService();
             boolean logsExist = new File(logsDirectory).isDirectory();
-
-            if (logsExist) {
-                // If the logs directory already exists, then
-                // setup a watch service to monitor the directory.
-                Paths.get(logsDirectory).register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
-                        StandardWatchEventKinds.ENTRY_MODIFY);
-            }
 
             // Start server
             serverThread = new Thread(new Runnable() {
@@ -517,20 +513,59 @@ public abstract class DevUtil {
             setDevStop(false);
 
             if (logsExist) {
+                final AtomicBoolean messagesModified = new AtomicBoolean(false);
+
                 // If logs already exist, then watch the directory to ensure
                 // messages.log is modified before continuing.
-                boolean messagesModified = false;
-                WatchKey key;
-                while (!messagesModified && (key = watchService.take()) != null) {
-                    for (WatchEvent<?> event : key.pollEvents()) {
-                        if (event.context().toString().equals("messages.log")) {
-                            messagesModified = true;
-                            debug("messages.log has been changed");
+                FileFilter singleFileFilter = new FileFilter() {
+                    @Override
+                    public boolean accept(File file) {
+                        try {
+                            if (file.getCanonicalFile().equals(messagesLogFile.getCanonicalFile())) {
+                                return true;
+                            }
+                        } catch (IOException e) {
+                            if (file.equals(messagesLogFile)) {
+                                return true;
+                            }
                         }
+                        return false;
+                    }
+                };
+
+                FileAlterationObserver observer = new FileAlterationObserver(logsDirectory, singleFileFilter);
+                observer.addListener(new FileAlterationListenerAdaptor() {
+                    @Override
+                    public void onFileCreate(File file) {
+                        messagesModified.set(true);
                     }
 
-                    if (!key.reset()) {
-                        break;
+                    @Override
+                    public void onFileChange(File file) {
+                        messagesModified.set(true);
+                    }
+                });
+
+                try {
+                    observer.initialize();
+                    while (!messagesModified.get()) {
+                        observer.checkAndNotify();
+                        if (polling) {
+                            // if polling is enabled, use the specified polling interval
+                            Thread.sleep(pollingInterval);
+                        } else {
+                            // otherwise just use something reasonable while waiting for the log file to update during server startup
+                            Thread.sleep(500);
+                        }
+                    }
+                    debug("messages.log has been changed");
+                } catch (Exception e) {
+                    error("An error occured while waiting for the server to update messages.log: " + e.getMessage(), e);
+                } finally {
+                    try {
+                        observer.destroy();
+                    } catch (Exception e) {
+                        debug("Could not destroy FileAlterationObserver for logs directory " + logsDirectory, e);
                     }
                 }
             }
@@ -561,7 +596,7 @@ public abstract class DevUtil {
 
             // Parse hostname, http, https ports for integration tests to use
             parseHostNameAndPorts(serverTask, messagesLogFile);
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
         }
     }
