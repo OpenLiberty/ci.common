@@ -584,7 +584,7 @@ public abstract class DevUtil {
                 setDevStop(true);
                 stopServer();
                 throw new PluginExecutionException("The server has not started within " + serverStartTimeout + " seconds. " +
-                        "Consider increasing the server start timeout if this continues to occur. " +
+                        "Consider increasing the server start timeout if this continues to occur." +
                         "For example, " + getServerStartTimeoutExample());
             }
 
@@ -1061,17 +1061,20 @@ public abstract class DevUtil {
     boolean triggerJavaTestRecompile;
     File outputDirectory;
     File serverXmlFile;
+    File bootstrapPropertiesFile;
     File serverXmlFileParent;
+    File bootstrapPropertiesFileParent;
     File buildFile;
     List<String> artifactPaths;
 
     // The serverXmlFile parameter can be null when using the server.xml from the
     // configDirectory, which has a default value.
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> artifactPaths, File serverXmlFile) throws Exception {
+            final ThreadPoolExecutor executor, List<String> artifactPaths, File serverXmlFile, File bootstrapPropertiesFile) throws Exception {
         this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
+        this.bootstrapPropertiesFile = bootstrapPropertiesFile;
         this.artifactPaths = artifactPaths;
 
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
@@ -1079,6 +1082,11 @@ public abstract class DevUtil {
             serverXmlFileParent = null;
             if (serverXmlFile != null && serverXmlFile.exists()) {
                 serverXmlFileParent = serverXmlFile.getParentFile();
+            }
+
+            bootstrapPropertiesFileParent = null;
+            if (bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists()) {
+                bootstrapPropertiesFileParent = bootstrapPropertiesFile.getParentFile();
             }
 
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
@@ -1089,6 +1097,7 @@ public abstract class DevUtil {
             boolean testSourceDirRegistered = false;
             boolean configDirRegistered = false;
             boolean serverXmlFileRegistered = false;
+            boolean bootstrapPropertiesFileRegistered = false;
 
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, executor, watcher);
@@ -1109,6 +1118,12 @@ public abstract class DevUtil {
                 Path serverXmlFilePath = serverXmlFileParent.getCanonicalFile().toPath();
                 registerAll(serverXmlFilePath, executor, watcher);
                 serverXmlFileRegistered = true;
+            }
+
+            if (bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists() && bootstrapPropertiesFileParent.exists()) {
+                Path bootstrapPropertiesFilePath = bootstrapPropertiesFileParent.getCanonicalFile().toPath();
+                registerAll(bootstrapPropertiesFilePath, executor, watcher);
+                bootstrapPropertiesFileRegistered = true;
             }
 
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
@@ -1168,7 +1183,7 @@ public abstract class DevUtil {
                         debug("Registering configuration directory: " + this.configDirectory);
                     } else {
                         warn("The server configuration directory " + configDirectory
-                                + " has been added. Restart liberty:dev mode for it to take effect.");
+                                + " has been added. Restart dev mode for it to take effect.");
                     }
                 }
 
@@ -1177,7 +1192,12 @@ public abstract class DevUtil {
                     serverXmlFileRegistered = true;
                     debug("Server configuration file has been added: " + serverXmlFile);
                     warn("The server configuration file " + serverXmlFile
-                            + " has been added. Restart liberty:dev mode for it to take effect.");
+                            + " has been added. Restart dev mode for it to take effect.");
+                }
+
+                //TODO: what actions should be performed here when bootstrapPropertiesFile has been added?
+                if (!bootstrapPropertiesFileRegistered && bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists()) {
+                    bootstrapPropertiesFileRegistered = true;
                 }
 
                 // check if resourceDirectory has been added
@@ -1560,6 +1580,13 @@ public abstract class DevUtil {
                     // re-enable debug variables in server.env
                     enableServerDebug(false);
                 }
+
+                //TODO: this check partially works... the file is still copied to the server dir in code above, which we don't want if we are not using default bootstrap.properties
+                //TODO: this also does not work when bootstrapPropertiesFile is assigned in pom.xml but, the file does not exist
+                if (fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFile == null) {
+                    // restart server to load new properties
+                    restartServer();
+                }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
@@ -1571,10 +1598,9 @@ public abstract class DevUtil {
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
         } else if (serverXmlFileParent != null
-                && directory.startsWith(serverXmlFileParent.getCanonicalFile().toPath())) {
-            if (fileChanged.exists() && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())
-                    && (changeType == ChangeType.MODIFY
-                            || changeType == ChangeType.CREATE)) {
+                && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
+                && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
+            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (changeType == ChangeType.CREATE) {
@@ -1582,12 +1608,17 @@ public abstract class DevUtil {
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
-            } else if (changeType == ChangeType.DELETE
-                    && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
+            } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
+        } else if (bootstrapPropertiesFileParent != null
+                   && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
+                   && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
+            // TODO: do we need to copy the file to the server dir?
+            // restart server to load new properties
+            restartServer();
         } else if (resourceParent != null
                 && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
             debug("Resource dir: " + resourceParent.toString());
