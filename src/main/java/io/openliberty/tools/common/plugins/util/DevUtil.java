@@ -241,6 +241,13 @@ public abstract class DevUtil {
      */
     public abstract String getServerStartTimeoutExample();
 
+    /**
+     * Returns whether the server is running.
+     * 
+     * @return true if the server is running, otherwise false
+     */
+    public abstract boolean isServerRunning();
+
     private File serverDirectory;
     private File sourceDirectory;
     private File testSourceDirectory;
@@ -274,12 +281,13 @@ public abstract class DevUtil {
     private boolean gradle;
     private boolean polling;
     private long pollingInterval;
+    private final boolean headless;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean polling,
-            long pollingInterval) {
+            long pollingInterval, boolean headless) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -304,6 +312,7 @@ public abstract class DevUtil {
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.polling = polling;
+        this.headless = headless;
 
         if (polling && pollingInterval < 0) {
             warn("The pollingInterval value needs to be an integer greater than or equal to 0.  The default value of 100 milliseconds will be used.");
@@ -333,7 +342,9 @@ public abstract class DevUtil {
                 // not expected since server should already have been started
                 error("Could not get the server task for running tests.", e);
             }
-            File logFile = serverTask.getLogFile();
+
+            File logFile = getMessagesLogFile(serverTask);
+
             String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
 
             try {
@@ -387,33 +398,40 @@ public abstract class DevUtil {
             }
 
             if (!skipITs) {
-
-                if (!detectedAppStarted.get()) {
-                    if (appStartupTimeout < 0) {
-                        warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
-                        appStartupTimeout = 30;
+                boolean serverRunning = true;
+                if (headless) {
+                    // if headless, check whether the server running
+                    serverRunning = serverDirectory.exists() && isServerRunning();
+                    debug("Is server running: " + serverRunning);
+                }
+                if (serverRunning) {
+                    if (!detectedAppStarted.get()) {
+                        if (appStartupTimeout < 0) {
+                            warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
+                            appStartupTimeout = 30;
+                        }
+                        long timeout = appStartupTimeout * 1000;
+    
+                        // Wait for the app started message in messages.log
+                        info("Waiting up to " + appStartupTimeout
+                                + " seconds to find the application start up or update message...");
+                        String startMessage = serverTask.waitForStringInLog(
+                                "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
+                                timeout, logFile);
+                        if (startMessage == null) {
+                            error("Unable to verify if the application was started after " + appStartupTimeout
+                                    + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
+                        } else {
+                            detectedAppStarted.set(true);
+                        }
+                    } else if (waitForApplicationUpdate) {
+                        // wait until application has been updated
+                        if (appUpdateTimeout < 0) {
+                            appUpdateTimeout = 5;
+                        }
+                        long timeout = appUpdateTimeout * 1000;
+                        serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
                     }
-                    long timeout = appStartupTimeout * 1000;
-
-                    // Wait for the app started message in messages.log
-                    info("Waiting up to " + appStartupTimeout
-                            + " seconds to find the application start up or update message...");
-                    String startMessage = serverTask.waitForStringInLog(
-                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
-                            timeout, logFile);
-                    if (startMessage == null) {
-                        error("Unable to verify if the application was started after " + appStartupTimeout
-                                + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
-                    } else {
-                        detectedAppStarted.set(true);
-                    }
-                } else if (waitForApplicationUpdate) {
-                    // wait until application has been updated
-                    if (appUpdateTimeout < 0) {
-                        appUpdateTimeout = 5;
-                    }
-                    long timeout = appUpdateTimeout * 1000;
-                    serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
                 }
 
                 if (gradle) {
@@ -451,7 +469,7 @@ public abstract class DevUtil {
         if (!(skipTests || skipITs)) {
             try {
                 ServerTask serverTask = getServerTask();
-                File logFile = serverTask.getLogFile();
+                File logFile = getMessagesLogFile(serverTask);
                 String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
                 messageOccurrences = serverTask.countStringOccurrencesInFile(regexp, logFile);
                 debug("Message occurrences before compile: " + messageOccurrences);
@@ -463,6 +481,24 @@ public abstract class DevUtil {
     }
 
     /**
+     * Try to get log file from server directory first.
+     * If the server directory path cannot be resolved, get log file from the server task instead.
+     * 
+     * @param serverTask the server task
+     * @return the messages log file for the server
+     */
+    private File getMessagesLogFile(ServerTask serverTask) {
+        File logFile;
+        try {
+            String logsDirectory = serverDirectory.getCanonicalPath() + "/logs";
+            logFile = new File(logsDirectory, "messages.log");
+        } catch (IOException e) {
+            logFile = serverTask.getLogFile();
+        }
+        return logFile;
+    }
+
+    /**
      * Start the server and keep it running in a background thread.
      * 
      * @throws PluginExecutionException If the server startup could not be verified
@@ -470,6 +506,9 @@ public abstract class DevUtil {
      *                                  failed.
      */
     public void startServer() throws PluginExecutionException {
+        if (headless) {
+            return;
+        }
         try {
             final ServerTask serverTask;
             try {
@@ -608,7 +647,11 @@ public abstract class DevUtil {
     public abstract void libertyInstallFeature() throws PluginExecutionException;
 
     public void restartServer() throws PluginExecutionException {
-        info("Restarting server...");
+        if (headless) {
+            info("Redeploying server...");
+        } else {
+            info("Restarting server...");
+        }
         setDevStop(true);
         stopServer();
         if (serverThread != null) {
@@ -635,7 +678,11 @@ public abstract class DevUtil {
         libertyDeploy();
         startServer();
         setDevStop(false);
-        info("The server has been restarted.");
+        if (headless) {
+            info("The server has been redeployed.");
+        } else {
+            info("The server has been restarted.");
+        }
     }
 
     private void parseHostNameAndPorts(final ServerTask serverTask, File messagesLogFile)
@@ -1439,7 +1486,7 @@ public abstract class DevUtil {
 
     private void checkServerStopped() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if (serverThread.getState().equals(Thread.State.TERMINATED)) {
+        if (serverThread != null && serverThread.getState().equals(Thread.State.TERMINATED)) {
             if (!this.devStop.get()) {
                 // server was stopped outside of dev mode
                 throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
