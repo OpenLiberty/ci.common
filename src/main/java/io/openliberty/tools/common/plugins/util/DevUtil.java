@@ -1066,8 +1066,6 @@ public abstract class DevUtil {
     File bootstrapPropertiesFileParent;
     File jvmOptionsFile;
     File jvmOptionsFileParent;
-    File serverEnvFile;
-    File serverEnvFileParent;
     File buildFile;
     List<String> artifactPaths;
 
@@ -1075,13 +1073,12 @@ public abstract class DevUtil {
     // configDirectory, which has a default value.
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
             final ThreadPoolExecutor executor, List<String> artifactPaths, File serverXmlFile,
-            File bootstrapPropertiesFile, File jvmOptionsFile, File serverEnvFile) throws Exception {
+            File bootstrapPropertiesFile, File jvmOptionsFile) throws Exception {
         this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
         this.bootstrapPropertiesFile = bootstrapPropertiesFile;
         this.jvmOptionsFile = jvmOptionsFile;
-        this.serverEnvFile = serverEnvFile;
         this.artifactPaths = artifactPaths;
 
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
@@ -1101,11 +1098,6 @@ public abstract class DevUtil {
                 jvmOptionsFileParent = jvmOptionsFile.getParentFile();
             }
 
-            serverEnvFileParent = null;
-            if (serverEnvFile != null && serverEnvFile.exists()) {
-                serverEnvFileParent = serverEnvFile.getParentFile();
-            }
-
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
@@ -1116,7 +1108,6 @@ public abstract class DevUtil {
             boolean serverXmlFileRegistered = false;
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
-            boolean serverEnvFileRegistered = false;
 
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, executor, watcher);
@@ -1149,12 +1140,6 @@ public abstract class DevUtil {
                 Path jvmOptionsFilePath = jvmOptionsFileParent.getCanonicalFile().toPath();
                 registerAll(jvmOptionsFilePath, executor, watcher);
                 jvmOptionsFileRegistered = true;
-            }
-
-            if (serverEnvFile != null && serverEnvFile.exists() && serverEnvFileParent.exists()) {
-                Path serverEnvFilePath = serverEnvFileParent.getCanonicalFile().toPath();
-                registerAll(serverEnvFilePath, executor, watcher);
-                serverEnvFileRegistered = true;
             }
 
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
@@ -1237,13 +1222,6 @@ public abstract class DevUtil {
                     jvmOptionsFileRegistered = true;
                     debug("JVM Options file has been added: " + jvmOptionsFile);
                     warn("The JVM Options file " + jvmOptionsFile
-                            + " has been added. Restart dev mode for it to take effect.");
-                }
-
-                if (!serverEnvFileRegistered && serverEnvFile != null && serverEnvFile.exists()) {
-                    serverEnvFileRegistered = true;
-                    debug("server.env file has been added: " + serverEnvFile);
-                    warn("The server.env file " + serverEnvFile
                             + " has been added. Restart dev mode for it to take effect.");
                 }
 
@@ -1629,8 +1607,7 @@ public abstract class DevUtil {
                 }
                 
                 if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
-                     || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)
-                     || (fileChanged.getName().equals("server.env") && serverEnvFileParent == null)) {
+                     || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
                     // restart server to load new properties
                     restartServer();
                 }
@@ -1669,11 +1646,6 @@ public abstract class DevUtil {
                 && directory.equals(jvmOptionsFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(jvmOptionsFile.getName())) {
             // restart server to load new options
-            restartServer();
-        } else if (serverEnvFileParent != null
-                && directory.equals(serverEnvFileParent.getCanonicalFile().toPath())
-                && fileChanged.getCanonicalPath().endsWith(serverEnvFile.getName())) {
-            // restart server to load new values
             restartServer();
         } else if (resourceParent != null
                 && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
