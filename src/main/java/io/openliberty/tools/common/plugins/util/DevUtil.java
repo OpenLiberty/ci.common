@@ -584,7 +584,7 @@ public abstract class DevUtil {
                 setDevStop(true);
                 stopServer();
                 throw new PluginExecutionException("The server has not started within " + serverStartTimeout + " seconds. " +
-                        "Consider increasing the server start timeout if this continues to occur." +
+                        "Consider increasing the server start timeout if this continues to occur. " +
                         "For example, " + getServerStartTimeoutExample());
             }
 
@@ -1061,20 +1061,27 @@ public abstract class DevUtil {
     boolean triggerJavaTestRecompile;
     File outputDirectory;
     File serverXmlFile;
-    File bootstrapPropertiesFile;
     File serverXmlFileParent;
+    File bootstrapPropertiesFile;
     File bootstrapPropertiesFileParent;
+    File jvmOptionsFile;
+    File jvmOptionsFileParent;
+    File serverEnvFile;
+    File serverEnvFileParent;
     File buildFile;
     List<String> artifactPaths;
 
     // The serverXmlFile parameter can be null when using the server.xml from the
     // configDirectory, which has a default value.
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> artifactPaths, File serverXmlFile, File bootstrapPropertiesFile) throws Exception {
+            final ThreadPoolExecutor executor, List<String> artifactPaths, File serverXmlFile,
+            File bootstrapPropertiesFile, File jvmOptionsFile, File serverEnvFile) throws Exception {
         this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
         this.bootstrapPropertiesFile = bootstrapPropertiesFile;
+        this.jvmOptionsFile = jvmOptionsFile;
+        this.serverEnvFile = serverEnvFile;
         this.artifactPaths = artifactPaths;
 
         try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
@@ -1089,6 +1096,16 @@ public abstract class DevUtil {
                 bootstrapPropertiesFileParent = bootstrapPropertiesFile.getParentFile();
             }
 
+            jvmOptionsFileParent = null;
+            if (jvmOptionsFile != null && jvmOptionsFile.exists()) {
+                jvmOptionsFileParent = jvmOptionsFile.getParentFile();
+            }
+
+            serverEnvFileParent = null;
+            if (serverEnvFile != null && serverEnvFile.exists()) {
+                serverEnvFileParent = serverEnvFile.getParentFile();
+            }
+
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
@@ -1098,6 +1115,8 @@ public abstract class DevUtil {
             boolean configDirRegistered = false;
             boolean serverXmlFileRegistered = false;
             boolean bootstrapPropertiesFileRegistered = false;
+            boolean jvmOptionsFileRegistered = false;
+            boolean serverEnvFileRegistered = false;
 
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, executor, watcher);
@@ -1124,6 +1143,18 @@ public abstract class DevUtil {
                 Path bootstrapPropertiesFilePath = bootstrapPropertiesFileParent.getCanonicalFile().toPath();
                 registerAll(bootstrapPropertiesFilePath, executor, watcher);
                 bootstrapPropertiesFileRegistered = true;
+            }
+
+            if (jvmOptionsFile != null && jvmOptionsFile.exists() && jvmOptionsFileParent.exists()) {
+                Path jvmOptionsFilePath = jvmOptionsFileParent.getCanonicalFile().toPath();
+                registerAll(jvmOptionsFilePath, executor, watcher);
+                jvmOptionsFileRegistered = true;
+            }
+
+            if (serverEnvFile != null && serverEnvFile.exists() && serverEnvFileParent.exists()) {
+                Path serverEnvFilePath = serverEnvFileParent.getCanonicalFile().toPath();
+                registerAll(serverEnvFilePath, executor, watcher);
+                serverEnvFileRegistered = true;
             }
 
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
@@ -1195,9 +1226,25 @@ public abstract class DevUtil {
                             + " has been added. Restart dev mode for it to take effect.");
                 }
 
-                //TODO: what actions should be performed here when bootstrapPropertiesFile has been added?
                 if (!bootstrapPropertiesFileRegistered && bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists()) {
                     bootstrapPropertiesFileRegistered = true;
+                    debug("Bootstrap properties file has been added: " + bootstrapPropertiesFile);
+                    warn("The bootstrap properties file " + bootstrapPropertiesFile
+                            + " has been added. Restart dev mode for it to take effect.");
+                }
+
+                if (!jvmOptionsFileRegistered && jvmOptionsFile != null && jvmOptionsFile.exists()) {
+                    jvmOptionsFileRegistered = true;
+                    debug("JVM Options file has been added: " + jvmOptionsFile);
+                    warn("The JVM Options file " + jvmOptionsFile
+                            + " has been added. Restart dev mode for it to take effect.");
+                }
+
+                if (!serverEnvFileRegistered && serverEnvFile != null && serverEnvFile.exists()) {
+                    serverEnvFileRegistered = true;
+                    debug("server.env file has been added: " + serverEnvFile);
+                    warn("The server.env file " + serverEnvFile
+                            + " has been added. Restart dev mode for it to take effect.");
                 }
 
                 // check if resourceDirectory has been added
@@ -1580,10 +1627,10 @@ public abstract class DevUtil {
                     // re-enable debug variables in server.env
                     enableServerDebug(false);
                 }
-
-                //TODO: this check partially works... the file is still copied to the server dir in code above, which we don't want if we are not using default bootstrap.properties
-                //TODO: this also does not work when bootstrapPropertiesFile is assigned in pom.xml but, the file does not exist
-                if (fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFile == null) {
+                
+                if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
+                     || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)
+                     || (fileChanged.getName().equals("server.env") && serverEnvFileParent == null)) {
                     // restart server to load new properties
                     restartServer();
                 }
@@ -1616,8 +1663,17 @@ public abstract class DevUtil {
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
                    && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
-            // TODO: do we need to copy the file to the server dir?
             // restart server to load new properties
+            restartServer();
+        } else if (jvmOptionsFileParent != null
+                && directory.equals(jvmOptionsFileParent.getCanonicalFile().toPath())
+                && fileChanged.getCanonicalPath().endsWith(jvmOptionsFile.getName())) {
+            // restart server to load new options
+            restartServer();
+        } else if (serverEnvFileParent != null
+                && directory.equals(serverEnvFileParent.getCanonicalFile().toPath())
+                && fileChanged.getCanonicalPath().endsWith(serverEnvFile.getName())) {
+            // restart server to load new values
             restartServer();
         } else if (resourceParent != null
                 && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
