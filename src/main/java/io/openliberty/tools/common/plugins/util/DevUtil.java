@@ -241,6 +241,10 @@ public abstract class DevUtil {
      */
     public abstract String getServerStartTimeoutExample();
 
+    private enum FileTrackMode {
+        NOT_SET, FILE_WATCHER, POLLING
+    }
+
     private File serverDirectory;
     private File sourceDirectory;
     private File testSourceDirectory;
@@ -274,6 +278,7 @@ public abstract class DevUtil {
     private boolean gradle;
     private boolean polling;
     private long pollingInterval;
+    private FileTrackMode trackingMode;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -304,6 +309,7 @@ public abstract class DevUtil {
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.polling = polling;
+        this.trackingMode = FileTrackMode.NOT_SET;
 
         if (polling && pollingInterval < 0) {
             warn("The pollingInterval value needs to be an integer greater than or equal to 0.  The default value of 100 milliseconds will be used.");
@@ -796,33 +802,37 @@ public abstract class DevUtil {
     private void runShutdownHook(final ThreadPoolExecutor executor) {
         if (!calledShutdownHook.getAndSet(true)) {
             debug("Inside Shutdown Hook, shutting down server");
-            
+
             if (polling) {
-                synchronized(newFileObservers) {
-                    consolidateFileObservers();
-                    for (FileAlterationObserver observer : fileObservers) {
-                        try {
-                            observer.destroy();
-                        } catch (Exception e) {
-                            debug("Could not destroy file observer", e);
-                        }
-                    }
-                }    
+                disablePolling();
             }
 
             setDevStop(true);
             cleanUpTempConfig();
             cleanUpServerEnv();
-    
+
             if (hotkeyReader != null) {
                 hotkeyReader.shutdown();
             }
-    
+
             // shutdown tests
             executor.shutdown();
-    
+
             // stopping server
             stopServer();
+        }
+    }
+
+    private void disablePolling() {
+        synchronized (newFileObservers) {
+            consolidateFileObservers();
+            for (FileAlterationObserver observer : fileObservers) {
+                try {
+                    observer.destroy();
+                } catch (Exception e) {
+                    debug("Could not destroy file observer", e);
+                }
+            }
         }
     }
 
@@ -1068,6 +1078,7 @@ public abstract class DevUtil {
     File jvmOptionsFileParent;
     File buildFile;
     List<String> artifactPaths;
+    WatchService watcher;
 
     // The serverXmlFile parameter can be null when using the server.xml from the
     // configDirectory, which has a default value.
@@ -1081,8 +1092,8 @@ public abstract class DevUtil {
         this.jvmOptionsFile = jvmOptionsFile;
         this.artifactPaths = artifactPaths;
 
-        try (WatchService watcher = FileSystems.getDefault().newWatchService();) {
-
+        try {
+            watcher = FileSystems.getDefault().newWatchService();
             serverXmlFileParent = null;
             if (serverXmlFile != null && serverXmlFile.exists()) {
                 serverXmlFileParent = serverXmlFile.getParentFile();
@@ -1110,35 +1121,35 @@ public abstract class DevUtil {
             boolean jvmOptionsFileRegistered = false;
 
             if (this.sourceDirectory.exists()) {
-                registerAll(srcPath, executor, watcher);
+                registerAll(srcPath, executor);
                 sourceDirRegistered = true;
             }
 
             if (this.testSourceDirectory.exists()) {
-                registerAll(testSrcPath, executor, watcher);
+                registerAll(testSrcPath, executor);
                 testSourceDirRegistered = true;
             }
 
             if (this.configDirectory.exists()) {
-                registerAll(configPath, executor, watcher);
+                registerAll(configPath, executor);
                 configDirRegistered = true;
             }
 
             if (serverXmlFile != null && serverXmlFile.exists() && serverXmlFileParent.exists()) {
                 Path serverXmlFilePath = serverXmlFileParent.getCanonicalFile().toPath();
-                registerAll(serverXmlFilePath, executor, watcher);
+                registerAll(serverXmlFilePath, executor);
                 serverXmlFileRegistered = true;
             }
 
             if (bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists() && bootstrapPropertiesFileParent.exists()) {
                 Path bootstrapPropertiesFilePath = bootstrapPropertiesFileParent.getCanonicalFile().toPath();
-                registerAll(bootstrapPropertiesFilePath, executor, watcher);
+                registerAll(bootstrapPropertiesFilePath, executor);
                 bootstrapPropertiesFileRegistered = true;
             }
 
             if (jvmOptionsFile != null && jvmOptionsFile.exists() && jvmOptionsFileParent.exists()) {
                 Path jvmOptionsFilePath = jvmOptionsFileParent.getCanonicalFile().toPath();
-                registerAll(jvmOptionsFilePath, executor, watcher);
+                registerAll(jvmOptionsFilePath, executor);
                 jvmOptionsFileRegistered = true;
             }
 
@@ -1146,16 +1157,16 @@ public abstract class DevUtil {
             for (File resourceDir : resourceDirs) {
                 resourceMap.put(resourceDir, false);
                 if (resourceDir.exists()) {
-                    registerAll(resourceDir.getCanonicalFile().toPath(), executor, watcher);
+                    registerAll(resourceDir.getCanonicalFile().toPath(), executor);
                     resourceMap.put(resourceDir, true);
                 }
             }
 
-            registerSingleFile(buildFile, executor, watcher);
+            registerSingleFile(buildFile, executor);
 
             if (propertyFilesMap != null) {
                 for (File f : propertyFilesMap.keySet()) {
-                    registerSingleFile(f, executor, watcher);
+                    registerSingleFile(f, executor);
                 }
             }
 
@@ -1169,7 +1180,7 @@ public abstract class DevUtil {
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
                         && this.sourceDirectory.listFiles().length > 0) {
                     compile(this.sourceDirectory);
-                    registerAll(srcPath, executor, watcher);
+                    registerAll(srcPath, executor);
                     debug("Registering Java source directory: " + this.sourceDirectory);
                     sourceDirRegistered = true;
                 } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
@@ -1181,7 +1192,7 @@ public abstract class DevUtil {
                 if (!testSourceDirRegistered && this.testSourceDirectory.exists()
                         && this.testSourceDirectory.listFiles().length > 0) {
                     compile(this.testSourceDirectory);
-                    registerAll(testSrcPath, executor, watcher);
+                    registerAll(testSrcPath, executor);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
                     runTestThread(false, executor, -1, false, false);
                     testSourceDirRegistered = true;
@@ -1195,7 +1206,7 @@ public abstract class DevUtil {
                 if (!configDirRegistered && this.configDirectory.exists()) {
                     configDirRegistered = true;
                     if (serverXmlFile != null && !serverXmlFile.exists()) {
-                        registerAll(configPath, executor, watcher);
+                        registerAll(configPath, executor);
                         debug("Registering configuration directory: " + this.configDirectory);
                     } else {
                         warn("The server configuration directory " + configDirectory
@@ -1229,7 +1240,7 @@ public abstract class DevUtil {
                 for (File resourceDir : resourceDirs) {
                     if (!resourceMap.get(resourceDir) && resourceDir.exists()) {
                         // added resource directory
-                        registerAll(resourceDir.getCanonicalFile().toPath(), executor, watcher);
+                        registerAll(resourceDir.getCanonicalFile().toPath(), executor);
                         resourceMap.put(resourceDir, true);
                     } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
                         // deleted resource directory
@@ -1239,25 +1250,29 @@ public abstract class DevUtil {
                     }
                 }
 
-                if (!polling) {
+                if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
                     try {
                         final WatchKey wk = watcher.poll(100, TimeUnit.MILLISECONDS);
                         final Watchable watchable = wk.watchable();
                         final Path directory = (Path) watchable;
-    
+
                         List<WatchEvent<?>> events = wk.pollEvents();
-    
+
                         for (WatchEvent<?> event : events) {
+                            if (trackingMode == FileTrackMode.NOT_SET) {
+                                trackingMode = FileTrackMode.FILE_WATCHER;
+                                disablePolling();
+                            }
                             final Path changed = (Path) event.context();
                             debug("Processing events for watched directory: " + directory);
-    
+
                             File fileChanged = new File(directory.toString(), changed.toString());
                             if (ignoreFileOrDir(fileChanged)) {
                                 // skip this file or directory, and continue to the next file or directory
                                 continue;
                             }
                             debug("Changed: " + changed + "; " + event.kind());
-    
+
                             ChangeType changeType = null;
                             if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
                                 changeType = ChangeType.CREATE;
@@ -1266,8 +1281,8 @@ public abstract class DevUtil {
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
                                 changeType = ChangeType.DELETE;
                             }
-                            processFileChanges(executor, fileChanged, outputDirectory, watcher, false, changeType);
-                            
+                            processFileChanges(executor, fileChanged, outputDirectory, false, changeType);
+
                         }
                         // reset the key
                         boolean valid = wk.reset();
@@ -1277,8 +1292,9 @@ public abstract class DevUtil {
                     } catch (InterruptedException | NullPointerException e) {
                         // do nothing let loop continue
                     }
-                } else {
-                    synchronized(newFileObservers) {
+                }
+                if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
+                    synchronized (newFileObservers) {
                         consolidateFileObservers();
                     }
                     // iterate through file observers
@@ -1288,6 +1304,16 @@ public abstract class DevUtil {
                     Thread.sleep(pollingInterval);
                 }
             }
+        } finally {
+            if (watcher != null) {
+                try {
+                    watcher.close();
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+
         }
     }
 
@@ -1299,14 +1325,14 @@ public abstract class DevUtil {
         newFileObservers.removeAll(newFileObservers);
     }
 
-    private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor, final WatchService watcher) throws IOException {
-        if (polling) {
+    private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor) throws IOException {
+        if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
             String parentPath = registerFile.getParentFile().getCanonicalPath();
 
             debug("Registering single file polling for " + registerFile.toString());
 
             // synchronize on the new observer set since only those are being updated in separate threads
-            synchronized(newFileObservers) {
+            synchronized (newFileObservers) {
                 Set<FileAlterationObserver> tempCombinedObservers = new HashSet<FileAlterationObserver>();
                 tempCombinedObservers.addAll(fileObservers);
                 tempCombinedObservers.addAll(newFileObservers);
@@ -1318,7 +1344,7 @@ public abstract class DevUtil {
                         return;
                     }
                 }
-    
+
                 FileFilter singleFileFilter = new FileFilter() {
                     @Override
                     public boolean accept(File file) {
@@ -1337,12 +1363,13 @@ public abstract class DevUtil {
 
                 try {
                     debug("Adding single file observer for: " + registerFile.toString());
-                    addFileAlterationObserver(executor, watcher, parentPath, singleFileFilter);
+                    addFileAlterationObserver(executor, parentPath, singleFileFilter);
                 } catch (Exception e) {
                     error("Could not observe single file " + registerFile.toString(), e);
                 }
             }
-        } else {
+        }
+        if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
             debug("Adding directory to WatchService " + registerFile.getParentFile().toPath() + " for single file " + registerFile.getName());
             registerFile.getParentFile().toPath().register(
                 watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
@@ -1351,50 +1378,74 @@ public abstract class DevUtil {
         }
     }
 
-    private void addFileAlterationObserver(final ThreadPoolExecutor executor, final WatchService watcher,
-            String parentPath, FileFilter filter) throws Exception {
-        FileAlterationObserver observer = getFileAlterationObserver(executor, watcher, parentPath, filter);
+    private void addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath, FileFilter filter)
+            throws Exception {
+        FileAlterationObserver observer = getFileAlterationObserver(executor, parentPath, filter);
         observer.initialize();
         newFileObservers.add(observer);
     }
 
-    private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final WatchService watcher, final String parentPath, FileFilter filter) {
+    private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final String parentPath, FileFilter filter) {
         FileAlterationObserver observer = new FileAlterationObserver(parentPath, filter);
         observer.addListener(new FileAlterationListenerAdaptor() {
             @Override
             public void onDirectoryCreate(File file) {
-                onAlteration(executor, watcher, parentPath, file, true, ChangeType.CREATE);
+                onAlteration(executor, parentPath, file, true, ChangeType.CREATE);
             }
 
             @Override
             public void onDirectoryDelete(File file) {
-                onAlteration(executor, watcher, parentPath, file, true, ChangeType.DELETE);
+                onAlteration(executor, parentPath, file, true, ChangeType.DELETE);
             }
 
             @Override
             public void onDirectoryChange(File file) {
-                onAlteration(executor, watcher, parentPath, file, true, ChangeType.MODIFY);
+                onAlteration(executor, parentPath, file, true, ChangeType.MODIFY);
             }
-            
+
             @Override
             public void onFileCreate(File file) {
-                onAlteration(executor, watcher, parentPath, file, false, ChangeType.CREATE);
+                onAlteration(executor, parentPath, file, false, ChangeType.CREATE);
             }
 
             @Override
             public void onFileDelete(File file) {
-                onAlteration(executor, watcher, parentPath, file, false, ChangeType.DELETE);
+                onAlteration(executor, parentPath, file, false, ChangeType.DELETE);
             }
 
             @Override
             public void onFileChange(File file) {
-                onAlteration(executor, watcher, parentPath, file, false, ChangeType.MODIFY);
+                onAlteration(executor, parentPath, file, false, ChangeType.MODIFY);
             }
 
-            private void onAlteration(final ThreadPoolExecutor executor, final WatchService watcher,
-                    final String parentPath, File file, boolean isDirectory, ChangeType changeType) {
+            private void onAlteration(final ThreadPoolExecutor executor, final String parentPath, File file,
+                    boolean isDirectory, ChangeType changeType) {
+                if (trackingMode == FileTrackMode.NOT_SET) {
+                    try {
+                        WatchKey wk = null;
+                        if (watcher != null) {
+                            wk = watcher.poll(100, TimeUnit.MILLISECONDS);
+                        }
+                        List<WatchEvent<?>> events = null;
+                        if (wk != null) {
+                            events = wk.pollEvents();
+                        }
+                        if ((events == null) || events.isEmpty()) {
+                            trackingMode = FileTrackMode.POLLING;
+                            if (watcher != null) {
+                                watcher.close();
+                            }
+                        } else {
+                            trackingMode = FileTrackMode.FILE_WATCHER;
+                            disablePolling();
+                        }
+                    } catch (Exception e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
                 try {
-                    processFileChanges(executor, file, outputDirectory, watcher, isDirectory, changeType);
+                    processFileChanges(executor, file, outputDirectory, isDirectory, changeType);
                 } catch(Exception e) {
                     debug(e);
                     error("Could not file process changes for " + file.getAbsolutePath() + ": " + e.getMessage());
@@ -1522,7 +1573,7 @@ public abstract class DevUtil {
 
     private void processFileChanges(
         final ThreadPoolExecutor executor, File fileChanged, File outputDirectory,
-        final WatchService watcher, boolean isDirectory, ChangeType changeType) throws IOException, PluginExecutionException {
+        boolean isDirectory, ChangeType changeType) throws IOException, PluginExecutionException {
 
         if (ignoreFileOrDir(fileChanged)) {
             // skip this file or directory, and continue to the next file or directory
@@ -1549,7 +1600,7 @@ public abstract class DevUtil {
         if (fileChanged.isDirectory()) {
             // if new directory added, watch the entire directory
             if (changeType == ChangeType.CREATE) {
-                registerAll(fileChanged.toPath(), executor, watcher);
+                registerAll(fileChanged.toPath(), executor);
             }
             // otherwise if a directory was modified, just continue to the next entry
             // (if delete, can't tell if it was a directory since it doesn't exist anymore)
@@ -1892,19 +1943,18 @@ public abstract class DevUtil {
      * 
      * @param start   parent directory
      * @param executor the test thread executor
-     * @param watcher WatchService
      * @throws IOException unable to walk through file tree
      */
-    protected void registerAll(final Path start, final ThreadPoolExecutor executor, final WatchService watcher) throws IOException {
+    protected void registerAll(final Path start, final ThreadPoolExecutor executor) throws IOException {
         debug("Registering all files in directory: " + start.toString());
 
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(final Path dir, BasicFileAttributes attrs) throws IOException {
-                if (polling) {
+                if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
                     // synchronize on the new observer set since only those are being updated in separate threads
-                    synchronized(newFileObservers) {
+                    synchronized (newFileObservers) {
                         Set<FileAlterationObserver> tempCombinedObservers = new HashSet<FileAlterationObserver>();
                         tempCombinedObservers.addAll(fileObservers);
                         tempCombinedObservers.addAll(newFileObservers);
@@ -1934,12 +1984,13 @@ public abstract class DevUtil {
             
                         try {
                             debug("Adding subdirectory to file observers: " + dir.toString());
-                            addFileAlterationObserver(executor, watcher, dir.toString(), singleDirectoryFilter);
+                            addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
                         } catch (Exception e) {
                             error("Could not observe directory " + dir.toString(), e);
                         }
                     }
-                } else {
+                } 
+                if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
                     debug("Adding subdirectory to WatchService: " + dir.toString());
                     dir.register(watcher,
                             new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
