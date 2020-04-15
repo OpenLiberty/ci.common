@@ -39,6 +39,7 @@ public class LibertyManagedObject {
      *
      */
     public enum LibertyManagedProperty implements LibertyProperty.LibertyPropertyI {
+        usrDir,
         serverStartTimeout,
         serverStopTimeout, 
         appDeployTimeout, 
