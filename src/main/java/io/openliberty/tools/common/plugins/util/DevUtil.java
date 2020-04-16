@@ -276,15 +276,13 @@ public abstract class DevUtil {
     final private Set<FileAlterationObserver> newFileObservers;
     private AtomicBoolean calledShutdownHook;
     private boolean gradle;
-    private boolean polling;
     private long pollingInterval;
     private FileTrackMode trackingMode;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean polling,
-            long pollingInterval) {
+            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -308,15 +306,8 @@ public abstract class DevUtil {
         this.gradle = gradle;
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
-        this.polling = polling;
+        this.pollingInterval = 100;
         this.trackingMode = FileTrackMode.NOT_SET;
-
-        if (polling && pollingInterval < 0) {
-            warn("The pollingInterval value needs to be an integer greater than or equal to 0.  The default value of 100 milliseconds will be used.");
-            this.pollingInterval = 100;
-        } else {
-            this.pollingInterval = pollingInterval;
-        }
     }
 
     /**
@@ -556,13 +547,8 @@ public abstract class DevUtil {
                     observer.initialize();
                     while (!messagesModified.get()) {
                         observer.checkAndNotify();
-                        if (polling) {
-                            // if polling is enabled, use the specified polling interval
-                            Thread.sleep(pollingInterval);
-                        } else {
-                            // otherwise just use something reasonable while waiting for the log file to update during server startup
-                            Thread.sleep(500);
-                        }
+                        // wait for the log file to update during server startup
+                        Thread.sleep(500);
                     }
                     debug("messages.log has been changed");
                 } catch (Exception e) {
@@ -803,7 +789,7 @@ public abstract class DevUtil {
         if (!calledShutdownHook.getAndSet(true)) {
             debug("Inside Shutdown Hook, shutting down server");
 
-            if (polling) {
+            if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
                 disablePolling();
             }
 
@@ -1309,8 +1295,7 @@ public abstract class DevUtil {
                 try {
                     watcher.close();
                 } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                    error("An error occurred attempting to close the file watcher. " + e.getMessage());
                 }
             }
 
@@ -1440,8 +1425,7 @@ public abstract class DevUtil {
                             disablePolling();
                         }
                     } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
+                        error("An error occured attempting to retrieve the watch key or close the file watcher. " + e.getMessage());
                     }
                 }
                 try {
