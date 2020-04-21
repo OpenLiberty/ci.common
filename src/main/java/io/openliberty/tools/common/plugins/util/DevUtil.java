@@ -282,7 +282,7 @@ public abstract class DevUtil {
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle) {
+            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -307,7 +307,11 @@ public abstract class DevUtil {
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.pollingInterval = 100;
-        this.trackingMode = FileTrackMode.NOT_SET;
+        if (pollingTest) {
+            this.trackingMode = FileTrackMode.POLLING;
+        } else {
+            this.trackingMode = FileTrackMode.NOT_SET;
+        }
     }
 
     /**
@@ -1295,7 +1299,7 @@ public abstract class DevUtil {
                 try {
                     watcher.close();
                 } catch (IOException e) {
-                    error("An error occurred attempting to close the file watcher. " + e.getMessage());
+                    error("An error occurred attempting to close the file watcher. " + e.getMessage(), e);
                 }
             }
 
@@ -1425,7 +1429,7 @@ public abstract class DevUtil {
                             disablePolling();
                         }
                     } catch (Exception e) {
-                        error("An error occured attempting to retrieve the watch key or close the file watcher. " + e.getMessage());
+                        error("An error occured attempting to retrieve the watch key or close the file watcher. " + e.getMessage(), e);
                     }
                 }
                 try {
