@@ -572,8 +572,8 @@ public abstract class DevUtil {
 
             // Set server start timeout
             if (serverStartTimeout < 0) {
-                warn("The serverStartTimeout value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
-                serverStartTimeout = 30;
+                warn("The serverStartTimeout value needs to be an integer greater than or equal to 0.  The default value of 90 seconds will be used.");
+                serverStartTimeout = 90;
             }
             long serverStartTimeoutMillis = serverStartTimeout * 1000;
 
