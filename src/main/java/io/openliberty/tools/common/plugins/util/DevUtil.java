@@ -1747,7 +1747,7 @@ public abstract class DevUtil {
         try (FileReader fileReader = new FileReader(targetFile);
                 BufferedReader bufferedReader = new BufferedReader(fileReader)) {
             String line = bufferedReader.readLine();
-            return line.matches(GENERATED_HEADER_REGEX);
+            return line == null ? false : line.matches(GENERATED_HEADER_REGEX);
         } catch (IOException e) {
             // If the target file could not be read, assume it was not a generated file
             debug("Could not read the target file " + targetFile + ". It will be replaced by the contents of "
