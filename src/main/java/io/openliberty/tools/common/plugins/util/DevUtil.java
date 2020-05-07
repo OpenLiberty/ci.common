@@ -284,13 +284,13 @@ public abstract class DevUtil {
     private boolean gradle;
     private long pollingInterval;
     private FileTrackMode trackingMode;
-    private final boolean headless;
+    private final boolean container;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean headless) {
+            boolean container) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -320,7 +320,7 @@ public abstract class DevUtil {
         } else {
             this.trackingMode = FileTrackMode.NOT_SET;
         }
-        this.headless = headless;
+        this.container = container;
     }
 
     /**
@@ -400,8 +400,8 @@ public abstract class DevUtil {
 
             if (!skipITs) {
                 boolean serverRunning = true;
-                if (headless) {
-                    // if headless, check whether the server running
+                if (container) {
+                    // if using container, check whether the server is actually running
                     serverRunning = serverDirectory.exists() && isServerRunning();
                     debug("Is server running: " + serverRunning);
                 }
@@ -507,7 +507,8 @@ public abstract class DevUtil {
      *                                  failed.
      */
     public void startServer() throws PluginExecutionException {
-        if (headless) {
+        if (container) {
+            // TODO build image and start container
             return;
         }
         try {
@@ -643,8 +644,10 @@ public abstract class DevUtil {
     public abstract void libertyInstallFeature() throws PluginExecutionException;
 
     public void restartServer() throws PluginExecutionException {
-        if (headless) {
-            info("Redeploying server...");
+        if (container) {
+            // TODO for now stopServer and startServer do nothing if container==true, so really only the app is being redeployed.
+            // But eventually we should restart the container as well.
+            info("Redeploying application...");
         } else {
             info("Restarting server...");
         }
@@ -670,12 +673,15 @@ public abstract class DevUtil {
             }
         }
         libertyCreate();
-        libertyInstallFeature();
+        if (!container) {
+            // local dev mode can't install feature on containerized runtime, unless we exec into the container
+            libertyInstallFeature();
+        }
         libertyDeploy();
         startServer();
         setDevStop(false);
-        if (headless) {
-            info("The server has been redeployed.");
+        if (container) {
+            info("The application has been redeployed.");
         } else {
             info("The server has been restarted.");
         }
