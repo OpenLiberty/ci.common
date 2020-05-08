@@ -170,12 +170,6 @@ public class BaseDevUtilTest {
             // not needed for tests
             return null;
         }
-
-        @Override
-        public boolean isServerRunning() {
-            // not needed for tests
-            return true;
-        }
         
     }
     

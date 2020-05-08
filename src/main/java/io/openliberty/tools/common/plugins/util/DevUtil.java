@@ -244,12 +244,6 @@ public abstract class DevUtil {
     private enum FileTrackMode {
         NOT_SET, FILE_WATCHER, POLLING
     }
-    /**
-     * Returns whether the server is running.
-     * 
-     * @return true if the server is running, otherwise false
-     */
-    public abstract boolean isServerRunning();
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -399,40 +393,32 @@ public abstract class DevUtil {
             }
 
             if (!skipITs) {
-                boolean serverRunning = true;
-                if (container) {
-                    // if using container, check whether the server is actually running
-                    serverRunning = serverDirectory.exists() && isServerRunning();
-                    debug("Is server running: " + serverRunning);
-                }
-                if (serverRunning) {
-                    if (!detectedAppStarted.get()) {
-                        if (appStartupTimeout < 0) {
-                            warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
-                            appStartupTimeout = 30;
-                        }
-                        long timeout = appStartupTimeout * 1000;
-    
-                        // Wait for the app started message in messages.log
-                        info("Waiting up to " + appStartupTimeout
-                                + " seconds to find the application start up or update message...");
-                        String startMessage = serverTask.waitForStringInLog(
-                                "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
-                                timeout, logFile);
-                        if (startMessage == null) {
-                            error("Unable to verify if the application was started after " + appStartupTimeout
-                                    + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
-                        } else {
-                            detectedAppStarted.set(true);
-                        }
-                    } else if (waitForApplicationUpdate) {
-                        // wait until application has been updated
-                        if (appUpdateTimeout < 0) {
-                            appUpdateTimeout = 5;
-                        }
-                        long timeout = appUpdateTimeout * 1000;
-                        serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
+                if (!detectedAppStarted.get()) {
+                    if (appStartupTimeout < 0) {
+                        warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
+                        appStartupTimeout = 30;
                     }
+                    long timeout = appStartupTimeout * 1000;
+
+                    // Wait for the app started message in messages.log
+                    info("Waiting up to " + appStartupTimeout
+                            + " seconds to find the application start up or update message...");
+                    String startMessage = serverTask.waitForStringInLog(
+                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
+                            timeout, logFile);
+                    if (startMessage == null) {
+                        error("Unable to verify if the application was started after " + appStartupTimeout
+                                + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
+                    } else {
+                        detectedAppStarted.set(true);
+                    }
+                } else if (waitForApplicationUpdate) {
+                    // wait until application has been updated
+                    if (appUpdateTimeout < 0) {
+                        appUpdateTimeout = 5;
+                    }
+                    long timeout = appUpdateTimeout * 1000;
+                    serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
                 }
 
                 if (gradle) {
