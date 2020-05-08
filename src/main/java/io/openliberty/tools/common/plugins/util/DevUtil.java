@@ -278,11 +278,13 @@ public abstract class DevUtil {
     private boolean gradle;
     private long pollingInterval;
     private FileTrackMode trackingMode;
+    private final boolean container;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest) {
+            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
+            boolean container) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -312,6 +314,7 @@ public abstract class DevUtil {
         } else {
             this.trackingMode = FileTrackMode.NOT_SET;
         }
+        this.container = container;
     }
 
     /**
@@ -334,7 +337,9 @@ public abstract class DevUtil {
                 // not expected since server should already have been started
                 error("Could not get the server task for running tests.", e);
             }
-            File logFile = serverTask.getLogFile();
+
+            File logFile = getMessagesLogFile(serverTask);
+
             String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
 
             try {
@@ -388,7 +393,6 @@ public abstract class DevUtil {
             }
 
             if (!skipITs) {
-
                 if (!detectedAppStarted.get()) {
                     if (appStartupTimeout < 0) {
                         warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
@@ -452,7 +456,7 @@ public abstract class DevUtil {
         if (!(skipTests || skipITs)) {
             try {
                 ServerTask serverTask = getServerTask();
-                File logFile = serverTask.getLogFile();
+                File logFile = getMessagesLogFile(serverTask);
                 String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
                 messageOccurrences = serverTask.countStringOccurrencesInFile(regexp, logFile);
                 debug("Message occurrences before compile: " + messageOccurrences);
@@ -464,6 +468,24 @@ public abstract class DevUtil {
     }
 
     /**
+     * Try to get log file from server directory first.
+     * If the server directory path cannot be resolved, get log file from the server task instead.
+     * 
+     * @param serverTask the server task
+     * @return the messages log file for the server
+     */
+    private File getMessagesLogFile(ServerTask serverTask) {
+        File logFile;
+        try {
+            String logsDirectory = serverDirectory.getCanonicalPath() + "/logs";
+            logFile = new File(logsDirectory, "messages.log");
+        } catch (IOException e) {
+            logFile = serverTask.getLogFile();
+        }
+        return logFile;
+    }
+
+    /**
      * Start the server and keep it running in a background thread.
      * 
      * @throws PluginExecutionException If the server startup could not be verified
@@ -471,6 +493,10 @@ public abstract class DevUtil {
      *                                  failed.
      */
     public void startServer() throws PluginExecutionException {
+        if (container) {
+            // TODO build image and start container
+            return;
+        }
         try {
             final ServerTask serverTask;
             try {
@@ -604,7 +630,13 @@ public abstract class DevUtil {
     public abstract void libertyInstallFeature() throws PluginExecutionException;
 
     public void restartServer() throws PluginExecutionException {
-        info("Restarting server...");
+        if (container) {
+            // TODO for now stopServer and startServer do nothing if container==true, so really only the app is being redeployed.
+            // But eventually we should restart the container as well.
+            info("Redeploying application...");
+        } else {
+            info("Restarting server...");
+        }
         setDevStop(true);
         stopServer();
         if (serverThread != null) {
@@ -627,11 +659,18 @@ public abstract class DevUtil {
             }
         }
         libertyCreate();
-        libertyInstallFeature();
+        if (!container) {
+            // local dev mode can't install feature on containerized runtime, unless we exec into the container
+            libertyInstallFeature();
+        }
         libertyDeploy();
         startServer();
         setDevStop(false);
-        info("The server has been restarted.");
+        if (container) {
+            info("The application has been redeployed.");
+        } else {
+            info("The server has been restarted.");
+        }
     }
 
     private void parseHostNameAndPorts(final ServerTask serverTask, File messagesLogFile)
@@ -1523,7 +1562,7 @@ public abstract class DevUtil {
 
     private void checkServerStopped() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if (serverThread.getState().equals(Thread.State.TERMINATED)) {
+        if (serverThread != null && serverThread.getState().equals(Thread.State.TERMINATED)) {
             if (!this.devStop.get()) {
                 // server was stopped outside of dev mode
                 throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
