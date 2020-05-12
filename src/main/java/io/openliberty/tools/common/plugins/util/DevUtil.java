@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019.
+ * (C) Copyright IBM Corporation 2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -279,6 +280,7 @@ public abstract class DevUtil {
     private long pollingInterval;
     private FileTrackMode trackingMode;
     private final boolean container;
+    private String containerID = null;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -493,10 +495,10 @@ public abstract class DevUtil {
      *                                  failed.
      */
     public void startServer() throws PluginExecutionException {
-        if (container) {
-            // TODO build image and start container
-            return;
-        }
+        // if (container) {
+        //     // TODO build image and start container
+        //     return;
+        // }
         try {
             final ServerTask serverTask;
             try {
@@ -520,7 +522,12 @@ public abstract class DevUtil {
                 @Override
                 public void run() {
                     try {
-                        serverTask.execute();
+
+                        if (container) {
+                            startContainer();
+                        } else {
+                            serverTask.execute();
+                        }
                     } catch (RuntimeException e) {
                         // If devStop is true server was stopped with Ctl-c, do not throw exception
                         if (devStop.get() == false) {
@@ -532,14 +539,13 @@ public abstract class DevUtil {
                 }
 
             });
-
             serverThread.start();
 
             // If the server thread dies at any point after this, allow the error to say
             // that the server stopped
             setDevStop(false);
 
-            if (logsExist) {
+            if (logsExist) {  // ???  && !container
                 final AtomicBoolean messagesModified = new AtomicBoolean(false);
 
                 // If logs already exist, then watch the directory to ensure
@@ -591,14 +597,12 @@ public abstract class DevUtil {
                     }
                 }
             }
-
             // Set server start timeout
             if (serverStartTimeout < 0) {
                 warn("The serverStartTimeout value needs to be an integer greater than or equal to 0.  The default value of 90 seconds will be used.");
                 serverStartTimeout = 90;
             }
             long serverStartTimeoutMillis = serverStartTimeout * 1000;
-
             // Wait for the server started message in messages.log
             String startMessage = serverTask.waitForStringInLog(START_SERVER_MESSAGE_PREFIX, serverStartTimeoutMillis,
                     messagesLogFile);
@@ -609,18 +613,121 @@ public abstract class DevUtil {
                         "Consider increasing the server start timeout if this continues to occur. " +
                         "For example, " + getServerStartTimeoutExample());
             }
-
             // Check for port already in use error
             String portError = serverTask.findStringInFile(PORT_IN_USE_MESSAGE_PREFIX, messagesLogFile);
             if (portError != null) {
                 error(portError.split(PORT_IN_USE_MESSAGE_PREFIX)[1]);
             }
-
             // Parse hostname, http, https ports for integration tests to use
             parseHostNameAndPorts(serverTask, messagesLogFile);
         } catch (IOException e) {
             throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
         }
+    }
+
+    private void startContainer() {
+        try {
+            containerID = execDockerCmd(getContainerCommand(), 30);
+            info("docker container: "+containerID);
+        } catch (RuntimeException r) {
+            debug("Error starting container:"+r.getMessage());
+        }
+    }
+
+    private void stopContainer() {
+        try {
+            info("stopping docker container: "+containerID);
+            if (containerID != null) {
+                String s = execDockerCmd("docker stop "+containerID, 30);
+            }
+        } catch (RuntimeException r) {
+            debug("Error starting container:"+r.getMessage());
+        }
+    }
+
+    // timeout unit is seconds
+    // return null for no output on stdout
+    private String execDockerCmd(String command, int timeout) {
+        String result = null;
+        try {
+            debug("execDocker, cmd="+command);
+            Process p = Runtime.getRuntime().exec(command);
+            p.waitFor(timeout, TimeUnit.SECONDS);
+            if (p.exitValue() != 0) {
+                // read messages from standard err
+                debug("Error running docker command, return value="+p.exitValue());
+                char[] d = new char[1023];
+                new InputStreamReader(p.getErrorStream()).read(d);
+                String errorMessage = new String(d).trim()+" RC="+p.exitValue();
+                throw new RuntimeException(errorMessage);
+            }
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            StringBuffer allLines = new StringBuffer();
+            while ((line = in.readLine())!= null) {
+                allLines.append(line);
+            }
+            if (allLines.length() > 0) {
+                result = allLines.toString();
+            }
+        } catch (InterruptedException e) {
+            // Container error, throw exception
+            // If a runtime exception occurred in the server task, log and rethrow
+            error("An interruption error occurred while running a docker command: " + e.getMessage(), e);
+            throw new RuntimeException(e.getMessage());
+        } catch (IOException e) {
+            // Container error, throw exception
+            // If a runtime exception occurred in the server task, log and rethrow
+            error("An error occurred while running a docker command: " + e.getMessage(), e);
+            throw new RuntimeException(e.getMessage());
+        }
+        return result;
+    }
+
+    private String getContainerCommand() {
+        StringBuffer command = new StringBuffer("docker run -d --rm");
+        if (httpPort != null) {
+            command.append(" -p "+httpPort+":"+httpPort);
+        } else {
+            command.append(" -p 9080:9080");
+        }
+        debug("System.getProperty(9443) ="+System.getProperty("9443") );
+        if (httpsPort != null) {
+            command.append(" -p "+httpsPort+":"+httpsPort);
+        } else {
+            if (System.getProperty("9443") == null) {
+                command.append(" -p 9443:9443");
+            }
+        }
+        if (libertyDebug) {
+            command.append(" -p "+libertyDebugPort+":"+libertyDebugPort);
+        } else {
+            command.append( "-p 7777:7777");
+        }
+        // mount application server configuration directory in the container
+        command.append(" -v "+serverDirectory.getParent()+":/opt/ol/wlp/usr/servers");
+        // mount the loose application resources in the container
+        String project = sourceDirectory.getParentFile().getParentFile().getParent(); // src/main/java
+        command.append(" -v "+project+":/devmode");
+        // mount the server logs directory over the /logs used by the open liberty container
+        try {
+            command.append(" -v "+serverDirectory.getCanonicalPath()+"/logs:/logs");
+        } catch (IOException i) {
+            // add no argument
+        }
+        // User options
+        if (System.getProperty("dockerRun") != null) {
+            command.append(" "+System.getProperty("dockerRun"));
+        }
+        // Image must be last
+        if (System.getProperty("DM_Docker_Image") != null) {
+            command.append(" "+System.getProperty("DM_Docker_Image"));
+        } else {
+            command.append(" open-liberty");
+        }
+        debug("docker command: "+command);
+        return command.toString();
     }
 
     public abstract void libertyCreate() throws PluginExecutionException;
@@ -706,7 +813,11 @@ public abstract class DevUtil {
             throw new PluginExecutionException(
                     "Could not parse the port number from the log message: " + webAppMessage);
         }
-        hostName = webAppMessage.substring(hostNameIndex, portPrefixIndex);
+        if (container) {
+            hostName = "localhost";
+        } else {
+            hostName = webAppMessage.substring(hostNameIndex, portPrefixIndex);
+        }
         debug("Parsed host name: " + hostName);
         return portPrefixIndex;
     }
@@ -830,7 +941,6 @@ public abstract class DevUtil {
 
     private void runShutdownHook(final ThreadPoolExecutor executor) {
         if (!calledShutdownHook.getAndSet(true)) {
-            debug("Inside Shutdown Hook, shutting down server");
 
             if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
                 disablePolling();
@@ -848,7 +958,11 @@ public abstract class DevUtil {
             executor.shutdown();
 
             // stopping server
-            stopServer();
+            if (container) {
+                stopContainer();
+            } else {
+                stopServer();
+            }
         }
     }
 
@@ -1084,7 +1198,6 @@ public abstract class DevUtil {
                     inputUnavailable.notify();
                 }
             }
-            debug("Hotkey reader thread was shut down");
         }
     }
 
@@ -1559,8 +1672,11 @@ public abstract class DevUtil {
             }
         }
     }
-
+ 
     private void checkServerStopped() throws PluginScenarioException {
+        if (containerID != null && !containerID.isEmpty()) {
+            return;
+        }
         // stop dev mode if the server has been stopped by another process
         if (serverThread != null && serverThread.getState().equals(Thread.State.TERMINATED)) {
             if (!this.devStop.get()) {

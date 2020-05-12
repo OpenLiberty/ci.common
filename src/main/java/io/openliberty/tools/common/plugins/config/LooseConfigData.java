@@ -26,6 +26,12 @@ import org.w3c.dom.Element;
 
 public class LooseConfigData extends XmlDocument {
     
+    private String projectRoot = null;
+
+    public void setProjectRoot(String root) {
+        projectRoot = root;
+    }
+
     public LooseConfigData() throws ParserConfigurationException {
         createDocument("archive");
     }
@@ -98,9 +104,19 @@ public class LooseConfigData extends XmlDocument {
     }
     
     private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
-        child.setAttribute("sourceOnDisk", src.getCanonicalPath());
+        String name = src.getCanonicalPath();
+        if (projectRoot != null && name.startsWith(projectRoot)) {
+            child.setAttribute("sourceOnDisk", "/devmode" + name.substring(projectRoot.length()));
+        } else {
+            child.setAttribute("sourceOnDisk", src.getCanonicalPath());
+        }
         addElement(parent, child, target);
     }
+    
+    // private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
+    //     child.setAttribute("sourceOnDisk", src.getCanonicalPath());
+    //     addElement(parent, child, target);
+    // }
     
     private void addElement(Element parent, Element child, String target) {
         child.setAttribute("targetInArchive", target);
