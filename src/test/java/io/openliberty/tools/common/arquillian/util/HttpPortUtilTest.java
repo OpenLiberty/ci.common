@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017.
+ * (C) Copyright IBM Corporation 2017, 2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,16 +78,28 @@ public class HttpPortUtilTest {
 			"	<httpEndpoint httpPort=\"9081\" httpsPort=\"9444\"" +
 			"		id=\"defaultHttpEndpoint\" />";
 	
+	private static final String CONFIG_VARIABLE_XML = 
+                        "<server><variable name=\"default.http.port\" value=\"9084\"/></server>";
+	
+	private static final String CONFIG_VARIABLE_DEFAULT_XML = 
+                        "<server><variable name=\"default.http.port\" defaultValue=\"9084\"/></server>";
+		
+	private static final String CONFIG_VARIABLE_INVALID_XML = 
+                        "<server><variable name=\"default.http.port\" value=\"invalid\"/></server>";
+	
+	private static final String CONFIG_VARIABLE_NO_MATCH_XML = 
+                        "<server><variable name=\"random\" value=\"random\"/></server>";
+	
 	@Test
 	public void testDefaultHttpPort() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + SERVER_XML_END;
-		assertTrue(HttpPortUtil.getHttpPort(serverXML, null) == HttpPortUtil.DEFAULT_PORT);
+		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, null, null) == HttpPortUtil.DEFAULT_PORT);
 	}
 	
 	@Test
 	public void testHttpPortSetFromServerXML() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + INTEGER_PORTS +  SERVER_XML_END;
-		assertTrue(HttpPortUtil.getHttpPort(serverXML, null) == 9081);
+		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, null, null) == 9081);
 	}
 	
 	@Test
@@ -95,7 +107,35 @@ public class HttpPortUtilTest {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
 		Properties bootstrapProperties = new Properties();
 		bootstrapProperties.setProperty("default.http.port", "9082");
-		assertTrue(HttpPortUtil.getHttpPort(serverXML, bootstrapProperties) == 9082);
+		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, null) == 9082);
+	}
+	
+	@Test
+	public void testHttpPortSetFromConfigVariableXML() throws Exception {
+		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
+		Properties bootstrapProperties = new Properties();
+		bootstrapProperties.setProperty("default.http.port", "9082");
+		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, CONFIG_VARIABLE_DEFAULT_XML) == 9084);
+	}
+	
+	@Test
+	public void testHttpPortSetFromConfigVariableXMLNoMatch() throws Exception {
+		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
+		Properties bootstrapProperties = new Properties();
+		bootstrapProperties.setProperty("default.http.port", "9082");
+		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, CONFIG_VARIABLE_NO_MATCH_XML) == 9082);
+	}
+	
+	@Test
+	public void testHttpPortSetFromConfigVariableXMLOnly() throws Exception {
+		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
+		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, null, CONFIG_VARIABLE_XML) == 9084);
+	}
+	
+	@Test(expected = ArquillianConfigurationException.class)
+	public void testHttpPortSetInvalidFromConfigVariableXML() throws Exception {
+		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
+		HttpPortUtil.getHttpPortForServerXML(serverXML, null, CONFIG_VARIABLE_INVALID_XML);
 	}
 	
 	@Test(expected = ArquillianConfigurationException.class)
@@ -103,23 +143,23 @@ public class HttpPortUtilTest {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
 		Properties bootstrapProperties = new Properties();
 		bootstrapProperties.setProperty("default.http.port", "invalid");
-		HttpPortUtil.getHttpPort(serverXML, bootstrapProperties);
+		HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, null);
 	}
 	
 	@Test(expected = ArquillianConfigurationException.class)
 	public void testHttpPortErrorFromBootstrapProperties() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
-		HttpPortUtil.getHttpPort(serverXML, null);
+		HttpPortUtil.getHttpPortForServerXML(serverXML, null, null);
 	}
 	
 	@Test(expected = FileNotFoundException.class)
 	public void testMissingServerXMLFile() throws Exception {
-		HttpPortUtil.getHttpPort(new File("somethingThatIsMissing"), null);
+		HttpPortUtil.getHttpPort(new File("somethingThatIsMissing"), null, null);
 	}
 	
 	@Test(expected = SAXParseException.class)
 	public void testInvalidServerXMLFile() throws Exception {
-		HttpPortUtil.getHttpPort(SERVER_XML_BEGIN, null);
+		HttpPortUtil.getHttpPortForServerXML(SERVER_XML_BEGIN, null, null);
 	}
 
 }
