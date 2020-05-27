@@ -250,6 +250,7 @@ public abstract class DevUtil {
     private File sourceDirectory;
     private File testSourceDirectory;
     private File configDirectory;
+    private File projectBaseDir;
     private List<File> resourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
@@ -281,16 +282,19 @@ public abstract class DevUtil {
     private FileTrackMode trackingMode;
     private final boolean container;
     private String containerID = null;
+    private String imageName;
+    private File dockerfile;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container) {
+            boolean container, File dockerfile) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
+        this.projectBaseDir = (sourceDirectory == null) ? null : sourceDirectory.getParentFile().getParentFile().getParentFile(); // {dir}/src/main/java <---
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
@@ -317,6 +321,8 @@ public abstract class DevUtil {
             this.trackingMode = FileTrackMode.NOT_SET;
         }
         this.container = container;
+        this.imageName = "open-liberty:latest";
+        this.dockerfile = dockerfile;
     }
 
     /**
@@ -495,10 +501,15 @@ public abstract class DevUtil {
      *                                  failed.
      */
     public void startServer() throws PluginExecutionException {
-        // if (container) {
-        //     // TODO build image and start container
-        //     return;
-        // }
+        if (container) {
+            debug("Custom Dockerfile: " + dockerfile);
+            if((dockerfile != null && dockerfile.exists()) || defaultDockerfileExists()) {
+                buildDockerImage();
+            }
+            else {
+                debug("Skipping docker build...");
+            }
+        }
         try {
             final ServerTask serverTask;
             try {
@@ -625,23 +636,49 @@ public abstract class DevUtil {
         }
     }
 
+    private boolean defaultDockerfileExists() {
+        File defaultDockerfile = new File (projectBaseDir.toString() + "/Dockerfile");
+        return defaultDockerfile.exists();
+    }
+
+    private void buildDockerImage() {
+        try {
+            debug("Building Docker image...");
+            String buildCmd;
+            imageName = "dev-mode-image";
+            if (dockerfile != null && dockerfile.exists()) {
+                debug("Docker build context: " + dockerfile.getParent());
+                buildCmd = "docker build -f " + dockerfile + " -t " + imageName + " " + dockerfile.getParent();
+            }
+            else {
+                buildCmd = "docker build -t " + imageName + " .";
+            }
+            //TODO: Figure out a good timeout value for docker build
+            String buildOutput = execDockerCmd(buildCmd, 60);
+            debug("Docker build output: " + buildOutput);
+        } catch (RuntimeException r) {
+            error("Error building Docker image: " + r.getMessage());
+            //TODO: Exit dev mode
+        }
+    }
+
     private void startContainer() {
         try {
             containerID = execDockerCmd(getContainerCommand(), 30);
-            info("docker container: "+containerID);
+            info("docker container: " + containerID);
         } catch (RuntimeException r) {
-            debug("Error starting container:"+r.getMessage());
+            debug("Error starting container: " + r.getMessage());
         }
     }
 
     private void stopContainer() {
         try {
-            info("stopping docker container: "+containerID);
+            info("stopping docker container: " + containerID);
             if (containerID != null) {
-                String s = execDockerCmd("docker stop "+containerID, 30);
+                String s = execDockerCmd("docker stop " + containerID, 30);
             }
         } catch (RuntimeException r) {
-            debug("Error starting container:"+r.getMessage());
+            debug("Error stopping container: " + r.getMessage());
         }
     }
 
@@ -708,8 +745,7 @@ public abstract class DevUtil {
         // mount application server configuration directory in the container
         command.append(" -v "+serverDirectory.getParent()+":/opt/ol/wlp/usr/servers");
         // mount the loose application resources in the container
-        String project = sourceDirectory.getParentFile().getParentFile().getParent(); // src/main/java
-        command.append(" -v "+project+":/devmode");
+        command.append(" -v " + projectBaseDir.toString() + ":/devmode");
         // mount the server logs directory over the /logs used by the open liberty container
         try {
             command.append(" -v "+serverDirectory.getCanonicalPath()+"/logs:/logs");
@@ -721,11 +757,7 @@ public abstract class DevUtil {
             command.append(" "+System.getProperty("dockerRun"));
         }
         // Image must be last
-        if (System.getProperty("DM_Docker_Image") != null) {
-            command.append(" "+System.getProperty("DM_Docker_Image"));
-        } else {
-            command.append(" open-liberty");
-        }
+        command.append(" " + imageName);
         debug("docker command: "+command);
         return command.toString();
     }
