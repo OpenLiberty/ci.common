@@ -25,11 +25,16 @@ import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
 
 public class LooseConfigData extends XmlDocument {
-    
+
     private String projectRoot = null;
+    private String sourceOnDiskName = "/devmode";
 
     public void setProjectRoot(String root) {
         projectRoot = root;
+    }
+
+    public void setSourceOnDiskName(String name) {
+        sourceOnDiskName = name;
     }
 
     public LooseConfigData() throws ParserConfigurationException {
@@ -106,7 +111,7 @@ public class LooseConfigData extends XmlDocument {
     private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
         String name = src.getCanonicalPath();
         if (projectRoot != null && name.startsWith(projectRoot)) {
-            child.setAttribute("sourceOnDisk", "/devmode" + name.substring(projectRoot.length()));
+            child.setAttribute("sourceOnDisk", sourceOnDiskName + name.substring(projectRoot.length()));
         } else {
             child.setAttribute("sourceOnDisk", src.getCanonicalPath());
         }
