@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017.
+ * (C) Copyright IBM Corporation 2017-2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,12 +29,18 @@ public class LooseConfigData extends XmlDocument {
     private String projectRoot = null;
     private String sourceOnDiskName = null;
 
-    // Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
+    /**
+     * Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
+     * @param root  the name of the directory that contains the actual project resources
+     */
     public void setProjectRoot(String root) {
         projectRoot = root;
     }
 
-    // Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
+    /** 
+     * Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
+     * @param name  the name to use in the config file as the apparent location of the resource
+     */
     public void setSourceOnDiskName(String name) {
         sourceOnDiskName = name;
     }
