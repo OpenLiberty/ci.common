@@ -27,12 +27,14 @@ import org.w3c.dom.Element;
 public class LooseConfigData extends XmlDocument {
 
     private String projectRoot = null;
-    private String sourceOnDiskName = "/devmode";
+    private String sourceOnDiskName = null;
 
+    // Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
     public void setProjectRoot(String root) {
         projectRoot = root;
     }
 
+    // Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
     public void setSourceOnDiskName(String name) {
         sourceOnDiskName = name;
     }
@@ -110,18 +112,13 @@ public class LooseConfigData extends XmlDocument {
     
     private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
         String name = src.getCanonicalPath();
-        if (projectRoot != null && name.startsWith(projectRoot)) {
+        if (sourceOnDiskName != null && projectRoot != null && name.startsWith(projectRoot)) {
             child.setAttribute("sourceOnDisk", sourceOnDiskName + name.substring(projectRoot.length()));
         } else {
             child.setAttribute("sourceOnDisk", src.getCanonicalPath());
         }
         addElement(parent, child, target);
     }
-    
-    // private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
-    //     child.setAttribute("sourceOnDisk", src.getCanonicalPath());
-    //     addElement(parent, child, target);
-    // }
     
     private void addElement(Element parent, Element child, String target) {
         child.setAttribute("targetInArchive", target);
