@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017.
+ * (C) Copyright IBM Corporation 2017-2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,11 +25,24 @@ import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
 
 public class LooseConfigData extends XmlDocument {
-    
-    private String projectRoot = null;
 
+    private String projectRoot = null;
+    private String sourceOnDiskName = null;
+
+    /**
+     * Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
+     * @param root  the name of the directory that contains the actual project resources
+     */
     public void setProjectRoot(String root) {
         projectRoot = root;
+    }
+
+    /** 
+     * Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
+     * @param name  the name to use in the config file as the apparent location of the resource
+     */
+    public void setSourceOnDiskName(String name) {
+        sourceOnDiskName = name;
     }
 
     public LooseConfigData() throws ParserConfigurationException {
@@ -105,18 +118,13 @@ public class LooseConfigData extends XmlDocument {
     
     private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
         String name = src.getCanonicalPath();
-        if (projectRoot != null && name.startsWith(projectRoot)) {
-            child.setAttribute("sourceOnDisk", "/devmode" + name.substring(projectRoot.length()));
+        if (sourceOnDiskName != null && projectRoot != null && name.startsWith(projectRoot)) {
+            child.setAttribute("sourceOnDisk", sourceOnDiskName + name.substring(projectRoot.length()));
         } else {
             child.setAttribute("sourceOnDisk", src.getCanonicalPath());
         }
         addElement(parent, child, target);
     }
-    
-    // private void addElement(Element parent, Element child, File src, String target) throws DOMException, IOException {
-    //     child.setAttribute("sourceOnDisk", src.getCanonicalPath());
-    //     addElement(parent, child, target);
-    // }
     
     private void addElement(Element parent, Element child, String target) {
         child.setAttribute("targetInArchive", target);
