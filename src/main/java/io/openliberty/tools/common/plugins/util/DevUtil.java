@@ -510,7 +510,7 @@ public abstract class DevUtil {
                 buildDockerImage();
             }
             else {
-                debug("Skipping docker build...");
+                info("Skipping docker build...");
             }
         }
         try {
@@ -646,7 +646,7 @@ public abstract class DevUtil {
 
     private void buildDockerImage() {
         try {
-            debug("Building Docker image...");
+            info("Building Docker image...");
             String buildCmd;
             imageName = "dev-mode-image";
             if (dockerfile != null && dockerfile.exists()) {
