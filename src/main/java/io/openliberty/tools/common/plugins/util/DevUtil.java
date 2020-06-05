@@ -661,7 +661,7 @@ public abstract class DevUtil {
             debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
-            //TODO: Exit dev mode
+            throw r;
         }
     }
 
