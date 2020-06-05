@@ -644,7 +644,7 @@ public abstract class DevUtil {
         return defaultDockerfile.exists();
     }
 
-    private void buildDockerImage() {
+    private void buildDockerImage() throws PluginExecutionException {
         try {
             info("Building Docker image...");
             String buildCmd;
@@ -661,7 +661,7 @@ public abstract class DevUtil {
             debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
-            throw r;
+            throw new PluginExecutionException("Failed to build Docker image. Please review Dockerfile and try to start dev mode again.", r);
         }
     }
 
