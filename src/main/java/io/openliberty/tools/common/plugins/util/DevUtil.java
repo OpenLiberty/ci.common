@@ -670,7 +670,7 @@ public abstract class DevUtil {
             containerID = execDockerCmd(getContainerCommand(), 30);
             info("docker container: " + containerID);
         } catch (RuntimeException r) {
-            debug("Error starting container: " + r.getMessage());
+            error("Error starting container: " + r.getMessage());
         }
     }
 
@@ -682,6 +682,8 @@ public abstract class DevUtil {
             }
         } catch (RuntimeException r) {
             debug("Error stopping container: " + r.getMessage());
+        } finally {
+            containerID = null;
         }
     }
 
@@ -1364,7 +1366,9 @@ public abstract class DevUtil {
             initWatchLoop();
 
             while (true) {
-                checkServerStopped();
+                // Check the server and stop dev mode by throwing an exception if the server stopped.
+                checkStopDevMode();
+
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
 
                 // check if javaSourceDirectory has been added
@@ -1503,7 +1507,6 @@ public abstract class DevUtil {
                     error("An error occurred attempting to close the file watcher. " + e.getMessage(), e);
                 }
             }
-
         }
     }
 
@@ -1722,12 +1725,10 @@ public abstract class DevUtil {
         }
     }
  
-    private void checkServerStopped() throws PluginScenarioException {
-        if (containerID != null && !containerID.isEmpty()) {
-            return;
-        }
+    private void checkStopDevMode() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if (serverThread != null && serverThread.getState().equals(Thread.State.TERMINATED)) {
+        if ((containerID == null || containerID.isEmpty()) &&
+            (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
             if (!this.devStop.get()) {
                 // server was stopped outside of dev mode
                 throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
