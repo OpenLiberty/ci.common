@@ -287,12 +287,13 @@ public abstract class DevUtil {
     private String containerID = null;
     private String imageName;
     private File dockerfile;
+    private String dockerRunOpts;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile) {
+            boolean container, File dockerfile, String dockerRunOpts) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -326,6 +327,7 @@ public abstract class DevUtil {
         this.container = container;
         this.imageName = DEFAULT_DOCKER_IMAGE;
         this.dockerfile = dockerfile;
+        this.dockerRunOpts = dockerRunOpts;
     }
 
     /**
@@ -766,8 +768,8 @@ public abstract class DevUtil {
         command.append(" -v "+serverDirectory.getAbsolutePath()+"/logs:/logs");
 
         // Allow the user to add their own options to this command via a system property.
-        if (System.getProperty("dockerRun") != null) {
-            command.append(" "+System.getProperty("dockerRun"));
+        if (dockerRunOpts != null) {
+            command.append(" "+dockerRunOpts);
         }
 
         // Options must preceed this in any order. Image name and command code follows.
