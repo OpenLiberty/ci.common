@@ -670,7 +670,8 @@ public abstract class DevUtil {
             containerID = execDockerCmd(getContainerCommand(), 30);
             info("docker container: " + containerID);
         } catch (RuntimeException r) {
-            debug("Error starting container: " + r.getMessage());
+            error("Error starting container: " + r.getMessage());
+            //TODO: Exit dev mode here? Should we add more to the error message?
         }
     }
 
@@ -750,10 +751,13 @@ public abstract class DevUtil {
             }
         }
         if (libertyDebug) {
-            command.append(" -p "+libertyDebugPort+":"+libertyDebugPort);
-        } else {
-            command.append( "-p 7777:7777");
+            command.append(" -p " + libertyDebugPort + ":" + libertyDebugPort);
         }
+        else {
+            command.append(" -p 7777:7777");
+        }
+        
+
         // mount application server configuration directory in the container's Open Liberty directory
         command.append(" -v "+serverDirectory.getParent()+":/opt/ol/wlp/usr/servers");
 
@@ -763,6 +767,9 @@ public abstract class DevUtil {
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v "+serverDirectory.getAbsolutePath()+"/logs:/logs");
 
+        // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used.
+        command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + ((libertyDebug) ? libertyDebugPort : "7777"));
+
         // Allow the user to add their own options to this command via a system property.
         if (System.getProperty("dockerRun") != null) {
             command.append(" "+System.getProperty("dockerRun"));
@@ -770,12 +777,12 @@ public abstract class DevUtil {
 
         // Options must preceed this in any order. Image name and command code follows.
         command.append(" " + imageName);
-        // Server 'run' command
-        command.append(" /opt/ol/wlp/bin/server run defaultServer");
+        // Server 'debug' command
+        command.append(" /opt/ol/wlp/bin/server debug defaultServer");
         // All the Liberty options:
         command.append(" -D"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
 
-        debug("docker command: "+command);
+        info("docker run command: " + command);
         return command.toString();
     }
 
