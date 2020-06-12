@@ -671,8 +671,7 @@ public abstract class DevUtil {
             info("docker container: " + containerID);
         } catch (RuntimeException r) {
             error("Error starting container: " + r.getMessage());
-            //TODO: Should we add more to the error message?
-            //TODO: Close off resources and exit dev mode
+            throw r;
         }
     }
 
@@ -683,7 +682,8 @@ public abstract class DevUtil {
                 String s = execDockerCmd("docker stop " + containerID, 30);
             }
         } catch (RuntimeException r) {
-            debug("Error stopping container: " + r.getMessage());
+            error("Error stopping container: " + r.getMessage());
+            throw r;
         }
     }
 
