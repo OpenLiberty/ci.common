@@ -779,7 +779,7 @@ public abstract class DevUtil {
 
         // Options must preceed this in any order. Image name and command code follows.
         command.append(" " + imageName);
-        // Server 'debug' command
+        // Command to start the server
         command.append(" /opt/ol/wlp/bin/server" + ((libertyDebug) ? " debug " : " run ")  + "defaultServer");
         // All the Liberty options:
         command.append(" -D"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
