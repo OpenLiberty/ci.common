@@ -287,12 +287,13 @@ public abstract class DevUtil {
     private String containerID = null;
     private String imageName;
     private File dockerfile;
+    private String dockerRunOpts;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile) {
+            boolean container, File dockerfile, String dockerRunOpts) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -326,6 +327,7 @@ public abstract class DevUtil {
         this.container = container;
         this.imageName = DEFAULT_DOCKER_IMAGE;
         this.dockerfile = dockerfile;
+        this.dockerRunOpts = dockerRunOpts;
     }
 
     /**
@@ -684,6 +686,9 @@ public abstract class DevUtil {
         } catch (RuntimeException r) {
             error("Error stopping container: " + r.getMessage());
             throw r;
+
+        } finally {
+            containerID = null;
         }
     }
 
@@ -768,8 +773,8 @@ public abstract class DevUtil {
         command.append(" -v "+serverDirectory.getAbsolutePath()+"/logs:/logs");
 
         // Allow the user to add their own options to this command via a system property.
-        if (System.getProperty("dockerRun") != null) {
-            command.append(" "+System.getProperty("dockerRun"));
+        if (dockerRunOpts != null) {
+            command.append(" "+dockerRunOpts);
         }
 
         // Options must preceed this in any order. Image name and command code follows.
@@ -1368,7 +1373,9 @@ public abstract class DevUtil {
             initWatchLoop();
 
             while (true) {
-                checkServerStopped();
+                // Check the server and stop dev mode by throwing an exception if the server stopped.
+                checkStopDevMode();
+
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
 
                 // check if javaSourceDirectory has been added
@@ -1507,7 +1514,6 @@ public abstract class DevUtil {
                     error("An error occurred attempting to close the file watcher. " + e.getMessage(), e);
                 }
             }
-
         }
     }
 
@@ -1726,12 +1732,10 @@ public abstract class DevUtil {
         }
     }
  
-    private void checkServerStopped() throws PluginScenarioException {
-        if (containerID != null && !containerID.isEmpty()) {
-            return;
-        }
+    private void checkStopDevMode() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if (serverThread != null && serverThread.getState().equals(Thread.State.TERMINATED)) {
+        if ((containerID == null || containerID.isEmpty()) &&
+            (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
             if (!this.devStop.get()) {
                 // server was stopped outside of dev mode
                 throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
