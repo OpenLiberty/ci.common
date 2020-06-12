@@ -673,6 +673,7 @@ public abstract class DevUtil {
             info("docker container: " + containerID);
         } catch (RuntimeException r) {
             error("Error starting container: " + r.getMessage());
+            throw r;
         }
     }
 
@@ -683,7 +684,9 @@ public abstract class DevUtil {
                 String s = execDockerCmd("docker stop " + containerID, 30);
             }
         } catch (RuntimeException r) {
-            debug("Error stopping container: " + r.getMessage());
+            error("Error stopping container: " + r.getMessage());
+            throw r;
+
         } finally {
             containerID = null;
         }
@@ -754,10 +757,12 @@ public abstract class DevUtil {
             }
         }
         if (libertyDebug) {
-            command.append(" -p "+libertyDebugPort+":"+libertyDebugPort);
-        } else {
-            command.append( "-p 7777:7777");
+            // map debug port
+            command.append(" -p " + libertyDebugPort + ":" + libertyDebugPort);
+            // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
+            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + libertyDebugPort);
         }
+
         // mount application server configuration directory in the container's Open Liberty directory
         command.append(" -v "+serverDirectory.getParent()+":/opt/ol/wlp/usr/servers");
 
@@ -774,12 +779,12 @@ public abstract class DevUtil {
 
         // Options must preceed this in any order. Image name and command code follows.
         command.append(" " + imageName);
-        // Server 'run' command
-        command.append(" /opt/ol/wlp/bin/server run defaultServer");
+        // Command to start the server
+        command.append(" /opt/ol/wlp/bin/server" + ((libertyDebug) ? " debug " : " run ")  + "defaultServer");
         // All the Liberty options:
         command.append(" -- --"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
 
-        debug("docker command: "+command);
+        info("docker run command: " + command);
         return command.toString();
     }
 
