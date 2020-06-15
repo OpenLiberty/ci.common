@@ -781,7 +781,8 @@ public abstract class DevUtil {
         command.append(" " + imageName);
         // Command to start the server
         command.append(" /opt/ol/wlp/bin/server" + ((libertyDebug) ? " debug " : " run ")  + "defaultServer");
-        // All the Liberty options:
+        // All the Liberty variable definitions must appear after the -- option.
+        // Important: other Liberty options must appear before --
         command.append(" -- --"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
 
         info("docker run command: " + command);
