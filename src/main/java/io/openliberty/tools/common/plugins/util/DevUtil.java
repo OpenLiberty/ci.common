@@ -624,7 +624,11 @@ public abstract class DevUtil {
                     messagesLogFile);
             if (startMessage == null) {
                 setDevStop(true);
-                stopServer();
+                if (container) {
+                    stopContainer();
+                } else {
+                    stopServer();
+                }
                 throw new PluginExecutionException("The server has not started within " + serverStartTimeout + " seconds. " +
                         "Consider increasing the server start timeout if this continues to occur. " +
                         "For example, " + getServerStartTimeoutExample());
@@ -796,31 +800,29 @@ public abstract class DevUtil {
     public abstract void libertyInstallFeature() throws PluginExecutionException;
 
     public void restartServer() throws PluginExecutionException {
-        if (container) {
-            // TODO for now stopServer and startServer do nothing if container==true, so really only the app is being redeployed.
-            // But eventually we should restart the container as well.
-            info("Redeploying application...");
-        } else {
-            info("Restarting server...");
-        }
+        info("Restarting server...");
         setDevStop(true);
-        stopServer();
-        if (serverThread != null) {
-            final long threadShutdownTimeoutSeconds = 30;
-            try {
-                serverThread.join(threadShutdownTimeoutSeconds * 1000);
-                if (serverThread.isAlive()) {
-                    throw new PluginExecutionException("Could not stop the server after " + threadShutdownTimeoutSeconds
-                            + " seconds.  Ensure that the server has been stopped, then start dev mode again.");
-                }
-            } catch (InterruptedException e) {
-                if (serverThread.isAlive()) {
-                    throw new PluginExecutionException(
-                            "Could not stop the server.  Ensure that the server has been stopped, then start dev mode again.",
-                            e);
-                } else {
-                    // the thread was interrupted, but the server thread is already stopped
-                    debug(e);
+        if (container) {
+            stopContainer(); // this command is synchronous
+        } else {
+            stopServer();
+            if (serverThread != null) {
+                final long threadShutdownTimeoutSeconds = 30;
+                try {
+                    serverThread.join(threadShutdownTimeoutSeconds * 1000);
+                    if (serverThread.isAlive()) {
+                        throw new PluginExecutionException("Could not stop the server after " + threadShutdownTimeoutSeconds
+                                + " seconds.  Ensure that the server has been stopped, then start dev mode again.");
+                    }
+                } catch (InterruptedException e) {
+                    if (serverThread.isAlive()) {
+                        throw new PluginExecutionException(
+                                "Could not stop the server.  Ensure that the server has been stopped, then start dev mode again.",
+                                e);
+                    } else {
+                        // the thread was interrupted, but the server thread is already stopped
+                        debug(e);
+                    }
                 }
             }
         }
@@ -832,11 +834,7 @@ public abstract class DevUtil {
         libertyDeploy();
         startServer();
         setDevStop(false);
-        if (container) {
-            info("The application has been redeployed.");
-        } else {
-            info("The server has been restarted.");
-        }
+        info("The server has been restarted.");
     }
 
     private void parseHostNameAndPorts(final ServerTask serverTask, File messagesLogFile)
