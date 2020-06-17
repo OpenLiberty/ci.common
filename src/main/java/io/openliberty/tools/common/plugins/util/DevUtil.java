@@ -827,8 +827,10 @@ public abstract class DevUtil {
             }
         }
         libertyCreate();
-        // On containerized runtime local dev mode can't install feature but install in local server for consistency
-        libertyInstallFeature();
+        if (!container) {
+            // local dev mode can't install feature on containerized runtime, unless we exec into the container
+            libertyInstallFeature();
+        }
         libertyDeploy();
         startServer();
         setDevStop(false);
