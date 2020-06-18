@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.InputStreamReader;
+import java.lang.ProcessBuilder.Redirect;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -60,6 +61,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -264,6 +266,7 @@ public abstract class DevUtil {
     private int appStartupTimeout;
     private int appUpdateTimeout;
     private Thread serverThread;
+    private PluginExecutionException serverThreadException;
     private AtomicBoolean devStop;
     private String hostName;
     private String httpPort;
@@ -284,10 +287,10 @@ public abstract class DevUtil {
     private long pollingInterval;
     private FileTrackMode trackingMode;
     private final boolean container;
-    private String containerID = null;
     private String imageName;
     private File dockerfile;
     private String dockerRunOpts;
+    private volatile Process dockerRunProcess;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -538,7 +541,6 @@ public abstract class DevUtil {
                 @Override
                 public void run() {
                     try {
-
                         if (container) {
                             startContainer();
                         } else {
@@ -547,13 +549,18 @@ public abstract class DevUtil {
                     } catch (RuntimeException e) {
                         // If devStop is true server was stopped with Ctl-c, do not throw exception
                         if (devStop.get() == false) {
-                            // If a runtime exception occurred in the server task, log and rethrow
-                            error("An error occurred while starting the server: " + e.getMessage(), e);
-                            throw e;
+                            // If a runtime exception occurred in the server task, log and set the exception field
+                            PluginExecutionException e2;
+                            if (container) {
+                                e2 = new PluginExecutionException("An error occurred while starting the container: " + e.getMessage(), e);
+                            } else {
+                                e2 = new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+                            }
+                            error(e2.getMessage());
+                            serverThreadException = e2;
                         }
                     }
                 }
-
             });
             serverThread.start();
 
@@ -561,7 +568,8 @@ public abstract class DevUtil {
             // that the server stopped
             setDevStop(false);
 
-            if (logsExist) {  // ???  && !container
+            // If there were already logs from a previous server run, wait for it to be updated.
+            if (logsExist) {
                 final AtomicBoolean messagesModified = new AtomicBoolean(false);
 
                 // If logs already exist, then watch the directory to ensure
@@ -598,11 +606,19 @@ public abstract class DevUtil {
                 try {
                     observer.initialize();
                     while (!messagesModified.get()) {
+                        checkStopDevMode(); // stop dev mode if the server thread was terminated
                         observer.checkAndNotify();
                         // wait for the log file to update during server startup
                         Thread.sleep(500);
                     }
                     debug("messages.log has been changed");
+                } catch (PluginScenarioException e) {
+                    if (serverThreadException != null) {
+                        throw serverThreadException;
+                    } else {
+                        // the server/container failed to start, so wrap this as an execution exception
+                        throw new PluginExecutionException(e);
+                    }
                 } catch (Exception e) {
                     error("An error occured while waiting for the server to update messages.log: " + e.getMessage(), e);
                 } finally {
@@ -611,6 +627,25 @@ public abstract class DevUtil {
                     } catch (Exception e) {
                         debug("Could not destroy FileAlterationObserver for logs directory " + logsDirectory, e);
                     }
+                }
+            } else {
+                // Wait until log exists
+                try {
+                    while (!messagesLogFile.exists()) {
+                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        // wait for the log file to appear during server startup
+                        Thread.sleep(500);
+                    }
+                    debug("messages.log has been created");
+                } catch (PluginScenarioException e) {
+                    if (serverThreadException != null) {
+                        throw serverThreadException;
+                    } else {
+                        // the server/container failed to start, so wrap this as an execution exception
+                        throw new PluginExecutionException(e);
+                    }
+                } catch (Exception e) {
+                    error("An error occured while waiting for the server to create messages.log: " + e.getMessage(), e);
                 }
             }
             // Set server start timeout
@@ -673,26 +708,53 @@ public abstract class DevUtil {
 
     private void startContainer() {
         try {
-            containerID = execDockerCmd(getContainerCommand(), 30);
-            info("docker container: " + containerID);
-        } catch (RuntimeException r) {
-            error("Error starting container: " + r.getMessage());
-            throw r;
+            String startContainerCommand = getContainerCommand();
+            debug("startContainer, cmd="+startContainerCommand);
+
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command(getCommandTokens(startContainerCommand));
+            processBuilder.redirectOutput(Redirect.INHERIT);
+            dockerRunProcess = processBuilder.start();
+            dockerRunProcess.waitFor();
+            if (dockerRunProcess.exitValue() != 0) {
+                info("Error running docker command, return value=" + dockerRunProcess.exitValue());
+                // read messages from standard err
+                char[] d = new char[1023];
+                new InputStreamReader(dockerRunProcess.getErrorStream()).read(d);
+                String errorMessage = new String(d).trim() + " RC=" + dockerRunProcess.exitValue();
+                throw new RuntimeException(errorMessage);
+            }
+        } catch (IOException e) {
+            error("Error starting container: " + e.getMessage());
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            error("Thread was interrupted while starting the container: " + e.getMessage());
         }
+    }
+
+    private String[] getCommandTokens(String command) {
+        StringTokenizer stringTokenizer = new StringTokenizer(command);
+        String[] commandTokens = new String[stringTokenizer.countTokens()];
+        for (int i = 0; stringTokenizer.hasMoreTokens(); i++) {
+            commandTokens[i] = stringTokenizer.nextToken();
+        }
+        return commandTokens;
     }
 
     private void stopContainer() {
         try {
-            info("stopping docker container: " + containerID);
-            if (containerID != null) {
-                String s = execDockerCmd("docker stop " + containerID, 30);
+            info("Stopping docker container...");
+            if (dockerRunProcess != null) {
+                // Emulate docker stop with SIGTERM, wait up to 10 seconds, then SIGKILL
+                dockerRunProcess.destroy();
+                dockerRunProcess.waitFor(10, TimeUnit.SECONDS);
+                dockerRunProcess.destroyForcibly();
+                dockerRunProcess.waitFor();
             }
-        } catch (RuntimeException r) {
-            error("Error stopping container: " + r.getMessage());
-            throw r;
-
+        } catch (InterruptedException e) {
+            error("Thread was interrupted while stopping the container: " + e.getMessage());
         } finally {
-            containerID = null;
+            dockerRunProcess = null;
         }
     }
 
@@ -746,7 +808,7 @@ public abstract class DevUtil {
      * @return the command string to use to start the container
      */
     private String getContainerCommand() {
-        StringBuffer command = new StringBuffer("docker run -d --rm");
+        StringBuffer command = new StringBuffer("docker run --rm");
         if (httpPort != null) {
             command.append(" -p "+httpPort+":"+httpPort);
         } else {
@@ -1733,10 +1795,12 @@ public abstract class DevUtil {
  
     private void checkStopDevMode() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if ((containerID == null || containerID.isEmpty()) &&
-            (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
+        if ((serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
             if (!this.devStop.get()) {
-                // server was stopped outside of dev mode
+                // an external situation caused the server to stop
+                if (container) {
+                    throw new PluginScenarioException("The container has stopped. Exiting dev mode.");
+                }
                 throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
             } else {
                 // server was stopped by dev mode
