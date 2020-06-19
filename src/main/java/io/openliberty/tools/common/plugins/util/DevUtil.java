@@ -507,9 +507,16 @@ public abstract class DevUtil {
      */
     public void startServer() throws PluginExecutionException {
         if (container) {
+            //TODO: change dockerfile to userDockerfile and add a defaultDockerfile variable as well? CONSTANT path for defaultDockerfile?
             debug("Custom Dockerfile: " + dockerfile);
             if((dockerfile != null && dockerfile.exists()) || defaultDockerfileExists()) {
-                buildDockerImage();
+                List<String> dockerfileLines; // should dockerfileLines be allowed to be null after this point?
+                File tempDockerfile;
+
+                dockerfileLines = readDockerfile(dockerfile);
+                dockerfileLines = removeWarFileLine(dockerfileLines);
+                tempDockerfile = createTempDockerfile(dockerfileLines);
+                buildDockerImage(tempDockerfile);
             }
             else {
                 info("Skipping docker build...");
@@ -646,23 +653,74 @@ public abstract class DevUtil {
         return defaultDockerfile.exists();
     }
 
-    private void buildDockerImage() throws PluginExecutionException {
+    private List<String> readDockerfile(File dockerfile) {
+        //convert Dockerfile to List of strings for each line
+        List<String> dockerfileLines = null;
+        try {
+            dockerfileLines = Files.readAllLines(dockerfile.toPath());
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        info((dockerfileLines != null) ? dockerfileLines.toString() : "null");
+        return dockerfileLines;
+    }
+
+    private List<String> removeWarFileLine(List<String> dockerfileLines) {
+        // how to deal with comment lines?
+        //remove front spaces
+        //check first character for # 
+        //check for first word to be COPY
+        //check if the first path arg ends with .war
+        //if it does, remove the line
+
+        // or search for .war first? and retroactively check for the other req's? do the other req's matter for the WAR file?
+        // what if there are multiple WAR file lines?
+
+        for (String line : dockerfileLines) {
+            if (line.contains(".war")) {
+                info(line);
+                dockerfileLines.remove(line);
+                break;
+            }
+        }
+        
+        info((dockerfileLines != null) ? dockerfileLines.toString() : "null");
+        return dockerfileLines;
+    }
+
+    private File createTempDockerfile(List<String> dockerfileLines) {
+        //create a temp Dockerfile to build image from
+        File tempDockerfile = null;
+        try {
+            info("Creating temp Dockerfile...");
+            tempDockerfile = File.createTempFile("tempDockerfile", "");
+            //StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND
+            Files.write(tempDockerfile.toPath(), dockerfileLines, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return tempDockerfile;
+    }
+
+    private void buildDockerImage(File tempDockerfile) throws PluginExecutionException {
+        //TODO: dockerfile param should be tempDockerfile but build context should be original dockerfile parent
         try {
             info("Building Docker image...");
             String buildCmd;
             imageName = "dev-mode-image";
             if (dockerfile != null && dockerfile.exists()) {
                 debug("Docker build context: " + dockerfile.getParent());
-                buildCmd = "docker build -f " + dockerfile + " -t " + imageName + " " + dockerfile.getParent();
+                buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + dockerfile.getParent();
+                //TODO: Figure out a good timeout value for docker build
+                String buildOutput = execDockerCmd(buildCmd, 60);
+                debug("Docker build output: " + buildOutput);
             }
-            else {
-                buildCmd = "docker build -t " + imageName + " .";
-            }
-            //TODO: Figure out a good timeout value for docker build
-            String buildOutput = execDockerCmd(buildCmd, 60);
-            debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
+            //TODO change to userDockerfile?
             throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + dockerfile + ". Address the following docker build error and then start dev mode again", r);
         }
     }
@@ -764,7 +822,7 @@ public abstract class DevUtil {
         }
 
         // mount application server configuration directory in the container's Open Liberty directory
-        command.append(" -v "+serverDirectory.getParent()+":/opt/ol/wlp/usr/servers");
+        //command.append(" -v "+serverDirectory.getParent()+":/opt/ol/wlp/usr/servers");
 
         // mount the loose application resources in the container
         command.append(" -v "+projectDirectory.getAbsolutePath()+":"+DEVMODE_DIR_NAME);
