@@ -716,21 +716,18 @@ public abstract class DevUtil {
 
             ProcessBuilder processBuilder = new ProcessBuilder();
             processBuilder.command(getCommandTokens(startContainerCommand));
+            //processBuilder.redirectOutput(Redirect.INHERIT);
             //processBuilder.redirectErrorStream(true);
             dockerRunProcess = processBuilder.start();
 
-            // copy output to Maven/Gradle logs
-            BufferedReader reader = new BufferedReader(new InputStreamReader(dockerRunProcess.getInputStream()));
-            try {
-                for (String line; (line = reader.readLine()) != null;) {
-                    info(line);
+            Thread logCopyThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    copyProcessOutputToBuildLog(dockerRunProcess);
                 }
-            } catch (IOException e) {
-                error("Error reading container output: " + e.getMessage());
-            } finally {
-                reader.close();
-            }
-        
+            });
+            logCopyThread.start();
+
             dockerRunProcess.waitFor();
             if (dockerRunProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
                 debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
@@ -745,6 +742,29 @@ public abstract class DevUtil {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             error("Thread was interrupted while starting the container: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Copies the process output to the Maven/Gradle logs
+     * 
+     * @param p
+     * @throws RuntimeException if there was an error reading the process output
+     */
+    private void copyProcessOutputToBuildLog(Process p) {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        try {
+            for (String line; (line = reader.readLine()) != null;) {
+                info(line);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading container output: " + e.getMessage());
+        } finally {
+            try {
+                reader.close();
+            } catch (IOException e) {
+                // nothing to do
+            }
         }
     }
 
