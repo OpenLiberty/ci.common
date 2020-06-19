@@ -515,7 +515,7 @@ public abstract class DevUtil {
                 File tempDockerfile;
 
                 dockerfileLines = readDockerfile(dockerfile);
-                dockerfileLines = removeWarFileLine(dockerfileLines);
+                dockerfileLines = removeWarFileLines(dockerfileLines);
                 tempDockerfile = createTempDockerfile(dockerfileLines);
                 buildDockerImage(tempDockerfile);
             }
@@ -664,11 +664,11 @@ public abstract class DevUtil {
             e.printStackTrace();
         }
 
-        info((dockerfileLines != null) ? dockerfileLines.toString() : "null");
+        debug((dockerfileLines != null) ? dockerfileLines.toString() : "null");
         return dockerfileLines;
     }
 
-    private List<String> removeWarFileLine(List<String> dockerfileLines) {
+    private List<String> removeWarFileLines(List<String> dockerfileLines) {
         // how to deal with comment lines?
         //remove front spaces
         //check first character for # 
@@ -679,15 +679,15 @@ public abstract class DevUtil {
         // or search for .war first? and retroactively check for the other req's? do the other req's matter for the WAR file?
         // what if there are multiple WAR file lines?
 
+        List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             if (line.contains(".war")) {
-                info(line);
-                dockerfileLines.remove(line);
-                break;
+                warFileLines.add(line);
             }
         }
+        dockerfileLines.removeAll(warFileLines);
         
-        info((dockerfileLines != null) ? dockerfileLines.toString() : "null");
+        debug((dockerfileLines != null) ? dockerfileLines.toString() : "null");
         return dockerfileLines;
     }
 
