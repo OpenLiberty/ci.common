@@ -713,8 +713,21 @@ public abstract class DevUtil {
 
             ProcessBuilder processBuilder = new ProcessBuilder();
             processBuilder.command(getCommandTokens(startContainerCommand));
-            processBuilder.redirectOutput(Redirect.INHERIT);
+            //processBuilder.redirectErrorStream(true);
             dockerRunProcess = processBuilder.start();
+
+            // copy output to Maven/Gradle logs
+            BufferedReader reader = new BufferedReader(new InputStreamReader(dockerRunProcess.getInputStream()));
+            try {
+                for (String line; (line = reader.readLine()) != null;) {
+                    info(line);
+                }
+            } catch (IOException e) {
+                error("Error reading container output: " + e.getMessage());
+            } finally {
+                reader.close();
+            }
+        
             dockerRunProcess.waitFor();
             if (dockerRunProcess.exitValue() != 0) {
                 info("Error running docker command, return value=" + dockerRunProcess.exitValue());
