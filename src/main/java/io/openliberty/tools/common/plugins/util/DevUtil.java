@@ -267,7 +267,10 @@ public abstract class DevUtil {
     private int appUpdateTimeout;
     private Thread serverThread;
     private PluginExecutionException serverThreadException;
+
+    /** If user stopped dev mode manually, this is true. If an external process caused dev mode to stop, this is false */
     private AtomicBoolean devStop;
+    
     private String hostName;
     private String httpPort;
     private String httpsPort;
@@ -729,8 +732,8 @@ public abstract class DevUtil {
             }
         
             dockerRunProcess.waitFor();
-            if (dockerRunProcess.exitValue() != 0) {
-                info("Error running docker command, return value=" + dockerRunProcess.exitValue());
+            if (dockerRunProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
+                debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
                 // read messages from standard err
                 char[] d = new char[1023];
                 new InputStreamReader(dockerRunProcess.getErrorStream()).read(d);
