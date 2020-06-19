@@ -697,7 +697,10 @@ public abstract class DevUtil {
         try {
             info("Creating temp Dockerfile...");
             tempDockerfile = File.createTempFile("tempDockerfile", "");
+            debug("temp Dockerfile: " + tempDockerfile);
             tempDockerfilePath = tempDockerfile.toPath();
+            // set the tempDockerfile to be deleted when the JVM exits
+            tempDockerfile.deleteOnExit();
             //StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND
             Files.write(tempDockerfile.toPath(), dockerfileLines, StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -1039,7 +1042,6 @@ public abstract class DevUtil {
 
     public void cleanUpTempDockerfile() {
         if (tempDockerfilePath != null) {
-            debug("tempDockerfile: " + tempDockerfilePath);
             File tempDockerfile = tempDockerfilePath.toFile();
             if (tempDockerfile.exists()) {
                 try {
