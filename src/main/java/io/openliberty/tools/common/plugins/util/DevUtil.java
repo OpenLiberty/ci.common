@@ -287,6 +287,7 @@ public abstract class DevUtil {
     private String containerID = null;
     private String imageName;
     private File dockerfile;
+    private Path tempDockerfilePath;
     private String dockerRunOpts;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
@@ -696,6 +697,7 @@ public abstract class DevUtil {
         try {
             info("Creating temp Dockerfile...");
             tempDockerfile = File.createTempFile("tempDockerfile", "");
+            tempDockerfilePath = tempDockerfile.toPath();
             //StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND
             Files.write(tempDockerfile.toPath(), dockerfileLines, StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -1035,6 +1037,21 @@ public abstract class DevUtil {
         }
     }
 
+    public void cleanUpTempDockerfile() {
+        if (tempDockerfilePath != null) {
+            debug("tempDockerfile: " + tempDockerfilePath);
+            File tempDockerfile = tempDockerfilePath.toFile();
+            if (tempDockerfile.exists()) {
+                try {
+                    Files.delete(tempDockerfilePath);
+                    debug("Sucessfully deleted dev mode temporary Dockerfile");
+                } catch (IOException e) {
+                    error("Could not delete dev mode temporary Dockerfile");
+                }
+            }
+        }
+    }
+
     /**
      * Whether dev mode intentionally caused the server to stop.
      * 
@@ -1075,6 +1092,7 @@ public abstract class DevUtil {
 
             // stopping server
             if (container) {
+                cleanUpTempDockerfile();
                 stopContainer();
             } else {
                 stopServer();
