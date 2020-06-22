@@ -826,8 +826,9 @@ public abstract class DevUtil {
             command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + libertyDebugPort);
         }
 
-        // mount application server configuration directory in the container's Open Liberty directory
-        //command.append(" -v "+serverDirectory.getParent()+":/opt/ol/wlp/usr/servers");
+        // mount .war.xml potential directories - override /config/apps and /config/dropins
+        command.append(" -v " + serverDirectory + "/apps:/config/apps");
+        command.append(" -v " + serverDirectory + "/dropins:/config/dropins");
 
         // mount the loose application resources in the container
         command.append(" -v "+projectDirectory.getAbsolutePath()+":"+DEVMODE_DIR_NAME);
