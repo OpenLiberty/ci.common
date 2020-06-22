@@ -508,8 +508,6 @@ public abstract class DevUtil {
      */
     public void startServer() throws PluginExecutionException {
         if (container) {
-            //TODO: change dockerfile to userDockerfile and add a defaultDockerfile variable as well? CONSTANT path for defaultDockerfile?
-            debug("Custom Dockerfile: " + dockerfile);
             if((dockerfile != null && dockerfile.exists()) || defaultDockerfileExists()) {
                 List<String> dockerfileLines; // should dockerfileLines be allowed to be null after this point?
                 File tempDockerfile;
@@ -654,17 +652,16 @@ public abstract class DevUtil {
         return defaultDockerfile.exists();
     }
 
-    private List<String> readDockerfile(File dockerfile) {
-        //convert Dockerfile to List of strings for each line
+    private List<String> readDockerfile(File dockerfile) throws PluginExecutionException {
+        // Convert Dockerfile to List of strings for each line
         List<String> dockerfileLines = null;
         try {
             dockerfileLines = Files.readAllLines(dockerfile.toPath());
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            error("Failed to read Dockerfile located at " + dockerfile);
+            //TODO: what direction should we give the user here?
+            throw new PluginExecutionException("Could not read Dockerfile: " + dockerfile, e);
         }
-
-        debug((dockerfileLines != null) ? dockerfileLines.toString() : "null");
         return dockerfileLines;
     }
 
@@ -686,13 +683,11 @@ public abstract class DevUtil {
             }
         }
         dockerfileLines.removeAll(warFileLines);
-        
-        debug((dockerfileLines != null) ? dockerfileLines.toString() : "null");
         return dockerfileLines;
     }
 
-    private File createTempDockerfile(List<String> dockerfileLines) {
-        //create a temp Dockerfile to build image from
+    private File createTempDockerfile(List<String> dockerfileLines) throws PluginExecutionException {
+        // Create a temp Dockerfile to build image from
         File tempDockerfile = null;
         try {
             info("Creating temp Dockerfile...");
@@ -701,11 +696,11 @@ public abstract class DevUtil {
             tempDockerfilePath = tempDockerfile.toPath();
             // set the tempDockerfile to be deleted when the JVM exits
             tempDockerfile.deleteOnExit();
-            //StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND
             Files.write(tempDockerfile.toPath(), dockerfileLines, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            error("Failed to create temp Dockerfile");
+            //TODO: what direction should we give the user here?
+            throw new PluginExecutionException("Could not create temp Dockerfile: ", e);
         }
         return tempDockerfile;
     }
