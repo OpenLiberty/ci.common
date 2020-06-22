@@ -1834,7 +1834,7 @@ public abstract class DevUtil {
  
     private void checkStopDevMode() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if ((serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
+        if (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED)) {
             if (!this.devStop.get()) {
                 // an external situation caused the server to stop
                 if (container) {
