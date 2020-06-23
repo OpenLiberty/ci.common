@@ -707,22 +707,21 @@ public abstract class DevUtil {
     }
 
     private List<String> removeWarFileLines(List<String> dockerfileLines) {
-        // how to deal with comment lines?
-        //remove front spaces
-        //check first character for # 
-        //check for first word to be COPY
-        //check if the first path arg ends with .war
-        //if it does, remove the line
-
-        // or search for .war first? and retroactively check for the other req's? do the other req's matter for the WAR file?
-        // what if there are multiple WAR file lines?
-
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
-            if (line.contains(".war")) {
-                warFileLines.add(line);
+            // Remove white space from the beginning and end of the line
+            String trimLine = line.trim();
+            if (!trimLine.startsWith("#") && trimLine.contains(".war")) {
+                // Break the Dockerfile line down into segments based on any amount of whitespace.
+                // The command must be to the left of any comments.
+                String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
+                // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
+                if (cmdSegments[0].equals("COPY") && cmdSegments[cmdSegments.length - 2].endsWith(".war")) {
+                    warFileLines.add(line);
+                }
             }
         }
+        debug("WAR file lines: " + warFileLines.toString());
         dockerfileLines.removeAll(warFileLines);
         return dockerfileLines;
     }
