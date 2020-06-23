@@ -707,12 +707,12 @@ public abstract class DevUtil {
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
-            if (!trimLine.startsWith("#") && trimLine.contains(".war")) {
+            if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(".war")) {
                 // Break the Dockerfile line down into segments based on any amount of whitespace.
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
-                if (cmdSegments[0].equals("COPY") && cmdSegments[cmdSegments.length - 2].endsWith(".war")) {
+                if (cmdSegments[0].equalsIgnoreCase("COPY") && cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
                     warFileLines.add(line);
                 }
             }
