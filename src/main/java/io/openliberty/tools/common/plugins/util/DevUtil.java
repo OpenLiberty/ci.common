@@ -520,11 +520,8 @@ public abstract class DevUtil {
             File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
             debug("Dockerfile to use: " + dockerfileToUse);
             if (dockerfileToUse.exists()) {
-                List<String> dockerfileLines;
-                File tempDockerfile;
-                dockerfileLines = readDockerfile(dockerfileToUse);
-                dockerfileLines = removeWarFileLines(dockerfileLines);
-                tempDockerfile = createTempDockerfile(dockerfileLines);
+                List<String> dockerfileLines = removeWarFileLines(readDockerfile(dockerfileToUse));
+                File tempDockerfile = createTempDockerfile(dockerfileLines);
                 buildDockerImage(tempDockerfile, dockerfileToUse);
             } else {
                 // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
@@ -701,7 +698,7 @@ public abstract class DevUtil {
         } catch (IOException e) {
             error("Failed to read Dockerfile located at " + dockerfile);
             //TODO: what direction should we give the user here?
-            throw new PluginExecutionException("Could not read Dockerfile: " + dockerfile, e);
+            throw new PluginExecutionException("Could not read Dockerfile " + dockerfile + ": " + e.getMessage(), e);
         }
         return dockerfileLines;
     }
@@ -740,7 +737,7 @@ public abstract class DevUtil {
         } catch (IOException e) {
             error("Failed to create temp Dockerfile");
             //TODO: what direction should we give the user here?
-            throw new PluginExecutionException("Could not create temp Dockerfile: ", e);
+            throw new PluginExecutionException("Could not create temp Dockerfile: " + e.getMessage(), e);
         }
         return tempDockerfile;
     }
@@ -1123,9 +1120,9 @@ public abstract class DevUtil {
             if (tempConfig.exists()) {
                 try {
                     FileUtils.deleteDirectory(tempConfig);
-                    debug("Sucessfully deleted liberty:dev temporary configuration folder");
+                    debug("Successfully deleted liberty:dev temporary configuration folder");
                 } catch (IOException e) {
-                    error("Could not delete liberty:dev temporary configuration folder");
+                    error("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
                 }
             }
         }
@@ -1137,9 +1134,9 @@ public abstract class DevUtil {
             if (tempDockerfile.exists()) {
                 try {
                     Files.delete(tempDockerfilePath);
-                    debug("Sucessfully deleted dev mode temporary Dockerfile");
+                    debug("Successfully deleted dev mode temporary Dockerfile");
                 } catch (IOException e) {
-                    error("Could not delete dev mode temporary Dockerfile");
+                    error("Could not delete dev mode temporary Dockerfile: " + e.getMessage());
                 }
             }
         }
