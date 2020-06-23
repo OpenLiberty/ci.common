@@ -697,7 +697,6 @@ public abstract class DevUtil {
             dockerfileLines = Files.readAllLines(dockerfile.toPath());
         } catch (IOException e) {
             error("Failed to read Dockerfile located at " + dockerfile);
-            //TODO: what direction should we give the user here?
             throw new PluginExecutionException("Could not read Dockerfile " + dockerfile + ": " + e.getMessage(), e);
         }
         return dockerfileLines;
@@ -736,7 +735,6 @@ public abstract class DevUtil {
             Files.write(tempDockerfile.toPath(), dockerfileLines, StandardCharsets.UTF_8);
         } catch (IOException e) {
             error("Failed to create temp Dockerfile");
-            //TODO: what direction should we give the user here?
             throw new PluginExecutionException("Could not create temp Dockerfile: " + e.getMessage(), e);
         }
         return tempDockerfile;
