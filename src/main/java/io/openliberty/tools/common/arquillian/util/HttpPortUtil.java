@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017.
+ * (C) Copyright IBM Corporation 2017, 2020
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ import javax.xml.xpath.XPathFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
+import org.w3c.dom.NodeList;
 
 public class HttpPortUtil {
 
@@ -53,20 +54,34 @@ public class HttpPortUtil {
     public static Integer getHttpPort(File serverXML, File bootstrapProperties)
             throws FileNotFoundException, IOException, ParserConfigurationException, SAXException,
             XPathExpressionException, ArquillianConfigurationException {
+        return getHttpPort(serverXML, bootstrapProperties, null);
+    }
+
+    public static Integer getHttpPort(File serverXML, File bootstrapProperties, File configVariableXML)
+            throws FileNotFoundException, IOException, ParserConfigurationException, SAXException,
+            XPathExpressionException, ArquillianConfigurationException {
         if (serverXML != null && serverXML.exists() && serverXML.isFile()) {
             byte[] encoded = Files.readAllBytes(Paths.get(serverXML.getCanonicalPath()));
+            String serverXMLAsString = new String(encoded, StandardCharsets.UTF_8);
+
             Properties prop = new Properties();
             if (bootstrapProperties != null && bootstrapProperties.exists()) {
                 prop.load(new FileInputStream(bootstrapProperties));
             }
-            return getHttpPort(new String(encoded, StandardCharsets.UTF_8), prop);
+
+            String configVariableXMLAsString = null;
+            if (configVariableXML != null && configVariableXML.exists() && configVariableXML.isFile()) {
+                byte[] configVarBytes = Files.readAllBytes(Paths.get(configVariableXML.getCanonicalPath()));
+                configVariableXMLAsString = new String(configVarBytes, StandardCharsets.UTF_8);
+            }
+
+            return getHttpPortForServerXML(serverXMLAsString, prop, configVariableXMLAsString);
         }
         throw new FileNotFoundException(
                 "The given server.xml file at " + serverXML.getCanonicalPath() + " was not found.");
     }
 
-    protected static Integer getHttpPort(String serverXML, Properties bootstrapProperties)
-            throws ParserConfigurationException, SAXException, IOException, XPathExpressionException,
+    protected static Integer getHttpPortForServerXML(String serverXML, Properties bootstrapProperties, String configVariableXML) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException,
             ArquillianConfigurationException {
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(new ByteArrayInputStream(serverXML.getBytes()));
@@ -87,11 +102,71 @@ public class HttpPortUtil {
             Matcher m = p.matcher(portString);
             while (m.find()) {
                 String variable = m.group(1);
-                return getHttpPortFromBootstrapProperties(variable, bootstrapProperties);
+                // First look for variable in configVariableXML if provided
+                String variableValue = getHttpPortFromConfigVariableXML(configVariableXML, variable);
+
+                if (variableValue != null) {
+                    try {
+                        return Integer.parseInt(variableValue);
+                    } catch (NumberFormatException ex) {
+                        // Config variable value is not a number, return error
+                        throw new ArquillianConfigurationException(
+                            "liberty-plugin-variable-config.xml variable " + variable + " is not in the correct format.");
+                    }
+                } else {
+                    return getHttpPortFromBootstrapProperties(variable, bootstrapProperties);
+                }
             }
             throw new ArquillianConfigurationException(
                     "Bootstrap properties variable " + portString + " is not in the correct format.");
         }
+    }
+
+    // Loop through all variables and look for ones that match the passed in variableName.
+    // If a matching variable has a value attribute, return that.
+    // Else if a matching variable has a defaultValue attribute, return that.
+    // Otherwise, return null.
+    // 
+    private static String getHttpPortFromConfigVariableXML(String configVariableXML, String variableName) throws ParserConfigurationException, SAXException, XPathExpressionException, IOException {
+        // If no configVariableXML is specified, return null.
+        if (configVariableXML == null || configVariableXML.length() == 0) {
+            return null;
+        }
+
+        // get input XML Document
+        DocumentBuilderFactory inputBuilderFactory = DocumentBuilderFactory.newInstance();
+        inputBuilderFactory.setIgnoringComments(true);
+        inputBuilderFactory.setCoalescing(true);
+        inputBuilderFactory.setIgnoringElementContentWhitespace(true);
+        inputBuilderFactory.setValidating(false);
+        DocumentBuilder inputBuilder = inputBuilderFactory.newDocumentBuilder();
+        Document inputDoc = inputBuilder.parse(new ByteArrayInputStream(configVariableXML.getBytes()));
+        
+        // parse input XML Document
+        String expression = "/server/variable";
+        NodeList nodes = (NodeList) XPATH.compile(expression).evaluate(inputDoc, XPathConstants.NODESET);
+
+        String variableValue = null;
+        String variableDefaultValue = null;
+
+        // iterate through nodes
+        for (int i=0; i < nodes.getLength(); i++) {
+            Element el = (Element) nodes.item(i);
+            String varName = el.getAttribute("name");
+
+            if (varName != null && varName.equals(variableName)) {
+                String varValue = el.getAttribute("value");
+                if (varValue != null && !varValue.isEmpty() && variableValue == null) {
+                    variableValue = varValue;
+                }
+                String varDefaultValue = el.getAttribute("defaultValue");
+                if (varDefaultValue != null && !varDefaultValue.isEmpty() && variableDefaultValue == null) {
+                    variableDefaultValue = varDefaultValue;
+                }
+            }
+        }
+
+        return (variableValue != null ? variableValue : variableDefaultValue);
     }
 
     private static Integer getHttpPortFromBootstrapProperties(String variable, Properties bootstrapProperties)
