@@ -298,6 +298,8 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
+    private List<String> srcMount;
+    private List<String> destMount;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -340,6 +342,8 @@ public abstract class DevUtil {
         if (projectDirectory != null) {
             this.defaultDockerfile = new File (projectDirectory.getAbsolutePath() + "/Dockerfile");
         }
+        this.srcMount = new ArrayList<String>();
+        this.destMount = new ArrayList<String>();
     }
 
     /**
@@ -522,7 +526,7 @@ public abstract class DevUtil {
             File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
             debug("Dockerfile to use: " + dockerfileToUse);
             if (dockerfileToUse.exists()) {
-                List<String> dockerfileLines = removeWarFileLines(readDockerfile(dockerfileToUse));
+                List<String> dockerfileLines = removeCopyLines(removeWarFileLines(readDockerfile(dockerfileToUse)), dockerfileToUse.getParent());
                 File tempDockerfile = createTempDockerfile(dockerfileLines);
                 buildDockerImage(tempDockerfile, dockerfileToUse);
             } else {
@@ -722,6 +726,56 @@ public abstract class DevUtil {
         debug("WAR file lines: " + warFileLines.toString());
         dockerfileLines.removeAll(warFileLines);
         return dockerfileLines;
+    }
+
+    private List<String> removeCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
+        List<String> copyLines = new ArrayList<String>();
+        for (String line : dockerfileLines) {
+            // Remove white space from the beginning and end of the line
+            String trimLine = line.trim();
+            if (!trimLine.startsWith("#")) {
+                // Break the Dockerfile line down into segments based on any amount of whitespace.
+                // The command must be to the left of any comments.
+                String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
+                // If the line starts with COPY
+                if (cmdSegments[0].equalsIgnoreCase("COPY")) {
+                    if (cmdSegments.length < 3) {
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
+                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                    }
+                    String src = cmdSegments[cmdSegments.length - 2];
+                    String dest = cmdSegments[cmdSegments.length - 1];
+                    if (validateSrcMount(new File(buildContext + "/" + src))) {
+                        srcMount.add(buildContext + "/" + src);
+                        destMount.add(formatDestMount(dest, new File(buildContext + "/" + src)));
+                        copyLines.add(line);
+                    }
+                }
+            }
+        }
+        debug("COPY lines: " + copyLines.toString());
+        dockerfileLines.removeAll(copyLines);
+        return dockerfileLines;
+    }
+
+    private boolean validateSrcMount(File srcMountFile) throws PluginExecutionException {
+        if (srcMountFile.isDirectory()) {
+            warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed for the dev mode container. " + 
+                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
+            return false;
+        }
+        else if (!srcMountFile.exists()) {
+            throw new PluginExecutionException("Cannot build docker image with missing file: " + srcMountFile);
+        }
+        return true;
+    }
+
+    private String formatDestMount(String destMountString, File srcMountFile) {
+        // Cannot mount a file onto a directory, so must add a filename to the end of the destination argument for mounting
+        if (destMountString.endsWith("/") || destMountString.endsWith("\\")) {
+            destMountString += srcMountFile.getName();
+        }
+        return destMountString;
     }
 
     private File createTempDockerfile(List<String> dockerfileLines) throws PluginExecutionException {
@@ -925,6 +979,11 @@ public abstract class DevUtil {
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v "+serverDirectory.getAbsolutePath()+"/logs:/logs");
+
+        // mount all files from COPY commands in the Dockerfile to allow for hot deployment
+        for (int i=0; i < srcMount.size(); i++) {
+            command.append(" -v " + srcMount.get(i) + ":" + destMount.get(i));
+        }
 
         command.append(" --name " + DEVMODE_CONTAINER_NAME);
 
