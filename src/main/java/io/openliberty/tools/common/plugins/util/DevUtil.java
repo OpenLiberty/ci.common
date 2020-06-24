@@ -738,9 +738,8 @@ public abstract class DevUtil {
                 // If the line starts with COPY
                 if (cmdSegments[0].equalsIgnoreCase("COPY")) {
                     if (cmdSegments.length < 3) {
-                        error("A COPY line in the Dockerfile has incorrect syntax: '" + line + "'. There must be at least " + 
-                        "two arguments, a source path and a destination path.");
-                        throw new PluginExecutionException("Cannot build docker image with incorrect COPY line syntax.");
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
+                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
                     }
                     String src = cmdSegments[cmdSegments.length - 2];
                     String dest = cmdSegments[cmdSegments.length - 1];
@@ -764,8 +763,7 @@ public abstract class DevUtil {
             return false;
         }
         else if (!srcMountFile.exists()) {
-            error(srcMountFile + " does not exist and will not be copied to the image.");
-            throw new PluginExecutionException("Cannot build docker image with missing file " + srcMountFile);
+            throw new PluginExecutionException("Cannot build docker image with missing file: " + srcMountFile);
         }
         return true;
     }
