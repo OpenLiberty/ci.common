@@ -769,7 +769,8 @@ public abstract class DevUtil {
     private String formatDestMount(String destMountString, String srcMountString) {
         // Cannot mount a file onto a directory, so must add a filename to the end of the destination argument for mounting
         if (destMountString.endsWith("/") || destMountString.endsWith("\\")) {
-            String [] segments = srcMountString.split("/|\\");
+            // Split on forward and backward slashes
+            String [] segments = srcMountString.split("/|\\\\");
             destMountString += segments[segments.length -1];
             debug("destMountString: " + destMountString);
         }
