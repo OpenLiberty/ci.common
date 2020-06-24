@@ -737,6 +737,11 @@ public abstract class DevUtil {
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // If the line starts with COPY
                 if (cmdSegments[0].equalsIgnoreCase("COPY")) {
+                    if (cmdSegments.length < 3) {
+                        error("A COPY line in the Dockerfile has incorrect syntax: '" + line + "'. There must be at least " + 
+                        "two arguments, a source path and a destination path.");
+                        throw new PluginExecutionException("Cannot build docker image with incorrect COPY line syntax.");
+                    }
                     String src = cmdSegments[cmdSegments.length - 2];
                     String dest = cmdSegments[cmdSegments.length - 1];
                     if (validateSrcMount(src, buildContext)) {
