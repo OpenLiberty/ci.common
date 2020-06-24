@@ -744,9 +744,9 @@ public abstract class DevUtil {
                     }
                     String src = cmdSegments[cmdSegments.length - 2];
                     String dest = cmdSegments[cmdSegments.length - 1];
-                    if (validateSrcMount(src, buildContext)) {
+                    if (validateSrcMount(new File(buildContext + "/" + src))) {
                         srcMount.add(buildContext + "/" + src);
-                        destMount.add(formatDestMount(dest, src));
+                        destMount.add(formatDestMount(dest, new File(buildContext + "/" + src)));
                         copyLines.add(line);
                     }
                 }
@@ -757,8 +757,7 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
-    private boolean validateSrcMount(String srcMountString, String buildContext) throws PluginExecutionException {
-        File srcMountFile = new File(buildContext + "/" + srcMountString);
+    private boolean validateSrcMount(File srcMountFile) throws PluginExecutionException {
         if (srcMountFile.isDirectory()) {
             warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed for the dev mode container. " + 
                 "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
@@ -771,13 +770,10 @@ public abstract class DevUtil {
         return true;
     }
 
-    private String formatDestMount(String destMountString, String srcMountString) {
+    private String formatDestMount(String destMountString, File srcMountFile) {
         // Cannot mount a file onto a directory, so must add a filename to the end of the destination argument for mounting
         if (destMountString.endsWith("/") || destMountString.endsWith("\\")) {
-            // Split on forward and backward slashes
-            String [] segments = srcMountString.split("/|\\\\");
-            destMountString += segments[segments.length -1];
-            debug("destMountString: " + destMountString);
+            destMountString += srcMountFile.getName();
         }
         return destMountString;
     }
