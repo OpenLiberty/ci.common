@@ -112,6 +112,8 @@ public abstract class DevUtil {
             // intellij
             "___jb_tmp___", "___jb_old___" };
 
+    private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
+
     /**
      * Log debug
      * 
@@ -2497,7 +2499,7 @@ public abstract class DevUtil {
                     }
                 }
 
-                List<String> optionList = new ArrayList<>();
+                List<String> optionList = new ArrayList<>(Arrays.asList(DEFAULT_COMPILER_OPTIONS));
                 List<File> outputDirs = new ArrayList<File>();
 
                 if (tests) {
