@@ -703,7 +703,7 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
-    private List<String> removeWarFileLines(List<String> dockerfileLines) {
+    private List<String> removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
@@ -713,8 +713,14 @@ public abstract class DevUtil {
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
-                if (cmdSegments[0].equalsIgnoreCase("COPY") && cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
-                    warFileLines.add(line);
+                if (cmdSegments[0].equalsIgnoreCase("COPY")) {
+                    if (cmdSegments.length < 3) {
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
+                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                    }
+                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
+                        warFileLines.add(line);
+                    }
                 }
             }
         }
