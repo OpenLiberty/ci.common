@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2020.
+ * (C) Copyright IBM Corporation 2019, 2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -298,8 +298,8 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
-    private List<String> srcMount;
-    private List<String> destMount;
+    private List<String> srcMount = new ArrayList<String>();
+    private List<String> destMount = new ArrayList<String>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -340,10 +340,8 @@ public abstract class DevUtil {
         this.dockerfile = dockerfile;
         this.dockerRunOpts = dockerRunOpts;
         if (projectDirectory != null) {
-            this.defaultDockerfile = new File (projectDirectory.getAbsolutePath() + "/Dockerfile");
+            this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
         }
-        this.srcMount = new ArrayList<String>();
-        this.destMount = new ArrayList<String>();
     }
 
     /**
@@ -497,19 +495,17 @@ public abstract class DevUtil {
     }
 
     /**
-     * Try to get log file from server directory first.
-     * If the server directory path cannot be resolved, get log file from the server task instead.
+     * Get the log file from server task or server directory.
      * 
-     * @param serverTask the server task
+     * @param serverTask the server task, can be null
      * @return the messages log file for the server
      */
     private File getMessagesLogFile(ServerTask serverTask) {
         File logFile;
-        try {
-            String logsDirectory = serverDirectory.getCanonicalPath() + "/logs";
-            logFile = new File(logsDirectory, "messages.log");
-        } catch (IOException e) {
+        if (serverTask != null) {
             logFile = serverTask.getLogFile();
+        } else {
+            logFile = new File(serverDirectory, "logs/messages.log");
         }
         return logFile;
     }
@@ -526,8 +522,7 @@ public abstract class DevUtil {
             File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
             debug("Dockerfile to use: " + dockerfileToUse);
             if (dockerfileToUse.exists()) {
-                List<String> dockerfileLines = removeCopyLines(removeWarFileLines(readDockerfile(dockerfileToUse)), dockerfileToUse.getParent());
-                File tempDockerfile = createTempDockerfile(dockerfileLines);
+                File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
                 buildDockerImage(tempDockerfile, dockerfileToUse);
             } else {
                 // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
@@ -708,7 +703,7 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
-    private List<String> removeWarFileLines(List<String> dockerfileLines) {
+    private List<String> removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
@@ -718,8 +713,14 @@ public abstract class DevUtil {
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
-                if (cmdSegments[0].equalsIgnoreCase("COPY") && cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
-                    warFileLines.add(line);
+                if (cmdSegments[0].equalsIgnoreCase("COPY")) {
+                    if (cmdSegments.length < 3) {
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
+                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                    }
+                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
+                        warFileLines.add(line);
+                    }
                 }
             }
         }
@@ -778,8 +779,13 @@ public abstract class DevUtil {
         return destMountString;
     }
 
-    private File createTempDockerfile(List<String> dockerfileLines) throws PluginExecutionException {
+    private File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
+
+        List<String> dockerfileLines = readDockerfile(dockerfile);
+        dockerfileLines = removeWarFileLines(dockerfileLines);
+        dockerfileLines = removeCopyLines(dockerfileLines, dockerfile.getParent());
+
         File tempDockerfile = null;
         try {
             info("Creating temp Dockerfile...");
@@ -955,13 +961,10 @@ public abstract class DevUtil {
         } else {
             command.append(" -p 9080:9080");
         }
-        debug("System.getProperty(9443) ="+System.getProperty("9443") );
         if (httpsPort != null) {
             command.append(" -p "+httpsPort+":"+httpsPort);
         } else {
-            if (System.getProperty("9443") == null) {
-                command.append(" -p 9443:9443");
-            }
+            command.append(" -p 9443:9443");
         }
         if (libertyDebug) {
             // map debug port
@@ -1181,7 +1184,7 @@ public abstract class DevUtil {
                     FileUtils.deleteDirectory(tempConfig);
                     debug("Successfully deleted liberty:dev temporary configuration folder");
                 } catch (IOException e) {
-                    error("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
+                    warn("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
                 }
             }
         }
@@ -1195,7 +1198,7 @@ public abstract class DevUtil {
                     Files.delete(tempDockerfilePath);
                     debug("Successfully deleted dev mode temporary Dockerfile");
                 } catch (IOException e) {
-                    error("Could not delete dev mode temporary Dockerfile: " + e.getMessage());
+                    warn("Could not delete dev mode temporary Dockerfile: " + e.getMessage());
                 }
             }
         }
