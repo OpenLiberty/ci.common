@@ -526,7 +526,7 @@ public abstract class DevUtil {
                 buildDockerImage(tempDockerfile, dockerfileToUse);
             } else {
                 // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
-                throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support.");
+                throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
             }
         }
         try {
@@ -786,7 +786,7 @@ public abstract class DevUtil {
 
         File tempDockerfile = null;
         try {
-            info("Creating temp Dockerfile...");
+            debug("Creating temp Dockerfile...");
             tempDockerfile = File.createTempFile("tempDockerfile", "");
             debug("temp Dockerfile: " + tempDockerfile);
             tempDockerfilePath = tempDockerfile.toPath();
