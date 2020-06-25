@@ -497,21 +497,28 @@ public abstract class DevUtil {
     }
 
     /**
-     * Try to get log file from server directory first.
-     * If the server directory path cannot be resolved, get log file from the server task instead.
+     * Get the log file from server task or server directory.
      * 
-     * @param serverTask the server task
+     * @param serverTask the server task, can be null
      * @return the messages log file for the server
      */
     private File getMessagesLogFile(ServerTask serverTask) {
         File logFile;
-        try {
-            String logsDirectory = serverDirectory.getCanonicalPath() + "/logs";
-            logFile = new File(logsDirectory, "messages.log");
-        } catch (IOException e) {
+        if (serverTask != null) {
             logFile = serverTask.getLogFile();
+        } else {
+            try {
+                logFile = getLogFile(serverDirectory.getCanonicalPath());
+            } catch (IOException e) {
+                logFile = getLogFile(serverDirectory.getAbsolutePath());
+            }
         }
         return logFile;
+    }
+
+    private File getLogFile(String serverPath) {
+        String logsDirectory = serverPath + "/logs";
+        return new File(logsDirectory, "messages.log");
     }
 
     /**
@@ -955,13 +962,10 @@ public abstract class DevUtil {
         } else {
             command.append(" -p 9080:9080");
         }
-        debug("System.getProperty(9443) ="+System.getProperty("9443") );
         if (httpsPort != null) {
             command.append(" -p "+httpsPort+":"+httpsPort);
         } else {
-            if (System.getProperty("9443") == null) {
-                command.append(" -p 9443:9443");
-            }
+            command.append(" -p 9443:9443");
         }
         if (libertyDebug) {
             // map debug port
@@ -1181,7 +1185,7 @@ public abstract class DevUtil {
                     FileUtils.deleteDirectory(tempConfig);
                     debug("Successfully deleted liberty:dev temporary configuration folder");
                 } catch (IOException e) {
-                    error("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
+                    warn("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
                 }
             }
         }
@@ -1195,7 +1199,7 @@ public abstract class DevUtil {
                     Files.delete(tempDockerfilePath);
                     debug("Successfully deleted dev mode temporary Dockerfile");
                 } catch (IOException e) {
-                    error("Could not delete dev mode temporary Dockerfile: " + e.getMessage());
+                    warn("Could not delete dev mode temporary Dockerfile: " + e.getMessage());
                 }
             }
         }
