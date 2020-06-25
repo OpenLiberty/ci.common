@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2020.
+ * (C) Copyright IBM Corporation 2019, 2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -298,8 +298,8 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
-    private List<String> srcMount;
-    private List<String> destMount;
+    private List<String> srcMount = new ArrayList<String>();
+    private List<String> destMount = new ArrayList<String>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -340,10 +340,8 @@ public abstract class DevUtil {
         this.dockerfile = dockerfile;
         this.dockerRunOpts = dockerRunOpts;
         if (projectDirectory != null) {
-            this.defaultDockerfile = new File (projectDirectory.getAbsolutePath() + "/Dockerfile");
+            this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
         }
-        this.srcMount = new ArrayList<String>();
-        this.destMount = new ArrayList<String>();
     }
 
     /**
@@ -507,18 +505,9 @@ public abstract class DevUtil {
         if (serverTask != null) {
             logFile = serverTask.getLogFile();
         } else {
-            try {
-                logFile = getLogFile(serverDirectory.getCanonicalPath());
-            } catch (IOException e) {
-                logFile = getLogFile(serverDirectory.getAbsolutePath());
-            }
+            logFile = new File(serverDirectory, "logs/messages.log");
         }
         return logFile;
-    }
-
-    private File getLogFile(String serverPath) {
-        String logsDirectory = serverPath + "/logs";
-        return new File(logsDirectory, "messages.log");
     }
 
     /**
@@ -533,8 +522,7 @@ public abstract class DevUtil {
             File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
             debug("Dockerfile to use: " + dockerfileToUse);
             if (dockerfileToUse.exists()) {
-                List<String> dockerfileLines = removeCopyLines(removeWarFileLines(readDockerfile(dockerfileToUse)), dockerfileToUse.getParent());
-                File tempDockerfile = createTempDockerfile(dockerfileLines);
+                File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
                 buildDockerImage(tempDockerfile, dockerfileToUse);
             } else {
                 // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
@@ -785,8 +773,13 @@ public abstract class DevUtil {
         return destMountString;
     }
 
-    private File createTempDockerfile(List<String> dockerfileLines) throws PluginExecutionException {
+    private File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
+
+        List<String> dockerfileLines = readDockerfile(dockerfile);
+        dockerfileLines = removeWarFileLines(dockerfileLines);
+        dockerfileLines = removeCopyLines(dockerfileLines, dockerfile.getParent());
+
         File tempDockerfile = null;
         try {
             info("Creating temp Dockerfile...");
