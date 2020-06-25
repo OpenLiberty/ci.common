@@ -703,7 +703,7 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
-    private List<String> removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
+    private void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
@@ -726,10 +726,9 @@ public abstract class DevUtil {
         }
         debug("WAR file lines: " + warFileLines.toString());
         dockerfileLines.removeAll(warFileLines);
-        return dockerfileLines;
     }
 
-    private List<String> removeCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
+    private void removeCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
         List<String> copyLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
@@ -756,7 +755,6 @@ public abstract class DevUtil {
         }
         debug("COPY lines: " + copyLines.toString());
         dockerfileLines.removeAll(copyLines);
-        return dockerfileLines;
     }
 
     private boolean validateSrcMount(File srcMountFile) throws PluginExecutionException {
@@ -783,8 +781,8 @@ public abstract class DevUtil {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
-        dockerfileLines = removeWarFileLines(dockerfileLines);
-        dockerfileLines = removeCopyLines(dockerfileLines, dockerfile.getParent());
+        removeWarFileLines(dockerfileLines);
+        removeCopyLines(dockerfileLines, dockerfile.getParent());
 
         File tempDockerfile = null;
         try {
