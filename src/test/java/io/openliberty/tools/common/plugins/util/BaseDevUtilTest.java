@@ -35,7 +35,7 @@ public class BaseDevUtilTest {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory,
                 File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, resourceDirs, hotTests, skipTests, false, false, null, 30, 30, 5, 500, true, false, false, false);
+            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, resourceDirs, hotTests, skipTests, false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null);
         }
 
         @Override
