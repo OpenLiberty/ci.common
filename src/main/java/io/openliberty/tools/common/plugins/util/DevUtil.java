@@ -495,17 +495,17 @@ public abstract class DevUtil {
     }
 
     /**
-     * Get the log file from server task or server directory.
+     * Get the log file from server directory if using container, or from server task otherwise.
      * 
-     * @param serverTask the server task, can be null
+     * @param serverTask the server task
      * @return the messages log file for the server
      */
     private File getMessagesLogFile(ServerTask serverTask) {
         File logFile;
-        if (serverTask != null) {
-            logFile = serverTask.getLogFile();
-        } else {
+        if (container) {
             logFile = new File(serverDirectory, "logs/messages.log");
+        } else {
+            logFile = serverTask.getLogFile();           
         }
         return logFile;
     }
@@ -1039,10 +1039,7 @@ public abstract class DevUtil {
             }
         }
         libertyCreate();
-        if (!container) {
-            // local dev mode can't install feature on containerized runtime, unless we exec into the container
-            libertyInstallFeature();
-        }
+        libertyInstallFeature();
         libertyDeploy();
         startServer();
         setDevStop(false);
