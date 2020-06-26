@@ -502,7 +502,7 @@ public abstract class DevUtil {
      */
     private File getMessagesLogFile(ServerTask serverTask) {
         File logFile;
-        if (serverTask != null) {
+        if (!container && serverTask != null) {
             logFile = serverTask.getLogFile();
         } else {
             logFile = new File(serverDirectory, "logs/messages.log");
