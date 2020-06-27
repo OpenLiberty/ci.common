@@ -298,8 +298,8 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
-    private List<String> srcMount = new ArrayList<String>();
-    private List<String> destMount = new ArrayList<String>();
+    protected List<String> srcMount = new ArrayList<String>();
+    protected List<String> destMount = new ArrayList<String>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -703,6 +703,50 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
+    /**
+     * Trim all lines and get them without comments or empty lines.
+     */
+    protected static List<String> getCleanedLines(List<String> dockerfileLines) throws PluginExecutionException {
+        List<String> result = new ArrayList<String>();
+        for (String line : dockerfileLines) {
+            // Remove white space from the beginning and end of the line
+            String pendingLine = line.trim();
+            int commentIndex = pendingLine.indexOf("#");
+            if (commentIndex >= 0) {
+                String contentBeforeSymbol = pendingLine.substring(0, commentIndex);
+                // trim again after removing trailing comment
+                pendingLine = contentBeforeSymbol.trim();
+            }
+            if (!pendingLine.isEmpty()) {
+                result.add(pendingLine);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Combine multi-line commands into single lines
+     */
+    protected static List<String> getCombinedLines(List<String> dockerfileLines) throws PluginExecutionException {
+        List<String> result = new ArrayList<String>();
+        int i = 0;
+        while (i < dockerfileLines.size()) {
+            String pendingLine = dockerfileLines.get(i).trim();
+            int multilineIndex;
+            int j = i+1;
+            while ((multilineIndex = pendingLine.indexOf("\\")) >= 0 && j < dockerfileLines.size()) {
+                String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
+                String nextLine = dockerfileLines.get(j);
+                String combined = contentBeforeSymbol + nextLine;
+                pendingLine = combined;
+                j++;
+            }
+            result.add(pendingLine);
+            i = j;
+        }
+        return result;
+    }
+
     private void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
@@ -762,8 +806,7 @@ public abstract class DevUtil {
             warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed for the dev mode container. " + 
                 "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
             return false;
-        }
-        else if (!srcMountFile.exists()) {
+        } else if (!srcMountFile.exists()) {
             throw new PluginExecutionException("Cannot build docker image with missing file: " + srcMountFile);
         }
         return true;
@@ -777,10 +820,12 @@ public abstract class DevUtil {
         return destMountString;
     }
 
-    private File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
+    protected File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
+        dockerfileLines = getCleanedLines(dockerfileLines);
+        dockerfileLines = getCombinedLines(dockerfileLines);
         removeWarFileLines(dockerfileLines);
         removeCopyLines(dockerfileLines, dockerfile.getParent());
 
