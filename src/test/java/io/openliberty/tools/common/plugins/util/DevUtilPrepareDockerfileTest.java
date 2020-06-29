@@ -20,7 +20,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,7 +51,7 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         File expected = new File(dockerfiles, expectedFile);
         result = util.prepareTempDockerfile(test);
         // trim the overall file content string since the file write can insert an extra line break at the end
-        assertEquals(new String(Files.readAllBytes(expected.toPath())).trim(), new String(Files.readAllBytes(result.toPath())).trim());
+        assertEquals(util.readDockerfile(expected), util.readDockerfile(result));
     }
 
     @Test
