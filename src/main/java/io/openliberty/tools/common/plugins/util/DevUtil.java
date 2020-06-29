@@ -825,6 +825,10 @@ public abstract class DevUtil {
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
                     }
+                    if (line.contains("$")) {
+                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands.");
+                        continue;
+                    }
                     List<String> srcOrDestArguments = new ArrayList<String>();
                     boolean skipLine = false;
                     for (int i = 1; i < cmdSegments.length; i++) { // start after the COPY word
