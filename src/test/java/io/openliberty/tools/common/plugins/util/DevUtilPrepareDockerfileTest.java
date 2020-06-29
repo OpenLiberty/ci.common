@@ -103,7 +103,7 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     @Test
     public void testMultilineEscapeDockerfile() throws Exception {
         testPrepareDockerfile("multilineEscape.txt", "multilineEscape-expected.txt");
-        assertTrue(util.srcMount.get(0).endsWith("myconfigdir"));
+        assertTrue(util.srcMount.get(0).endsWith("server.xml"));
         assertTrue(util.destMount.get(0).endsWith("c:\\config\\server.xml"));
     }
 

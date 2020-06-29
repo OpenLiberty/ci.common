@@ -772,7 +772,7 @@ public abstract class DevUtil {
             String pendingLine = dockerfileLines.get(i).trim();
             int multilineIndex;
             int j = i+1;
-            while (pendingLine.length() > 0 && (pendingLine.charAt(pendingLine.length() - 1) == escape) && j < dockerfileLines.size()) {
+            while (pendingLine.length() > 0 && !pendingLine.startsWith("#") && (pendingLine.charAt(pendingLine.length() - 1) == escape) && j < dockerfileLines.size()) {
                 multilineIndex = pendingLine.length() - 1;
                 String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
                 String nextLine = dockerfileLines.get(j);
