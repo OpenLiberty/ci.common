@@ -92,6 +92,63 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     }
 
     @Test
+    public void testBasicDockerfileFlow() throws Exception {
+        File dockerfile = new File(dockerfiles, "basic.txt");
+
+        List<String> dockerfileLines = util.readDockerfile(dockerfile);
+
+        List<String> expectedDockerfileLines = new ArrayList<String>();
+        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedDockerfileLines.add("");
+        expectedDockerfileLines.add("# Add my app and config");
+        expectedDockerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
+        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedDockerfileLines.add("");
+        expectedDockerfileLines.add("# Default setting for the verbose option");
+        expectedDockerfileLines.add("ARG VERBOSE=false");
+        expectedDockerfileLines.add("");
+        expectedDockerfileLines.add("# This script will add the requested XML snippets, grow image to be fit-for-purpose and apply interim fixes");
+        expectedDockerfileLines.add("RUN configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+
+        char escape = util.getEscapeCharacter(dockerfileLines);
+        assertEquals(String.valueOf('\\'), String.valueOf(escape));
+
+        dockerfileLines = util.getCleanedLines(dockerfileLines);
+        List<String> cleanedLines = new ArrayList<String>();
+        expectedDockerfileLines.clear();
+        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedDockerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
+        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedDockerfileLines.add("ARG VERBOSE=false");
+        expectedDockerfileLines.add("RUN configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+
+        dockerfileLines = util.getCombinedLines(dockerfileLines, escape);
+        expectedDockerfileLines.clear();
+        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedDockerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
+        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedDockerfileLines.add("ARG VERBOSE=false");
+        expectedDockerfileLines.add("RUN configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+
+        util.removeWarFileLines(dockerfileLines);
+        expectedDockerfileLines.clear();
+        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedDockerfileLines.add("ARG VERBOSE=false");
+        expectedDockerfileLines.add("RUN configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+
+        util.processCopyLines(dockerfileLines, dockerfile.getParent());
+        assertTrue(util.srcMount.get(0).endsWith("server.xml"));
+        assertTrue(util.destMount.get(0).endsWith("/config/server.xml"));
+        assertEquals(1, util.srcMount.size());
+        assertEquals(1, util.destMount.size());
+    }
+
+    @Test
     public void testMultilineDockerfile() throws Exception {
         testPrepareDockerfile("multiline.txt", "multiline-expected.txt");
         assertTrue(util.srcMount.get(0).endsWith("file1.xml"));

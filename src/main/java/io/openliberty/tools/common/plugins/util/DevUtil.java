@@ -691,7 +691,7 @@ public abstract class DevUtil {
         }
     }
 
-    private List<String> readDockerfile(File dockerfile) throws PluginExecutionException {
+    protected List<String> readDockerfile(File dockerfile) throws PluginExecutionException {
         // Convert Dockerfile to List of strings for each line
         List<String> dockerfileLines = null;
         try {
@@ -786,7 +786,7 @@ public abstract class DevUtil {
         return result;
     }
 
-    private void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
+    protected void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
@@ -811,7 +811,7 @@ public abstract class DevUtil {
         dockerfileLines.removeAll(warFileLines);
     }
 
-    private void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
+    protected void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
