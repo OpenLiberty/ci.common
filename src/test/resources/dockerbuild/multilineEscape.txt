@@ -1,0 +1,14 @@
+# escape=`
+FROM openliberty/open-liberty:kernel-java8-openj9-ubi
+
+# tag::copy-config[]
+# tag::config-userID[]
+COPY --chown=1001:0 `
+# end::config-userID[]
+    # tag::inventory-config[]
+    server.xml `
+    # end::inventory-config[]
+    # tag::config[]
+    c:\config\
+    # end::config[]
+# end::copy-config[]

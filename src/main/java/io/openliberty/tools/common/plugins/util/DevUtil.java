@@ -298,8 +298,8 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
-    private List<String> srcMount = new ArrayList<String>();
-    private List<String> destMount = new ArrayList<String>();
+    protected List<String> srcMount = new ArrayList<String>();
+    protected List<String> destMount = new ArrayList<String>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -691,7 +691,7 @@ public abstract class DevUtil {
         }
     }
 
-    private List<String> readDockerfile(File dockerfile) throws PluginExecutionException {
+    protected List<String> readDockerfile(File dockerfile) throws PluginExecutionException {
         // Convert Dockerfile to List of strings for each line
         List<String> dockerfileLines = null;
         try {
@@ -703,7 +703,90 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
-    private void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
+    /**
+     * Get escape character from the escape directive at the top of the Dockerfile.
+     * Docker documents a couple of directives, but it seems escape must always be the first line to work.
+     */
+    protected static char getEscapeCharacter(List<String> dockerfileLines) throws PluginExecutionException {
+        if (dockerfileLines.size() > 0) {
+            // Remove white space from the beginning and end of the line
+            String pendingLine = dockerfileLines.get(0).trim();
+            int directiveSymbolIndex = pendingLine.indexOf("#");
+            if (directiveSymbolIndex >= 0) {
+                String contentAfterSymbol = pendingLine.substring(directiveSymbolIndex + 1, pendingLine.length());
+                // trim again after removing preceding symbol
+                String directive = contentAfterSymbol.trim();
+                String[] split = directive.split("=");
+                if (split.length == 2 && split[0].trim().equalsIgnoreCase("escape")) {
+                    String escapeChar = split[1].trim();
+                    if (escapeChar.length() > 0) {
+                        // Get the first char, and don't validate here whether it's a valid escape char
+                        // but just let Docker fail the build if it determines that it is invalid.
+                        return escapeChar.charAt(0);
+                    }
+                }
+            }
+        }
+        return '\\';
+    }
+
+    /**
+     * Trim all lines and get them without comments or empty lines after the first FROM command
+     * (so that directives at the beginning of the file are preserved)
+     */
+    protected static List<String> getCleanedLines(List<String> dockerfileLines) throws PluginExecutionException {
+        List<String> result = new ArrayList<String>();
+        boolean fromFound = false;
+        for (String line : dockerfileLines) {
+            // Remove white space from the beginning and end of the line
+            String pendingLine = line.trim();
+            if (!fromFound) {
+                if (pendingLine.startsWith("FROM")) {
+                    fromFound = true;
+                } else {
+                    // until we find a FROM line, just keep all the lines
+                    result.add(pendingLine);
+                    continue;
+                }
+            }
+            int commentIndex = pendingLine.indexOf("#");
+            if (commentIndex >= 0) {
+                String contentBeforeSymbol = pendingLine.substring(0, commentIndex);
+                // trim again after removing trailing comment
+                pendingLine = contentBeforeSymbol.trim();
+            }
+            if (!pendingLine.isEmpty()) {
+                result.add(pendingLine);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Combine multi-line commands into single lines. Requires that getCleanedLines() be called first.
+     */
+    protected static List<String> getCombinedLines(List<String> dockerfileLines, char escape) throws PluginExecutionException {
+        List<String> result = new ArrayList<String>();
+        int i = 0;
+        while (i < dockerfileLines.size()) {
+            String pendingLine = dockerfileLines.get(i).trim();
+            int multilineIndex;
+            int j = i+1;
+            while (pendingLine.length() > 0 && !pendingLine.startsWith("#") && (pendingLine.charAt(pendingLine.length() - 1) == escape) && j < dockerfileLines.size()) {
+                multilineIndex = pendingLine.length() - 1;
+                String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
+                String nextLine = dockerfileLines.get(j);
+                String combined = contentBeforeSymbol + nextLine;
+                pendingLine = combined.trim(); // trim the combined string to remove whitespace around any further line escapes
+                j++;
+            }
+            result.add(pendingLine);
+            i = j;
+        }
+        return result;
+    }
+
+    protected void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
@@ -728,8 +811,7 @@ public abstract class DevUtil {
         dockerfileLines.removeAll(warFileLines);
     }
 
-    private void removeCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
-        List<String> copyLines = new ArrayList<String>();
+    protected void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
@@ -739,33 +821,62 @@ public abstract class DevUtil {
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // If the line starts with COPY
                 if (cmdSegments[0].equalsIgnoreCase("COPY")) {
-                    if (cmdSegments.length < 3) {
+                    if (cmdSegments.length < 3) { // preliminary check but some of these segments could be options
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
                     }
-                    String src = cmdSegments[cmdSegments.length - 2];
-                    String dest = cmdSegments[cmdSegments.length - 1];
-                    if (validateSrcMount(new File(buildContext + "/" + src))) {
-                        srcMount.add(buildContext + "/" + src);
-                        destMount.add(formatDestMount(dest, new File(buildContext + "/" + src)));
-                        copyLines.add(line);
+                    if (line.contains("$")) {
+                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands.");
+                        continue;
+                    }
+                    List<String> srcOrDestArguments = new ArrayList<String>();
+                    boolean skipLine = false;
+                    for (int i = 1; i < cmdSegments.length; i++) { // start after the COPY word
+                        String segment = cmdSegments[i];
+                        if (segment.startsWith("--from")) {
+                            // multi-stage build, give a warning
+                            warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support hot deployment with multi-stage COPY commands.");
+                            skipLine = true; // don't mount the dirs in this COPY command
+                            break;
+                        } else if (segment.startsWith("--")) {
+                            continue; // ignore options
+                        } else {
+                            srcOrDestArguments.add(segment);
+                        }
+                    }
+                    if (skipLine) {
+                        continue;
+                    }
+                    if (srcOrDestArguments.size() < 2) { // proper check for number of src and dest args
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
+                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                    }
+                    // dest is the last argument
+                    String dest = srcOrDestArguments.get(srcOrDestArguments.size() - 1);
+                    List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
+                    for (String src : srcArguments) {
+                        if (src.contains("*") || src.contains("?")) {
+                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command.");
+                        } else if (isMountableSource(new File(buildContext + "/" + src))) {
+                            String srcMountString = buildContext + "/" + src;
+                            String destMountString = formatDestMount(dest, new File(buildContext + "/" + src));
+                            srcMount.add(srcMountString);
+                            destMount.add(destMountString);
+                            debug("COPY line=" + line + ", src=" + srcMountString + ", dest=" + destMountString);
+                        }
                     }
                 }
             }
         }
-        debug("COPY lines: " + copyLines.toString());
-        dockerfileLines.removeAll(copyLines);
     }
 
-    private boolean validateSrcMount(File srcMountFile) throws PluginExecutionException {
+    private boolean isMountableSource(File srcMountFile) throws PluginExecutionException {
         if (srcMountFile.isDirectory()) {
-            warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed for the dev mode container. " + 
+            warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed to the dev mode container. " +
+                "Dev mode does not currently support hot deployment with directories specified in the COPY command. " + 
                 "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
             return false;
-        }
-        else if (!srcMountFile.exists()) {
-            throw new PluginExecutionException("Cannot build docker image with missing file: " + srcMountFile);
-        }
+        } // no need to validate existence of the file, just let the Docker build fail
         return true;
     }
 
@@ -777,12 +888,15 @@ public abstract class DevUtil {
         return destMountString;
     }
 
-    private File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
+    protected File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
+        char escape = getEscapeCharacter(dockerfileLines);
+        dockerfileLines = getCleanedLines(dockerfileLines);
+        dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
-        removeCopyLines(dockerfileLines, dockerfile.getParent());
+        processCopyLines(dockerfileLines, dockerfile.getParent());
 
         File tempDockerfile = null;
         try {
