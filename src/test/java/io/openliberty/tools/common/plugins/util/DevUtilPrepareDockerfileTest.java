@@ -58,6 +58,7 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     @Test
     public void testCleanAndCombine() throws Exception {
         List<String> test = new ArrayList<String>();
+        test.add("FROM open-liberty");
         test.add("  COPY --chown=1001:0 \\  ");
         test.add("  # COMMENT ");
         test.add("    src/main/liberty/config/server.xml \\");
@@ -65,6 +66,7 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         test.add("    \t   COPY secondline.xml /config/  \t  ");
 
         List<String> expectedCleaned = new ArrayList<String>();
+        expectedCleaned.add("FROM open-liberty");
         expectedCleaned.add("COPY --chown=1001:0 \\");
         expectedCleaned.add("src/main/liberty/config/server.xml \\");
         expectedCleaned.add("/config/");
@@ -74,10 +76,11 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertEquals(expectedCleaned, actualCleaned);
 
         List<String> expectedCombined = new ArrayList<String>();
+        expectedCombined.add("FROM open-liberty");
         expectedCombined.add("COPY --chown=1001:0 src/main/liberty/config/server.xml /config/");
         expectedCombined.add("COPY secondline.xml /config/");
         
-        List<String> actualCombined = DevUtil.getCombinedLines(actualCleaned);
+        List<String> actualCombined = DevUtil.getCombinedLines(actualCleaned, '\\');
         assertEquals(expectedCombined, actualCombined);
     }
 
@@ -95,6 +98,33 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertTrue(util.destMount.get(0).endsWith("/config/filenameWithoutExtension"));
         assertTrue(util.srcMount.get(1).endsWith("file2.xml"));
         assertTrue(util.destMount.get(1).endsWith("/config/directoryName/file2.xml"));
+    }
+
+    @Test
+    public void testMultilineEscapeDockerfile() throws Exception {
+        testPrepareDockerfile("multilineEscape.txt", "multilineEscape-expected.txt");
+        assertTrue(util.srcMount.get(0).endsWith("myconfigdir"));
+        assertTrue(util.destMount.get(0).endsWith("c:\\config\\server.xml"));
+    }
+
+    @Test
+    public void testGetEscapeChar() throws Exception {
+        List<String> test = new ArrayList<String>();
+        test.add("#");
+        assertEquals(String.valueOf('\\'), String.valueOf(DevUtil.getEscapeCharacter(test)));
+
+        test.clear();
+        test.add("#    EsCApE   =   `   ");
+        assertEquals(String.valueOf('`'), String.valueOf(DevUtil.getEscapeCharacter(test)));
+
+        test.clear();
+        test.add("  #    EsCApE   =   \\   ");
+        assertEquals(String.valueOf('\\'), String.valueOf(DevUtil.getEscapeCharacter(test)));
+
+        test.clear();
+        test.add("# some comment");
+        test.add("# escape=`");
+        assertEquals(String.valueOf('\\'), String.valueOf(DevUtil.getEscapeCharacter(test)));
     }
 
 }

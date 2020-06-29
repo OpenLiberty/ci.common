@@ -704,13 +704,51 @@ public abstract class DevUtil {
     }
 
     /**
-     * Trim all lines and get them without comments or empty lines.
+     * Get escape character from the escape directive at the top of the Dockerfile.
+     * Docker documents a couple of directives, but it seems escape must always be the first line to work.
+     */
+    protected static char getEscapeCharacter(List<String> dockerfileLines) throws PluginExecutionException {
+        if (dockerfileLines.size() > 0) {
+            // Remove white space from the beginning and end of the line
+            String pendingLine = dockerfileLines.get(0).trim();
+            int directiveSymbolIndex = pendingLine.indexOf("#");
+            if (directiveSymbolIndex >= 0) {
+                String contentAfterSymbol = pendingLine.substring(directiveSymbolIndex + 1, pendingLine.length());
+                // trim again after removing preceding symbol
+                String directive = contentAfterSymbol.trim();
+                String[] split = directive.split("=");
+                if (split.length == 2 && split[0].trim().equalsIgnoreCase("escape")) {
+                    String escapeChar = split[1].trim();
+                    if (escapeChar.length() > 0) {
+                        // Get the first char, and don't validate here whether it's a valid escape char
+                        // but just let Docker fail the build if it determines that it is invalid.
+                        return escapeChar.charAt(0);
+                    }
+                }
+            }
+        }
+        return '\\';
+    }
+
+    /**
+     * Trim all lines and get them without comments or empty lines after the first FROM command
+     * (so that directives at the beginning of the file are preserved)
      */
     protected static List<String> getCleanedLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> result = new ArrayList<String>();
+        boolean fromFound = false;
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String pendingLine = line.trim();
+            if (!fromFound) {
+                if (pendingLine.startsWith("FROM")) {
+                    fromFound = true;
+                } else {
+                    // until we find a FROM line, just keep all the lines
+                    result.add(pendingLine);
+                    continue;
+                }
+            }
             int commentIndex = pendingLine.indexOf("#");
             if (commentIndex >= 0) {
                 String contentBeforeSymbol = pendingLine.substring(0, commentIndex);
@@ -725,20 +763,21 @@ public abstract class DevUtil {
     }
 
     /**
-     * Combine multi-line commands into single lines
+     * Combine multi-line commands into single lines. Requires that getCleanedLines() be called first.
      */
-    protected static List<String> getCombinedLines(List<String> dockerfileLines) throws PluginExecutionException {
+    protected static List<String> getCombinedLines(List<String> dockerfileLines, char escape) throws PluginExecutionException {
         List<String> result = new ArrayList<String>();
         int i = 0;
         while (i < dockerfileLines.size()) {
             String pendingLine = dockerfileLines.get(i).trim();
             int multilineIndex;
             int j = i+1;
-            while ((multilineIndex = pendingLine.indexOf("\\")) >= 0 && j < dockerfileLines.size()) {
+            while (pendingLine.length() > 0 && (pendingLine.charAt(pendingLine.length() - 1) == escape) && j < dockerfileLines.size()) {
+                multilineIndex = pendingLine.length() - 1;
                 String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
                 String nextLine = dockerfileLines.get(j);
                 String combined = contentBeforeSymbol + nextLine;
-                pendingLine = combined;
+                pendingLine = combined.trim(); // trim the combined string to remove whitespace around any further line escapes
                 j++;
             }
             result.add(pendingLine);
@@ -824,8 +863,9 @@ public abstract class DevUtil {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
+        char escape = getEscapeCharacter(dockerfileLines);
         dockerfileLines = getCleanedLines(dockerfileLines);
-        dockerfileLines = getCombinedLines(dockerfileLines);
+        dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
         removeCopyLines(dockerfileLines, dockerfile.getParent());
 
