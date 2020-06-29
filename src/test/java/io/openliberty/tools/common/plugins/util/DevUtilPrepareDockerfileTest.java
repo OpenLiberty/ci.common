@@ -127,4 +127,15 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertEquals(String.valueOf('\\'), String.valueOf(DevUtil.getEscapeCharacter(test)));
     }
 
+    @Test
+    public void testCopyParsing() throws Exception {
+        testPrepareDockerfile("copyParsing.txt", "copyParsing-expected.txt");
+        assertTrue(util.srcMount.get(0).endsWith("file1.xml"));
+        assertTrue(util.destMount.get(0).endsWith("/config/file1.xml"));
+        assertTrue(util.srcMount.get(1).endsWith("file2.xml"));
+        assertTrue(util.destMount.get(1).endsWith("/config/file2.xml"));
+        assertEquals(2, util.srcMount.size());
+        assertEquals(2, util.destMount.size());
+    }
+
 }

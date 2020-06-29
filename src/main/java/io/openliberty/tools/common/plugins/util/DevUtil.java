@@ -811,8 +811,7 @@ public abstract class DevUtil {
         dockerfileLines.removeAll(warFileLines);
     }
 
-    private void removeCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
-        List<String> copyLines = new ArrayList<String>();
+    private void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
@@ -822,32 +821,58 @@ public abstract class DevUtil {
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // If the line starts with COPY
                 if (cmdSegments[0].equalsIgnoreCase("COPY")) {
-                    if (cmdSegments.length < 3) {
+                    if (cmdSegments.length < 3) { // preliminary check but some of these segments could be options
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
                     }
-                    String src = cmdSegments[cmdSegments.length - 2];
-                    String dest = cmdSegments[cmdSegments.length - 1];
-                    if (validateSrcMount(new File(buildContext + "/" + src))) {
-                        srcMount.add(buildContext + "/" + src);
-                        destMount.add(formatDestMount(dest, new File(buildContext + "/" + src)));
-                        copyLines.add(line);
+                    List<String> srcOrDestArguments = new ArrayList<String>();
+                    boolean skipLine = false;
+                    for (int i = 1; i < cmdSegments.length; i++) { // start after the COPY word
+                        String segment = cmdSegments[i];
+                        if (segment.startsWith("--from")) {
+                            // multi-stage build, give a warning
+                            warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support hot deployment with multi-stage COPY commands.");
+                            skipLine = true; // don't mount the dirs in this COPY command
+                            break;
+                        } else if (segment.startsWith("--")) {
+                            continue; // ignore options
+                        } else {
+                            srcOrDestArguments.add(segment);
+                        }
+                    }
+                    if (skipLine) {
+                        continue;
+                    }
+                    if (srcOrDestArguments.size() < 2) { // proper check for number of src and dest args
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
+                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                    }
+                    // dest is the last argument
+                    String dest = srcOrDestArguments.get(srcOrDestArguments.size() - 1);
+                    List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
+                    for (String src : srcArguments) {
+                        if (src.contains("*") || src.contains("?")) {
+                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command.");
+                        } else if (isMountableSource(new File(buildContext + "/" + src))) {
+                            String srcMountString = buildContext + "/" + src;
+                            String destMountString = formatDestMount(dest, new File(buildContext + "/" + src));
+                            srcMount.add(srcMountString);
+                            destMount.add(destMountString);
+                            debug("COPY line=" + line + ", src=" + srcMountString + ", dest=" + destMountString);
+                        }
                     }
                 }
             }
         }
-        debug("COPY lines: " + copyLines.toString());
-        dockerfileLines.removeAll(copyLines);
     }
 
-    private boolean validateSrcMount(File srcMountFile) throws PluginExecutionException {
+    private boolean isMountableSource(File srcMountFile) throws PluginExecutionException {
         if (srcMountFile.isDirectory()) {
-            warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed for the dev mode container. " + 
+            warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed to the dev mode container. " +
+                "Dev mode does not currently support hot deployment with directories specified in the COPY command. " + 
                 "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
             return false;
-        } else if (!srcMountFile.exists()) {
-            throw new PluginExecutionException("Cannot build docker image with missing file: " + srcMountFile);
-        }
+        } // no need to validate existence of the file, just let the Docker build fail
         return true;
     }
 
@@ -867,7 +892,7 @@ public abstract class DevUtil {
         dockerfileLines = getCleanedLines(dockerfileLines);
         dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
-        removeCopyLines(dockerfileLines, dockerfile.getParent());
+        processCopyLines(dockerfileLines, dockerfile.getParent());
 
         File tempDockerfile = null;
         try {
