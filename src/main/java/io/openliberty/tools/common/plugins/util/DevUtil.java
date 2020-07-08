@@ -24,9 +24,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -78,6 +78,7 @@ import javax.tools.ToolProvider;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 
@@ -1555,7 +1556,7 @@ public abstract class DevUtil {
         @Override
         public void run() {
             debug("Running hotkey reader thread");
-            scanner = new Scanner(System.in);
+            scanner = new Scanner(new CloseShieldInputStream(System.in)); // shield allows us to close the scanner without closing System.in.
             try {
                 readInput();
             } finally {
