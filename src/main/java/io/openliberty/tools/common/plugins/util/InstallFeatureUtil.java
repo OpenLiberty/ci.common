@@ -244,6 +244,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         if (propertiesFiles != null) {
             for (File propertiesFile : propertiesFiles) {
+                debug("PropertiesFile: " + propertiesFile.getAbsolutePath());
                 Properties properties = new Properties();
                 InputStream input = null;
                 try {
@@ -251,6 +252,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     properties.load(input);
                     String productId = properties.getProperty("com.ibm.websphere.productId");
                     String productVersion = properties.getProperty("com.ibm.websphere.productVersion");
+                    debug("productId: " + productId);
+                    debug("productVersion: " + productVersion);
                     if (productId == null) {
                         throw new PluginExecutionException(
                                 "Cannot find the \"com.ibm.websphere.productId\" property in the file "
@@ -265,6 +268,12 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     }
                     if (productId.equals(OPEN_LIBERTY_PRODUCT_ID)) {
                         openLibertyVersion = productVersion;
+                        //TODO: test only
+                        //openLibertyVersion = productVersion + "-beta";
+                        debug("Open Liberty version is SET here: " + openLibertyVersion);
+                        debug("OL PropertiesFile: " + propertiesFile.getAbsolutePath());
+                        debug("OL productId: " + productId);
+                        debug("OL productVersion: " + productVersion);
                     }
                     list.add(new ProductProperties(productId, productVersion));
                 } catch (IOException e) {
@@ -305,6 +314,18 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         public String getVersion() {
             return version;
         }
+    }
+
+    public String getOpenLibertyVersion() {
+        return openLibertyVersion;
+    }
+
+    public boolean isOpenLibertyBetaVersion() {
+        debug("Inside isOpenLibertyBetaVersion - openLibertyVersion: " + openLibertyVersion);
+        if (openLibertyVersion != null && openLibertyVersion.endsWith("-beta")) {
+            return true;
+        }
+        return false;
     }
 
     /**
