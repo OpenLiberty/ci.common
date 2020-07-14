@@ -145,6 +145,12 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertTrue(util.destMount.get(0).endsWith("/config/server.xml"));
         assertEquals(1, util.srcMount.size());
         assertEquals(1, util.destMount.size());
+
+        util.processCopyLines(dockerfileLines, dockerfile.getParent()); // ensure retest still has only one line
+        assertTrue(util.srcMount.get(0).endsWith("server.xml"));
+        assertTrue(util.destMount.get(0).endsWith("/config/server.xml"));
+        assertEquals(1, util.srcMount.size());
+        assertEquals(1, util.destMount.size());
     }
 
     @Test

@@ -813,6 +813,8 @@ public abstract class DevUtil {
     }
 
     protected void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
+        srcMount.clear();
+        destMount.clear();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
