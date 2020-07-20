@@ -1093,7 +1093,9 @@ public abstract class DevUtil {
         command.append(" -v " + serverDirectory + "/dropins:/config/dropins");
 
         // mount the loose application resources in the container
-        command.append(" -v "+projectDirectory.getAbsolutePath()+":"+DEVMODE_DIR_NAME);
+        command.append(" -v " + projectDirectory.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+        command.append(" -v " + serverDirectory.getAbsolutePath() + "/configDropins/overrides/liberty-plugin-variable-config.xml" +
+                       ":/config/configDropins/overrides/liberty-plugin-variable-config.xml");
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v "+serverDirectory.getAbsolutePath()+"/logs:/logs");
