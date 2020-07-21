@@ -1094,18 +1094,24 @@ public abstract class DevUtil {
         command.append(" -v " + serverDirectory + "/apps:/config/apps");
         command.append(" -v " + serverDirectory + "/dropins:/config/dropins");
 
-        // mount the loose application resources in the container
-        command.append(" -v " + projectDirectory.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
-        command.append(" -v " + serverDirectory.getAbsolutePath() + "/configDropins/overrides/liberty-plugin-variable-config.xml" +
-                       ":/config/configDropins/overrides/liberty-plugin-variable-config.xml");
-
-        // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
-        command.append(" -v "+serverDirectory.getAbsolutePath()+"/logs:/logs");
-
+        boolean pluginConfigMounted = false;
         // mount all files from COPY commands in the Dockerfile to allow for hot deployment
         for (int i=0; i < srcMount.size(); i++) {
             command.append(" -v " + srcMount.get(i) + ":" + destMount.get(i));
+            if (srcMount.get(i).endsWith("liberty-plugin-variable-config.xml")) {
+                pluginConfigMounted = true;
+            }
         }
+
+        // mount the loose application resources in the container
+        command.append(" -v " + projectDirectory.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+        if (!pluginConfigMounted) {
+            command.append(" -v " + serverDirectory.getAbsolutePath() + "/configDropins/overrides/liberty-plugin-variable-config.xml" +
+                           ":/config/configDropins/overrides/liberty-plugin-variable-config.xml");
+        }
+
+        // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
+        command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
 
         command.append(" --name " + DEVMODE_CONTAINER_NAME);
 
