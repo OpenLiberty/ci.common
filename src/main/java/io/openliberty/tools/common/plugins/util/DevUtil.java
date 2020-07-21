@@ -1208,7 +1208,6 @@ public abstract class DevUtil {
                     "Could not parse the host name from the log message: " + webAppMessage);
         }
 
-        debug("Position of protocol (escaped or unescaped) in hostname: " + protocolIndex);
         int portPrefixIndex = webAppMessage.indexOf(":", hostNameIndex);
         if (portPrefixIndex < 0) {
             throw new PluginExecutionException(
