@@ -525,17 +525,6 @@ public abstract class DevUtil {
      *                                  failed.
      */
     public void startServer() throws PluginExecutionException {
-        if (container) {
-            File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
-            debug("Dockerfile to use: " + dockerfileToUse);
-            if (dockerfileToUse.exists()) {
-                File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
-                buildDockerImage(tempDockerfile, dockerfileToUse);
-            } else {
-                // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
-                throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
-            }
-        }
         try {
             final ServerTask serverTask;
             try {
@@ -546,6 +535,19 @@ public abstract class DevUtil {
 
             // Set debug variables in server.env if debug enabled
             enableServerDebug();
+
+            // build Docker image if in container mode
+            if (container) {
+                File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
+                debug("Dockerfile to use: " + dockerfileToUse);
+                if (dockerfileToUse.exists()) {
+                    File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
+                    buildDockerImage(tempDockerfile, dockerfileToUse);
+                } else {
+                    // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
+                    throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
+                }
+            }
 
             String logsDirectory = serverDirectory.getCanonicalPath() + "/logs";
             final File messagesLogFile = new File(logsDirectory + "/messages.log");
