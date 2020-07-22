@@ -938,6 +938,19 @@ public abstract class DevUtil {
 
     private void startContainer() {
         try {
+            // Set up permissions on Linux
+            String os = System.getProperty("os.name");
+            String id = System.getProperty("user.name");
+            if (os != null && os.equalsIgnoreCase("linux") &&
+                id != null && id.equalsIgnoreCase("root")) {
+                // Allow the container server to read the config files e.g. server.xml
+                runCMD("chmod -R o+r " + serverDirectory);
+                // Allow the server to write to the log files.
+                runCMD("mkdir -p " + serverDirectory + "/logs");
+                runCMD("chown -R 1001:0 " + serverDirectory + "/logs"); // in case it is new
+                runCMD("chmod -R u+rw " + serverDirectory + "/logs"); // in case it is old
+            }
+
             String startContainerCommand = getContainerCommand();
             debug("startContainer, cmd="+startContainerCommand);
 
@@ -967,6 +980,14 @@ public abstract class DevUtil {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             error("Thread was interrupted while starting the container: " + e.getMessage());
+        }
+    }
+
+    private void runCMD(String cmd) throws IOException, InterruptedException {
+        Process p = Runtime.getRuntime().exec(cmd);
+        p.waitFor(5, TimeUnit.SECONDS);
+        if (p.exitValue() != 0) {
+            error("Error running command:" + cmd + ", return value=" + p.exitValue());
         }
     }
 
