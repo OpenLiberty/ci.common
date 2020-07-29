@@ -948,12 +948,11 @@ public abstract class DevUtil {
             String os = System.getProperty("os.name");
             String id = System.getProperty("user.name");
             if (os != null && os.equalsIgnoreCase("linux")) {
-                // Allow the container server to read the config files e.g. server.xml
+                // Allow the container server to read the config files like server.xml
                 runCmd(false, "chmod -R o+r " + serverDirectory);
                 // Allow the container server to read directories like apps and dropins
-                runCmd("chmod -R o+x " + serverDirectory + "/apps " +
-                    serverDirectory + "/dropins " +
-                    serverDirectory + "/configDropins");
+                runCmd("find " + serverDirectory +
+                    " -type d -not -name logs -not -name workarea -exec chmod o+x {} ;");
                 // Allow the server to write to the log files.
                 runCmd("mkdir -p " + serverDirectory + "/logs");
                 if (id != null && id.equalsIgnoreCase("root")) {
