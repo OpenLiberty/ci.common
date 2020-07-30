@@ -971,21 +971,28 @@ public abstract class DevUtil {
             processBuilder.command(getCommandTokens(startContainerCommand));
             dockerRunProcess = processBuilder.start();
 
-            Thread logCopyThread = new Thread(new Runnable() {
+            Thread logCopyInputThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    copyProcessOutputToBuildLog(dockerRunProcess);
+                    copyStreamToBuildLog(dockerRunProcess.getInputStream(), true);
                 }
             });
-            logCopyThread.start();
+            logCopyInputThread.start();
+
+            final StringBuilder firstErrorLine = new StringBuilder();
+            Thread logCopyErrorThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    firstErrorLine.append(copyStreamToBuildLog(dockerRunProcess.getErrorStream(), false));
+                }
+            });
+            logCopyErrorThread.start();
 
             dockerRunProcess.waitFor();
             if (dockerRunProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
                 debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
-                // read messages from standard err
-                char[] d = new char[1023];
-                new InputStreamReader(dockerRunProcess.getErrorStream()).read(d);
-                String errorMessage = new String(d).trim() + " RC=" + dockerRunProcess.exitValue();
+                // show first message from standard err
+                String errorMessage = new String(firstErrorLine).trim() + " RC=" + dockerRunProcess.exitValue();
                 throw new RuntimeException(errorMessage);
             }
         } catch (IOException e) {
@@ -1015,24 +1022,35 @@ public abstract class DevUtil {
     /**
      * Copies the process output to the Maven/Gradle logs
      * 
-     * @param p
+     * @param stream The stream to copy
+     * @param info If true, log as info. Else log as error.
      * @throws RuntimeException if there was an error reading the process output
+     * @return The first line from the stream
      */
-    private void copyProcessOutputToBuildLog(Process p) {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    private String copyStreamToBuildLog(InputStream stream, boolean info) {
+        String firstLine = null;
+        BufferedReader inputReader = new BufferedReader(new InputStreamReader(stream));
         try {
-            for (String line; (line = reader.readLine()) != null;) {
-                info(line);
+            for (String line; (line = inputReader.readLine()) != null;) {
+                if (firstLine == null) {
+                    firstLine = line;
+                }
+                if (info) {
+                    info(line);
+                } else {
+                    error(line);
+                }
             }
         } catch (IOException e) {
             throw new RuntimeException("Error reading container output: " + e.getMessage());
         } finally {
             try {
-                reader.close();
+                inputReader.close();
             } catch (IOException e) {
                 // nothing to do
             }
         }
+        return firstLine;
     }
 
     private String[] getCommandTokens(String command) {
