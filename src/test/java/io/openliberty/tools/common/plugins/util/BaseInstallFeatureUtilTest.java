@@ -18,6 +18,7 @@ package io.openliberty.tools.common.plugins.util;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
@@ -28,6 +29,7 @@ import org.junit.rules.TemporaryFolder;
 import io.openliberty.tools.common.plugins.util.InstallFeatureUtil;
 import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import io.openliberty.tools.common.plugins.util.PluginScenarioException;
+import io.openliberty.tools.common.plugins.util.InstallFeatureUtil.ProductProperties;
 
 public class BaseInstallFeatureUtilTest {
 
@@ -48,8 +50,9 @@ public class BaseInstallFeatureUtilTest {
     }
     
     public class InstallFeatureTestUtil extends InstallFeatureUtil {
-        public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)  throws PluginScenarioException, PluginExecutionException {
-            super(installDirectory, from, to, pluginListedEsas);
+        public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, 
+                List<ProductProperties> propertiesList, String openLibertyVersion)  throws PluginScenarioException, PluginExecutionException {
+            super(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion);
         }
 
         @Override
@@ -89,7 +92,17 @@ public class BaseInstallFeatureUtilTest {
     }
     
     public InstallFeatureUtil getNewInstallFeatureUtil() throws PluginExecutionException, PluginScenarioException {
-        return new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir, new File(installDir, "lib/versions"));
+        String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
+
+        return new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion);
+    }
+
+    public InstallFeatureUtil getNewInstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginExecutionException, PluginScenarioException {
+        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDirectory, new File(installDirectory, "lib/versions"));
+        String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
+
+        return new InstallFeatureTestUtil(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion);
     }
     
 }

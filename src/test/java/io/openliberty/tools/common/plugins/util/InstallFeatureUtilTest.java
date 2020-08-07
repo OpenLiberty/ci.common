@@ -31,6 +31,7 @@ import org.junit.Test;
 import io.openliberty.tools.common.plugins.util.InstallFeatureUtil;
 import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import io.openliberty.tools.common.plugins.util.PluginScenarioException;
+import io.openliberty.tools.common.plugins.util.InstallFeatureUtil.ProductProperties;
 
 public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     
@@ -49,7 +50,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         File wlProps = new File(installDir, "lib/versions/WebSphereApplicationServer.properties");
         assertTrue(olProps.delete());
         assertTrue(wlProps.delete());
-        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
     }
     
     /**
@@ -59,7 +60,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorNoInstallMap() throws Exception {
         File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
         assertTrue(installMap.delete());
-        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
     }
     
     /**
@@ -69,7 +70,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorNoOpenLibertyProperties() throws Exception {
         File olProps = new File(installDir, "lib/versions/openliberty.properties");
         assertTrue(olProps.delete());
-        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
     }
     
     /**
@@ -81,12 +82,12 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         assertTrue(olProps.delete());
         File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
         assertTrue(installMap.delete());
-        new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
     }
         
     @Test
     public void testConstructorTo() throws Exception {
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, "myextension", new HashSet<String>());
+        InstallFeatureUtil util = getNewInstallFeatureUtil(installDir, null, "myextension", new HashSet<String>());
         assertNotNull(util);
     }
     
@@ -95,7 +96,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
      */
     @Test(expected = PluginScenarioException.class)
     public void testConstructorFrom() throws Exception {
-        new InstallFeatureTestUtil(installDir, installDir.getAbsolutePath(), null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, installDir.getAbsolutePath(), null, new HashSet<String>());
     }
     
     /**
@@ -105,7 +106,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorEsas() throws Exception {
         Set<String> esas = new HashSet<String>();
         esas.add("abc.esa");
-        new InstallFeatureTestUtil(installDir, null, null, esas);
+        getNewInstallFeatureUtil(installDir, null, null, esas);
     }
     
     /**
@@ -192,7 +193,9 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
 
     @Test
     public void testDownloadOverrideBundle() throws Exception {
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>()) {
+        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir, new File(installDir, "lib/versions"));
+        String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion) {
             @Override
             public File downloadArtifact(String groupId, String artifactId, String type, String version)
                     throws PluginExecutionException {

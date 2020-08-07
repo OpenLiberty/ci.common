@@ -83,11 +83,12 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @throws PluginExecutionException If properties files cannot be found in the
      *                                  installDirectory/lib/versions
      */
-    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)
-            throws PluginScenarioException, PluginExecutionException {
+    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, 
+            List<ProductProperties> propertiesList, String openLibertyVersion) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
         this.to = to;
-        propertiesList = loadProperties(new File(installDirectory, "lib/versions"));
+        this.propertiesList = propertiesList;
+        this.openLibertyVersion = openLibertyVersion;
         installJarFile = loadInstallJarFile(installDirectory);
         if (installJarFile == null) {
             throw new PluginScenarioException("Install map jar not found.");
@@ -232,7 +233,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
-    private List<ProductProperties> loadProperties(File dir) throws PluginExecutionException {
+    public static List<ProductProperties> loadProperties(File installDir, File dir) throws PluginExecutionException {
         List<ProductProperties> list = new ArrayList<ProductProperties>();
 
         File[] propertiesFiles = dir.listFiles(new FilenameFilter() {
@@ -244,7 +245,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         if (propertiesFiles != null) {
             for (File propertiesFile : propertiesFiles) {
-                debug("PropertiesFile: " + propertiesFile.getAbsolutePath());
                 Properties properties = new Properties();
                 InputStream input = null;
                 try {
@@ -252,8 +252,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     properties.load(input);
                     String productId = properties.getProperty("com.ibm.websphere.productId");
                     String productVersion = properties.getProperty("com.ibm.websphere.productVersion");
-                    debug("productId: " + productId);
-                    debug("productVersion: " + productVersion);
                     if (productId == null) {
                         throw new PluginExecutionException(
                                 "Cannot find the \"com.ibm.websphere.productId\" property in the file "
@@ -266,16 +264,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                                         + propertiesFile.getAbsolutePath()
                                         + ". Ensure the file is valid properties file for the Liberty product or extension.");
                     }
-                    if (productId.equals(OPEN_LIBERTY_PRODUCT_ID)) {
-                        openLibertyVersion = productVersion;
-                        //TODO: test only
-                        //openLibertyVersion = productVersion + "-beta";
-                        debug("Open Liberty version is SET here: " + openLibertyVersion);
-                        debug("OL PropertiesFile: " + propertiesFile.getAbsolutePath());
-                        debug("OL productId: " + productId);
-                        debug("OL productVersion: " + productVersion);
-                    }
-                    list.add(new ProductProperties(productId, productVersion));
+                    list.add(new InstallFeatureUtil.ProductProperties(productId, productVersion));
                 } catch (IOException e) {
                     throw new PluginExecutionException(
                             "Cannot read the product properties file " + propertiesFile.getAbsolutePath(), e);
@@ -292,13 +281,22 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         if (list.isEmpty()) {
             throw new PluginExecutionException("Could not find any properties file in the " + dir
-                    + " directory. Ensure the directory " + installDirectory + " contains a Liberty installation.");
+                    + " directory. Ensure the directory " + installDir + " contains a Liberty installation.");
         }
 
         return list;
     }
 
-    private class ProductProperties {
+    public static String getOpenLibertyVersion(List<ProductProperties> propList) {
+        for (ProductProperties properties : propList) {
+            if (properties.getId().equals(OPEN_LIBERTY_PRODUCT_ID)) {
+                return properties.getVersion();
+            }
+        }
+        return null;
+    }
+
+    public static class ProductProperties {
         private String id;
         private String version;
 
@@ -314,18 +312,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         public String getVersion() {
             return version;
         }
-    }
-
-    public String getOpenLibertyVersion() {
-        return openLibertyVersion;
-    }
-
-    public boolean isOpenLibertyBetaVersion() {
-        debug("Inside isOpenLibertyBetaVersion - openLibertyVersion: " + openLibertyVersion);
-        if (openLibertyVersion != null && openLibertyVersion.endsWith("-beta")) {
-            return true;
-        }
-        return false;
     }
 
     /**
