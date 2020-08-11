@@ -233,8 +233,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
-    public static List<ProductProperties> loadProperties(File installDir, File dir) throws PluginExecutionException {
+    public static List<ProductProperties> loadProperties(File installDir) throws PluginExecutionException {
         List<ProductProperties> list = new ArrayList<ProductProperties>();
+        File dir = new File(installDir, "lib/versions");
 
         File[] propertiesFiles = dir.listFiles(new FilenameFilter() {
             @Override
@@ -294,6 +295,13 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
         }
         return null;
+    }
+
+    public static boolean isOpenLibertyBetaVersion(String olVersion) {
+        if (olVersion != null && olVersion.endsWith("-beta")) {
+            return true;
+        }
+        return false;
     }
 
     public static class ProductProperties {

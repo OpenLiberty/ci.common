@@ -193,7 +193,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
 
     @Test
     public void testDownloadOverrideBundle() throws Exception {
-        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir, new File(installDir, "lib/versions"));
+        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir);
         String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
         InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion) {
             @Override
