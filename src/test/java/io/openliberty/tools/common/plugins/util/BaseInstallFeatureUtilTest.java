@@ -92,10 +92,7 @@ public class BaseInstallFeatureUtilTest {
     }
     
     public InstallFeatureUtil getNewInstallFeatureUtil() throws PluginExecutionException, PluginScenarioException {
-        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir);
-        String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
-
-        return new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion);
+        return getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
     }
 
     public InstallFeatureUtil getNewInstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginExecutionException, PluginScenarioException {

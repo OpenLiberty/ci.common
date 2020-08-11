@@ -72,13 +72,16 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     /**
      * Initialize the utility and check for unsupported scenarios.
      * 
-     * @param installDirectory The install directory
-     * @param from             The "from" parameter specified in the plugin
-     *                         configuration, or null if not specified
-     * @param to               The "to" parameter specified in the plugin
-     *                         configuration, or null if not specified
-     * @param pluginListedEsas The list of ESAs specified in the plugin
-     *                         configuration, or null if not specified
+     * @param installDirectory   The install directory
+     * @param from               The "from" parameter specified in the plugin
+     *                           configuration, or null if not specified
+     * @param to                 The "to" parameter specified in the plugin
+     *                           configuration, or null if not specified
+     * @param pluginListedEsas   The list of ESAs specified in the plugin
+     *                           configuration, or null if not specified
+     * @param propertiesList     The list of product properties installed
+     *                           with the Open Liberty runtime
+     * @param openLibertyVersion The version of the Open Liberty runtime
      * @throws PluginScenarioException  If the current scenario is not supported
      * @throws PluginExecutionException If properties files cannot be found in the
      *                                  installDirectory/lib/versions
