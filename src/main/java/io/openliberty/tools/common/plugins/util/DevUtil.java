@@ -517,14 +517,20 @@ public abstract class DevUtil {
         return logFile;
     }
 
+    public void startServer() throws PluginExecutionException {
+        startServer(true);
+    }
+
     /**
      * Start the server and keep it running in a background thread.
+     * @param  buildContainer           Force a Docker build when in container mode.
+     *                                  Ignored otherwise.
      * 
      * @throws PluginExecutionException If the server startup could not be verified
      *                                  within the timeout, or server startup
      *                                  failed.
      */
-    public void startServer() throws PluginExecutionException {
+    public void startServer(boolean buildContainer) throws PluginExecutionException {
         try {
             final ServerTask serverTask;
             try {
@@ -537,7 +543,7 @@ public abstract class DevUtil {
             enableServerDebug();
 
             // build Docker image if in container mode
-            if (container) {
+            if (container && buildContainer) {
                 File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
                 debug("Dockerfile to use: " + dockerfileToUse);
                 if (dockerfileToUse.exists()) {
@@ -1210,6 +1216,14 @@ public abstract class DevUtil {
     public abstract void libertyInstallFeature() throws PluginExecutionException;
 
     public void restartServer() throws PluginExecutionException {
+        restartServer(false);
+    }
+
+    /**
+     * Stop the server, set up Liberty and restart it.
+     * @param buildContainer  Force a Docker build when in container mode. Ignored otherwise.
+     */
+    public void restartServer(boolean buildContainer) throws PluginExecutionException {
         info("Restarting server...");
         setDevStop(true);
         if (container) {
@@ -1239,7 +1253,7 @@ public abstract class DevUtil {
         libertyCreate();
         libertyInstallFeature();
         libertyDeploy();
-        startServer();
+        startServer(buildContainer);
         setDevStop(false);
         info("The server has been restarted.");
     }
@@ -2307,6 +2321,16 @@ public abstract class DevUtil {
                 if (fileChanged.getName().equals("server.env")) {
                     // re-enable debug variables in server.env
                     enableServerDebug(false);
+                }
+                if (container && System.getProperty("os.name").equalsIgnoreCase("linux")) {
+                    info("Restarting the container for this change to take effect.");
+                    // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        debug("Unexpected InterruptedException handling config file deletion.", e);
+                    }
+                    restartServer(false);
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
