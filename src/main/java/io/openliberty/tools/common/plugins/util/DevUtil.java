@@ -971,7 +971,7 @@ public abstract class DevUtil {
                 }
             }
 
-            info("Starting Docker image...");
+            info("Starting Docker container...");
             String startContainerCommand = getContainerCommand();
             info(startContainerCommand);
 
