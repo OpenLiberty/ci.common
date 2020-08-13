@@ -939,6 +939,7 @@ public abstract class DevUtil {
             // The image is built using the tempDockerfile, but the build context comes from the user's Dockerfile location
             debug("Docker build context: " + userDockerfile.getParent());
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
+            info(buildCmd);
             //TODO: Figure out a good timeout value for docker build
             String buildOutput = execDockerCmd(buildCmd, 60);
             debug("Docker build output: " + buildOutput);
@@ -970,8 +971,9 @@ public abstract class DevUtil {
                 }
             }
 
+            info("Starting Docker container...");
             String startContainerCommand = getContainerCommand();
-            debug("startContainer, cmd="+startContainerCommand);
+            info(startContainerCommand);
 
             ProcessBuilder processBuilder = new ProcessBuilder();
             processBuilder.command(getCommandTokens(startContainerCommand));
@@ -1187,7 +1189,6 @@ public abstract class DevUtil {
         // Important: other Liberty options must appear before --
         command.append(" -- --"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
 
-        info("docker run command: " + command);
         return command.toString();
     }
 
