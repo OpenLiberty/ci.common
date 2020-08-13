@@ -2323,12 +2323,12 @@ public abstract class DevUtil {
                     enableServerDebug(false);
                 }
                 if (container && System.getProperty("os.name").equalsIgnoreCase("linux")) {
-                    info("Restarting the container is required on Linux for it to take effect.");
+                    info("Now restarting the container for this change to take effect which is required on Linux.");
                     // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
-                        debug("Unexpected InterruptedException handling config file deletion.");
+                        debug("Unexpected InterruptedException handling config file deletion.", e);
                     }
                     restartServer(false);
                 }
