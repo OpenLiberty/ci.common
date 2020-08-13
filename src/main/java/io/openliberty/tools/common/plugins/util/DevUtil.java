@@ -2323,7 +2323,7 @@ public abstract class DevUtil {
                     enableServerDebug(false);
                 }
                 if (container && System.getProperty("os.name").equalsIgnoreCase("linux")) {
-                    info("Now restarting the container for this change to take effect which is required on Linux.");
+                    info("Restarting the container for this change to take effect.");
                     // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
                     try {
                         Thread.sleep(1000);
