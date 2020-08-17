@@ -945,7 +945,7 @@ public abstract class DevUtil {
             debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again:" + r.getMessage(), r);
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
         }
     }
 
@@ -1119,6 +1119,12 @@ public abstract class DevUtil {
             if (allLines.length() > 0) {
                 result = allLines.toString();
             }
+        } catch (IllegalThreadStateException  e) {
+            // the timeout was too short and the docker command has not yet completed. There is no exit value.
+            debug("IllegalThreadStateException, message="+e.getMessage());
+            error("The docker command did not complete within the timeout period: " + timeout + " seconds. " +
+                "Use the dockerTimeout option to specify a longer period or investigate issues running docker. ", e);
+            throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
         } catch (InterruptedException e) {
             // Container error, throw exception
             // If a runtime exception occurred in the server task, log and rethrow
