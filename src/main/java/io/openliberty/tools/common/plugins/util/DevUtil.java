@@ -305,6 +305,7 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
+    private int dockerTimeout;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
 
@@ -312,7 +313,7 @@ public abstract class DevUtil {
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts) {
+            boolean container, File dockerfile, String dockerRunOpts, int dockerTimeout) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -348,6 +349,11 @@ public abstract class DevUtil {
         this.dockerRunOpts = dockerRunOpts;
         if (projectDirectory != null) {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
+        }
+        if (dockerTimeout < 1 || dockerTimeout > 3600) {
+            this.dockerTimeout = 60;
+        } else {
+            this.dockerTimeout = dockerTimeout;
         }
     }
 
@@ -940,8 +946,7 @@ public abstract class DevUtil {
             debug("Docker build context: " + userDockerfile.getParent());
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
-            //TODO: Figure out a good timeout value for docker build
-            String buildOutput = execDockerCmd(buildCmd, 60);
+            String buildOutput = execDockerCmd(buildCmd, dockerTimeout);
             debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
@@ -1076,11 +1081,11 @@ public abstract class DevUtil {
             if (dockerRunProcess != null) {
                 String dockerPsCmd = "docker ps -qf name=" + DEVMODE_CONTAINER_NAME;
                 debug("docker ps command: " + dockerPsCmd);
-                String containerId = execDockerCmd(dockerPsCmd, 10);
+                String containerId = execDockerCmd(dockerPsCmd, dockerTimeout);
 
                 String dockerStopCmd = "docker stop " + containerId;
                 debug("docker stop command: " + dockerStopCmd);
-                execDockerCmd(dockerStopCmd, 30);
+                execDockerCmd(dockerStopCmd, dockerTimeout);
             }
         } catch (RuntimeException r) {
             error("Error stopping container: " + r.getMessage());
@@ -1097,7 +1102,7 @@ public abstract class DevUtil {
     private String execDockerCmd(String command, int timeout) {
         String result = null;
         try {
-            debug("execDocker, cmd="+command);
+            debug("execDocker, timeout=" + timeout + ", cmd=" + command);
             Process p = Runtime.getRuntime().exec(command);
             p.waitFor(timeout, TimeUnit.SECONDS);
             if (p.exitValue() != 0) {
