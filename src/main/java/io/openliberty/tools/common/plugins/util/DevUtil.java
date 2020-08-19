@@ -350,7 +350,7 @@ public abstract class DevUtil {
         if (projectDirectory != null) {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
         }
-        if (dockerTimeout < 1 || dockerTimeout > 3600) {
+        if (dockerTimeout < 1) {
             this.dockerTimeout = 60;
         } else {
             this.dockerTimeout = dockerTimeout;
@@ -1081,11 +1081,11 @@ public abstract class DevUtil {
             if (dockerRunProcess != null) {
                 String dockerPsCmd = "docker ps -qf name=" + DEVMODE_CONTAINER_NAME;
                 debug("docker ps command: " + dockerPsCmd);
-                String containerId = execDockerCmd(dockerPsCmd, dockerTimeout);
+                String containerId = execDockerCmd(dockerPsCmd, 10);
 
                 String dockerStopCmd = "docker stop " + containerId;
                 debug("docker stop command: " + dockerStopCmd);
-                execDockerCmd(dockerStopCmd, dockerTimeout);
+                execDockerCmd(dockerStopCmd, 30);
             }
         } catch (RuntimeException r) {
             error("Error stopping container: " + r.getMessage());
