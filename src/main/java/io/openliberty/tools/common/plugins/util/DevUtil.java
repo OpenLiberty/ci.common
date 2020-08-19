@@ -1123,7 +1123,7 @@ public abstract class DevUtil {
             // the timeout was too short and the docker command has not yet completed. There is no exit value.
             debug("IllegalThreadStateException, message="+e.getMessage());
             error("The docker command did not complete within the timeout period: " + timeout + " seconds. " +
-                "Use the dockerTimeout option to specify a longer period or investigate issues running docker. ", e);
+                "Use the dockerTimeout option to specify a longer period or investigate performance issues with running the docker command. ", e);
             throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
         } catch (InterruptedException e) {
             // Container error, throw exception
