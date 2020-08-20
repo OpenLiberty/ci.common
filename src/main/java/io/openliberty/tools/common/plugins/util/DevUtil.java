@@ -1171,7 +1171,12 @@ public abstract class DevUtil {
 
         // mount all files from COPY commands in the Dockerfile to allow for hot deployment
         for (int i=0; i < srcMount.size(); i++) {
-            command.append(" -v " + srcMount.get(i) + ":" + destMount.get(i));
+            if (new File(srcMount.get(i)).exists()) { // only Files are in this list
+                command.append(" -v " + srcMount.get(i) + ":" + destMount.get(i));
+            } else {
+                error("A file referenced by the Dockerfile is not found: " + srcMount.get(i) +
+                    ". Update the Dockerfile or ensure the file is in the correct location.");
+            }
         }
 
         command.append(" --name " + DEVMODE_CONTAINER_NAME);
