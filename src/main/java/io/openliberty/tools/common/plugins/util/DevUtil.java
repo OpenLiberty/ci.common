@@ -1125,7 +1125,7 @@ public abstract class DevUtil {
             if (command.startsWith("docker build")) {
                 error("The docker build command did not complete within the timeout period: " + timeout + " seconds. " +
                     "Use the dockerBuildTimeout option to specify a longer period or " +
-                    "add files not needed in the container to the .dockerIgnore file. ", e);
+                    "add files not needed in the container to the .dockerignore file.", e);
             } else {
                 error("The docker command did not complete within the timeout period: " + timeout + " seconds.", e);
             }
