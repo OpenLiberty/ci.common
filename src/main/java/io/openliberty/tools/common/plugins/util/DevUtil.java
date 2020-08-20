@@ -305,7 +305,7 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
-    private int dockerTimeout;
+    private int dockerBuildTimeout;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
 
@@ -313,7 +313,7 @@ public abstract class DevUtil {
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts, int dockerTimeout) {
+            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -350,10 +350,10 @@ public abstract class DevUtil {
         if (projectDirectory != null) {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
         }
-        if (dockerTimeout < 1) {
-            this.dockerTimeout = 60;
+        if (dockerBuildTimeout < 1) {
+            this.dockerBuildTimeout = 60;
         } else {
-            this.dockerTimeout = dockerTimeout;
+            this.dockerBuildTimeout = dockerBuildTimeout;
         }
     }
 
@@ -946,7 +946,7 @@ public abstract class DevUtil {
             debug("Docker build context: " + userDockerfile.getParent());
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
-            String buildOutput = execDockerCmd(buildCmd, dockerTimeout);
+            String buildOutput = execDockerCmd(buildCmd, dockerBuildTimeout);
             debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
