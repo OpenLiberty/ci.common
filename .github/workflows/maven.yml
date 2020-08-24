@@ -26,12 +26,6 @@ jobs:
       uses: joschi/setup-jdk@v2
       with:
         java-version: ${{ matrix.java }}
-    - name: Cache maven packages
-      uses: actions/cache@v1
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
     - name: Checkout ci.common
       uses: actions/checkout@v2
     - name: Checkout ci.ant
@@ -39,6 +33,12 @@ jobs:
       with:
         repository: OpenLiberty/ci.ant
         path: ci.ant
+    - name: Cache maven packages
+      uses: actions/cache@v1
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
     - name: Install ci.ant
       run: |
         cd ./ci.ant
