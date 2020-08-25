@@ -305,6 +305,7 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
+    private int dockerBuildTimeout;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
 
@@ -312,7 +313,7 @@ public abstract class DevUtil {
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts) {
+            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -348,6 +349,11 @@ public abstract class DevUtil {
         this.dockerRunOpts = dockerRunOpts;
         if (projectDirectory != null) {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
+        }
+        if (dockerBuildTimeout < 1) {
+            this.dockerBuildTimeout = 60;
+        } else {
+            this.dockerBuildTimeout = dockerBuildTimeout;
         }
     }
 
@@ -940,12 +946,11 @@ public abstract class DevUtil {
             debug("Docker build context: " + userDockerfile.getParent());
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
-            //TODO: Figure out a good timeout value for docker build
-            String buildOutput = execDockerCmd(buildCmd, 60);
+            String buildOutput = execDockerCmd(buildCmd, dockerBuildTimeout);
             debug("Docker build output: " + buildOutput);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again:" + r.getMessage(), r);
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
         }
     }
 
@@ -1097,7 +1102,7 @@ public abstract class DevUtil {
     private String execDockerCmd(String command, int timeout) {
         String result = null;
         try {
-            debug("execDocker, cmd="+command);
+            debug("execDocker, timeout=" + timeout + ", cmd=" + command);
             Process p = Runtime.getRuntime().exec(command);
             p.waitFor(timeout, TimeUnit.SECONDS);
             if (p.exitValue() != 0) {
@@ -1119,6 +1124,17 @@ public abstract class DevUtil {
             if (allLines.length() > 0) {
                 result = allLines.toString();
             }
+        } catch (IllegalThreadStateException  e) {
+            // the timeout was too short and the docker command has not yet completed. There is no exit value.
+            debug("IllegalThreadStateException, message="+e.getMessage());
+            if (command.startsWith("docker build")) {
+                error("The docker build command did not complete within the timeout period: " + timeout + " seconds. " +
+                    "Use the dockerBuildTimeout option to specify a longer period or " +
+                    "add files not needed in the container to the .dockerignore file.", e);
+            } else {
+                error("The docker command did not complete within the timeout period: " + timeout + " seconds.", e);
+            }
+            throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
         } catch (InterruptedException e) {
             // Container error, throw exception
             // If a runtime exception occurred in the server task, log and rethrow
