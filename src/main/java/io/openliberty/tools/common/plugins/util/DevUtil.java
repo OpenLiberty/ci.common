@@ -1103,6 +1103,7 @@ public abstract class DevUtil {
         String result = null;
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
+            long startTime = System.currentTimeMillis();
             Process p = Runtime.getRuntime().exec(command);
             p.waitFor(timeout, TimeUnit.SECONDS);
             if (p.exitValue() != 0) {
@@ -1112,6 +1113,9 @@ public abstract class DevUtil {
                 new InputStreamReader(p.getErrorStream()).read(d);
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
                 throw new RuntimeException(errorMessage);
+            }
+            if (command.startsWith("docker build")) {
+                dockerIgnoreHelpMessage(startTime);
             }
 
             // Read all the output on stdout and return it to the caller
@@ -1147,6 +1151,24 @@ public abstract class DevUtil {
             throw new RuntimeException(e.getMessage());
         }
         return result;
+    }
+
+    // Suggest a performance improvement if docker build takes too long.
+    static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
+    private void dockerIgnoreHelpMessage(long startTime) {
+        if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
+            return;
+        }
+        File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
+        if (dockerfileToUse.exists()) {
+            File dockerContext = dockerfileToUse.getParentFile();
+            debug("dockerIgnoreHelpMessage, dockerContext="+dockerContext.getAbsolutePath());
+            File dockerIgnore = new File(dockerContext, ".dockerignore");
+            if (!dockerIgnore.exists()) { // provide some advice
+                warn("The docker build command is slower than expected. You may increase performance by adding " + 
+                    "unneeded files and directories such as any Liberty runtime directories to the .dockerignore file.");
+            }
+        }
     }
 
     /**
