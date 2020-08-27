@@ -1115,7 +1115,7 @@ public abstract class DevUtil {
                 throw new RuntimeException(errorMessage);
             }
             if (command.startsWith("docker build")) {
-                dockerIgnoreHelpMessage(startTime);
+                checkDockerIgnore(startTime);
             }
 
             // Read all the output on stdout and return it to the caller
@@ -1154,19 +1154,24 @@ public abstract class DevUtil {
     }
 
     // Suggest a performance improvement if docker build takes too long.
-    static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
-    private void dockerIgnoreHelpMessage(long startTime) {
+    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
+    private void checkDockerIgnore(long startTime) {
         if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
             return;
         }
         File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
         if (dockerfileToUse.exists()) {
             File dockerContext = dockerfileToUse.getParentFile();
-            debug("dockerIgnoreHelpMessage, dockerContext="+dockerContext.getAbsolutePath());
+            debug("checkDockerIgnore, dockerContext="+dockerContext.getAbsolutePath());
             File dockerIgnore = new File(dockerContext, ".dockerignore");
             if (!dockerIgnore.exists()) { // provide some advice
-                warn("The docker build command is slower than expected. You may increase performance by adding " + 
-                    "unneeded files and directories such as any Liberty runtime directories to the .dockerignore file.");
+                try {
+                    warn("The docker build command is slower than expected. You may increase performance by adding " + 
+                        "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
+                        dockerContext.getCanonicalPath()+ ".");
+                } catch (IOException e) {
+                    error("Exception while retrieving the path name of the docker context directory", e);
+                }
             }
         }
     }
