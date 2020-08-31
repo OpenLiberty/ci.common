@@ -1165,13 +1165,15 @@ public abstract class DevUtil {
             debug("checkDockerIgnore, dockerContext="+dockerContext.getAbsolutePath());
             File dockerIgnore = new File(dockerContext, ".dockerignore");
             if (!dockerIgnore.exists()) { // provide some advice
+                String buildContext;
                 try {
-                    warn("The docker build command is slower than expected. You may increase performance by adding " + 
-                        "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
-                        dockerContext.getCanonicalPath()+ ".");
+                    buildContext = dockerContext.getCanonicalPath();
                 } catch (IOException e) {
-                    error("Exception while retrieving the path name of the docker context directory", e);
+                    buildContext = dockerContext.getAbsolutePath();
                 }
+                warn("The docker build command is slower than expected. You may increase performance by adding " + 
+                    "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
+                    buildContext + ".");
             }
         }
     }
