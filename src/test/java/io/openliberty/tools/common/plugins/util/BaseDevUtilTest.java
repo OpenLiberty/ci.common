@@ -170,6 +170,12 @@ public class BaseDevUtilTest {
             // not needed for tests
             return null;
         }
+
+        @Override
+        public String getProjectName() {
+            // not needed for tests
+            return null;
+        }
         
     }
     
