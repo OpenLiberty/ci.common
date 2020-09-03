@@ -1178,9 +1178,10 @@ public abstract class DevUtil {
         }
         if (libertyDebug) {
             // map debug port
-            command.append(" -p " + libertyDebugPort + ":" + libertyDebugPort);
+            int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+            command.append(" -p " + debugPort + ":" + debugPort);
             // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
-            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + libertyDebugPort);
+            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + debugPort);
         }
 
         // mount .war.xml potential directories - override /config/apps and /config/dropins
