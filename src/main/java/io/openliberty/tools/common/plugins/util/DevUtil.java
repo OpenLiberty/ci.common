@@ -1016,11 +1016,12 @@ public abstract class DevUtil {
         }
     }
 
-    private void runCmd(String cmd) throws IOException, InterruptedException {
-        runCmd(true, cmd);
+    private String runCmd(String cmd) throws IOException, InterruptedException {
+        return runCmd(true, cmd);
     }
 
-    private void runCmd(boolean report, String cmd) throws IOException, InterruptedException {
+    private String runCmd(boolean report, String cmd) throws IOException, InterruptedException {
+        String result = null;
         Process p = Runtime.getRuntime().exec(cmd);
         p.waitFor(5, TimeUnit.SECONDS);
         if (p.exitValue() != 0) {
@@ -1029,7 +1030,10 @@ public abstract class DevUtil {
             } else {
                 debug("Error running command:" + cmd + ", return value=" + p.exitValue());
             }
+        } else {
+            result = readStdOut(p);
         }
+        return result;
     }
 
     /**
@@ -1117,17 +1121,7 @@ public abstract class DevUtil {
             if (command.startsWith("docker build")) {
                 checkDockerIgnore(startTime);
             }
-
-            // Read all the output on stdout and return it to the caller
-            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            StringBuffer allLines = new StringBuffer();
-            while ((line = in.readLine())!= null) {
-                allLines.append(line);
-            }
-            if (allLines.length() > 0) {
-                result = allLines.toString();
-            }
+            result = readStdOut(p);
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed. There is no exit value.
             debug("IllegalThreadStateException, message="+e.getMessage());
@@ -1149,6 +1143,21 @@ public abstract class DevUtil {
             // If a runtime exception occurred in the server task, log and rethrow
             error("An error occurred while running a docker command: " + e.getMessage(), e);
             throw new RuntimeException(e.getMessage());
+        }
+        return result;
+    }
+
+    private String readStdOut(Process p) throws IOException, InterruptedException {
+        String result = null;
+        // Read all the output on stdout and return it to the caller
+        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line;
+        StringBuffer allLines = new StringBuffer();
+        while ((line = in.readLine())!= null) {
+            allLines.append(line);
+        }
+        if (allLines.length() > 0) {
+            result = allLines.toString();
         }
         return result;
     }
@@ -1221,6 +1230,16 @@ public abstract class DevUtil {
             } else {
                 error("A file referenced by the Dockerfile is not found: " + srcMount.get(i) +
                     ". Update the Dockerfile or ensure the file is in the correct location.");
+            }
+        }
+
+        if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+            try {
+                command.append(" --user " + runCmd("id -u"));
+            } catch (IOException e) {
+                // can't get user id. runCmd has printed an error message.
+            } catch (InterruptedException e) {
+                // can't get user id. runCmd has printed an error message.
             }
         }
 
