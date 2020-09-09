@@ -256,6 +256,11 @@ public abstract class DevUtil {
      */
     public abstract String getServerStartTimeoutExample();
 
+    /**
+     * Is the application deployed as a loose application.
+     */
+    public abstract boolean isLooseApplication();
+
     private enum FileTrackMode {
         NOT_SET, FILE_WATCHER, POLLING
     }
@@ -2881,6 +2886,11 @@ public abstract class DevUtil {
                 if (tests) {
                     info("Tests compilation was successful.");
                 } else {
+                    // redeploy app after compilation if not loose application
+                    if (!isLooseApplication()) {
+                        redeployApp();
+                    }
+
                     info("Source compilation was successful.");
                 }
 
