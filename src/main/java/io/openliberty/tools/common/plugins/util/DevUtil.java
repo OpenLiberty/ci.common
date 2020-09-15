@@ -1224,24 +1224,10 @@ public abstract class DevUtil {
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
 
         // mount all files from COPY commands in the Dockerfile to allow for hot deployment
-        for (int i=0; i < srcMount.size(); i++) {
-            if (new File(srcMount.get(i)).exists()) { // only Files are in this list
-                command.append(" -v " + srcMount.get(i) + ":" + destMount.get(i));
-            } else {
-                error("A file referenced by the Dockerfile is not found: " + srcMount.get(i) +
-                    ". Update the Dockerfile or ensure the file is in the correct location.");
-            }
-        }
+        command.append(getCopiedFiles());
 
-        if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
-            try {
-                command.append(" --user " + runCmd("id -u"));
-            } catch (IOException e) {
-                // can't get user id. runCmd has printed an error message.
-            } catch (InterruptedException e) {
-                // can't get user id. runCmd has printed an error message.
-            }
-        }
+        // Add a --user option when running Linux
+        command.append(getUserId());
 
         command.append(" --name " + DEVMODE_CONTAINER_NAME);
 
@@ -1259,6 +1245,36 @@ public abstract class DevUtil {
         command.append(" -- --"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
 
         return command.toString();
+    }
+
+    // Read all the files from the array list.
+    private String getCopiedFiles() {
+        StringBuffer param = new StringBuffer("");
+        for (int i=0; i < srcMount.size(); i++) {
+            if (new File(srcMount.get(i)).exists()) { // only Files are in this list
+                param.append(" -v ").append(srcMount.get(i)).append(":").append(destMount.get(i));
+            } else {
+                error("A file referenced by the Dockerfile is not found: " + srcMount.get(i) +
+                    ". Update the Dockerfile or ensure the file is in the correct location.");
+            }
+        }
+        return param.toString();
+    }
+
+    private String getUserId() {
+        if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+            try {
+                String id = runCmd("id -u");
+                if (id != null) {
+                    return " --user " + id;
+                }
+            } catch (IOException e) {
+                // can't get user id. runCmd has printed an error message.
+            } catch (InterruptedException e) {
+                // can't get user id. runCmd has printed an error message.
+            }
+        }
+        return "";
     }
 
     public void generateDevModeConfig(String projectRoot, String header) throws IOException, TransformerException, ParserConfigurationException {
