@@ -1695,12 +1695,12 @@ public abstract class DevUtil {
                         // it's available
                         inputUnavailable.wait(500);
                     }
-                    if (!inputUnavailable.get()) {
-                        // the following will be printed only on first startup
-                        if (!printedStartupMessages) {
-                            info("Liberty dev mode has started!");
-                        }
+                    // the following will be printed only on first startup
+                    if (!printedStartupMessages) {
+                        info("Liberty dev mode has started!");
+                    }
 
+                    if (!inputUnavailable.get()) {
                         // the following will be printed every time after the tests run
                         if (hotTests) {
                             info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
@@ -1716,13 +1716,13 @@ public abstract class DevUtil {
                                 info("If you need to restart the server, type 'r' and press the Enter key.");
                             }
                             info("To stop the server and quit dev mode, use Ctrl-C or type 'q' and press the Enter key.");
-                            printedStartupMessages = true;
                         }
                     } else {
                         debug("Cannot read user input, setting hotTests to true.");
                         info("Tests will run automatically when changes are detected.");
                         hotTests = true;
                     }
+                    printedStartupMessages = true;
                 } catch (InterruptedException e) {
                     debug("Interrupted while waiting to determine whether input can be read", e);
                 }
