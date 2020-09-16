@@ -643,7 +643,7 @@ public abstract class DevUtil {
                 try {
                     observer.initialize();
                     while (!messagesModified.get()) {
-                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         observer.checkAndNotify();
                         // wait for the log file to update during server startup
                         Thread.sleep(500);
@@ -669,7 +669,7 @@ public abstract class DevUtil {
                 // Wait until log exists
                 try {
                     while (!messagesLogFile.exists()) {
-                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         // wait for the log file to appear during server startup
                         Thread.sleep(500);
                     }
@@ -1751,6 +1751,15 @@ public abstract class DevUtil {
                             || line.trim().equalsIgnoreCase("exit"))) {
                         debug("Detected exit command");
                         runShutdownHook(executor);
+                    } else if (line != null && line.trim().equalsIgnoreCase("r")) {
+                        debug("Detected restart command");
+                        try {
+                            restartServer(true);
+                        } catch (PluginExecutionException e) {
+                            debug("Exiting dev mode due to server restart failure");
+                            error("Could not restart the server.", e);
+                            runShutdownHook(executor);
+                        }
                     } else {
                         debug("Detected Enter key. Running tests...");
                         runTestThread(false, executor, -1, false, true);
@@ -1880,7 +1889,7 @@ public abstract class DevUtil {
 
             while (true) {
                 // Check the server and stop dev mode by throwing an exception if the server stopped.
-                checkStopDevMode();
+                checkStopDevMode(true);
 
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
 
@@ -2238,9 +2247,15 @@ public abstract class DevUtil {
         }
     }
  
-    private void checkStopDevMode() throws PluginScenarioException {
+    private void checkStopDevMode(boolean skipOnRestart) throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
         if (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED)) {
+            // server is restarting if devStop was set to true and we have not called the shutdown hook
+            boolean restarting = devStop.get() && !calledShutdownHook.get();
+            if (skipOnRestart && restarting) {
+                debug("Server is restarting. Allowing dev mode to continue.");
+                return;
+            }
             if (!this.devStop.get()) {
                 // an external situation caused the server to stop
                 if (container) {
