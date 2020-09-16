@@ -313,6 +313,7 @@ public abstract class DevUtil {
     private int dockerBuildTimeout;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
+    private boolean printedStartupMessages = false;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -1695,10 +1696,27 @@ public abstract class DevUtil {
                         inputUnavailable.wait(500);
                     }
                     if (!inputUnavailable.get()) {
+                        // the following will be printed only on first startup
+                        if (!printedStartupMessages) {
+                            info("Liberty dev mode has started!");
+                        }
+
+                        // the following will be printed every time after the tests run
                         if (hotTests) {
                             info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
                         } else {
-                            info("Press the Enter key to run tests on demand. To stop the server and quit dev mode, use Ctrl-C or type 'q' and press the Enter key.");
+                            info("Press the Enter key to run tests on demand.");
+                        }
+
+                        // the following will be printed only on first startup
+                        if (!printedStartupMessages) {
+                            if (container) {
+                                info("If you need to rebuild the Docker image and restart the container, type 'r' and press the Enter key.");
+                            } else {
+                                info("If you need to restart the server, type 'r' and press the Enter key.");
+                            }
+                            info("To stop the server and quit dev mode, use Ctrl-C or type 'q' and press the Enter key.");
+                            printedStartupMessages = true;
                         }
                     } else {
                         debug("Cannot read user input, setting hotTests to true.");
