@@ -951,8 +951,7 @@ public abstract class DevUtil {
             debug("Docker build context: " + userDockerfile.getParent());
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
-            String buildOutput = execDockerCmd(buildCmd, dockerBuildTimeout);
-            debug("Docker build output: " + buildOutput);
+            execDockerCmd(buildCmd, dockerBuildTimeout);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
             throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
@@ -1109,8 +1108,22 @@ public abstract class DevUtil {
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
             long startTime = System.currentTimeMillis();
-            Process p = Runtime.getRuntime().exec(command);
+            final Process p = Runtime.getRuntime().exec(command);
+
+            // Echo docker build output in real time. Other command output handled after process exits.
+            if (command.startsWith("docker build")) {
+                Thread logCopyThread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        copyStreamToBuildLog(p.getInputStream(), true);
+                    }
+                });
+                logCopyThread.start();
+            }
+
             p.waitFor(timeout, TimeUnit.SECONDS);
+
+            // After waiting for the process, handle the error case and normal termination.
             if (p.exitValue() != 0) {
                 debug("Error running docker command, return value="+p.exitValue());
                 // read messages from standard err
@@ -1119,19 +1132,21 @@ public abstract class DevUtil {
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
                 throw new RuntimeException(errorMessage);
             }
-            if (command.startsWith("docker build")) {
-                checkDockerIgnore(startTime);
-            }
 
-            // Read all the output on stdout and return it to the caller
-            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            StringBuffer allLines = new StringBuffer();
-            while ((line = in.readLine())!= null) {
-                allLines.append(line);
-            }
-            if (allLines.length() > 0) {
-                result = allLines.toString();
+            if (command.startsWith("docker build")) {
+                // Docker build output already echoed to the console
+                checkDockerIgnore(startTime);
+            } else {
+                // Read all the output on stdout and return it to the caller
+                BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                String line;
+                StringBuffer allLines = new StringBuffer();
+                while ((line = in.readLine())!= null) {
+                    allLines.append(line);
+                }
+                if (allLines.length() > 0) {
+                    result = allLines.toString();
+                }
             }
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed. There is no exit value.
