@@ -1194,7 +1194,7 @@ public abstract class DevUtil {
      * @return the command string to use to start the container
      */
     private String getContainerCommand() {
-        StringBuffer command = new StringBuffer("docker run --rm");
+        StringBuilder command = new StringBuilder("docker run --rm");
         if (httpPort != null) {
             command.append(" -p "+httpPort+":"+httpPort);
         } else {
@@ -1249,7 +1249,7 @@ public abstract class DevUtil {
 
     // Read all the files from the array list.
     private String getCopiedFiles() {
-        StringBuffer param = new StringBuffer("");
+        StringBuilder param = new StringBuilder(256); // estimate of size needed
         for (int i=0; i < srcMount.size(); i++) {
             if (new File(srcMount.get(i)).exists()) { // only Files are in this list
                 param.append(" -v ").append(srcMount.get(i)).append(":").append(destMount.get(i));
