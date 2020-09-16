@@ -855,7 +855,7 @@ public abstract class DevUtil {
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
                     }
                     if (line.contains("$")) {
-                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands.");
+                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         continue;
                     }
                     List<String> srcOrDestArguments = new ArrayList<String>();
@@ -885,7 +885,7 @@ public abstract class DevUtil {
                     List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
                     for (String src : srcArguments) {
                         if (src.contains("*") || src.contains("?")) {
-                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command.");
+                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         } else if (isMountableSource(new File(buildContext + "/" + src))) {
                             String srcMountString = buildContext + "/" + src;
                             String destMountString = formatDestMount(dest, new File(buildContext + "/" + src));
@@ -903,7 +903,8 @@ public abstract class DevUtil {
         if (srcMountFile.isDirectory()) {
             warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed to the dev mode container. " +
                 "Dev mode does not currently support hot deployment with directories specified in the COPY command. " + 
-                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
+                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile. " + 
+                "Otherwise, if you make changes to files in this directory, type 'r' and press Enter to rebuild the Docker image and restart the container.");
             return false;
         } // no need to validate existence of the file, just let the Docker build fail
         return true;
