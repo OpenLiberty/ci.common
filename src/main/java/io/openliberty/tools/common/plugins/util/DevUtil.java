@@ -2275,7 +2275,7 @@ public abstract class DevUtil {
                 debug("Server is restarting. Allowing dev mode to continue.");
                 return;
             }
-            if (!this.devStop.get()) {
+            if (!devStop.get()) {
                 // an external situation caused the server to stop
                 if (container) {
                     throw new PluginScenarioException("The container has stopped. Exiting dev mode.");
