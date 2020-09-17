@@ -956,24 +956,9 @@ public abstract class DevUtil {
 
     private void startContainer() {
         try {
-            // Set up permissions on Linux
-            String os = System.getProperty("os.name");
-            String id = System.getProperty("user.name");
-            if (os != null && os.equalsIgnoreCase("linux")) {
-                // Allow the container server to read the config files like server.xml
-                runCmd(false, "chmod -R o+r " + serverDirectory);
-                // Allow the container server to read directories like apps and dropins
-                runCmd("find " + serverDirectory +
-                    " -type d -not -name logs -not -name workarea -exec chmod o+x {} ;");
-                // Allow the server to write to the log files.
+            if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+                // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
                 runCmd("mkdir -p " + serverDirectory + "/logs");
-                if (id != null && id.equalsIgnoreCase("root")) {
-                    runCmd("chown -R 1001:0 " + serverDirectory + "/logs"); // in case it is new
-                    runCmd("chmod -R u+rw " + serverDirectory + "/logs"); // in case it is old
-                } else {
-                    // Set gid bit so that log file group id is same as current id.
-                    runCmd(false, "chmod -R go+rws " + serverDirectory + "/logs");
-                }
             }
 
             info("Starting Docker container...");
