@@ -177,6 +177,12 @@ public class BaseDevUtilTest {
             // not needed for tests
             return null;
         }
+
+        @Override
+        public boolean isLooseApplication() {
+            // not needed for tests
+            return true;
+        }
         
     }
     

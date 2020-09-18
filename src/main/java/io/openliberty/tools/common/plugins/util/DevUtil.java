@@ -263,6 +263,11 @@ public abstract class DevUtil {
      */
     public abstract String getProjectName();
 
+    /**
+     * Is the application deployed as a loose application.
+     */
+    public abstract boolean isLooseApplication();
+
     private enum FileTrackMode {
         NOT_SET, FILE_WATCHER, POLLING
     }
@@ -966,24 +971,9 @@ public abstract class DevUtil {
 
     private void startContainer() {
         try {
-            // Set up permissions on Linux
-            String os = System.getProperty("os.name");
-            String id = System.getProperty("user.name");
-            if (os != null && os.equalsIgnoreCase("linux")) {
-                // Allow the container server to read the config files like server.xml
-                runCmd(false, "chmod -R o+r " + serverDirectory);
-                // Allow the container server to read directories like apps and dropins
-                runCmd("find " + serverDirectory +
-                    " -type d -not -name logs -not -name workarea -exec chmod o+x {} ;");
-                // Allow the server to write to the log files.
+            if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+                // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
                 runCmd("mkdir -p " + serverDirectory + "/logs");
-                if (id != null && id.equalsIgnoreCase("root")) {
-                    runCmd("chown -R 1001:0 " + serverDirectory + "/logs"); // in case it is new
-                    runCmd("chmod -R u+rw " + serverDirectory + "/logs"); // in case it is old
-                } else {
-                    // Set gid bit so that log file group id is same as current id.
-                    runCmd(false, "chmod -R go+rws " + serverDirectory + "/logs");
-                }
             }
 
             info("Starting Docker container...");
@@ -1026,11 +1016,12 @@ public abstract class DevUtil {
         }
     }
 
-    private void runCmd(String cmd) throws IOException, InterruptedException {
-        runCmd(true, cmd);
+    private String runCmd(String cmd) throws IOException, InterruptedException {
+        return runCmd(true, cmd);
     }
 
-    private void runCmd(boolean report, String cmd) throws IOException, InterruptedException {
+    private String runCmd(boolean report, String cmd) throws IOException, InterruptedException {
+        String result = null;
         Process p = Runtime.getRuntime().exec(cmd);
         p.waitFor(5, TimeUnit.SECONDS);
         if (p.exitValue() != 0) {
@@ -1039,7 +1030,10 @@ public abstract class DevUtil {
             } else {
                 debug("Error running command:" + cmd + ", return value=" + p.exitValue());
             }
+        } else {
+            result = readStdOut(p);
         }
+        return result;
     }
 
     /**
@@ -1114,6 +1108,7 @@ public abstract class DevUtil {
         String result = null;
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
+            long startTime = System.currentTimeMillis();
             Process p = Runtime.getRuntime().exec(command);
             p.waitFor(timeout, TimeUnit.SECONDS);
             if (p.exitValue() != 0) {
@@ -1124,17 +1119,10 @@ public abstract class DevUtil {
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
                 throw new RuntimeException(errorMessage);
             }
-
-            // Read all the output on stdout and return it to the caller
-            BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            StringBuffer allLines = new StringBuffer();
-            while ((line = in.readLine())!= null) {
-                allLines.append(line + " ");
+            if (command.startsWith("docker build")) {
+                checkDockerIgnore(startTime);
             }
-            if (allLines.length() > 0) {
-                result = allLines.toString();
-            }
+            result = readStdOut(p);
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed. There is no exit value.
             debug("IllegalThreadStateException, message="+e.getMessage());
@@ -1160,6 +1148,46 @@ public abstract class DevUtil {
         return result;
     }
 
+    private String readStdOut(Process p) throws IOException, InterruptedException {
+        String result = null;
+        // Read all the output on stdout and return it to the caller
+        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line;
+        StringBuffer allLines = new StringBuffer();
+        while ((line = in.readLine())!= null) {
+            allLines.append(line + " ");
+        }
+        if (allLines.length() > 0) {
+            result = allLines.toString();
+        }
+        return result;
+    }
+
+    // Suggest a performance improvement if docker build takes too long.
+    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
+    private void checkDockerIgnore(long startTime) {
+        if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
+            return;
+        }
+        File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
+        if (dockerfileToUse.exists()) {
+            File dockerContext = dockerfileToUse.getParentFile();
+            debug("checkDockerIgnore, dockerContext="+dockerContext.getAbsolutePath());
+            File dockerIgnore = new File(dockerContext, ".dockerignore");
+            if (!dockerIgnore.exists()) { // provide some advice
+                String buildContext;
+                try {
+                    buildContext = dockerContext.getCanonicalPath();
+                } catch (IOException e) {
+                    buildContext = dockerContext.getAbsolutePath();
+                }
+                warn("The docker build command is slower than expected. You may increase performance by adding " + 
+                    "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
+                    buildContext + ".");
+            }
+        }
+    }
+
     /**
      * Build a docker run command with all the ports and directories required to run Open Liberty 
      * inside a container. Also included is the image name and the server run command to override
@@ -1167,7 +1195,7 @@ public abstract class DevUtil {
      * @return the command string to use to start the container
      */
     private String getContainerCommand() {
-        StringBuffer command = new StringBuffer("docker run --rm");
+        StringBuilder command = new StringBuilder("docker run --rm");
         if (dockerPortOverrides == null) {
             if (httpPort != null) {
                 command.append(" -p "+httpPort+":"+httpPort);
@@ -1179,7 +1207,7 @@ public abstract class DevUtil {
             } else {
                 command.append(" -p 9443:9443");
             }
-        } else if (dockerPortOverrides.contains(" ")) { //make a validateParam function for dockerPortOverrides and call it here
+        } else if (dockerPortOverrides.contains(" ")) {
             String[] mappings = dockerPortOverrides.split(" ");
             command.append(" -p " + mappings[0] + " -p " + mappings[1]);
         } else {
@@ -1206,9 +1234,10 @@ public abstract class DevUtil {
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
 
         // mount all files from COPY commands in the Dockerfile to allow for hot deployment
-        for (int i=0; i < srcMount.size(); i++) {
-            command.append(" -v " + srcMount.get(i) + ":" + destMount.get(i));
-        }
+        command.append(getCopiedFiles());
+
+        // Add a --user option when running Linux
+        command.append(getUserId());
 
         containerName = getContainerName();
         debug("containerName: " + containerName);
@@ -1263,6 +1292,36 @@ public abstract class DevUtil {
         }
         
         return DEVMODE_CONTAINER_BASE_NAME + ((highestNum != -1) ? "_" + ++highestNum : "");
+    }
+
+    // Read all the files from the array list.
+    private String getCopiedFiles() {
+        StringBuilder param = new StringBuilder(256); // estimate of size needed
+        for (int i=0; i < srcMount.size(); i++) {
+            if (new File(srcMount.get(i)).exists()) { // only Files are in this list
+                param.append(" -v ").append(srcMount.get(i)).append(":").append(destMount.get(i));
+            } else {
+                error("A file referenced by the Dockerfile is not found: " + srcMount.get(i) +
+                    ". Update the Dockerfile or ensure the file is in the correct location.");
+            }
+        }
+        return param.toString();
+    }
+
+    private String getUserId() {
+        if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+            try {
+                String id = runCmd("id -u");
+                if (id != null) {
+                    return " --user " + id;
+                }
+            } catch (IOException e) {
+                // can't get user id. runCmd has printed an error message.
+            } catch (InterruptedException e) {
+                // can't get user id. runCmd has printed an error message.
+            }
+        }
+        return "";
     }
 
     public void generateDevModeConfig(String projectRoot, String header) throws IOException, TransformerException, ParserConfigurationException {
@@ -2904,6 +2963,11 @@ public abstract class DevUtil {
                 if (tests) {
                     info("Tests compilation was successful.");
                 } else {
+                    // redeploy app after compilation if not loose application
+                    if (!isLooseApplication()) {
+                        redeployApp();
+                    }
+
                     info("Source compilation was successful.");
                 }
 
