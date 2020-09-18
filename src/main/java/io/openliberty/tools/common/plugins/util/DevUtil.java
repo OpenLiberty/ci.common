@@ -314,6 +314,7 @@ public abstract class DevUtil {
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
     private int dockerBuildTimeout;
+    private String dockerPortOverrides;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
 
@@ -321,7 +322,7 @@ public abstract class DevUtil {
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout) {
+            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, String dockerPortOverrides) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -363,6 +364,7 @@ public abstract class DevUtil {
         } else {
             this.dockerBuildTimeout = dockerBuildTimeout;
         }
+        this.dockerPortOverrides = dockerPortOverrides;
     }
 
     /**
@@ -1166,16 +1168,24 @@ public abstract class DevUtil {
      */
     private String getContainerCommand() {
         StringBuffer command = new StringBuffer("docker run --rm");
-        if (httpPort != null) {
-            command.append(" -p "+httpPort+":"+httpPort);
+        if (dockerPortOverrides == null) {
+            if (httpPort != null) {
+                command.append(" -p "+httpPort+":"+httpPort);
+            } else {
+                command.append(" -p 9080:9080");
+            }
+            if (httpsPort != null) {
+                command.append(" -p "+httpsPort+":"+httpsPort);
+            } else {
+                command.append(" -p 9443:9443");
+            }
+        } else if (dockerPortOverrides.contains(" ")) { //make a validateParam function for dockerPortOverrides and call it here
+            String[] mappings = dockerPortOverrides.split(" ");
+            command.append(" -p " + mappings[0] + " -p " + mappings[1]);
         } else {
-            command.append(" -p 9080:9080");
+            command.append(" -p " + dockerPortOverrides);
         }
-        if (httpsPort != null) {
-            command.append(" -p "+httpsPort+":"+httpsPort);
-        } else {
-            command.append(" -p 9443:9443");
-        }
+        
         if (libertyDebug) {
             // map debug port
             int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
@@ -1221,9 +1231,12 @@ public abstract class DevUtil {
     }
 
     private String getContainerName() {
-        String dockerContNamesCmd = "docker ps --format \"{{.Names}}\"";
+        String dockerContNamesCmd = "docker ps -a --format \"{{.Names}}\"";
         debug("docker container names list command: " + dockerContNamesCmd);
         String result = execDockerCmd(dockerContNamesCmd, 10);
+        if (result == null) {
+            return DEVMODE_CONTAINER_BASE_NAME;
+        }
         String[] containerNames = result.split(" ");
         int highestNum = -1;
         for(int i = 0; i < containerNames.length; i++) {
