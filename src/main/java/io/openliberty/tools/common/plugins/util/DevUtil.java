@@ -952,21 +952,24 @@ public abstract class DevUtil {
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
             long startTime = System.currentTimeMillis();
-            runCommandAndLog(buildCmd, dockerBuildTimeout);
+            runCommandAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
             checkDockerIgnore(startTime, userDockerfile);
             info("Completed building Docker image.");
         } catch (IllegalThreadStateException  e) {
-            // the timeout was too short and the docker command has not yet completed. There is no exit value.
+            // the timeout was too short and the docker command has not yet completed.
             debug("IllegalThreadStateException, message="+e.getMessage());
             error("The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds. " +
                 "Use the dockerBuildTimeout option to specify a longer period or " +
                 "add files not needed in the container to the .dockerignore file.", e);
-            throw new RuntimeException("The docker command did not complete within the timeout period: " + dockerBuildTimeout + " seconds. ");
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + 
+                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " +
+                "The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds", e);
         } catch (IOException e) {
-            error("Error building container: " + e.getMessage());
+            error("Input or output error building Docker image: " + e.getMessage());
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
-            error("Thread was interrupted while building the container: " + e.getMessage());
+            error("Thread was interrupted while building the Docker image: " + e.getMessage());
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + e.getMessage(), e);
         } catch (RuntimeException r) {
             error("Error building Docker image: " + r.getMessage());
             throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
@@ -1007,7 +1010,8 @@ public abstract class DevUtil {
             info("Starting Docker container...");
             String startContainerCommand = getContainerCommand();
             info(startContainerCommand);
-            runCommandAndLog(startContainerCommand, 0);
+            dockerRunProcess = getRunProcess(startContainerCommand);
+            runCommandAndLog(dockerRunProcess, 0);
         } catch (IOException e) {
             error("Error starting container: " + e.getMessage());
             throw new RuntimeException(e);
@@ -1016,16 +1020,17 @@ public abstract class DevUtil {
         }
     }
 
-    private void runCommandAndLog(String command, int timeout) throws IOException, InterruptedException {
-
+    private Process getRunProcess(String command) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
         processBuilder.command(getCommandTokens(command));
-        dockerRunProcess = processBuilder.start();
+        return processBuilder.start();
+    }
 
+    private void runCommandAndLog(final Process startingProcess, int timeout) throws InterruptedException {
         Thread logCopyInputThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                copyStreamToBuildLog(dockerRunProcess.getInputStream(), true);
+                copyStreamToBuildLog(startingProcess.getInputStream(), true);
             }
         });
         logCopyInputThread.start();
@@ -1034,20 +1039,20 @@ public abstract class DevUtil {
         Thread logCopyErrorThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                firstErrorLine.append(copyStreamToBuildLog(dockerRunProcess.getErrorStream(), false));
+                firstErrorLine.append(copyStreamToBuildLog(startingProcess.getErrorStream(), false));
             }
         });
         logCopyErrorThread.start();
 
         if (timeout == 0) {
-            dockerRunProcess.waitFor();
+            startingProcess.waitFor();
         } else {
-            dockerRunProcess.waitFor(timeout, TimeUnit.SECONDS);
+            startingProcess.waitFor(timeout, TimeUnit.SECONDS);
         }
-        if (dockerRunProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
-            debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
+        if (startingProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
+            debug("Error running docker command, return value=" + startingProcess.exitValue());
             // show first message from standard err
-            String errorMessage = new String(firstErrorLine).trim() + " RC=" + dockerRunProcess.exitValue();
+            String errorMessage = new String(firstErrorLine).trim() + " RC=" + startingProcess.exitValue();
             throw new RuntimeException(errorMessage);
         }
     }
@@ -1117,8 +1122,8 @@ public abstract class DevUtil {
 
     private void stopContainer() {
         try {
-            info("Stopping container...");
             if (dockerRunProcess != null) {
+                info("Stopping container...");
                 String dockerPsCmd = "docker ps -qf name=" + DEVMODE_CONTAINER_NAME;
                 debug("docker ps command: " + dockerPsCmd);
                 String containerId = execDockerCmd(dockerPsCmd, 10);
