@@ -1058,19 +1058,11 @@ public abstract class DevUtil {
     }
 
     private String runCmd(String cmd) throws IOException, InterruptedException {
-        return runCmd(true, cmd);
-    }
-
-    private String runCmd(boolean report, String cmd) throws IOException, InterruptedException {
         String result = null;
         Process p = Runtime.getRuntime().exec(cmd);
         p.waitFor(5, TimeUnit.SECONDS);
         if (p.exitValue() != 0) {
-            if (report) {
-                error("Error running command:" + cmd + ", return value=" + p.exitValue());
-            } else {
-                debug("Error running command:" + cmd + ", return value=" + p.exitValue());
-            }
+            error("Error running command:" + cmd + ", return value=" + p.exitValue());
         } else {
             result = readStdOut(p);
         }
@@ -1148,7 +1140,7 @@ public abstract class DevUtil {
         String result = null;
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
-            final Process p = Runtime.getRuntime().exec(command);
+            Process p = Runtime.getRuntime().exec(command);
 
             p.waitFor(timeout, TimeUnit.SECONDS);
 
