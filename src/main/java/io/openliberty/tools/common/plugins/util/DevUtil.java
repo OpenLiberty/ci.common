@@ -313,7 +313,7 @@ public abstract class DevUtil {
     private int dockerBuildTimeout;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
-    private boolean printedStartupMessages = false;
+    private boolean printStartupMessages = true;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -1697,38 +1697,57 @@ public abstract class DevUtil {
                         inputUnavailable.wait(500);
                     }
                     // the following will be printed only on first startup
-                    if (!printedStartupMessages) {
-                        info("Liberty dev mode has started!");
+                    if (printStartupMessages) {
+                        info(formatAttentionBarrier()); // print barrier header
+                        info(formatAttentionTitle("Liberty dev mode has started!"));
                     }
 
                     if (!inputUnavailable.get()) {
-                        // the following will be printed every time after the tests run
+                        // the following will be printed on startup and every time after the tests run
                         if (hotTests) {
-                            info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
+                            String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                            info(printStartupMessages ? formatAttentionMessage(message) : message);
                         } else {
-                            info("Press the Enter key to run tests on demand.");
+                            String message = "To run tests on demand, press Enter.";
+                            info(printStartupMessages ? formatAttentionMessage(message) : message);
                         }
 
                         // the following will be printed only on first startup
-                        if (!printedStartupMessages) {
+                        if (printStartupMessages) {
                             if (container) {
-                                info("If you need to rebuild the Docker image and restart the container, type 'r' and press the Enter key.");
+                                info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
                             } else {
-                                info("If you need to restart the server, type 'r' and press the Enter key.");
+                                info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
                             }
-                            info("To stop the server and quit dev mode, use Ctrl-C or type 'q' and press the Enter key.");
+                            info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
                         }
                     } else {
                         debug("Cannot read user input, setting hotTests to true.");
-                        info("Tests will run automatically when changes are detected.");
+                        String message = "Tests will run automatically when changes are detected.";
+                        info(printStartupMessages ? formatAttentionMessage(message) : message);
                         hotTests = true;
                     }
-                    printedStartupMessages = true;
+                    if (printStartupMessages) {
+                        info(formatAttentionBarrier()); // print barrier footer
+                        printStartupMessages = false;
+                    }
                 } catch (InterruptedException e) {
                     debug("Interrupted while waiting to determine whether input can be read", e);
                 }
             }
         }
+    }
+
+    private String formatAttentionBarrier() {
+        return "************************************************************************";
+    }
+
+    private String formatAttentionTitle(String message) {
+        return "*    " + message;
+    }
+
+    private String formatAttentionMessage(String message) {
+        return "*        " + message;
     }
 
     private class HotkeyReader implements Runnable {
