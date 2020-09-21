@@ -313,6 +313,7 @@ public abstract class DevUtil {
     private int dockerBuildTimeout;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
+    private boolean printStartupMessages = true;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -643,7 +644,7 @@ public abstract class DevUtil {
                 try {
                     observer.initialize();
                     while (!messagesModified.get()) {
-                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         observer.checkAndNotify();
                         // wait for the log file to update during server startup
                         Thread.sleep(500);
@@ -669,7 +670,7 @@ public abstract class DevUtil {
                 // Wait until log exists
                 try {
                     while (!messagesLogFile.exists()) {
-                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         // wait for the log file to appear during server startup
                         Thread.sleep(500);
                     }
@@ -854,7 +855,7 @@ public abstract class DevUtil {
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
                     }
                     if (line.contains("$")) {
-                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands.");
+                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         continue;
                     }
                     List<String> srcOrDestArguments = new ArrayList<String>();
@@ -884,7 +885,7 @@ public abstract class DevUtil {
                     List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
                     for (String src : srcArguments) {
                         if (src.contains("*") || src.contains("?")) {
-                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command.");
+                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         } else if (isMountableSource(new File(buildContext + "/" + src))) {
                             String srcMountString = buildContext + "/" + src;
                             String destMountString = formatDestMount(dest, new File(buildContext + "/" + src));
@@ -902,7 +903,8 @@ public abstract class DevUtil {
         if (srcMountFile.isDirectory()) {
             warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed to the dev mode container. " +
                 "Dev mode does not currently support hot deployment with directories specified in the COPY command. " + 
-                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
+                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile. " + 
+                "Otherwise, if you make changes to files in this directory, type 'r' and press Enter to rebuild the Docker image and restart the container.");
             return false;
         } // no need to validate existence of the file, just let the Docker build fail
         return true;
@@ -1714,22 +1716,58 @@ public abstract class DevUtil {
                         // it's available
                         inputUnavailable.wait(500);
                     }
+                    // the following will be printed only on first startup
+                    if (printStartupMessages) {
+                        info(formatAttentionBarrier()); // print barrier header
+                        info(formatAttentionTitle("Liberty dev mode has started!"));
+                    }
+
                     if (!inputUnavailable.get()) {
+                        // the following will be printed on startup and every time after the tests run
                         if (hotTests) {
-                            info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
+                            String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                            info(printStartupMessages ? formatAttentionMessage(message) : message);
                         } else {
-                            info("Press the Enter key to run tests on demand. To stop the server and quit dev mode, use Ctrl-C or type 'q' and press the Enter key.");
+                            String message = "To run tests on demand, press Enter.";
+                            info(printStartupMessages ? formatAttentionMessage(message) : message);
+                        }
+
+                        // the following will be printed only on first startup
+                        if (printStartupMessages) {
+                            if (container) {
+                                info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+                            } else {
+                                info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+                            }
+                            info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
                         }
                     } else {
                         debug("Cannot read user input, setting hotTests to true.");
-                        info("Tests will run automatically when changes are detected.");
+                        String message = "Tests will run automatically when changes are detected.";
+                        info(printStartupMessages ? formatAttentionMessage(message) : message);
                         hotTests = true;
+                    }
+                    if (printStartupMessages) {
+                        info(formatAttentionBarrier()); // print barrier footer
+                        printStartupMessages = false;
                     }
                 } catch (InterruptedException e) {
                     debug("Interrupted while waiting to determine whether input can be read", e);
                 }
             }
         }
+    }
+
+    private String formatAttentionBarrier() {
+        return "************************************************************************";
+    }
+
+    private String formatAttentionTitle(String message) {
+        return "*    " + message;
+    }
+
+    private String formatAttentionMessage(String message) {
+        return "*        " + message;
     }
 
     private class HotkeyReader implements Runnable {
@@ -1771,6 +1809,15 @@ public abstract class DevUtil {
                             || line.trim().equalsIgnoreCase("exit"))) {
                         debug("Detected exit command");
                         runShutdownHook(executor);
+                    } else if (line != null && line.trim().equalsIgnoreCase("r")) {
+                        debug("Detected restart command");
+                        try {
+                            restartServer(true);
+                        } catch (PluginExecutionException e) {
+                            debug("Exiting dev mode due to server restart failure");
+                            error("Could not restart the server.", e);
+                            runShutdownHook(executor);
+                        }
                     } else {
                         debug("Detected Enter key. Running tests...");
                         runTestThread(false, executor, -1, false, true);
@@ -1900,7 +1947,7 @@ public abstract class DevUtil {
 
             while (true) {
                 // Check the server and stop dev mode by throwing an exception if the server stopped.
-                checkStopDevMode();
+                checkStopDevMode(true);
 
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
 
@@ -2258,10 +2305,16 @@ public abstract class DevUtil {
         }
     }
  
-    private void checkStopDevMode() throws PluginScenarioException {
+    private void checkStopDevMode(boolean skipOnRestart) throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
         if (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED)) {
-            if (!this.devStop.get()) {
+            // server is restarting if devStop was set to true and we have not called the shutdown hook
+            boolean restarting = devStop.get() && !calledShutdownHook.get();
+            if (skipOnRestart && restarting) {
+                debug("Server is restarting. Allowing dev mode to continue.");
+                return;
+            }
+            if (!devStop.get()) {
                 // an external situation caused the server to stop
                 if (container) {
                     throw new PluginScenarioException("The container has stopped. Exiting dev mode.");
