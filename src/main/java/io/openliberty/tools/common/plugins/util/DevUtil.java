@@ -953,11 +953,51 @@ public abstract class DevUtil {
             debug("Docker build context: " + userDockerfile.getParent());
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
-            String buildOutput = execDockerCmd(buildCmd, dockerBuildTimeout);
-            debug("Docker build output: " + buildOutput);
+            long startTime = System.currentTimeMillis();
+            execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
+            checkDockerIgnore(startTime, userDockerfile);
+            info("Completed building Docker image.");
+        } catch (IllegalThreadStateException  e) {
+            // the timeout was too short and the docker command has not yet completed.
+            debug("IllegalThreadStateException, message="+e.getMessage());
+            throw new PluginExecutionException("The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds. " +
+                "Use the dockerBuildTimeout option to specify a longer period or " +
+                "add files not needed in the container to the .dockerignore file", e);
+        } catch (IOException e) {
+            error("Input or output error building Docker image: " + e.getMessage());
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            debug("Thread InterruptedException while building the Docker image: " + e.getMessage());
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " +
+                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + e.getMessage(), e);
         } catch (RuntimeException r) {
-            error("Error building Docker image: " + r.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
+            debug("RuntimeException building Docker image: " + r.getMessage());
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + 
+                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
+        }
+    }
+
+    // Suggest a performance improvement if docker build takes too long.
+    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
+    private void checkDockerIgnore(long startTime, File userDockerfile) {
+        if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
+            return;
+        }
+        if (userDockerfile.exists()) {
+            File dockerContext = userDockerfile.getParentFile();
+            debug("checkDockerIgnore, dockerContext="+dockerContext.getAbsolutePath());
+            File dockerIgnore = new File(dockerContext, ".dockerignore");
+            if (!dockerIgnore.exists()) { // provide some advice
+                String buildContext;
+                try {
+                    buildContext = dockerContext.getCanonicalPath();
+                } catch (IOException e) {
+                    buildContext = dockerContext.getAbsolutePath();
+                }
+                warn("The docker build command is slower than expected. You may increase performance by adding " + 
+                    "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
+                    buildContext + ".");
+            }
         }
     }
 
@@ -971,35 +1011,8 @@ public abstract class DevUtil {
             info("Starting Docker container...");
             String startContainerCommand = getContainerCommand();
             info(startContainerCommand);
-
-            ProcessBuilder processBuilder = new ProcessBuilder();
-            processBuilder.command(getCommandTokens(startContainerCommand));
-            dockerRunProcess = processBuilder.start();
-
-            Thread logCopyInputThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    copyStreamToBuildLog(dockerRunProcess.getInputStream(), true);
-                }
-            });
-            logCopyInputThread.start();
-
-            final StringBuilder firstErrorLine = new StringBuilder();
-            Thread logCopyErrorThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    firstErrorLine.append(copyStreamToBuildLog(dockerRunProcess.getErrorStream(), false));
-                }
-            });
-            logCopyErrorThread.start();
-
-            dockerRunProcess.waitFor();
-            if (dockerRunProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
-                debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
-                // show first message from standard err
-                String errorMessage = new String(firstErrorLine).trim() + " RC=" + dockerRunProcess.exitValue();
-                throw new RuntimeException(errorMessage);
-            }
+            dockerRunProcess = getRunProcess(startContainerCommand);
+            execDockerCmdAndLog(dockerRunProcess, 0);
         } catch (IOException e) {
             error("Error starting container: " + e.getMessage());
             throw new RuntimeException(e);
@@ -1008,20 +1021,49 @@ public abstract class DevUtil {
         }
     }
 
-    private String runCmd(String cmd) throws IOException, InterruptedException {
-        return runCmd(true, cmd);
+    private Process getRunProcess(String command) throws IOException {
+        ProcessBuilder processBuilder = new ProcessBuilder();
+        processBuilder.command(getCommandTokens(command));
+        return processBuilder.start();
     }
 
-    private String runCmd(boolean report, String cmd) throws IOException, InterruptedException {
+    private void execDockerCmdAndLog(final Process startingProcess, int timeout) throws InterruptedException {
+        Thread logCopyInputThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                copyStreamToBuildLog(startingProcess.getInputStream(), true);
+            }
+        });
+        logCopyInputThread.start();
+
+        final StringBuilder firstErrorLine = new StringBuilder();
+        Thread logCopyErrorThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                firstErrorLine.append(copyStreamToBuildLog(startingProcess.getErrorStream(), false));
+            }
+        });
+        logCopyErrorThread.start();
+
+        if (timeout == 0) {
+            startingProcess.waitFor();
+        } else {
+            startingProcess.waitFor(timeout, TimeUnit.SECONDS);
+        }
+        if (startingProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
+            debug("Error running docker command, return value=" + startingProcess.exitValue());
+            // show first message from standard err
+            String errorMessage = new String(firstErrorLine).trim() + " RC=" + startingProcess.exitValue();
+            throw new RuntimeException(errorMessage);
+        }
+    }
+
+    private String runCmd(String cmd) throws IOException, InterruptedException {
         String result = null;
         Process p = Runtime.getRuntime().exec(cmd);
         p.waitFor(5, TimeUnit.SECONDS);
         if (p.exitValue() != 0) {
-            if (report) {
-                error("Error running command:" + cmd + ", return value=" + p.exitValue());
-            } else {
-                debug("Error running command:" + cmd + ", return value=" + p.exitValue());
-            }
+            error("Error running command:" + cmd + ", return value=" + p.exitValue());
         } else {
             result = readStdOut(p);
         }
@@ -1073,8 +1115,8 @@ public abstract class DevUtil {
 
     private void stopContainer() {
         try {
-            info("Stopping container...");
             if (dockerRunProcess != null) {
+                info("Stopping container...");
                 String dockerPsCmd = "docker ps -qf name=" + DEVMODE_CONTAINER_NAME;
                 debug("docker ps command: " + dockerPsCmd);
                 String containerId = execDockerCmd(dockerPsCmd, 10);
@@ -1099,9 +1141,11 @@ public abstract class DevUtil {
         String result = null;
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
-            long startTime = System.currentTimeMillis();
             Process p = Runtime.getRuntime().exec(command);
+
             p.waitFor(timeout, TimeUnit.SECONDS);
+
+            // After waiting for the process, handle the error case and normal termination.
             if (p.exitValue() != 0) {
                 debug("Error running docker command, return value="+p.exitValue());
                 // read messages from standard err
@@ -1110,28 +1154,17 @@ public abstract class DevUtil {
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
                 throw new RuntimeException(errorMessage);
             }
-            if (command.startsWith("docker build")) {
-                checkDockerIgnore(startTime);
-            }
             result = readStdOut(p);
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed. There is no exit value.
             debug("IllegalThreadStateException, message="+e.getMessage());
-            if (command.startsWith("docker build")) {
-                error("The docker build command did not complete within the timeout period: " + timeout + " seconds. " +
-                    "Use the dockerBuildTimeout option to specify a longer period or " +
-                    "add files not needed in the container to the .dockerignore file.", e);
-            } else {
-                error("The docker command did not complete within the timeout period: " + timeout + " seconds.", e);
-            }
+            error("The docker command did not complete within the timeout period: " + timeout + " seconds.", e);
             throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
         } catch (InterruptedException e) {
-            // Container error, throw exception
             // If a runtime exception occurred in the server task, log and rethrow
             error("An interruption error occurred while running a docker command: " + e.getMessage(), e);
             throw new RuntimeException(e.getMessage());
         } catch (IOException e) {
-            // Container error, throw exception
             // If a runtime exception occurred in the server task, log and rethrow
             error("An error occurred while running a docker command: " + e.getMessage(), e);
             throw new RuntimeException(e.getMessage());
@@ -1152,31 +1185,6 @@ public abstract class DevUtil {
             result = allLines.toString();
         }
         return result;
-    }
-
-    // Suggest a performance improvement if docker build takes too long.
-    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
-    private void checkDockerIgnore(long startTime) {
-        if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
-            return;
-        }
-        File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
-        if (dockerfileToUse.exists()) {
-            File dockerContext = dockerfileToUse.getParentFile();
-            debug("checkDockerIgnore, dockerContext="+dockerContext.getAbsolutePath());
-            File dockerIgnore = new File(dockerContext, ".dockerignore");
-            if (!dockerIgnore.exists()) { // provide some advice
-                String buildContext;
-                try {
-                    buildContext = dockerContext.getCanonicalPath();
-                } catch (IOException e) {
-                    buildContext = dockerContext.getAbsolutePath();
-                }
-                warn("The docker build command is slower than expected. You may increase performance by adding " + 
-                    "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
-                    buildContext + ".");
-            }
-        }
     }
 
     /**
