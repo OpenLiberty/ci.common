@@ -1018,6 +1018,14 @@ public abstract class DevUtil {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             error("Thread was interrupted while starting the container: " + e.getMessage());
+        } catch (RuntimeException r) {
+            // remove container in case of an error trying to run the container because the docker run --rm will not rm the container
+            String containerId = getContainerId();
+            if (containerId != null && !containerId.isEmpty()) {
+                String dockerRmCmd = "docker container rm " + containerId;
+                execDockerCmd(dockerRmCmd, 10);
+            }
+            throw r;
         }
     }
 
@@ -1117,13 +1125,12 @@ public abstract class DevUtil {
         try {
             if (dockerRunProcess != null) {
                 info("Stopping container...");
-                String dockerPsCmd = "docker ps -qf name=" + DEVMODE_CONTAINER_NAME;
-                debug("docker ps command: " + dockerPsCmd);
-                String containerId = execDockerCmd(dockerPsCmd, 10);
-
-                String dockerStopCmd = "docker stop " + containerId;
-                debug("docker stop command: " + dockerStopCmd);
-                execDockerCmd(dockerStopCmd, 30);
+                String containerId = getContainerId();
+                debug("Stopping container id=" + containerId);
+                if (containerId != null && !containerId.isEmpty()) {
+                    String dockerStopCmd = "docker stop " + containerId;
+                    execDockerCmd(dockerStopCmd, 30);
+                }
             }
         } catch (RuntimeException r) {
             error("Error stopping container: " + r.getMessage());
@@ -1131,6 +1138,12 @@ public abstract class DevUtil {
         } finally {
             dockerRunProcess = null;
         }
+    }
+
+    private String getContainerId() {
+        // -q = quiet, only id number, -a = include stopped containers, -f = filter by key=value. -f must be last
+        String dockerPsCmd = "docker ps -aqf name=" + DEVMODE_CONTAINER_NAME;
+        return execDockerCmd(dockerPsCmd, 10);
     }
 
     /**
