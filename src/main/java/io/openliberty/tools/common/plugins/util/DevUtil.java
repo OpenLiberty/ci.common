@@ -952,27 +952,26 @@ public abstract class DevUtil {
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
             long startTime = System.currentTimeMillis();
-            runCommandAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
+            execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
             checkDockerIgnore(startTime, userDockerfile);
             info("Completed building Docker image.");
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed.
             debug("IllegalThreadStateException, message="+e.getMessage());
-            error("The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds. " +
+            throw new PluginExecutionException("The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds. " +
                 "Use the dockerBuildTimeout option to specify a longer period or " +
-                "add files not needed in the container to the .dockerignore file.", e);
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + 
-                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " +
-                "The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds", e);
+                "add files not needed in the container to the .dockerignore file", e);
         } catch (IOException e) {
             error("Input or output error building Docker image: " + e.getMessage());
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
-            error("Thread was interrupted while building the Docker image: " + e.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + e.getMessage(), e);
+            debug("Thread InterruptedException while building the Docker image: " + e.getMessage());
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " +
+                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + e.getMessage(), e);
         } catch (RuntimeException r) {
-            error("Error building Docker image: " + r.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
+            debug("RuntimeException building Docker image: " + r.getMessage());
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + 
+                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
         }
     }
 
@@ -1011,7 +1010,7 @@ public abstract class DevUtil {
             String startContainerCommand = getContainerCommand();
             info(startContainerCommand);
             dockerRunProcess = getRunProcess(startContainerCommand);
-            runCommandAndLog(dockerRunProcess, 0);
+            execDockerCmdAndLog(dockerRunProcess, 0);
         } catch (IOException e) {
             error("Error starting container: " + e.getMessage());
             throw new RuntimeException(e);
@@ -1026,7 +1025,7 @@ public abstract class DevUtil {
         return processBuilder.start();
     }
 
-    private void runCommandAndLog(final Process startingProcess, int timeout) throws InterruptedException {
+    private void execDockerCmdAndLog(final Process startingProcess, int timeout) throws InterruptedException {
         Thread logCopyInputThread = new Thread(new Runnable() {
             @Override
             public void run() {
