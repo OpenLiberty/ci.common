@@ -322,6 +322,7 @@ public abstract class DevUtil {
     private boolean skipDefaultPorts;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
+    private boolean printStartupMessages = true;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -653,7 +654,7 @@ public abstract class DevUtil {
                 try {
                     observer.initialize();
                     while (!messagesModified.get()) {
-                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         observer.checkAndNotify();
                         // wait for the log file to update during server startup
                         Thread.sleep(500);
@@ -679,7 +680,7 @@ public abstract class DevUtil {
                 // Wait until log exists
                 try {
                     while (!messagesLogFile.exists()) {
-                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         // wait for the log file to appear during server startup
                         Thread.sleep(500);
                     }
@@ -864,7 +865,7 @@ public abstract class DevUtil {
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
                     }
                     if (line.contains("$")) {
-                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands.");
+                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         continue;
                     }
                     List<String> srcOrDestArguments = new ArrayList<String>();
@@ -894,7 +895,7 @@ public abstract class DevUtil {
                     List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
                     for (String src : srcArguments) {
                         if (src.contains("*") || src.contains("?")) {
-                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command.");
+                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         } else if (isMountableSource(new File(buildContext + "/" + src))) {
                             String srcMountString = buildContext + "/" + src;
                             String destMountString = formatDestMount(dest, new File(buildContext + "/" + src));
@@ -912,7 +913,8 @@ public abstract class DevUtil {
         if (srcMountFile.isDirectory()) {
             warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed to the dev mode container. " +
                 "Dev mode does not currently support hot deployment with directories specified in the COPY command. " + 
-                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
+                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile. " + 
+                "Otherwise, if you make changes to files in this directory, type 'r' and press Enter to rebuild the Docker image and restart the container.");
             return false;
         } // no need to validate existence of the file, just let the Docker build fail
         return true;
@@ -961,11 +963,48 @@ public abstract class DevUtil {
             debug("Docker build context: " + userDockerfile.getParent());
             buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
             info(buildCmd);
-            String buildOutput = execDockerCmd(buildCmd, dockerBuildTimeout);
-            debug("Docker build output: " + buildOutput);
+            long startTime = System.currentTimeMillis();
+            execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
+            checkDockerIgnore(startTime, userDockerfile.getParentFile());
+            info("Completed building Docker image.");
+        } catch (IllegalThreadStateException  e) {
+            // the timeout was too short and the docker command has not yet completed.
+            debug("IllegalThreadStateException, message="+e.getMessage());
+            throw new PluginExecutionException("The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds. " +
+                "Use the dockerBuildTimeout option to specify a longer period or " +
+                "add files not needed in the container to the .dockerignore file", e);
+        } catch (IOException e) {
+            error("Input or output error building Docker image: " + e.getMessage());
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            debug("Thread InterruptedException while building the Docker image: " + e.getMessage());
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " +
+                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + e.getMessage(), e);
         } catch (RuntimeException r) {
-            error("Error building Docker image: " + r.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
+            debug("RuntimeException building Docker image: " + r.getMessage());
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + 
+                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
+        }
+    }
+
+    // Suggest a performance improvement if docker build takes too long.
+    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
+    private void checkDockerIgnore(long startTime, File dockerBuildContext) {
+        if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
+            return;
+        }
+        debug("checkDockerIgnore, dockerBuildContext=" + dockerBuildContext.getAbsolutePath());
+        File dockerIgnore = new File(dockerBuildContext, ".dockerignore");
+        if (!dockerIgnore.exists()) { // provide some advice
+            String buildContextPath;
+            try {
+                buildContextPath = dockerBuildContext.getCanonicalPath();
+            } catch (IOException e) {
+                buildContextPath = dockerBuildContext.getAbsolutePath();
+            }
+            warn("The docker build command is slower than expected. You may increase performance by adding " +
+                "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
+                buildContextPath + ".");
         }
     }
 
@@ -979,57 +1018,69 @@ public abstract class DevUtil {
             info("Starting Docker container...");
             String startContainerCommand = getContainerCommand();
             info(startContainerCommand);
-
-            ProcessBuilder processBuilder = new ProcessBuilder();
-            processBuilder.command(getCommandTokens(startContainerCommand));
-            dockerRunProcess = processBuilder.start();
-
-            Thread logCopyInputThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    copyStreamToBuildLog(dockerRunProcess.getInputStream(), true);
-                }
-            });
-            logCopyInputThread.start();
-
-            final StringBuilder firstErrorLine = new StringBuilder();
-            Thread logCopyErrorThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    firstErrorLine.append(copyStreamToBuildLog(dockerRunProcess.getErrorStream(), false));
-                }
-            });
-            logCopyErrorThread.start();
-
-            dockerRunProcess.waitFor();
-            if (dockerRunProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
-                debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
-                // show first message from standard err
-                String errorMessage = new String(firstErrorLine).trim() + " RC=" + dockerRunProcess.exitValue();
-                throw new RuntimeException(errorMessage);
-            }
+            dockerRunProcess = getRunProcess(startContainerCommand);
+            execDockerCmdAndLog(dockerRunProcess, 0);
         } catch (IOException e) {
             error("Error starting container: " + e.getMessage());
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             error("Thread was interrupted while starting the container: " + e.getMessage());
+        } catch (RuntimeException r) {
+            try {
+                // remove container in case of an error trying to run the container because the docker run --rm will not rm the container
+                String dockerRmCmd = "docker container rm " + containerName;
+                execDockerCmd(dockerRmCmd, 10);
+            } catch (Exception e) {
+                // do not report the "docker container rm" error so that we can instead report the startContainer() error
+                debug("Exception running docker container rm:", e);
+            }
+            throw r;
+        }
+    }
+
+    private Process getRunProcess(String command) throws IOException {
+        ProcessBuilder processBuilder = new ProcessBuilder();
+        processBuilder.command(getCommandTokens(command));
+        return processBuilder.start();
+    }
+
+    private void execDockerCmdAndLog(final Process startingProcess, int timeout) throws InterruptedException {
+        Thread logCopyInputThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                copyStreamToBuildLog(startingProcess.getInputStream(), true);
+            }
+        });
+        logCopyInputThread.start();
+
+        final StringBuilder firstErrorLine = new StringBuilder();
+        Thread logCopyErrorThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                firstErrorLine.append(copyStreamToBuildLog(startingProcess.getErrorStream(), false));
+            }
+        });
+        logCopyErrorThread.start();
+
+        if (timeout == 0) {
+            startingProcess.waitFor();
+        } else {
+            startingProcess.waitFor(timeout, TimeUnit.SECONDS);
+        }
+        if (startingProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
+            debug("Error running docker command, return value=" + startingProcess.exitValue());
+            // show first message from standard err
+            String errorMessage = new String(firstErrorLine).trim() + " RC=" + startingProcess.exitValue();
+            throw new RuntimeException(errorMessage);
         }
     }
 
     private String runCmd(String cmd) throws IOException, InterruptedException {
-        return runCmd(true, cmd);
-    }
-
-    private String runCmd(boolean report, String cmd) throws IOException, InterruptedException {
         String result = null;
         Process p = Runtime.getRuntime().exec(cmd);
         p.waitFor(5, TimeUnit.SECONDS);
         if (p.exitValue() != 0) {
-            if (report) {
-                error("Error running command:" + cmd + ", return value=" + p.exitValue());
-            } else {
-                debug("Error running command:" + cmd + ", return value=" + p.exitValue());
-            }
+            error("Error running command:" + cmd + ", return value=" + p.exitValue());
         } else {
             result = readStdOut(p);
         }
@@ -1081,10 +1132,10 @@ public abstract class DevUtil {
 
     private void stopContainer() {
         try {
-            info("Stopping container...");
             if (dockerRunProcess != null) {
+                info("Stopping container...");
                 String dockerStopCmd = "docker stop " + containerName;
-                debug("docker stop command: " + dockerStopCmd);
+                debug("Stopping container " + containerName);
                 execDockerCmd(dockerStopCmd, 30);
             }
         } catch (RuntimeException r) {
@@ -1103,9 +1154,11 @@ public abstract class DevUtil {
         String result = null;
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
-            long startTime = System.currentTimeMillis();
             Process p = Runtime.getRuntime().exec(command);
+
             p.waitFor(timeout, TimeUnit.SECONDS);
+
+            // After waiting for the process, handle the error case and normal termination.
             if (p.exitValue() != 0) {
                 debug("Error running docker command, return value="+p.exitValue());
                 // read messages from standard err
@@ -1114,28 +1167,17 @@ public abstract class DevUtil {
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
                 throw new RuntimeException(errorMessage);
             }
-            if (command.startsWith("docker build")) {
-                checkDockerIgnore(startTime);
-            }
             result = readStdOut(p);
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed. There is no exit value.
             debug("IllegalThreadStateException, message="+e.getMessage());
-            if (command.startsWith("docker build")) {
-                error("The docker build command did not complete within the timeout period: " + timeout + " seconds. " +
-                    "Use the dockerBuildTimeout option to specify a longer period or " +
-                    "add files not needed in the container to the .dockerignore file.", e);
-            } else {
-                error("The docker command did not complete within the timeout period: " + timeout + " seconds.", e);
-            }
+            error("The docker command did not complete within the timeout period: " + timeout + " seconds.", e);
             throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
         } catch (InterruptedException e) {
-            // Container error, throw exception
             // If a runtime exception occurred in the server task, log and rethrow
             error("An interruption error occurred while running a docker command: " + e.getMessage(), e);
             throw new RuntimeException(e.getMessage());
         } catch (IOException e) {
-            // Container error, throw exception
             // If a runtime exception occurred in the server task, log and rethrow
             error("An error occurred while running a docker command: " + e.getMessage(), e);
             throw new RuntimeException(e.getMessage());
@@ -1156,31 +1198,6 @@ public abstract class DevUtil {
             result = allLines.toString();
         }
         return result;
-    }
-
-    // Suggest a performance improvement if docker build takes too long.
-    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
-    private void checkDockerIgnore(long startTime) {
-        if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
-            return;
-        }
-        File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
-        if (dockerfileToUse.exists()) {
-            File dockerContext = dockerfileToUse.getParentFile();
-            debug("checkDockerIgnore, dockerContext="+dockerContext.getAbsolutePath());
-            File dockerIgnore = new File(dockerContext, ".dockerignore");
-            if (!dockerIgnore.exists()) { // provide some advice
-                String buildContext;
-                try {
-                    buildContext = dockerContext.getCanonicalPath();
-                } catch (IOException e) {
-                    buildContext = dockerContext.getAbsolutePath();
-                }
-                warn("The docker build command is slower than expected. You may increase performance by adding " + 
-                    "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
-                    buildContext + ".");
-            }
-        }
     }
 
     /**
@@ -1761,22 +1778,58 @@ public abstract class DevUtil {
                         // it's available
                         inputUnavailable.wait(500);
                     }
+                    // the following will be printed only on first startup
+                    if (printStartupMessages) {
+                        info(formatAttentionBarrier()); // print barrier header
+                        info(formatAttentionTitle("Liberty dev mode has started!"));
+                    }
+
                     if (!inputUnavailable.get()) {
+                        // the following will be printed on startup and every time after the tests run
                         if (hotTests) {
-                            info("Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.");
+                            String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                            info(printStartupMessages ? formatAttentionMessage(message) : message);
                         } else {
-                            info("Press the Enter key to run tests on demand. To stop the server and quit dev mode, use Ctrl-C or type 'q' and press the Enter key.");
+                            String message = "To run tests on demand, press Enter.";
+                            info(printStartupMessages ? formatAttentionMessage(message) : message);
+                        }
+
+                        // the following will be printed only on first startup
+                        if (printStartupMessages) {
+                            if (container) {
+                                info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+                            } else {
+                                info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+                            }
+                            info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
                         }
                     } else {
                         debug("Cannot read user input, setting hotTests to true.");
-                        info("Tests will run automatically when changes are detected.");
+                        String message = "Tests will run automatically when changes are detected.";
+                        info(printStartupMessages ? formatAttentionMessage(message) : message);
                         hotTests = true;
+                    }
+                    if (printStartupMessages) {
+                        info(formatAttentionBarrier()); // print barrier footer
+                        printStartupMessages = false;
                     }
                 } catch (InterruptedException e) {
                     debug("Interrupted while waiting to determine whether input can be read", e);
                 }
             }
         }
+    }
+
+    private String formatAttentionBarrier() {
+        return "************************************************************************";
+    }
+
+    private String formatAttentionTitle(String message) {
+        return "*    " + message;
+    }
+
+    private String formatAttentionMessage(String message) {
+        return "*        " + message;
     }
 
     private class HotkeyReader implements Runnable {
@@ -1818,6 +1871,15 @@ public abstract class DevUtil {
                             || line.trim().equalsIgnoreCase("exit"))) {
                         debug("Detected exit command");
                         runShutdownHook(executor);
+                    } else if (line != null && line.trim().equalsIgnoreCase("r")) {
+                        debug("Detected restart command");
+                        try {
+                            restartServer(true);
+                        } catch (PluginExecutionException e) {
+                            debug("Exiting dev mode due to server restart failure");
+                            error("Could not restart the server.", e);
+                            runShutdownHook(executor);
+                        }
                     } else {
                         debug("Detected Enter key. Running tests...");
                         runTestThread(false, executor, -1, false, true);
@@ -1947,7 +2009,7 @@ public abstract class DevUtil {
 
             while (true) {
                 // Check the server and stop dev mode by throwing an exception if the server stopped.
-                checkStopDevMode();
+                checkStopDevMode(true);
 
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
 
@@ -2305,10 +2367,16 @@ public abstract class DevUtil {
         }
     }
  
-    private void checkStopDevMode() throws PluginScenarioException {
+    private void checkStopDevMode(boolean skipOnRestart) throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
         if (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED)) {
-            if (!this.devStop.get()) {
+            // server is restarting if devStop was set to true and we have not called the shutdown hook
+            boolean restarting = devStop.get() && !calledShutdownHook.get();
+            if (skipOnRestart && restarting) {
+                debug("Server is restarting. Allowing dev mode to continue.");
+                return;
+            }
+            if (!devStop.get()) {
                 // an external situation caused the server to stop
                 if (container) {
                     throw new PluginScenarioException("The container has stopped. Exiting dev mode.");
