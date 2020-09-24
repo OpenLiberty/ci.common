@@ -1019,11 +1019,16 @@ public abstract class DevUtil {
         } catch (InterruptedException e) {
             error("Thread was interrupted while starting the container: " + e.getMessage());
         } catch (RuntimeException r) {
-            // remove container in case of an error trying to run the container because the docker run --rm will not rm the container
-            String containerId = getContainerId();
-            if (containerId != null && !containerId.isEmpty()) {
-                String dockerRmCmd = "docker container rm " + containerId;
-                execDockerCmd(dockerRmCmd, 10);
+            try {
+                // remove container in case of an error trying to run the container because the docker run --rm will not rm the container
+                String containerId = getContainerId();
+                if (containerId != null && !containerId.isEmpty()) {
+                    String dockerRmCmd = "docker container rm " + containerId;
+                    execDockerCmd(dockerRmCmd, 10);
+                }
+            } catch (Exception e) {
+                // do not report the "docker container rm" error so that we can instead report the startContainer() error
+                debug("Exception running docker container rm:", e);
             }
             throw r;
         }
