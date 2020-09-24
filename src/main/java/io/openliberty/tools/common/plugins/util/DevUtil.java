@@ -955,7 +955,7 @@ public abstract class DevUtil {
             info(buildCmd);
             long startTime = System.currentTimeMillis();
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
-            checkDockerIgnore(startTime, userDockerfile);
+            checkDockerIgnore(startTime, userDockerfile.getParentFile());
             info("Completed building Docker image.");
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed.
@@ -979,25 +979,22 @@ public abstract class DevUtil {
 
     // Suggest a performance improvement if docker build takes too long.
     private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
-    private void checkDockerIgnore(long startTime, File userDockerfile) {
+    private void checkDockerIgnore(long startTime, File dockerBuildContext) {
         if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
             return;
         }
-        if (userDockerfile.exists()) {
-            File dockerContext = userDockerfile.getParentFile();
-            debug("checkDockerIgnore, dockerContext="+dockerContext.getAbsolutePath());
-            File dockerIgnore = new File(dockerContext, ".dockerignore");
-            if (!dockerIgnore.exists()) { // provide some advice
-                String buildContext;
-                try {
-                    buildContext = dockerContext.getCanonicalPath();
-                } catch (IOException e) {
-                    buildContext = dockerContext.getAbsolutePath();
-                }
-                warn("The docker build command is slower than expected. You may increase performance by adding " + 
-                    "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
-                    buildContext + ".");
+        debug("checkDockerIgnore, dockerBuildContext=" + dockerBuildContext.getAbsolutePath());
+        File dockerIgnore = new File(dockerBuildContext, ".dockerignore");
+        if (!dockerIgnore.exists()) { // provide some advice
+            String buildContextPath;
+            try {
+                buildContextPath = dockerBuildContext.getCanonicalPath();
+            } catch (IOException e) {
+                buildContextPath = dockerBuildContext.getAbsolutePath();
             }
+            warn("The docker build command is slower than expected. You may increase performance by adding " +
+                "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
+                buildContextPath + ".");
         }
     }
 
