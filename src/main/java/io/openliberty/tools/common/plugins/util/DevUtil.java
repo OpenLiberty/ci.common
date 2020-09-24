@@ -319,7 +319,7 @@ public abstract class DevUtil {
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
     private int dockerBuildTimeout;
-    private String dockerPortOverrides;
+    private boolean skipDefaultPorts;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
 
@@ -327,7 +327,7 @@ public abstract class DevUtil {
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, String dockerPortOverrides) {
+            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -369,7 +369,7 @@ public abstract class DevUtil {
         } else {
             this.dockerBuildTimeout = dockerBuildTimeout;
         }
-        this.dockerPortOverrides = dockerPortOverrides;
+        this.skipDefaultPorts = skipDefaultPorts;
     }
 
     /**
@@ -1083,12 +1083,7 @@ public abstract class DevUtil {
         try {
             info("Stopping container...");
             if (dockerRunProcess != null) {
-                String dockerPsCmd = "docker ps -qf name=" + containerName;
-                debug("docker ps command: " + dockerPsCmd);
-                String containerId = execDockerCmd(dockerPsCmd, 10);
-                //TODO: should we have a check here for if the container ID is not found?
-
-                String dockerStopCmd = "docker stop " + containerId;
+                String dockerStopCmd = "docker stop " + containerName;
                 debug("docker stop command: " + dockerStopCmd);
                 execDockerCmd(dockerStopCmd, 30);
             }
@@ -1196,7 +1191,7 @@ public abstract class DevUtil {
      */
     private String getContainerCommand() {
         StringBuilder command = new StringBuilder("docker run --rm");
-        if (dockerPortOverrides == null) {
+        if (!skipDefaultPorts) {
             if (httpPort != null) {
                 command.append(" -p "+httpPort+":"+httpPort);
             } else {
@@ -1207,11 +1202,6 @@ public abstract class DevUtil {
             } else {
                 command.append(" -p 9443:9443");
             }
-        } else if (dockerPortOverrides.contains(" ")) {
-            String[] mappings = dockerPortOverrides.split(" ");
-            command.append(" -p " + mappings[0] + " -p " + mappings[1]);
-        } else {
-            command.append(" -p " + dockerPortOverrides);
         }
         
         if (libertyDebug) {
