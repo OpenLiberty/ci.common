@@ -1192,7 +1192,7 @@ public abstract class DevUtil {
         String line;
         StringBuffer allLines = new StringBuffer();
         while ((line = in.readLine())!= null) {
-            allLines.append(line + " ");
+            allLines.append(line).append(" ");
         }
         if (allLines.length() > 0) {
             result = allLines.toString();
