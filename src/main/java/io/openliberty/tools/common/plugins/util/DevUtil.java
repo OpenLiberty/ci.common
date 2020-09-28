@@ -1280,8 +1280,7 @@ public abstract class DevUtil {
             int num = -1;
             if (name.equals(DEVMODE_CONTAINER_BASE_NAME)) {
                 num = 0;
-            }
-            else if (name.startsWith(DEVMODE_CONTAINER_BASE_NAME + "_")) {
+            } else if (name.startsWith(DEVMODE_CONTAINER_BASE_NAME + "_")) {
                 String[] nameSegments = name.split("_");
                 // if DEVMODE_CONTAINER_BASE_NAME changes, the logic below may need to change
                 if (nameSegments.length == 3) {
