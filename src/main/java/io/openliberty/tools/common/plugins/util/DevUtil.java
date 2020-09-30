@@ -1146,11 +1146,15 @@ public abstract class DevUtil {
         }
     }
 
+    private String execDockerCmd(String command, int timeout) {
+        return execDockerCmd(command, timeout, true);
+    }
+
     /**
      * @param timeout unit is seconds
      * @return the stdout of the command or null for no output on stdout
      */
-    private String execDockerCmd(String command, int timeout) {
+    private String execDockerCmd(String command, int timeout, boolean throwExceptionOnError) {
         String result = null;
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
@@ -1165,7 +1169,11 @@ public abstract class DevUtil {
                 char[] d = new char[1023];
                 new InputStreamReader(p.getErrorStream()).read(d);
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
-                throw new RuntimeException(errorMessage);
+                if (throwExceptionOnError) {
+                    throw new RuntimeException(errorMessage);
+                } else {
+                    return errorMessage;
+                }
             }
             result = readStdOut(p);
         } catch (IllegalThreadStateException  e) {
@@ -1464,8 +1472,13 @@ public abstract class DevUtil {
             // if no ending slash, the port ends at the end of the message
             portEndIndex = webAppMessage.length();
         }
-        httpPort = webAppMessage.substring(portIndex, portEndIndex);
-        debug("Parsed http port: " + httpPort);
+        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex);
+        debug("Parsed http port: " + parsedHttpPort);
+        if (container) {
+            httpPort = findLocalPort(parsedHttpPort);
+        } else {
+            httpPort = parsedHttpPort;
+        }
     }
 
     protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
@@ -1479,7 +1492,11 @@ public abstract class DevUtil {
                     String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
                     if (parsedHttpsPort != null) {
                         debug("Parsed https port: " + parsedHttpsPort);
-                        httpsPort = parsedHttpsPort;
+                        if (container) {
+                            httpsPort = findLocalPort(parsedHttpsPort);
+                        } else {
+                            httpsPort = parsedHttpsPort;
+                        }
                         return;
                     } else {
                         throw new PluginExecutionException(
@@ -1511,6 +1528,23 @@ public abstract class DevUtil {
             }
         }
         return null;
+    }
+
+    private String findLocalPort(String internalContainerPort) {
+        String dockerPortCmd = "docker port " + containerName + " " + internalContainerPort;
+        String cmdResult = execDockerCmd(dockerPortCmd, 10, false);
+        if (cmdResult == null) {
+            error("Unable to retrieve locally mapped port.");
+            return null;
+        }
+        String[] cmdResultSplit = cmdResult.split(":");
+        if (cmdResultSplit[0].equals("Error")) {
+            error("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult + "\". Ensure the Docker ports are mapped correctly.");
+            return null;
+        }
+        String localPort = cmdResultSplit[cmdResultSplit.length - 1];
+        debug("Local port: " + localPort);
+        return localPort;
     }
 
     public void cleanUpServerEnv() {
