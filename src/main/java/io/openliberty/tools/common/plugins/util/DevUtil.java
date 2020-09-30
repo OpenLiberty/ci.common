@@ -1217,16 +1217,7 @@ public abstract class DevUtil {
     private String getContainerCommand() {
         StringBuilder command = new StringBuilder("docker run --rm");
         if (!skipDefaultPorts) {
-            if (httpPort != null) {
-                command.append(" -p "+httpPort+":"+httpPort);
-            } else {
-                command.append(" -p 9080:9080");
-            }
-            if (httpsPort != null) {
-                command.append(" -p "+httpsPort+":"+httpsPort);
-            } else {
-                command.append(" -p 9443:9443");
-            }
+            command.append(" -p 9080:9080  -p 9443:9443");
         }
         
         if (libertyDebug) {
