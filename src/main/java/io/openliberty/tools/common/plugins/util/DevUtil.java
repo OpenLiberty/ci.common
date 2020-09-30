@@ -1474,11 +1474,7 @@ public abstract class DevUtil {
         }
         String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex);
         debug("Parsed http port: " + parsedHttpPort);
-        if (container) {
-            httpPort = findLocalPort(parsedHttpPort);
-        } else {
-            httpPort = parsedHttpPort;
-        }
+        httpPort = (container ? findLocalPort(parsedHttpPort) : parsedHttpPort);
     }
 
     protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
@@ -1492,11 +1488,7 @@ public abstract class DevUtil {
                     String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
                     if (parsedHttpsPort != null) {
                         debug("Parsed https port: " + parsedHttpsPort);
-                        if (container) {
-                            httpsPort = findLocalPort(parsedHttpsPort);
-                        } else {
-                            httpsPort = parsedHttpsPort;
-                        }
+                        httpsPort = (container ? findLocalPort(parsedHttpsPort) : parsedHttpsPort);
                         return;
                     } else {
                         throw new PluginExecutionException(
@@ -1835,6 +1827,15 @@ public abstract class DevUtil {
                                 info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
                             }
                             info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+                            if (httpPort != null) {
+                                info(formatAttentionMessage("Liberty local http port: " + httpPort));
+                            }
+                            if (httpsPort != null) {
+                                info(formatAttentionMessage("Liberty local https port: " + httpsPort));
+                            }
+                            if (libertyDebug) {
+                                info(formatAttentionMessage("Liberty debug port: " + (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort)));
+                            }
                         }
                     } else {
                         debug("Cannot read user input, setting hotTests to true.");
