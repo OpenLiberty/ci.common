@@ -1217,7 +1217,7 @@ public abstract class DevUtil {
     private String getContainerCommand() {
         StringBuilder command = new StringBuilder("docker run --rm");
         if (!skipDefaultPorts) {
-            command.append(" -p 9080:9080  -p 9443:9443");
+            command.append(" -p 9080:9080 -p 9443:9443");
         }
         
         if (libertyDebug) {
@@ -1520,11 +1520,12 @@ public abstract class DevUtil {
             error("Unable to retrieve locally mapped port.");
             return null;
         }
-        String[] cmdResultSplit = cmdResult.split(":");
-        if (cmdResultSplit[0].equals("Error")) {
-            error("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult + "\". Ensure the Docker ports are mapped correctly.");
+        String[] cmdResultSplit = cmdResult.split("RC=");
+        if (cmdResultSplit[cmdResultSplit.length - 1].equals("1")) {
+            error("Unable to retrieve locally mapped port. Docker result: \"" + cmdResultSplit[0] + "\". Ensure the Docker ports are mapped correctly.");
             return null;
         }
+        cmdResultSplit = cmdResult.split(":");
         String localPort = cmdResultSplit[cmdResultSplit.length - 1];
         debug("Local port: " + localPort);
         return localPort;
@@ -1817,12 +1818,22 @@ public abstract class DevUtil {
                             } else {
                                 info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
                             }
+
                             info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+
                             if (httpPort != null) {
-                                info(formatAttentionMessage("Liberty local http port: " + httpPort));
+                                if (container) {
+                                    info(formatAttentionMessage("Liberty server HTTP port mapped to Docker host port: " + httpPort));
+                                } else {
+                                    info(formatAttentionMessage("Liberty server HTTP port: " + httpPort));
+                                }
                             }
                             if (httpsPort != null) {
-                                info(formatAttentionMessage("Liberty local https port: " + httpsPort));
+                                if (container) {
+                                    info(formatAttentionMessage("Liberty server HTTPS port mapped to Docker host port: " + httpsPort));
+                                } else {
+                                    info(formatAttentionMessage("Liberty server HTTPS port: " + httpsPort));
+                                }
                             }
                             if (libertyDebug) {
                                 info(formatAttentionMessage("Liberty debug port: " + (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort)));
