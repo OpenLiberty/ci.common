@@ -1520,12 +1520,11 @@ public abstract class DevUtil {
             error("Unable to retrieve locally mapped port.");
             return null;
         }
-        String[] cmdResultSplit = cmdResult.split("RC=");
-        if (cmdResultSplit[cmdResultSplit.length - 1].equals("1")) {
-            error("Unable to retrieve locally mapped port. Docker result: \"" + cmdResultSplit[0] + "\". Ensure the Docker ports are mapped correctly.");
+        if (cmdResult.contains(" RC=")) { // This piece of the string is added in execDockerCmd if there is an error
+            error("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult.split(" RC=")[0] + "\". Ensure the Docker ports are mapped correctly.");
             return null;
         }
-        cmdResultSplit = cmdResult.split(":");
+        String[] cmdResultSplit = cmdResult.split(":");
         String localPort = cmdResultSplit[cmdResultSplit.length - 1];
         debug("Local port: " + localPort);
         return localPort;
@@ -1836,7 +1835,12 @@ public abstract class DevUtil {
                                 }
                             }
                             if (libertyDebug) {
-                                info(formatAttentionMessage("Liberty debug port: " + (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort)));
+                                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                                if (container) {
+                                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: " + debugPort));
+                                } else {
+                                    info(formatAttentionMessage("Liberty debug port: " + debugPort));
+                                }
                             }
                         }
                     } else {
