@@ -1146,11 +1146,15 @@ public abstract class DevUtil {
         }
     }
 
+    private String execDockerCmd(String command, int timeout) {
+        return execDockerCmd(command, timeout, true);
+    }
+
     /**
      * @param timeout unit is seconds
      * @return the stdout of the command or null for no output on stdout
      */
-    private String execDockerCmd(String command, int timeout) {
+    private String execDockerCmd(String command, int timeout, boolean throwExceptionOnError) {
         String result = null;
         try {
             debug("execDocker, timeout=" + timeout + ", cmd=" + command);
@@ -1165,7 +1169,11 @@ public abstract class DevUtil {
                 char[] d = new char[1023];
                 new InputStreamReader(p.getErrorStream()).read(d);
                 String errorMessage = new String(d).trim()+" RC="+p.exitValue();
-                throw new RuntimeException(errorMessage);
+                if (throwExceptionOnError) {
+                    throw new RuntimeException(errorMessage);
+                } else {
+                    return errorMessage;
+                }
             }
             result = readStdOut(p);
         } catch (IllegalThreadStateException  e) {
@@ -1209,16 +1217,7 @@ public abstract class DevUtil {
     private String getContainerCommand() {
         StringBuilder command = new StringBuilder("docker run --rm");
         if (!skipDefaultPorts) {
-            if (httpPort != null) {
-                command.append(" -p "+httpPort+":"+httpPort);
-            } else {
-                command.append(" -p 9080:9080");
-            }
-            if (httpsPort != null) {
-                command.append(" -p "+httpsPort+":"+httpsPort);
-            } else {
-                command.append(" -p 9443:9443");
-            }
+            command.append(" -p 9080:9080 -p 9443:9443");
         }
         
         if (libertyDebug) {
@@ -1464,8 +1463,9 @@ public abstract class DevUtil {
             // if no ending slash, the port ends at the end of the message
             portEndIndex = webAppMessage.length();
         }
-        httpPort = webAppMessage.substring(portIndex, portEndIndex);
-        debug("Parsed http port: " + httpPort);
+        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex);
+        debug("Parsed http port: " + parsedHttpPort);
+        httpPort = (container ? findLocalPort(parsedHttpPort) : parsedHttpPort);
     }
 
     protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
@@ -1479,7 +1479,7 @@ public abstract class DevUtil {
                     String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
                     if (parsedHttpsPort != null) {
                         debug("Parsed https port: " + parsedHttpsPort);
-                        httpsPort = parsedHttpsPort;
+                        httpsPort = (container ? findLocalPort(parsedHttpsPort) : parsedHttpsPort);
                         return;
                     } else {
                         throw new PluginExecutionException(
@@ -1511,6 +1511,23 @@ public abstract class DevUtil {
             }
         }
         return null;
+    }
+
+    private String findLocalPort(String internalContainerPort) {
+        String dockerPortCmd = "docker port " + containerName + " " + internalContainerPort;
+        String cmdResult = execDockerCmd(dockerPortCmd, 10, false);
+        if (cmdResult == null) {
+            error("Unable to retrieve locally mapped port.");
+            return null;
+        }
+        if (cmdResult.contains(" RC=")) { // This piece of the string is added in execDockerCmd if there is an error
+            error("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult.split(" RC=")[0] + "\". Ensure the Docker ports are mapped correctly.");
+            return null;
+        }
+        String[] cmdResultSplit = cmdResult.split(":");
+        String localPort = cmdResultSplit[cmdResultSplit.length - 1];
+        debug("Local port: " + localPort);
+        return localPort;
     }
 
     public void cleanUpServerEnv() {
@@ -1800,7 +1817,31 @@ public abstract class DevUtil {
                             } else {
                                 info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
                             }
+
                             info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+
+                            if (httpPort != null) {
+                                if (container) {
+                                    info(formatAttentionMessage("Liberty server HTTP port mapped to Docker host port: " + httpPort));
+                                } else {
+                                    info(formatAttentionMessage("Liberty server HTTP port: " + httpPort));
+                                }
+                            }
+                            if (httpsPort != null) {
+                                if (container) {
+                                    info(formatAttentionMessage("Liberty server HTTPS port mapped to Docker host port: " + httpsPort));
+                                } else {
+                                    info(formatAttentionMessage("Liberty server HTTPS port: " + httpsPort));
+                                }
+                            }
+                            if (libertyDebug) {
+                                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                                if (container) {
+                                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: " + debugPort));
+                                } else {
+                                    info(formatAttentionMessage("Liberty debug port: " + debugPort));
+                                }
+                            }
                         }
                     } else {
                         debug("Cannot read user input, setting hotTests to true.");
