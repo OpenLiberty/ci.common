@@ -425,4 +425,18 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertTrue("File should be detected as a generated file", util.isGeneratedConfigFile(sourceFile, configDirectory, targetDir));
     }
 
+    @Test
+    public void testRemoveSurroundingQuotes() {
+        assertEquals("liberty_dev", DevUtil.removeSurroundingQuotes("liberty_dev"));
+
+        // one-sided quote should not be removed
+        assertEquals("\"", DevUtil.removeSurroundingQuotes("\""));
+        assertEquals("\"liberty_dev", DevUtil.removeSurroundingQuotes("\"liberty_dev"));
+        assertEquals("liberty_dev\"", DevUtil.removeSurroundingQuotes("liberty_dev\""));
+
+        // surrounding quotes should be removed
+        assertEquals("liberty_dev", DevUtil.removeSurroundingQuotes("\"liberty_dev\""));
+        assertEquals("", DevUtil.removeSurroundingQuotes("\"\""));
+    }
+
 }
