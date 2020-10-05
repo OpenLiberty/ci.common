@@ -1532,7 +1532,7 @@ public abstract class DevUtil {
             return null;
         }
         String[] cmdResultSplit = cmdResult.split(":");
-        String localPort = cmdResultSplit[cmdResultSplit.length - 1];
+        String localPort = cmdResultSplit[cmdResultSplit.length - 1].trim();
         debug("Local port: " + localPort);
         return localPort;
     }
