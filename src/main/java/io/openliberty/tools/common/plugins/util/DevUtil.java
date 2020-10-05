@@ -1275,7 +1275,7 @@ public abstract class DevUtil {
         String[] containerNames = result.split(" ");
         int highestNum = -1;
         for(int i = 0; i < containerNames.length; i++) {
-            String name = containerNames[i];
+            String name = removeSurroundingQuotes(containerNames[i]);
             int num = -1;
             if (name.equals(DEVMODE_CONTAINER_BASE_NAME)) {
                 num = 0;
@@ -1297,6 +1297,13 @@ public abstract class DevUtil {
         }
         
         return DEVMODE_CONTAINER_BASE_NAME + ((highestNum != -1) ? "_" + ++highestNum : "");
+    }
+
+    protected static String removeSurroundingQuotes(String str) {
+        if (str != null && str.length() >= 2 && str.startsWith("\"") && str.endsWith("\"")) {
+            return str.substring(1, str.length()-1);
+        }
+        return str;
     }
 
     // Read all the files from the array list.
