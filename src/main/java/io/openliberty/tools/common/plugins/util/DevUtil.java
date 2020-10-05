@@ -322,7 +322,7 @@ public abstract class DevUtil {
     private boolean skipDefaultPorts;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
-    private AtomicBoolean printStartupMessages;
+    private boolean firstStartup = true;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -371,7 +371,6 @@ public abstract class DevUtil {
             this.dockerBuildTimeout = dockerBuildTimeout;
         }
         this.skipDefaultPorts = skipDefaultPorts;
-        this.printStartupMessages = new AtomicBoolean(true);
     }
 
     /**
@@ -1399,6 +1398,7 @@ public abstract class DevUtil {
         libertyCreate();
         libertyInstallFeature();
         libertyDeploy();
+        printDevModeMessages(inputUnavailable.get(), true);
         startServer(buildContainer);
         setDevStop(false);
         info("The server has been restarted.");
@@ -1802,7 +1802,8 @@ public abstract class DevUtil {
                         // it's available
                         inputUnavailable.wait(500);
                     }
-                    printStartupMessages(inputUnavailable.get(), printStartupMessages.getAndSet(false));
+                    printDevModeMessages(inputUnavailable.get(), firstStartup);
+                    firstStartup = false;
                 } catch (InterruptedException e) {
                     debug("Interrupted while waiting to determine whether input can be read", e);
                 }
@@ -1810,12 +1811,18 @@ public abstract class DevUtil {
         }
     }
 
-    private void printStartupMessages(boolean inputUnavailable, boolean firstStartupOrRestart) {
+    /**
+     * Print the dev mode startup and/or run tests messages.
+     * 
+     * @param inputUnavailable If true, that the console is non-interactive so hotkeys should not be printed.
+     * @param startup If true, include attention barriers (asterisks lines) and overall dev mode startup messages such as list of hotkeys and ports.
+     */
+    private void printDevModeMessages(boolean inputUnavailable, boolean startup) {
         // the following will be printed only on startup or restart
-        if (firstStartupOrRestart) {
+        if (startup) {
             // print barrier header
             info(formatAttentionBarrier());
-            
+
             info(formatAttentionTitle("Liberty is running in dev mode."));
         }
 
@@ -1823,14 +1830,14 @@ public abstract class DevUtil {
             // the following will be printed on startup and every time after the tests run
             if (hotTests) {
                 String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-                info(firstStartupOrRestart ? formatAttentionMessage(message) : message);
+                info(startup ? formatAttentionMessage(message) : message);
             } else {
                 String message = "To run tests on demand, press Enter.";
-                info(firstStartupOrRestart ? formatAttentionMessage(message) : message);
+                info(startup ? formatAttentionMessage(message) : message);
             }
 
             // the following will be printed only on startup or restart
-            if (firstStartupOrRestart) {
+            if (startup) {
                 if (container) {
                     info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
                 } else {
@@ -1842,10 +1849,10 @@ public abstract class DevUtil {
         } else {
             debug("Cannot read user input, setting hotTests to true.");
             String message = "Tests will run automatically when changes are detected.";
-            info(firstStartupOrRestart ? formatAttentionMessage(message) : message);
+            info(startup ? formatAttentionMessage(message) : message);
             hotTests = true;
         }
-        if (firstStartupOrRestart) {
+        if (startup) {
             if (httpPort != null) {
                 if (container) {
                     info(formatAttentionMessage("Liberty server HTTP port mapped to Docker host port: " + httpPort));
