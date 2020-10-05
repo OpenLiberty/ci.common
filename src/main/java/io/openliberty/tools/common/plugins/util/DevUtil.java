@@ -1398,10 +1398,10 @@ public abstract class DevUtil {
         libertyCreate();
         libertyInstallFeature();
         libertyDeploy();
-        printDevModeMessages(inputUnavailable.get(), true);
         startServer(buildContainer);
         setDevStop(false);
         info("The server has been restarted.");
+        printDevModeMessages(inputUnavailable.get(), true);
     }
 
     private void parseHostNameAndPorts(final ServerTask serverTask, File messagesLogFile)
