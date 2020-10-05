@@ -1814,7 +1814,7 @@ public abstract class DevUtil {
     /**
      * Print the dev mode startup and/or run tests messages.
      * 
-     * @param inputUnavailable If true, that the console is non-interactive so hotkeys should not be printed.
+     * @param inputUnavailable If true, indicates that the console is non-interactive so hotkey messages should not be printed.
      * @param startup If true, include attention barriers (asterisks lines) and overall dev mode startup messages such as list of hotkeys and ports.
      */
     private void printDevModeMessages(boolean inputUnavailable, boolean startup) {
