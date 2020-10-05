@@ -322,7 +322,7 @@ public abstract class DevUtil {
     private boolean skipDefaultPorts;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
-    private boolean printStartupMessages = true;
+    private AtomicBoolean printStartupMessages;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -371,6 +371,7 @@ public abstract class DevUtil {
             this.dockerBuildTimeout = dockerBuildTimeout;
         }
         this.skipDefaultPorts = skipDefaultPorts;
+        this.printStartupMessages = new AtomicBoolean(true);
     }
 
     /**
@@ -1801,69 +1802,75 @@ public abstract class DevUtil {
                         // it's available
                         inputUnavailable.wait(500);
                     }
-                    // the following will be printed only on first startup
-                    if (printStartupMessages) {
-                        info(formatAttentionBarrier()); // print barrier header
-                        info(formatAttentionTitle("Liberty dev mode has started!"));
-                    }
-
-                    if (!inputUnavailable.get()) {
-                        // the following will be printed on startup and every time after the tests run
-                        if (hotTests) {
-                            String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-                            info(printStartupMessages ? formatAttentionMessage(message) : message);
-                        } else {
-                            String message = "To run tests on demand, press Enter.";
-                            info(printStartupMessages ? formatAttentionMessage(message) : message);
-                        }
-
-                        // the following will be printed only on first startup
-                        if (printStartupMessages) {
-                            if (container) {
-                                info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
-                            } else {
-                                info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
-                            }
-
-                            info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
-
-                            if (httpPort != null) {
-                                if (container) {
-                                    info(formatAttentionMessage("Liberty server HTTP port mapped to Docker host port: " + httpPort));
-                                } else {
-                                    info(formatAttentionMessage("Liberty server HTTP port: " + httpPort));
-                                }
-                            }
-                            if (httpsPort != null) {
-                                if (container) {
-                                    info(formatAttentionMessage("Liberty server HTTPS port mapped to Docker host port: " + httpsPort));
-                                } else {
-                                    info(formatAttentionMessage("Liberty server HTTPS port: " + httpsPort));
-                                }
-                            }
-                            if (libertyDebug) {
-                                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                                if (container) {
-                                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: " + debugPort));
-                                } else {
-                                    info(formatAttentionMessage("Liberty debug port: " + debugPort));
-                                }
-                            }
-                        }
-                    } else {
-                        debug("Cannot read user input, setting hotTests to true.");
-                        String message = "Tests will run automatically when changes are detected.";
-                        info(printStartupMessages ? formatAttentionMessage(message) : message);
-                        hotTests = true;
-                    }
-                    if (printStartupMessages) {
-                        info(formatAttentionBarrier()); // print barrier footer
-                        printStartupMessages = false;
-                    }
+                    printStartupMessages(inputUnavailable.get(), printStartupMessages.getAndSet(false));
                 } catch (InterruptedException e) {
                     debug("Interrupted while waiting to determine whether input can be read", e);
                 }
             }
+        }
+    }
+
+    private void printStartupMessages(boolean inputUnavailable, boolean firstStartupOrRestart) {
+        // the following will be printed only on startup or restart
+        if (firstStartupOrRestart) {
+            // print barrier header
+            info(formatAttentionBarrier());
+            
+            info(formatAttentionTitle("Liberty is running in dev mode."));
+        }
+
+        if (!inputUnavailable) {
+            // the following will be printed on startup and every time after the tests run
+            if (hotTests) {
+                String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                info(firstStartupOrRestart ? formatAttentionMessage(message) : message);
+            } else {
+                String message = "To run tests on demand, press Enter.";
+                info(firstStartupOrRestart ? formatAttentionMessage(message) : message);
+            }
+
+            // the following will be printed only on startup or restart
+            if (firstStartupOrRestart) {
+                if (container) {
+                    info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+                } else {
+                    info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+                }
+
+                info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+            }
+        } else {
+            debug("Cannot read user input, setting hotTests to true.");
+            String message = "Tests will run automatically when changes are detected.";
+            info(firstStartupOrRestart ? formatAttentionMessage(message) : message);
+            hotTests = true;
+        }
+        if (firstStartupOrRestart) {
+            if (httpPort != null) {
+                if (container) {
+                    info(formatAttentionMessage("Liberty server HTTP port mapped to Docker host port: " + httpPort));
+                } else {
+                    info(formatAttentionMessage("Liberty server HTTP port: " + httpPort));
+                }
+            }
+            if (httpsPort != null) {
+                if (container) {
+                    info(formatAttentionMessage("Liberty server HTTPS port mapped to Docker host port: " + httpsPort));
+                } else {
+                    info(formatAttentionMessage("Liberty server HTTPS port: " + httpsPort));
+                }
+            }
+            if (libertyDebug) {
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                if (container) {
+                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: " + debugPort));
+                } else {
+                    info(formatAttentionMessage("Liberty debug port: " + debugPort));
+                }
+            }
+
+            // print barrier footer
+            info(formatAttentionBarrier());
         }
     }
 
