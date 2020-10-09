@@ -848,6 +848,26 @@ public abstract class DevUtil {
         dockerfileLines.removeAll(warFileLines);
     }
 
+    /**
+     * Disables OpenJ9 SCC to speed up build times by injecting environment variable before "RUN configure.sh" is called.
+     * Reference: https://github.com/OpenLiberty/ci.docker#openj9-shared-class-cache-scc
+     * 
+     * Note: lines should have been cleaned of comments using getCleanedLines() before calling this.
+     */
+    private void disableOpenJ9SCC(List<String> dockerfileLines) {
+        final String RUN_CONFIGURE_COMMAND_LOWERCASE = "run configure.sh";
+        for (int i=0; i<dockerfileLines.size(); i++) {
+            String line = dockerfileLines.get(i);
+            // RUN command is case insensitive, so use lowercase matching.
+            // Match with contains in case there is something around the command e.g. comments, even though they should have been cleaned.
+            if (line.toLowerCase().contains(RUN_CONFIGURE_COMMAND_LOWERCASE)) {
+                debug("Detected RUN configure.sh command.  Skipping OpenJ9 Shared Class Cache.");
+                dockerfileLines.add(i, "ENV OPENJ9_SCC=false");
+                return;
+            }
+        }
+    }
+
     protected void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
         srcMount.clear();
         destMount.clear();
@@ -937,6 +957,7 @@ public abstract class DevUtil {
         dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
         processCopyLines(dockerfileLines, dockerfile.getParent());
+        disableOpenJ9SCC(dockerfileLines);
 
         File tempDockerfile = null;
         try {
