@@ -409,8 +409,8 @@ public abstract class ServerFeatureUtil {
             if(!VALID_LIBERTY_DIRECTORY_PROPERTY.contains(envDirectoryProperty)) {
                 // Check if property is a reference to a configured bootstrap property
                 String bootStrapValue = properties.getProperty(envDirectoryProperty, "\\$\\{" + envDirectoryProperty + "\\}");
-                if(boostrapValue != null) {
-                    m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(boostrapValue);
+                if(bootStrapValue != null) {
+                    m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(bootStrapValue, properties));
                 }
                 else {
                     warn("The directory property " + envDirectoryProperty + "specified is not a predifined Liberty directory property or a configured boostrap property.");
