@@ -390,7 +390,7 @@ public abstract class ServerFeatureUtil {
                 String propertyValue = properties.getProperty(variable, "\\$\\{" + variable + "\\}");
                 
                 // Remove encapsulating ${} characters and validate that a valid liberty directory property was configured
-                propertyValue = removeEncapsulatingEnvVarSyntax(propertyValue); 
+                propertyValue = removeEncapsulatingEnvVarSyntax(propertyValue, properties); 
 
                 m.appendReplacement(sb, propertyValue);
             }
@@ -400,18 +400,25 @@ public abstract class ServerFeatureUtil {
         return value;
     }
 
-    private String removeEncapsulatingEnvVarSyntax(String propertyValue){
+    private String removeEncapsulatingEnvVarSyntax(String propertyValue, Properties properties){
         Pattern p = Pattern.compile("\\$\\{(.*?)\\}");
         Matcher m = p.matcher(propertyValue);
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
-            String envDirctoryProperty = m.group(1);
-            if(!VALID_LIBERTY_DIRECTORY_PROPERTY.contains(envDirctoryProperty)) {
-                warn("The directory property " + envDirctoryProperty + "specified is not a predifined Liberty directory property");
-                return null;
+            String envDirectoryProperty = m.group(1);
+            if(!VALID_LIBERTY_DIRECTORY_PROPERTY.contains(envDirectoryProperty)) {
+                // Check if property is a reference to a configured bootstrap property
+                String bootStrapValue = properties.getProperty(envDirectoryProperty, "\\$\\{" + envDirectoryProperty + "\\}");
+                if(boostrapValue != null) {
+                    m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(boostrapValue);
+                }
+                else {
+                    warn("The directory property " + envDirectoryProperty + "specified is not a predifined Liberty directory property or a configured boostrap property.");
+                    return null;
+                }
             }
             else {
-                m.appendReplacement(sb, envDirctoryProperty);
+                m.appendReplacement(sb, envDirectoryProperty);
             }
         }
         m.appendTail(sb);
