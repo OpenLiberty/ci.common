@@ -413,7 +413,7 @@ public abstract class ServerFeatureUtil {
                     m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(bootStrapValue, properties));
                 }
                 else {
-                    warn("The directory property " + envDirectoryProperty + "specified is not a predifined Liberty directory property or a configured boostrap property.");
+                    warn("The referenced property " + envDirectoryProperty + "is not a predefined Liberty directory property or a configured bootstrap property.");
                     return null;
                 }
             }
