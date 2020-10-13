@@ -6,4 +6,5 @@ LABEL org.opencontainers.image.authors="Your Name" org.opencontainers.image.vend
 COPY --chown=1001:0 myconfigdir /config/
 COPY --chown=1001:0 file1.xml /config/filenameWithoutExtension
 COPY --chown=1001:0 file2.xml /config/directoryName/
+ENV OPENJ9_SCC=false
 RUN configure.sh

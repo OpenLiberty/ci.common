@@ -71,5 +71,6 @@ COPY --chown=1001:0 \
 # end::copy-war[]
 
 # tag::configure-sh[]
-RUN configure.sh
+RUN \
+    configure.sh # SOME COMMENTS
 # end::configure-sh[]
