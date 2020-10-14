@@ -56,6 +56,8 @@ public abstract class ServerFeatureUtil {
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     private static final int COPY_FILE_TIMEOUT_MILLIS = 5 * 60 * 1000;
+    private static final List<String> VALID_LIBERTY_DIRECTORY_PROPERTY = Arrays.asList("wlp.install.dir", "wlp.user.dir", "usr.extension.dir", 
+            "shared.app.dir", "shared.config.dir", "shared.resource.dir", "shared.stackgroup.dir", "server.config.dir", "server.output.dir");
     
     /**
      * Log debug
@@ -380,12 +382,16 @@ public abstract class ServerFeatureUtil {
     private String evaluateExpression(Properties properties, String expression) {
         String value = expression;
         if (expression != null) {
-            Pattern p = Pattern.compile("\\$\\{([^\\}]*)\\}");
+            Pattern p = Pattern.compile("\\$\\{(.*?)\\}");
             Matcher m = p.matcher(expression);
             StringBuffer sb = new StringBuffer();
             while (m.find()) {
                 String variable = m.group(1);
                 String propertyValue = properties.getProperty(variable, "\\$\\{" + variable + "\\}");
+                
+                // Remove encapsulating ${} characters and validate that a valid liberty directory property was configured
+                propertyValue = removeEncapsulatingEnvVarSyntax(propertyValue, properties); 
+
                 m.appendReplacement(sb, propertyValue);
             }
             m.appendTail(sb);
@@ -393,5 +399,29 @@ public abstract class ServerFeatureUtil {
         }
         return value;
     }
-    
+
+    private String removeEncapsulatingEnvVarSyntax(String propertyValue, Properties properties){
+        Pattern p = Pattern.compile("\\$\\{(.*?)\\}");
+        Matcher m = p.matcher(propertyValue);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String envDirectoryProperty = m.group(1);
+            if(!VALID_LIBERTY_DIRECTORY_PROPERTY.contains(envDirectoryProperty)) {
+                // Check if property is a reference to a configured bootstrap property
+                String bootStrapValue = properties.getProperty(envDirectoryProperty, "\\$\\{" + envDirectoryProperty + "\\}");
+                if(bootStrapValue != null) {
+                    m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(bootStrapValue, properties));
+                }
+                else {
+                    warn("The referenced property " + envDirectoryProperty + "is not a predefined Liberty directory property or a configured bootstrap property.");
+                    return null;
+                }
+            }
+            else {
+                m.appendReplacement(sb, envDirectoryProperty);
+            }
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
 }
