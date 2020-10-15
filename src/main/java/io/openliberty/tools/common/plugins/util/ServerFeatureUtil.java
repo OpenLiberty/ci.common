@@ -28,6 +28,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -56,8 +58,17 @@ public abstract class ServerFeatureUtil {
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     private static final int COPY_FILE_TIMEOUT_MILLIS = 5 * 60 * 1000;
-    private static final List<String> VALID_LIBERTY_DIRECTORY_PROPERTY = Arrays.asList("wlp.install.dir", "wlp.user.dir", "usr.extension.dir", 
-            "shared.app.dir", "shared.config.dir", "shared.resource.dir", "shared.stackgroup.dir", "server.config.dir", "server.output.dir");
+
+    public static final String WLP_INSTALL_DIR = "wlp.install.dir";
+    public static final String WLP_USER_DIR = "wlp.user.dir";
+    public static final String USR_EXTENSION_DIR = "usr.extension.dir";
+    public static final String SHARED_APP_DIR = "shared.app.dir";
+    public static final String SHARED_CONFIG_DIR = "shared.config.dir";
+    public static final String SHARED_RESOURCES_DIR = "shared.resource.dir";
+    public static final String SHARED_STACKGROUP_DIR = "shared.stackgroup.dir";
+    public static final String SERVER_CONFIG_DIR = "server.config.dir";
+
+    private Map<String,File> libertyDirectoryPropertyToFile = new HashMap<String,File>();
     
     /**
      * Log debug
@@ -96,11 +107,51 @@ public abstract class ServerFeatureUtil {
      * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      */
     public Set<String> getServerFeatures(File serverDirectory) {
+        initializeLibertyDirectoryPropertyFiles(serverDirectory);
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
         Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults");
         result = getServerXmlFeatures(result, new File(serverDirectory, "server.xml"), bootstrapProperties, null);
         // add the overrides at the end since they should not be replaced by any previous content
         return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides");
+    }
+
+    /**
+     * Initializes the pre-defined Liberty directory properties which will be used when resolving variable references in 
+     * the include element location attribute, such as <include location="${server.config.dir}/xyz.xml"/>. 
+     * Note that we are intentionally not including the wlp.output.dir property, as that location can be specified by the
+     * user outside of the Liberty installation and does not make much sense as a location for server include files.
+     * All other Liberty directory properties can be determined relative to the passed in serverDirectory, which is the 
+     * server.config.dir.
+     *
+     * @param serverDirectory The server directory containing the server.xml
+     */
+    private void initializeLibertyDirectoryPropertyFiles(File serverDirectory) {
+        if (serverDirectory.exists()) {
+            libertyDirectoryPropertyToFile.put(SERVER_CONFIG_DIR, serverDirectory);
+
+            File wlpUserDir = serverDirectory.getParentFile().getParentFile();
+            libertyDirectoryPropertyToFile.put(WLP_USER_DIR, wlpUserDir);
+
+            File wlpInstallDir = wlpUserDir.getParentFile();
+            libertyDirectoryPropertyToFile.put(WLP_INSTALL_DIR, wlpInstallDir);
+
+            File userExtDir = new File(wlpUserDir, "extension");
+            libertyDirectoryPropertyToFile.put(USR_EXTENSION_DIR, userExtDir);
+
+            File userSharedDir = new File(wlpUserDir, "shared");
+            File userSharedAppDir = new File(userSharedDir, "app");
+            File userSharedConfigDir = new File(userSharedDir, "config");
+            File userSharedResourcesDir = new File(userSharedDir, "resources");
+            File userSharedStackGroupsDir = new File(userSharedDir, "stackGroups");
+
+            libertyDirectoryPropertyToFile.put(SHARED_APP_DIR, userSharedAppDir);
+            libertyDirectoryPropertyToFile.put(SHARED_CONFIG_DIR, userSharedConfigDir);
+            libertyDirectoryPropertyToFile.put(SHARED_RESOURCES_DIR, userSharedResourcesDir);
+            libertyDirectoryPropertyToFile.put(SHARED_STACKGROUP_DIR, userSharedStackGroupsDir);
+
+        } else {
+            warn("The " + serverDirectory + " directory cannot be accessed. Skipping its server features.");
+        }
     }
     
     /**
@@ -183,9 +234,10 @@ public abstract class ServerFeatureUtil {
             debug(e);
             return result;
         }
+        info("Parsing the server file " + canonicalServerFile + " for features and includes.");
         updatedParsedXmls.add(canonicalServerFile);
         if (!canonicalServerFile.exists()) {
-            debug("The server file " + canonicalServerFile + " does not exist.");
+            warn("The server file " + canonicalServerFile + " does not exist. Skipping its features.");
         } else if (canonicalServerFile.length() == 0) {
             debug("The server file " + canonicalServerFile + " is empty.");
         } else {
@@ -282,6 +334,7 @@ public abstract class ServerFeatureUtil {
         String includeFileName = evaluateExpression(bootstrapProperties, node.getAttribute("location"));
 
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
+            warn("Unable to parse include file "+node.getAttribute("location")+". Skipping the included features.");
             return result;
         }
 
@@ -316,6 +369,9 @@ public abstract class ServerFeatureUtil {
         if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
             Set<String> features = getServerXmlFeatures(null, includeFile, bootstrapProperties, updatedParsedXmls);
+            if (features != null && !features.isEmpty()) {
+                info("Features were included for file "+ includeFileName);
+            }
             result = handleOnConflict(result, onConflict, features);
         }
         return result;
@@ -387,16 +443,22 @@ public abstract class ServerFeatureUtil {
             StringBuffer sb = new StringBuffer();
             while (m.find()) {
                 String variable = m.group(1);
+                
                 String propertyValue = properties.getProperty(variable, "\\$\\{" + variable + "\\}");
                 
                 // Remove encapsulating ${} characters and validate that a valid liberty directory property was configured
                 propertyValue = removeEncapsulatingEnvVarSyntax(propertyValue, properties); 
+                
+                if (propertyValue == null) {
+                    return null;
+                }
 
                 m.appendReplacement(sb, propertyValue);
             }
             m.appendTail(sb);
             value = sb.toString();
         }
+        debug("Include location attribute "+ expression +" evaluated and replaced with "+value);
         return value;
     }
 
@@ -406,22 +468,32 @@ public abstract class ServerFeatureUtil {
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
             String envDirectoryProperty = m.group(1);
-            if(!VALID_LIBERTY_DIRECTORY_PROPERTY.contains(envDirectoryProperty)) {
+            if(!libertyDirectoryPropertyToFile.containsKey(envDirectoryProperty)) {
                 // Check if property is a reference to a configured bootstrap property
-                String bootStrapValue = properties.getProperty(envDirectoryProperty, "\\$\\{" + envDirectoryProperty + "\\}");
+                String bootStrapValue = properties.getProperty(envDirectoryProperty);
                 if(bootStrapValue != null) {
                     m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(bootStrapValue, properties));
-                }
-                else {
-                    warn("The referenced property " + envDirectoryProperty + "is not a predefined Liberty directory property or a configured bootstrap property.");
+                } else {
+                    warn("The referenced property " + envDirectoryProperty + " is not a predefined Liberty directory property or a configured bootstrap property.");
                     return null;
                 }
-            }
-            else {
-                m.appendReplacement(sb, envDirectoryProperty);
+            } else {
+                File envDirectory = libertyDirectoryPropertyToFile.get(envDirectoryProperty);
+                String path = envDirectory.getPath();
+                m.appendReplacement(sb, path);
             }
         }
         m.appendTail(sb);
-        return sb.toString();
+        String returnValue = sb.toString();
+        if (sb.charAt(0) == '"' && sb.charAt(sb.length()-1) == '"') {
+            if (sb.length() > 2) {
+                returnValue = sb.substring(1,sb.length()-1);
+            } else {
+                // The sb variable just contains a beginning and ending quote. Return an empty String.
+                returnValue = "";
+            }
+        }
+        debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
+        return returnValue;
     }
 }
