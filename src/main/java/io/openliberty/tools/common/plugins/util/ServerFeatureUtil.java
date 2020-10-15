@@ -127,28 +127,32 @@ public abstract class ServerFeatureUtil {
      */
     private void initializeLibertyDirectoryPropertyFiles(File serverDirectory) {
         if (serverDirectory.exists()) {
-            libertyDirectoryPropertyToFile.put(SERVER_CONFIG_DIR, serverDirectory);
+            try {
+                libertyDirectoryPropertyToFile.put(SERVER_CONFIG_DIR, serverDirectory.getCanonicalFile());
 
-            File wlpUserDir = serverDirectory.getParentFile().getParentFile();
-            libertyDirectoryPropertyToFile.put(WLP_USER_DIR, wlpUserDir);
+                File wlpUserDir = serverDirectory.getParentFile().getParentFile();
+                libertyDirectoryPropertyToFile.put(WLP_USER_DIR, wlpUserDir.getCanonicalFile());
 
-            File wlpInstallDir = wlpUserDir.getParentFile();
-            libertyDirectoryPropertyToFile.put(WLP_INSTALL_DIR, wlpInstallDir);
+                File wlpInstallDir = wlpUserDir.getParentFile();
+                libertyDirectoryPropertyToFile.put(WLP_INSTALL_DIR, wlpInstallDir.getCanonicalFile());
+ 
+                File userExtDir = new File(wlpUserDir, "extension");
+                libertyDirectoryPropertyToFile.put(USR_EXTENSION_DIR, userExtDir.getCanonicalFile());
 
-            File userExtDir = new File(wlpUserDir, "extension");
-            libertyDirectoryPropertyToFile.put(USR_EXTENSION_DIR, userExtDir);
+                File userSharedDir = new File(wlpUserDir, "shared");
+                File userSharedAppDir = new File(userSharedDir, "app");
+                File userSharedConfigDir = new File(userSharedDir, "config");
+                File userSharedResourcesDir = new File(userSharedDir, "resources");
+                File userSharedStackGroupsDir = new File(userSharedDir, "stackGroups");
 
-            File userSharedDir = new File(wlpUserDir, "shared");
-            File userSharedAppDir = new File(userSharedDir, "app");
-            File userSharedConfigDir = new File(userSharedDir, "config");
-            File userSharedResourcesDir = new File(userSharedDir, "resources");
-            File userSharedStackGroupsDir = new File(userSharedDir, "stackGroups");
-
-            libertyDirectoryPropertyToFile.put(SHARED_APP_DIR, userSharedAppDir);
-            libertyDirectoryPropertyToFile.put(SHARED_CONFIG_DIR, userSharedConfigDir);
-            libertyDirectoryPropertyToFile.put(SHARED_RESOURCES_DIR, userSharedResourcesDir);
-            libertyDirectoryPropertyToFile.put(SHARED_STACKGROUP_DIR, userSharedStackGroupsDir);
-
+                libertyDirectoryPropertyToFile.put(SHARED_APP_DIR, userSharedAppDir.getCanonicalFile());
+                libertyDirectoryPropertyToFile.put(SHARED_CONFIG_DIR, userSharedConfigDir.getCanonicalFile());
+                libertyDirectoryPropertyToFile.put(SHARED_RESOURCES_DIR, userSharedResourcesDir.getCanonicalFile());
+                libertyDirectoryPropertyToFile.put(SHARED_STACKGROUP_DIR, userSharedStackGroupsDir.getCanonicalFile());
+            } catch (IOException e) {
+                debug("The properties for directories could not be initialized because an error occurred when accessing them.");
+                debug(e);
+            }
         } else {
             warn("The " + serverDirectory + " directory cannot be accessed. Skipping its server features.");
         }
@@ -479,7 +483,9 @@ public abstract class ServerFeatureUtil {
                 }
             } else {
                 File envDirectory = libertyDirectoryPropertyToFile.get(envDirectoryProperty);
-                String path = envDirectory.getPath();
+                String path = envDirectory.toString();
+                // For Windows, need to escape the backslashes in the path
+                path = path.replace("\\","\\\\");
                 m.appendReplacement(sb, path);
             }
         }
