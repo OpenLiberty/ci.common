@@ -295,6 +295,8 @@ public abstract class DevUtil {
     private String hostName;
     private String httpPort;
     private String httpsPort;
+    private String containerHttpPort;
+    private String containerHttpsPort;
     private final long compileWaitMillis;
     private AtomicBoolean inputUnavailable;
     private int alternativeDebugPort = -1;
@@ -1493,7 +1495,13 @@ public abstract class DevUtil {
         }
         String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex);
         debug("Parsed http port: " + parsedHttpPort);
-        httpPort = (container ? findLocalPort(parsedHttpPort) : parsedHttpPort);
+        if (container) {
+            httpPort = findLocalPort(parsedHttpPort);
+            containerHttpPort = parsedHttpPort;
+        }
+        else {
+            httpPort = parsedHttpPort;
+        }
     }
 
     protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
@@ -1507,7 +1515,13 @@ public abstract class DevUtil {
                     String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
                     if (parsedHttpsPort != null) {
                         debug("Parsed https port: " + parsedHttpsPort);
-                        httpsPort = (container ? findLocalPort(parsedHttpsPort) : parsedHttpsPort);
+                        if (container) {
+                            httpsPort = findLocalPort(parsedHttpsPort);
+                            containerHttpsPort = parsedHttpsPort;
+                        }
+                        else {
+                            httpsPort = parsedHttpsPort;
+                        }
                         return;
                     } else {
                         throw new PluginExecutionException(
@@ -1873,6 +1887,7 @@ public abstract class DevUtil {
             hotTests = true;
         }
         if (startup) {
+            // TODO: Update start up messages to include internal container ports
             if (httpPort != null) {
                 if (container) {
                     info(formatAttentionMessage("Liberty server HTTP port mapped to Docker host port: " + httpPort));
