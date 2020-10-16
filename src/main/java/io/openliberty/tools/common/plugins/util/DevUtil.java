@@ -1396,6 +1396,7 @@ public abstract class DevUtil {
             }
         }
         libertyCreate();
+        //TODO: Add code here to suppress install feature warning
         libertyInstallFeature();
         libertyDeploy();
         startServer(buildContainer);
@@ -2513,6 +2514,9 @@ public abstract class DevUtil {
 
         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
 
+        // reset this property in case it had been set to true
+        System.setProperty("skipBetaInstallFeatureWarning", "false");
+
         // src/main/java directory
         if (directory.startsWith(srcPath)) {
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -2551,6 +2555,10 @@ public abstract class DevUtil {
                                                                                             // files
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY
                     || changeType == ChangeType.CREATE)) {
+                if (fileChanged.getName().equals("server.xml")) {
+                    // property must be set before calling copyConfigFolder
+                    System.setProperty("skipBetaInstallFeatureWarning", "true");
+                }
                 copyConfigFolder(fileChanged, configDirectory, null);
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
                 if (changeType == ChangeType.CREATE) {
@@ -2590,6 +2598,8 @@ public abstract class DevUtil {
                 && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                // property must be set before calling copyConfigFolder
+                System.setProperty("skipBetaInstallFeatureWarning", "true");
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (changeType == ChangeType.CREATE) {
