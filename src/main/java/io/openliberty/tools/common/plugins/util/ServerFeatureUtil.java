@@ -462,6 +462,8 @@ public abstract class ServerFeatureUtil {
             m.appendTail(sb);
             value = sb.toString();
         }
+        // For Windows, avoid escaping the backslashes by changing to forward slashes
+        value = value.replace("\\","/");
         debug("Include location attribute "+ expression +" evaluated and replaced with "+value);
         return value;
     }
@@ -476,6 +478,8 @@ public abstract class ServerFeatureUtil {
                 // Check if property is a reference to a configured bootstrap property
                 String bootStrapValue = properties.getProperty(envDirectoryProperty);
                 if(bootStrapValue != null) {
+                    // For Windows, avoid escaping the backslashes by changing to forward slashes
+                    bootStrapValue = bootStrapValue.replace("\\","/");
                     m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(bootStrapValue, properties));
                 } else {
                     warn("The referenced property " + envDirectoryProperty + " is not a predefined Liberty directory property or a configured bootstrap property.");
@@ -484,8 +488,8 @@ public abstract class ServerFeatureUtil {
             } else {
                 File envDirectory = libertyDirectoryPropertyToFile.get(envDirectoryProperty);
                 String path = envDirectory.toString();
-                // For Windows, need to escape the backslashes in the path
-                path = path.replace("\\","\\\\");
+                // For Windows, avoid escaping the backslashes by changing to forward slashes
+                path = path.replace("\\","/");
                 m.appendReplacement(sb, path);
             }
         }
@@ -499,6 +503,8 @@ public abstract class ServerFeatureUtil {
                 returnValue = "";
             }
         }
+        // For Windows, avoid escaping the backslashes by changing to forward slashes
+        returnValue = returnValue.replace("\\","/");
         debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
         return returnValue;
     }
