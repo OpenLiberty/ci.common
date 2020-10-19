@@ -1396,7 +1396,8 @@ public abstract class DevUtil {
             }
         }
         libertyCreate();
-        //TODO: Add code here to suppress install feature warning
+        // suppress install feature warning
+        System.setProperty("skipBetaInstallFeatureWarning", "true");
         libertyInstallFeature();
         libertyDeploy();
         startServer(buildContainer);
@@ -2556,7 +2557,7 @@ public abstract class DevUtil {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY
                     || changeType == ChangeType.CREATE)) {
                 if (fileChanged.getName().equals("server.xml")) {
-                    // property must be set before calling copyConfigFolder
+                    // suppress install feature warning - property must be set before calling copyConfigFolder
                     System.setProperty("skipBetaInstallFeatureWarning", "true");
                 }
                 copyConfigFolder(fileChanged, configDirectory, null);
@@ -2598,7 +2599,7 @@ public abstract class DevUtil {
                 && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                // property must be set before calling copyConfigFolder
+                // suppress install feature warning - property must be set before calling copyConfigFolder
                 System.setProperty("skipBetaInstallFeatureWarning", "true");
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
