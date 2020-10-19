@@ -1545,11 +1545,11 @@ public abstract class DevUtil {
         String dockerPortCmd = "docker port " + containerName + " " + internalContainerPort;
         String cmdResult = execDockerCmd(dockerPortCmd, 10, false);
         if (cmdResult == null) {
-            error("Unable to retrieve locally mapped port.");
+            warn("Unable to retrieve locally mapped port.");
             return null;
         }
         if (cmdResult.contains(" RC=")) { // This piece of the string is added in execDockerCmd if there is an error
-            error("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult.split(" RC=")[0] + "\". Ensure the Docker ports are mapped correctly.");
+            warn("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult.split(" RC=")[0] + "\". Ensure the Docker ports are mapped correctly.");
             return null;
         }
         String[] cmdResultSplit = cmdResult.split(":");
