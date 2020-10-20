@@ -566,7 +566,7 @@ public abstract class DevUtil {
 
             // build Docker image if in container mode
             if (container && buildContainer) {
-                File dockerfileToUse = dockerfile != null ? dockerfile : defaultDockerfile;
+                File dockerfileToUse = getDockerfile();
                 debug("Dockerfile to use: " + dockerfileToUse);
                 if (dockerfileToUse.exists()) {
                     File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
@@ -726,6 +726,10 @@ public abstract class DevUtil {
         } catch (IOException e) {
             throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
         }
+    }
+
+    private File getDockerfile() {
+        return dockerfile != null ? dockerfile : defaultDockerfile;
     }
 
     protected List<String> readDockerfile(File dockerfile) throws PluginExecutionException {
@@ -1993,6 +1997,7 @@ public abstract class DevUtil {
     File jvmOptionsFile;
     File jvmOptionsFileParent;
     File buildFile;
+    File dockerfileUsed;
     List<String> artifactPaths;
     WatchService watcher;
 
@@ -2007,6 +2012,7 @@ public abstract class DevUtil {
         this.bootstrapPropertiesFile = bootstrapPropertiesFile;
         this.jvmOptionsFile = jvmOptionsFile;
         this.artifactPaths = artifactPaths;
+        this.dockerfileUsed = null;
 
         try {
             watcher = FileSystems.getDefault().newWatchService();
@@ -2024,7 +2030,6 @@ public abstract class DevUtil {
             if (jvmOptionsFile != null && jvmOptionsFile.exists()) {
                 jvmOptionsFileParent = jvmOptionsFile.getParentFile();
             }
-
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
@@ -2067,6 +2072,11 @@ public abstract class DevUtil {
                 Path jvmOptionsFilePath = jvmOptionsFileParent.getCanonicalFile().toPath();
                 registerAll(jvmOptionsFilePath, executor);
                 jvmOptionsFileRegistered = true;
+            }
+
+            if (container) {
+                dockerfileUsed = getDockerfile();
+                registerSingleFile(dockerfileUsed, executor);
             }
 
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
@@ -2664,8 +2674,11 @@ public abstract class DevUtil {
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
-        } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)) { // properties
-                                                                                                  // file
+        } else if (fileChanged.equals(dockerfileUsed)
+                && directory.startsWith(dockerfileUsed.getParentFile().getCanonicalFile().toPath())
+                && changeType == ChangeType.MODIFY) { // dockerfile
+            restartServer(true); // rebuild container and restart
+        } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)) { // properties file
             boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
             // run all tests on properties file change
             if (reloadedPropertyFile) {
