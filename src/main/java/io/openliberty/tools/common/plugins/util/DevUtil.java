@@ -2030,6 +2030,7 @@ public abstract class DevUtil {
             if (jvmOptionsFile != null && jvmOptionsFile.exists()) {
                 jvmOptionsFileParent = jvmOptionsFile.getParentFile();
             }
+
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
