@@ -306,6 +306,7 @@ public abstract class DevUtil {
     private Map<File, Properties> propertyFilesMap;
     final private Set<FileAlterationObserver> fileObservers;
     final private Set<FileAlterationObserver> newFileObservers;
+    final private Set<FileAlterationObserver> cancelledFileObservers;
     private AtomicBoolean calledShutdownHook;
     private boolean gradle;
     private long pollingInterval;
@@ -323,6 +324,10 @@ public abstract class DevUtil {
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
     private boolean firstStartup = true;
+    private Set<Path> dockerfileDirectoriesToWatch = new HashSet<Path>();
+    private Set<Path> dockerfileDirectoriesTracked = new HashSet<Path>();
+    private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
+    private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -353,6 +358,7 @@ public abstract class DevUtil {
         this.gradle = gradle;
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
+        this.cancelledFileObservers = new HashSet<FileAlterationObserver>();
         this.pollingInterval = 100;
         if (pollingTest) {
             this.trackingMode = FileTrackMode.POLLING;
@@ -917,30 +923,31 @@ public abstract class DevUtil {
                     String dest = srcOrDestArguments.get(srcOrDestArguments.size() - 1);
                     List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
                     for (String src : srcArguments) {
+                        String sourcePath = buildContext + "/" + src;
+                        File sourceFile = new File(sourcePath);
                         if (src.contains("*") || src.contains("?")) {
                             warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
-                        } else if (isMountableSource(new File(buildContext + "/" + src))) {
-                            String srcMountString = buildContext + "/" + src;
-                            String destMountString = formatDestMount(dest, new File(buildContext + "/" + src));
-                            srcMount.add(srcMountString);
+                        } else if (sourceFile.isDirectory()) {
+                            synchronized(dockerfileDirectoriesToWatch) {
+                                try {
+                                    dockerfileDirectoriesToWatch.add(sourceFile.getCanonicalFile().toPath());
+                                    debug("COPY line=" + line + ", src=" + sourcePath + ", added to dockerfileDirectoriesToWatch: " + sourceFile);
+                                } catch (IOException e) {
+                                    // Do not fail here.  Let the Docker build fail instead.
+                                    error("Could not resolve the canonical path of the directory specified in the Dockerfile: " + sourcePath, e);
+                                }
+                            }
+                        } else {
+                            // No need to validate existence of the file, just let the Docker build fail
+                            String destMountString = formatDestMount(dest, sourceFile);
+                            srcMount.add(sourcePath);
                             destMount.add(destMountString);
-                            debug("COPY line=" + line + ", src=" + srcMountString + ", dest=" + destMountString);
+                            debug("COPY line=" + line + ", src=" + sourcePath + ", dest=" + destMountString);
                         }
                     }
                 }
             }
         }
-    }
-
-    private boolean isMountableSource(File srcMountFile) throws PluginExecutionException {
-        if (srcMountFile.isDirectory()) {
-            warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed to the dev mode container. " +
-                "Dev mode does not currently support hot deployment with directories specified in the COPY command. " + 
-                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile. " + 
-                "Otherwise, if you make changes to files in this directory, type 'r' and press Enter to rebuild the Docker image and restart the container.");
-            return false;
-        } // no need to validate existence of the file, just let the Docker build fail
-        return true;
     }
 
     private String formatDestMount(String destMountString, File srcMountFile) {
@@ -2103,6 +2110,19 @@ public abstract class DevUtil {
                 // Check the server and stop dev mode by throwing an exception if the server stopped.
                 checkStopDevMode(true);
 
+                if (container) {
+                    synchronized(dockerfileDirectoriesToWatch) {
+                        if (!dockerfileDirectoriesToWatch.isEmpty()) {
+                            for (Path path : dockerfileDirectoriesToWatch) {
+                                debug("Registering path from dockerfileDirectoriesToWatch: " + path);
+                                registerAll(path, executor, true);
+                                dockerfileDirectoriesToWatch.remove(path);
+                                dockerfileDirectoriesTracked.add(path);
+                            }
+                        }
+                    }
+                }
+
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
 
                 // check if javaSourceDirectory has been added
@@ -2228,8 +2248,14 @@ public abstract class DevUtil {
                     }
                     // iterate through file observers
                     for (FileAlterationObserver observer : fileObservers) {
-                        observer.checkAndNotify();
+                        if (!cancelledFileObservers.contains(observer)) {
+                            observer.checkAndNotify();
+                        }
                     }
+                    synchronized (cancelledFileObservers) {
+                        removeCancelledFileObservers();
+                    }
+
                     Thread.sleep(pollingInterval);
                 }
             }
@@ -2249,7 +2275,15 @@ public abstract class DevUtil {
      */
     private void consolidateFileObservers() {
         fileObservers.addAll(newFileObservers);
-        newFileObservers.removeAll(newFileObservers);
+        newFileObservers.clear();
+    }
+
+    /**
+     * Remove cancelled file observers from the main observers set
+     */
+    private void removeCancelledFileObservers() {
+        fileObservers.removeAll(cancelledFileObservers);
+        cancelledFileObservers.clear();
     }
 
     private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor) throws IOException {
@@ -2305,11 +2339,12 @@ public abstract class DevUtil {
         }
     }
 
-    private void addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath, FileFilter filter)
+    private FileAlterationObserver addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath, FileFilter filter)
             throws Exception {
         FileAlterationObserver observer = getFileAlterationObserver(executor, parentPath, filter);
         observer.initialize();
         newFileObservers.add(observer);
+        return observer;
     }
 
     private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final String parentPath, FileFilter filter) {
@@ -2584,36 +2619,43 @@ public abstract class DevUtil {
                     || changeType == ChangeType.CREATE)) {
                 copyConfigFolder(fileChanged, configDirectory, null);
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
-                if (changeType == ChangeType.CREATE) {
-                    redeployApp();
-                }
-                if (fileChanged.getName().equals("server.env")) {
-                    // re-enable debug variables in server.env
-                    enableServerDebug(false);
-                }
-                
-                if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
-                     || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
-                    // restart server to load new properties
-                    restartServer();
+
+                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                    restartOnDockerfileDirectoryChanged();
+                } else {
+                    if (changeType == ChangeType.CREATE) {
+                        redeployApp();
+                    }
+                    if (fileChanged.getName().equals("server.env")) {
+                        // re-enable debug variables in server.env
+                        enableServerDebug(false);
+                    } else if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
+                         || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
+                        // restart server to load new properties
+                        restartServer(false);
+                    }
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
-                if (fileChanged.getName().equals("server.env")) {
-                    // re-enable debug variables in server.env
-                    enableServerDebug(false);
-                }
-                if (container && System.getProperty("os.name").equalsIgnoreCase("linux")) {
-                    info("Restarting the container for this change to take effect.");
-                    // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        debug("Unexpected InterruptedException handling config file deletion.", e);
+                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                    restartOnDockerfileDirectoryChanged();
+                } else {
+                    if (fileChanged.getName().equals("server.env")) {
+                        // re-enable debug variables in server.env
+                        enableServerDebug(false);
                     }
-                    restartServer(false);
+                    if (container && System.getProperty("os.name").equalsIgnoreCase("linux")) {
+                        info("Restarting the container for this change to take effect.");
+                        // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                            debug("Unexpected InterruptedException handling config file deletion.", e);
+                        }
+                        restartServer(false);
+                    }    
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
@@ -2623,7 +2665,9 @@ public abstract class DevUtil {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-                if (changeType == ChangeType.CREATE) {
+                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                    restartOnDockerfileDirectoryChanged();
+                } else if (changeType == ChangeType.CREATE) {
                     redeployApp();
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
@@ -2631,18 +2675,32 @@ public abstract class DevUtil {
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
+                // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
+                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                    restartOnDockerfileDirectoryChanged();
+                }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
                    && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
+            // This is for bootstrap.properties outside of the config folder
             // restart server to load new properties
-            restartServer();
+            if (isDockerfileDirectoryChanged(fileChanged)) {
+                restartOnDockerfileDirectoryChanged();
+            } else {
+                restartServer(false);
+            }
         } else if (jvmOptionsFileParent != null
                 && directory.equals(jvmOptionsFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(jvmOptionsFile.getName())) {
+            // This is for jvm.options outside of the config folder
             // restart server to load new options
-            restartServer();
+            if (isDockerfileDirectoryChanged(fileChanged)) {
+                restartOnDockerfileDirectoryChanged();
+            } else {
+                restartServer(false);
+            }
         } else if (resourceParent != null
                 && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
             debug("Resource dir: " + resourceParent.toString());
@@ -2685,7 +2743,71 @@ public abstract class DevUtil {
             if (reloadedPropertyFile) {
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
+        } else if (isDockerfileDirectoryChanged(fileChanged)) {
+            // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
+            restartOnDockerfileDirectoryChanged();
         }
+    }
+
+    /**
+     * Unwatches all directories that were specified in Dockerfile COPY commands, then does a container
+     * rebuild and restart.
+     * 
+     * @throws PluginExecutionException
+     */
+    private void restartOnDockerfileDirectoryChanged() throws PluginExecutionException {
+        // Cancel and clear any WatchKeys that were added for to the Dockerfile directories
+        for (WatchKey key : dockerfileDirectoriesWatchKeys) {
+            key.cancel();
+        }
+        dockerfileDirectoriesWatchKeys.clear();
+
+        // Cancel and clear any FileAlterationObservers that were added for the Dockerfile directories
+        synchronized (cancelledFileObservers) {
+            for (FileAlterationObserver observer : dockerfileDirectoriesFileObservers) {
+                // add the observer to be cancelled 
+                cancelledFileObservers.add(observer);
+                try {
+                    // destroy the observer
+                    observer.destroy();
+                } catch (Exception e) {
+                    debug("Could not destroy file observer", e);
+                }
+            }
+        }
+        dockerfileDirectoriesFileObservers.clear();
+
+        // Untrack the directories
+        dockerfileDirectoriesTracked.clear();
+
+        restartServer(true);
+    }
+
+    /**
+     * If container mode, check if any of the files are within a directory specified in one of the Dockerfile's
+     * COPY commands.  If not container mode, does nothing.
+     * 
+     * @param file The files to check, in the same order.
+     * @return true if container mode and any of the files are within a directory specified in one of the Dockerfile's COPY commands.
+     * @throws IOException if there was an error getting canonical paths
+     */
+    private boolean isDockerfileDirectoryChanged(File... files) throws IOException {
+        // Check for directory content changes from directories specified in Dockerfile
+        if (container && !dockerfileDirectoriesTracked.isEmpty()) {
+            for (Path trackedPath : dockerfileDirectoriesTracked) {
+                Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
+
+                for (File file : files) {
+                    // if the file's path is a child of the tracked path, except for the server logs folder or if it's the loose application itself
+                    Path filePath = file.getCanonicalFile().toPath();
+                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
+                        debug("isDockerfileDirectoryChanged=true for directory " + trackedPath + " with file " + file);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -2894,6 +3016,18 @@ public abstract class DevUtil {
      * @throws IOException unable to walk through file tree
      */
     protected void registerAll(final Path start, final ThreadPoolExecutor executor) throws IOException {
+        registerAll(start, executor, false);
+    }
+
+    /**
+     * Register the parent directory and all sub-directories with the WatchService
+     * 
+     * @param start   parent directory
+     * @param executor the test thread executor
+     * @param removeOnContainerRebuild whether the files should be unwatched if the container is rebuilt
+     * @throws IOException unable to walk through file tree
+     */
+    protected void registerAll(final Path start, final ThreadPoolExecutor executor, final boolean removeOnContainerRebuild) throws IOException {
         debug("Registering all files in directory: " + start.toString());
 
         // register directory and sub-directories
@@ -2932,7 +3066,11 @@ public abstract class DevUtil {
             
                         try {
                             debug("Adding subdirectory to file observers: " + dir.toString());
-                            addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
+                            FileAlterationObserver observer = addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
+                            if (removeOnContainerRebuild) {
+                                debug("Adding to dockerfileDirectoriesFileObservers: " + dir);
+                                dockerfileDirectoriesFileObservers.add(observer);
+                            }
                         } catch (Exception e) {
                             error("Could not observe directory " + dir.toString(), e);
                         }
@@ -2940,10 +3078,14 @@ public abstract class DevUtil {
                 } 
                 if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
                     debug("Adding subdirectory to WatchService: " + dir.toString());
-                    dir.register(watcher,
+                    WatchKey key = dir.register(watcher,
                             new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                                     StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                             SensitivityWatchEventModifier.HIGH);
+                    if (removeOnContainerRebuild) {
+                        debug("Adding to dockerfileDirectoriesWatchKeys: " + dir);
+                        dockerfileDirectoriesWatchKeys.add(key);
+                    }
                 }
                 return FileVisitResult.CONTINUE;
             }
