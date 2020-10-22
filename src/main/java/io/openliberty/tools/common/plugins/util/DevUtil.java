@@ -325,7 +325,7 @@ public abstract class DevUtil {
     protected List<String> destMount = new ArrayList<String>();
     private boolean firstStartup = true;
     private Set<Path> dockerfileDirectoriesToWatch = new HashSet<Path>();
-    private Set<Path> dockerfileDirectoriesChildren = new HashSet<Path>();
+    private Set<Path> dockerfileDirectoriesTracked = new HashSet<Path>();
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
 
@@ -2117,7 +2117,7 @@ public abstract class DevUtil {
                                 debug("Registering path from dockerfileDirectoriesToWatch: " + path);
                                 registerAll(path, executor, true);
                                 dockerfileDirectoriesToWatch.remove(path);
-                                dockerfileDirectoriesChildren.add(path);
+                                dockerfileDirectoriesTracked.add(path);
                             }
                         }
                     }
@@ -2777,7 +2777,8 @@ public abstract class DevUtil {
         }
         dockerfileDirectoriesFileObservers.clear();
 
-        dockerfileDirectoriesChildren.clear();
+        // Untrack the directories
+        dockerfileDirectoriesTracked.clear();
 
         restartServer(true);
     }
@@ -2792,15 +2793,15 @@ public abstract class DevUtil {
      */
     private boolean isDockerfileDirectoryChanged(File... files) throws IOException {
         // Check for directory content changes from directories specified in Dockerfile
-        if (container && !dockerfileDirectoriesChildren.isEmpty()) {
-            for (Path dockerfileChildPath : dockerfileDirectoriesChildren) {
+        if (container && !dockerfileDirectoriesTracked.isEmpty()) {
+            for (Path trackedPath : dockerfileDirectoriesTracked) {
                 Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
 
                 for (File file : files) {
-                    // if the file's path is a child of the dockerfile path, except for the server logs folder or if it's the application itself
+                    // if the file's path is a child of the tracked path, except for the server logs folder or if it's the loose application itself
                     Path filePath = file.getCanonicalFile().toPath();
-                    if (filePath.startsWith(dockerfileChildPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
-                        debug("isDockerfileDirectoryChanged=true for directory " + dockerfileChildPath + " with file " + file);
+                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
+                        debug("isDockerfileDirectoryChanged=true for directory " + trackedPath + " with file " + file);
                         return true;
                     }
                 }
