@@ -68,7 +68,7 @@ public abstract class ServerFeatureUtil {
     public static final String SHARED_STACKGROUP_DIR = "shared.stackgroup.dir";
     public static final String SERVER_CONFIG_DIR = "server.config.dir";
 
-    private Map<String,File> libertyDirectoryPropertyToFile = new HashMap<String,File>();
+    private Map<String,File> libertyDirectoryPropertyToFile = null;
     
     /**
      * Log debug
@@ -108,6 +108,19 @@ public abstract class ServerFeatureUtil {
      */
     public Set<String> getServerFeatures(File serverDirectory) {
         initializeLibertyDirectoryPropertyFiles(serverDirectory);
+        return getServerFeatures(serverDirectory, null);
+    }
+
+    /**
+     * Get the set of features defined in the server.xml
+     * @param serverDirectory The server directory containing the server.xml
+     * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
+     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
+     */
+    public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles) {
+        if (libertyDirPropFiles != null) {
+            libertyDirectoryPropertyToFile = new HashMap(libertyDirPropFiles);
+        }
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
         Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults");
         result = getServerXmlFeatures(result, new File(serverDirectory, "server.xml"), bootstrapProperties, null);
@@ -126,6 +139,7 @@ public abstract class ServerFeatureUtil {
      * @param serverDirectory The server directory containing the server.xml
      */
     private void initializeLibertyDirectoryPropertyFiles(File serverDirectory) {
+        libertyDirectoryPropertyToFile = new HashMap<String,File>();
         if (serverDirectory.exists()) {
             try {
                 libertyDirectoryPropertyToFile.put(SERVER_CONFIG_DIR, serverDirectory.getCanonicalFile());
@@ -149,9 +163,9 @@ public abstract class ServerFeatureUtil {
                 libertyDirectoryPropertyToFile.put(SHARED_CONFIG_DIR, userSharedConfigDir.getCanonicalFile());
                 libertyDirectoryPropertyToFile.put(SHARED_RESOURCES_DIR, userSharedResourcesDir.getCanonicalFile());
                 libertyDirectoryPropertyToFile.put(SHARED_STACKGROUP_DIR, userSharedStackGroupsDir.getCanonicalFile());
-            } catch (IOException e) {
-                debug("The properties for directories could not be initialized because an error occurred when accessing them.");
-                debug(e);
+            } catch (Exception e) {
+                warn("The properties for directories could not be initialized because an error occurred when accessing them.");
+                debug("Exception received: "+e.getMessage(), e);
             }
         } else {
             warn("The " + serverDirectory + " directory cannot be accessed. Skipping its server features.");
@@ -181,7 +195,7 @@ public abstract class ServerFeatureUtil {
         } catch (IOException e) {
             // skip this directory if its path cannot be queried
             warn("The " + serverDirectory + "/configDropins/" + folderName + " directory cannot be accessed. Skipping its server features.");
-            debug(e);
+            debug("Exception received: "+e.getMessage(), e);
             return result;
         }
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
@@ -235,7 +249,7 @@ public abstract class ServerFeatureUtil {
         } catch (IOException e) {
             // skip this server.xml if its path cannot be queried
             warn("The server file " + serverFile + " cannot be accessed. Skipping its features.");
-            debug(e);
+            debug("Exception received: "+e.getMessage(), e);
             return result;
         }
         info("Parsing the server file " + canonicalServerFile + " for features and includes.");
@@ -250,7 +264,7 @@ public abstract class ServerFeatureUtil {
                 db.setErrorHandler(new ErrorHandler() {
                     @Override
                     public void warning(SAXParseException e) throws SAXException {
-                        debug(e);
+                        debug("Exception received: "+e.getMessage(), e);
                     }
                 
                     @Override
@@ -283,7 +297,7 @@ public abstract class ServerFeatureUtil {
             } catch (IOException | ParserConfigurationException | SAXException e) {
                 // just skip this server.xml if it cannot be parsed
                 warn("The server file " + canonicalServerFile + " cannot be parsed. Skipping its features.");
-                debug(e);
+                debug("Exception received: "+e.getMessage(), e);
                 return result;
             }
         }
@@ -351,7 +365,7 @@ public abstract class ServerFeatureUtil {
             } catch (IOException e) {
                 // skip this xml if it cannot be accessed from URL
                 warn("The server file " + serverFile + " includes a URL " + includeFileName + " that cannot be accessed. Skipping the included features.");
-                debug(e);
+                debug("Exception received: "+e.getMessage(), e);
                 return result;
             }
         } else {
@@ -367,7 +381,7 @@ public abstract class ServerFeatureUtil {
         } catch (IOException e) {
             // skip this xml if its path cannot be queried
             warn("The server file " + serverFile + " includes a file " + includeFileName + " that cannot be accessed. Skipping the included features.");
-            debug(e);
+            debug("Exception received: "+e.getMessage(), e);
             return result;
         }
         if (!updatedParsedXmls.contains(includeFile)) {
@@ -425,7 +439,7 @@ public abstract class ServerFeatureUtil {
             } catch (IOException e) {
                 warn("The bootstrap.properties file " + bootstrapProperties.getAbsolutePath()
                         + " could not be loaded. Skipping the bootstrap.properties file.");
-                debug(e);
+                debug("Exception received: "+e.getMessage(), e);
             } finally {
                 if (stream != null) {
                     try {
