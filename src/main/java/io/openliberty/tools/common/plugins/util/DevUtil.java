@@ -1887,17 +1887,19 @@ public abstract class DevUtil {
             hotTests = true;
         }
         if (startup) {
-            // TODO: Update start up messages to include internal container ports
+            info(formatAttentionTitle("Liberty server port information:"));
             if (httpPort != null) {
                 if (container) {
-                    info(formatAttentionMessage("Liberty server HTTP port mapped to Docker host port: " + httpPort));
+                    info(formatAttentionMessage("Internal container HTTP port: " + containerHttpPort));
+                    info(formatAttentionMessage("Mapped Docker host HTTP port: " + httpPort));
                 } else {
                     info(formatAttentionMessage("Liberty server HTTP port: " + httpPort));
                 }
             }
             if (httpsPort != null) {
                 if (container) {
-                    info(formatAttentionMessage("Liberty server HTTPS port mapped to Docker host port: " + httpsPort));
+                    info(formatAttentionMessage("Internal container HTTPS port: " + containerHttpsPort));
+                    info(formatAttentionMessage("Mapped Docker host HTTPS port: " + httpsPort));
                 } else {
                     info(formatAttentionMessage("Liberty server HTTPS port: " + httpsPort));
                 }
