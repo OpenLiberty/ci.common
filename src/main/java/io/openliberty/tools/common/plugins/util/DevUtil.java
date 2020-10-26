@@ -843,7 +843,7 @@ public abstract class DevUtil {
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
-                if (cmdSegments[0].equalsIgnoreCase("COPY")) {
+                if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) {
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
@@ -887,8 +887,8 @@ public abstract class DevUtil {
                 // Break the Dockerfile line down into segments based on any amount of whitespace.
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
-                // If the line starts with COPY
-                if (cmdSegments[0].equalsIgnoreCase("COPY")) {
+                // If the line starts with COPY or ADD
+                if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) { // preliminary check but some of these segments could be options
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
@@ -917,7 +917,7 @@ public abstract class DevUtil {
                     }
                     if (srcOrDestArguments.size() < 2) { // proper check for number of src and dest args
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
-                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                        "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
                     // dest is the last argument
                     String dest = srcOrDestArguments.get(srcOrDestArguments.size() - 1);
@@ -927,11 +927,11 @@ public abstract class DevUtil {
                         File sourceFile = new File(sourcePath);
                         if (src.contains("*") || src.contains("?")) {
                             warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
-                        } else if (sourceFile.isDirectory()) {
+                        } else if (sourceFile.isDirectory() || cmdSegments[0].equalsIgnoreCase("ADD")) {
                             synchronized(dockerfileDirectoriesToWatch) {
                                 try {
                                     dockerfileDirectoriesToWatch.add(sourceFile.getCanonicalFile().toPath());
-                                    debug("COPY line=" + line + ", src=" + sourcePath + ", added to dockerfileDirectoriesToWatch: " + sourceFile);
+                                    debug("COPY/ADD line=" + line + ", src=" + sourcePath + ", added to dockerfileDirectoriesToWatch: " + sourceFile);
                                 } catch (IOException e) {
                                     // Do not fail here.  Let the Docker build fail instead.
                                     error("Could not resolve the canonical path of the directory specified in the Dockerfile: " + sourcePath, e);
@@ -968,6 +968,10 @@ public abstract class DevUtil {
         removeWarFileLines(dockerfileLines);
         processCopyLines(dockerfileLines, dockerfile.getParent());
         disableOpenJ9SCC(dockerfileLines);
+        for (String line : dockerfileLines) {
+            debug(line);
+        }
+//        debug(dockerfileLines.stream().collect(java.util.stream.Collectors.joining("\n")));
 
         File tempDockerfile = null;
         try {
@@ -2114,11 +2118,17 @@ public abstract class DevUtil {
                     synchronized(dockerfileDirectoriesToWatch) {
                         if (!dockerfileDirectoriesToWatch.isEmpty()) {
                             for (Path path : dockerfileDirectoriesToWatch) {
-                                debug("Registering path from dockerfileDirectoriesToWatch: " + path);
-                                registerAll(path, executor, true);
-                                dockerfileDirectoriesToWatch.remove(path);
+                                File f = path.toFile();
+                                if (f.isDirectory()) {
+                                    debug("Registering path from dockerfileDirectoriesToWatch: " + path);
+                                    registerAll(path, executor, true);
+                                } else {
+                                    debug("Registering file path from dockerfileDirectoriesToWatch: " + path);
+                                    registerSingleFile(f, executor, true);
+                                }
                                 dockerfileDirectoriesTracked.add(path);
                             }
+                            dockerfileDirectoriesToWatch.clear();
                         }
                     }
                 }
@@ -2287,6 +2297,10 @@ public abstract class DevUtil {
     }
 
     private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor) throws IOException {
+        registerSingleFile(registerFile, executor, false);
+    }
+
+    private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor, boolean removeOnContainerRebuild) throws IOException {
         if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
             String parentPath = registerFile.getParentFile().getCanonicalPath();
 
@@ -2324,7 +2338,11 @@ public abstract class DevUtil {
 
                 try {
                     debug("Adding single file observer for: " + registerFile.toString());
-                    addFileAlterationObserver(executor, parentPath, singleFileFilter);
+                    FileAlterationObserver observer = addFileAlterationObserver(executor, parentPath, singleFileFilter);
+                    if (removeOnContainerRebuild) {
+                        debug("Adding file to dockerfileDirectoriesFileObservers: " + registerFile.toString());
+                        dockerfileDirectoriesFileObservers.add(observer);
+                    }
                 } catch (Exception e) {
                     error("Could not observe single file " + registerFile.toString(), e);
                 }
@@ -2332,10 +2350,15 @@ public abstract class DevUtil {
         }
         if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
             debug("Adding directory to WatchService " + registerFile.getParentFile().toPath() + " for single file " + registerFile.getName());
-            registerFile.getParentFile().toPath().register(
-                watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+            WatchKey key = registerFile.getParentFile().toPath().register(
+                watcher, 
+                new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                         StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                 SensitivityWatchEventModifier.HIGH);
+            if (removeOnContainerRebuild) {
+                debug("Adding file to dockerfileDirectoriesWatchKeys: " + registerFile.getName());
+                dockerfileDirectoriesWatchKeys.add(key);
+            }
         }
     }
 
