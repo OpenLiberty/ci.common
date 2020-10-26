@@ -846,7 +846,7 @@ public abstract class DevUtil {
                 if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) {
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
-                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                        "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
                     if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
                         warFileLines.add(line);
@@ -891,18 +891,18 @@ public abstract class DevUtil {
                 if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) { // preliminary check but some of these segments could be options
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
-                        "'. There must be at least two arguments for the COPY command, a source path and a destination path.");
+                        "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
                     if (line.contains("$")) {
-                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
+                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY or ADD commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         continue;
                     }
                     List<String> srcOrDestArguments = new ArrayList<String>();
                     boolean skipLine = false;
-                    for (int i = 1; i < cmdSegments.length; i++) { // start after the COPY word
+                    for (int i = 1; i < cmdSegments.length; i++) { // start after the word COPY (or ADD)
                         String segment = cmdSegments[i];
                         if (segment.startsWith("--from")) {
-                            // multi-stage build, give a warning
+                            // multi-stage build, COPY only (not ADD), give a warning
                             warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support hot deployment with multi-stage COPY commands.");
                             skipLine = true; // don't mount the dirs in this COPY command
                             break;
@@ -926,7 +926,7 @@ public abstract class DevUtil {
                         String sourcePath = buildContext + "/" + src;
                         File sourceFile = new File(sourcePath);
                         if (src.contains("*") || src.contains("?")) {
-                            warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
+                            warn("The COPY or ADD source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY or ADD commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         } else if (sourceFile.isDirectory() || cmdSegments[0].equalsIgnoreCase("ADD")) {
                             synchronized(dockerfileDirectoriesToWatch) {
                                 try {
