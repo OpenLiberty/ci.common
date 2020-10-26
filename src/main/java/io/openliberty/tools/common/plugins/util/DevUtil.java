@@ -971,7 +971,6 @@ public abstract class DevUtil {
         for (String line : dockerfileLines) {
             debug(line);
         }
-//        debug(dockerfileLines.stream().collect(java.util.stream.Collectors.joining("\n")));
 
         File tempDockerfile = null;
         try {
@@ -2300,6 +2299,14 @@ public abstract class DevUtil {
         registerSingleFile(registerFile, executor, false);
     }
 
+    /**
+     * Register a single file with the WatchService using a file filter.
+     * 
+     * @param registerFile             the file of interest
+     * @param executor                 the test thread executor
+     * @param removeOnContainerRebuild whether the files should be unwatched if the container is rebuilt
+     * @throws IOException unable to read the canonical path name
+     */
     private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor, boolean removeOnContainerRebuild) throws IOException {
         if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
             String parentPath = registerFile.getParentFile().getCanonicalPath();
