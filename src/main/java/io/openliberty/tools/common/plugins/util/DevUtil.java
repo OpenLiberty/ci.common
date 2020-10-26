@@ -1276,9 +1276,19 @@ public abstract class DevUtil {
         // Add a --user option when running Linux
         command.append(getUserId());
 
-        containerName = getContainerName();
-        debug("containerName: " + containerName);
-        command.append(" --name " +  containerName);
+        // Do not generate a name if the user has specified a name
+        String name = getDockerOption("--name");
+        if (name == null || name.isEmpty()) {
+            if (name != null && name.isEmpty()) {
+                error("The Docker option --name is specified with an unsupported value: empty string.");
+                // now generate a name so that the Docker errors make some sense to the user.
+            }
+            containerName = getContainerName();
+            command.append(" --name " +  containerName);
+        } else {
+            containerName = name;
+        }
+        debug("containerName: " + containerName + ".");
 
         // Allow the user to add their own options to this command via a system property.
         if (dockerRunOpts != null) {
@@ -1294,6 +1304,28 @@ public abstract class DevUtil {
         command.append(" -- --"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
 
         return command.toString();
+    }
+
+    /**
+     * Obtain a given Docker run option from the dockerRunOpts parameter
+     * @param optionName the name of the option to extract from the dockerRunOpts
+     * @return a string representation of the value of the option or null
+     *
+     * The option of interest must not use a quoted string.
+     */
+    private String getDockerOption(String optionName) {
+        if (dockerRunOpts == null || dockerRunOpts.isEmpty()) {
+            return null;
+        }
+        String[] options = dockerRunOpts.split("\\s+"); // split on whitespace
+        for (int i = 0; i < options.length; i++) {
+            if (options[i].equals(optionName)) { // --name ABC format
+                return (i < options.length - 1) ? options[i+1] : null;
+            } else if (options[i].startsWith(optionName + "=")) { // --name=ABC format
+                return options[i].substring(optionName.length()+1); // could be empty string
+            }
+        }
+        return null;
     }
 
     private String getContainerName() {
