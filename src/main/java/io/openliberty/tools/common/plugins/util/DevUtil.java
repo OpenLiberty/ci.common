@@ -328,12 +328,14 @@ public abstract class DevUtil {
     private Set<Path> dockerfileDirectoriesTracked = new HashSet<Path>();
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
+    private final JavaCompilerOptions compilerOptions;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts) {
+            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
+            JavaCompilerOptions compilerOptions) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -377,6 +379,7 @@ public abstract class DevUtil {
             this.dockerBuildTimeout = dockerBuildTimeout;
         }
         this.skipDefaultPorts = skipDefaultPorts;
+        this.compilerOptions = compilerOptions;
     }
 
     /**
@@ -3221,7 +3224,11 @@ public abstract class DevUtil {
                     }
                 }
 
-                List<String> optionList = new ArrayList<>(Arrays.asList(DEFAULT_COMPILER_OPTIONS));
+                Set<String> combinedCompilerOptions = new HashSet<>(Arrays.asList(DEFAULT_COMPILER_OPTIONS));
+                if (compilerOptions != null) {
+                    combinedCompilerOptions.addAll(compilerOptions.getOptions());
+                }
+
                 List<File> outputDirs = new ArrayList<File>();
 
                 if (tests) {
@@ -3249,7 +3256,7 @@ public abstract class DevUtil {
                     }
                 }
 
-                JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
+                JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, combinedCompilerOptions, null,
                         compilationUnits);
 
                 compileResult = task.call();
