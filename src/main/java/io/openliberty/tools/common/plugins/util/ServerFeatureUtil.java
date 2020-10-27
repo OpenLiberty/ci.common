@@ -104,22 +104,15 @@ public abstract class ServerFeatureUtil {
     /**
      * Get the set of features defined in the server.xml
      * @param serverDirectory The server directory containing the server.xml
-     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
-     */
-    public Set<String> getServerFeatures(File serverDirectory) {
-        initializeLibertyDirectoryPropertyFiles(serverDirectory);
-        return getServerFeatures(serverDirectory, null);
-    }
-
-    /**
-     * Get the set of features defined in the server.xml
-     * @param serverDirectory The server directory containing the server.xml
      * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
      * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      */
     public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles) {
         if (libertyDirPropFiles != null) {
             libertyDirectoryPropertyToFile = new HashMap(libertyDirPropFiles);
+        } else {
+            warn("The properties for directories are null and could lead to server include files not being processed for server features.");
+            libertyDirectoryPropertyToFile = new HashMap<String,File>();
         }
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
         Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults");
