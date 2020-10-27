@@ -1887,6 +1887,7 @@ public abstract class DevUtil {
             hotTests = true;
         }
         if (startup) {
+            info(formatAttentionMessage(""));
             info(formatAttentionTitle("Liberty server port information:"));
             if (httpPort != null) {
                 if (container) {
