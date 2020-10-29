@@ -1933,33 +1933,48 @@ public abstract class DevUtil {
             hotTests = true;
         }
         if (startup) {
-            info(formatAttentionMessage(""));
-            info(formatAttentionTitle("Liberty server port information:"));
-            if (httpPort != null) {
-                if (container) {
-                    info(formatAttentionMessage("Internal container HTTP port: " + containerHttpPort));
-                    info(formatAttentionMessage("Mapped Docker host HTTP port: " + httpPort));
-                } else {
-                    info(formatAttentionMessage("Liberty server HTTP port: " + httpPort));
+            if (container) {
+                if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
+                    info(formatAttentionMessage(""));
+                    info(formatAttentionTitle("Liberty container port information:"));
+                }
+                if (containerHttpPort != null) {
+                    if (httpPort != null) {
+                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ]"));
+                    }
+                    else {
+                        info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
+                    }
+                }
+                if (containerHttpsPort != null) {
+                    if (httpsPort != null) {
+                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ]"));
+                    }
+                    else {
+                        info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
+                    }
+                }
+                if (libertyDebug) {
+                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
                 }
             }
-            if (httpsPort != null) {
-                if (container) {
-                    info(formatAttentionMessage("Internal container HTTPS port: " + containerHttpsPort));
-                    info(formatAttentionMessage("Mapped Docker host HTTPS port: " + httpsPort));
-                } else {
-                    info(formatAttentionMessage("Liberty server HTTPS port: " + httpsPort));
+            else {
+                if (httpPort != null || httpsPort != null || libertyDebug) {
+                    info(formatAttentionMessage(""));
+                    info(formatAttentionTitle("Liberty server port information:"));
+                }
+                if (httpPort != null) {
+                    info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
+                }
+                if (httpsPort != null) {
+                    info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
+                }
+                if (libertyDebug) {
+                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                    info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
                 }
             }
-            if (libertyDebug) {
-                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                if (container) {
-                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: " + debugPort));
-                } else {
-                    info(formatAttentionMessage("Liberty debug port: " + debugPort));
-                }
-            }
-
             // print barrier footer
             info(formatAttentionBarrier());
         }
