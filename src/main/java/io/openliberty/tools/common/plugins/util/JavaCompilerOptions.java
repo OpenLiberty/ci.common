@@ -16,8 +16,8 @@
 
 package io.openliberty.tools.common.plugins.util;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 public class JavaCompilerOptions {
     
@@ -32,19 +32,23 @@ public class JavaCompilerOptions {
     private String target;
 
     /**
-     * Set of options that can be passed to the compiler.
-     * @return
+     * Get list of options that can be passed to the compiler.
+     * Options with values are represented as multiple strings in the list
+     *  e.g. "-source" and "1.8"
+     * 
+     * @return List of options
      */
-    public Set<String> getOptions() {
-        Set<String> options = new HashSet<String>();
+    public List<String> getOptions() {
+        List<String> options = new ArrayList<String>();
         addStringOption(options, "source", source);
         addStringOption(options, "target", target);
         return options;
     }
 
-    private static void addStringOption(Set<String> options, String optionName, String optionValue) {
+    private static void addStringOption(List<String> options, String optionName, String optionValue) {
         if (optionValue != null && !optionValue.trim().isEmpty()) {
-            options.add("-" + optionName + " " + optionValue.trim());
+            options.add("-" + optionName);
+            options.add(optionValue.trim());
         }
     }
 

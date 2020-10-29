@@ -18,7 +18,7 @@ package io.openliberty.tools.common.plugins.util;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Set;
+import java.util.List;
 
 import org.junit.Test;
 
@@ -30,17 +30,19 @@ public class JavaCompilerOptionsTest {
         jco.setSource("9");
         jco.setTarget("1.8");
 
-        Set<String> result = jco.getOptions();
-        assertEquals(2, result.size());
-        assertTrue(result.contains("-source 9"));
-        assertTrue(result.contains("-target 1.8"));
+        List<String> result = jco.getOptions();
+        assertEquals(4, result.size());
+        assertTrue(result.get(0).equals("-source"));
+        assertTrue(result.get(1).equals("9"));
+        assertTrue(result.get(2).equals("-target"));
+        assertTrue(result.get(3).equals("1.8"));
     }
     
     @Test
     public void testNoOptions() throws Exception {
         JavaCompilerOptions jco = new JavaCompilerOptions();
 
-        Set<String> result = jco.getOptions();
+        List<String> result = jco.getOptions();
         assertEquals(0, result.size());
     }
 
@@ -49,9 +51,10 @@ public class JavaCompilerOptionsTest {
         JavaCompilerOptions jco = new JavaCompilerOptions();
         jco.setSource("10");
 
-        Set<String> result = jco.getOptions();
-        assertEquals(1, result.size());
-        assertTrue(result.contains("-source 10"));
+        List<String> result = jco.getOptions();
+        assertEquals(2, result.size());
+        assertTrue(result.get(0).equals("-source"));
+        assertTrue(result.get(1).equals("10"));
     }
 
     @Test
@@ -59,9 +62,10 @@ public class JavaCompilerOptionsTest {
         JavaCompilerOptions jco = new JavaCompilerOptions();
         jco.setTarget("10");
 
-        Set<String> result = jco.getOptions();
-        assertEquals(1, result.size());
-        assertTrue(result.contains("-target 10"));
+        List<String> result = jco.getOptions();
+        assertEquals(2, result.size());
+        assertTrue(result.get(0).equals("-target"));
+        assertTrue(result.get(1).equals("10"));
     }
 
 }

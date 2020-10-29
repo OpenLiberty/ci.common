@@ -3224,10 +3224,11 @@ public abstract class DevUtil {
                     }
                 }
 
-                Set<String> combinedCompilerOptions = new HashSet<>(Arrays.asList(DEFAULT_COMPILER_OPTIONS));
+                List<String> combinedCompilerOptions = new ArrayList<>(Arrays.asList(DEFAULT_COMPILER_OPTIONS));
                 if (compilerOptions != null) {
                     combinedCompilerOptions.addAll(compilerOptions.getOptions());
                 }
+                debug("Compiler options: " + combinedCompilerOptions);
 
                 List<File> outputDirs = new ArrayList<File>();
 
@@ -3291,7 +3292,8 @@ public abstract class DevUtil {
                 return false;
             }
         } catch (Exception e) {
-            debug("Error compiling java files", e);
+            error("Error compiling Java files: " + e.getMessage());
+            debug(e);
             return false;
         }
     }
