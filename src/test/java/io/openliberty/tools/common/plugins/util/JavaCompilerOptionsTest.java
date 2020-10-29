@@ -27,23 +27,29 @@ public class JavaCompilerOptionsTest {
     @Test
     public void testAllOptions() throws Exception {
         JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setShowWarnings(true);
         jco.setSource("9");
         jco.setTarget("1.8");
-
+        jco.setRelease("10");
+        
         List<String> result = jco.getOptions();
-        assertEquals(4, result.size());
-        assertTrue(result.get(0).equals("-source"));
-        assertTrue(result.get(1).equals("9"));
-        assertTrue(result.get(2).equals("-target"));
-        assertTrue(result.get(3).equals("1.8"));
+        int i = 0;
+        assertTrue(result.get(i++).equals("-source"));
+        assertTrue(result.get(i++).equals("9"));
+        assertTrue(result.get(i++).equals("-target"));
+        assertTrue(result.get(i++).equals("1.8"));
+        assertTrue(result.get(i++).equals("--release"));
+        assertTrue(result.get(i++).equals("10"));
+        assertEquals(i, result.size());
     }
     
     @Test
-    public void testNoOptions() throws Exception {
+    public void testDefaultOptions() throws Exception {
         JavaCompilerOptions jco = new JavaCompilerOptions();
 
         List<String> result = jco.getOptions();
-        assertEquals(0, result.size());
+        assertEquals(1, result.size());
+        assertTrue(result.get(0).equals("-nowarn"));
     }
 
     @Test
@@ -52,9 +58,10 @@ public class JavaCompilerOptionsTest {
         jco.setSource("10");
 
         List<String> result = jco.getOptions();
-        assertEquals(2, result.size());
-        assertTrue(result.get(0).equals("-source"));
-        assertTrue(result.get(1).equals("10"));
+        assertEquals(3, result.size());
+        assertTrue(result.get(0).equals("-nowarn"));
+        assertTrue(result.get(1).equals("-source"));
+        assertTrue(result.get(2).equals("10"));
     }
 
     @Test
@@ -63,9 +70,22 @@ public class JavaCompilerOptionsTest {
         jco.setTarget("10");
 
         List<String> result = jco.getOptions();
-        assertEquals(2, result.size());
-        assertTrue(result.get(0).equals("-target"));
-        assertTrue(result.get(1).equals("10"));
+        assertEquals(3, result.size());
+        assertTrue(result.get(0).equals("-nowarn"));
+        assertTrue(result.get(1).equals("-target"));
+        assertTrue(result.get(2).equals("10"));
+    }
+
+    @Test
+    public void testRelease() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setRelease("10");
+
+        List<String> result = jco.getOptions();
+        assertEquals(3, result.size());
+        assertTrue(result.get(0).equals("-nowarn"));
+        assertTrue(result.get(1).equals("--release"));
+        assertTrue(result.get(2).equals("10"));
     }
 
 }

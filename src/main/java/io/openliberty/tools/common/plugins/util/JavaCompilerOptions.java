@@ -32,6 +32,16 @@ public class JavaCompilerOptions {
     private String target;
 
     /**
+     * Java release version
+     */
+    private String release;
+
+    /**
+     * Whether to show warnings. Default is false.
+     */
+    private boolean showWarnings = false;
+
+    /**
      * Get list of options that can be passed to the compiler.
      * Options with values are represented as multiple strings in the list
      *  e.g. "-source" and "1.8"
@@ -40,14 +50,18 @@ public class JavaCompilerOptions {
      */
     public List<String> getOptions() {
         List<String> options = new ArrayList<String>();
-        addStringOption(options, "source", source);
-        addStringOption(options, "target", target);
+        if (!showWarnings) {
+            options.add("-nowarn");
+        }
+        addStringOption(options, "-source", source);
+        addStringOption(options, "-target", target);
+        addStringOption(options, "--release", release);
         return options;
     }
 
-    private static void addStringOption(List<String> options, String optionName, String optionValue) {
+    private static void addStringOption(List<String> options, String optionKey, String optionValue) {
         if (optionValue != null && !optionValue.trim().isEmpty()) {
-            options.add("-" + optionName);
+            options.add(optionKey);
             options.add(optionValue.trim());
         }
     }
@@ -66,6 +80,22 @@ public class JavaCompilerOptions {
 
     public void setTarget(String target) {
         this.target = target;
+    }
+
+    public boolean isShowWarnings() {
+        return showWarnings;
+    }
+
+    public void setShowWarnings(boolean showWarnings) {
+        this.showWarnings = showWarnings;
+    }
+
+    public String getRelease() {
+        return release;
+    }
+
+    public void setRelease(String release) {
+        this.release = release;
     }
 
 }
