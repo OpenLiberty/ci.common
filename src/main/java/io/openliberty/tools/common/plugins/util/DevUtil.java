@@ -1395,9 +1395,9 @@ public abstract class DevUtil {
                 }
             }
         }
-        libertyCreate();
         // suppress install feature warning
         System.setProperty("skipBetaInstallFeatureWarning", "true");
+        libertyCreate();
         libertyInstallFeature();
         libertyDeploy();
         startServer(buildContainer);
