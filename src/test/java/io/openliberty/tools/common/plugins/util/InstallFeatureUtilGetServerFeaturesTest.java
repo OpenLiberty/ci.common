@@ -65,7 +65,7 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
     
     private void verifyServerFeatures(Set<String> expected) throws Exception {
-        Set<String> getServerResult = util.getServerFeatures(serverDirectory);
+        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
         assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
     }
     

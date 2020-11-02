@@ -151,6 +151,15 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertTrue(util.destMount.get(0).endsWith("/config/server.xml"));
         assertEquals(1, util.srcMount.size());
         assertEquals(1, util.destMount.size());
+
+        util.disableOpenJ9SCC(dockerfileLines);
+        expectedDockerfileLines.clear();
+        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedDockerfileLines.add("ARG VERBOSE=false");
+        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedDockerfileLines.add("RUN configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
     }
 
     @Test
@@ -198,6 +207,57 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertTrue(util.destMount.get(1).endsWith("/config/file2.xml"));
         assertEquals(2, util.srcMount.size());
         assertEquals(2, util.destMount.size());
+    }
+
+    @Test
+    public void testDisableOpenJ9SCC_lowercase() throws Exception {
+        List<String> dockerfileLines = new ArrayList<String>();
+        List<String> expectedDockerfileLines = new ArrayList<String>();
+        dockerfileLines.add("FROM openliberty/open-liberty");
+        dockerfileLines.add("run configure.sh");
+        util.disableOpenJ9SCC(dockerfileLines);
+        expectedDockerfileLines.add("FROM openliberty/open-liberty");
+        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedDockerfileLines.add("run configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+    }
+
+    @Test
+    public void testDisableOpenJ9SCC_uppercase() throws Exception {
+        List<String> dockerfileLines = new ArrayList<String>();
+        List<String> expectedDockerfileLines = new ArrayList<String>();
+        dockerfileLines.add("FROM openliberty/open-liberty");
+        dockerfileLines.add("RUN configure.sh");
+        util.disableOpenJ9SCC(dockerfileLines);
+        expectedDockerfileLines.add("FROM openliberty/open-liberty");
+        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedDockerfileLines.add("RUN configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+    }
+
+    @Test
+    public void testDisableOpenJ9SCC_mixedcase() throws Exception {
+        List<String> dockerfileLines = new ArrayList<String>();
+        List<String> expectedDockerfileLines = new ArrayList<String>();
+        dockerfileLines.add("FROM openliberty/open-liberty");
+        dockerfileLines.add("RuN configure.sh");
+        util.disableOpenJ9SCC(dockerfileLines);
+        expectedDockerfileLines.add("FROM openliberty/open-liberty");
+        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedDockerfileLines.add("RuN configure.sh");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+    }
+
+    @Test
+    public void testDisableOpenJ9SCC_negative() throws Exception {
+        List<String> dockerfileLines = new ArrayList<String>();
+        List<String> expectedDockerfileLines = new ArrayList<String>();
+        dockerfileLines.add("FROM openliberty/open-liberty");
+        dockerfileLines.add("RUN configure.shaaaaaaaaaa");
+        util.disableOpenJ9SCC(dockerfileLines);
+        expectedDockerfileLines.add("FROM openliberty/open-liberty");
+        expectedDockerfileLines.add("RUN configure.shaaaaaaaaaa");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
     }
 
 }
