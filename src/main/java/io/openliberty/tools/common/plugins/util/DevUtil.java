@@ -1264,6 +1264,7 @@ public abstract class DevUtil {
                 httpPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTP_PORT, false);
                 httpsPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTPS_PORT, false);
             } catch (IOException x) {
+                debug("IOException trying to findAvailablePort(), using default ports.");
                 httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
                 httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
             }
