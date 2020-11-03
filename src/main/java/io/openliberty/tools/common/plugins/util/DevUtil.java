@@ -120,6 +120,9 @@ public abstract class DevUtil {
             "___jb_tmp___", "___jb_old___" };
 
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
+    private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
+    private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
+    private static final int LIBERTY_DEFAULT_DEBUG_PORT = 7777;
 
     /**
      * Log debug
@@ -1258,14 +1261,14 @@ public abstract class DevUtil {
         if (!skipDefaultPorts) {
             int httpPortToUse, httpsPortToUse;
             try {
-                httpPortToUse = findAvailablePort(9080, false);
-                httpsPortToUse = findAvailablePort(9443, false);
+                httpPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTP_PORT, false);
+                httpsPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTPS_PORT, false);
             } catch (IOException x) {
-                httpPortToUse = 9080;
-                httpsPortToUse = 9443;
+                httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
+                httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
             }
-            command.append(" -p ").append(httpPortToUse).append(":9080");
-            command.append(" -p ").append(httpsPortToUse).append(":9443");
+            command.append(" -p ").append(httpPortToUse).append(":").append(LIBERTY_DEFAULT_HTTP_PORT);
+            command.append(" -p ").append(httpsPortToUse).append(":").append(LIBERTY_DEFAULT_HTTPS_PORT);
         }
         
         if (libertyDebug) {
@@ -1962,29 +1965,45 @@ public abstract class DevUtil {
         }
         if (startup) {
             if (container) {
+                boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
+                boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                boolean nonDefaultDebugPortUsed = !skipDefaultPorts && LIBERTY_DEFAULT_DEBUG_PORT != debugPort;
                 if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
                     info(formatAttentionMessage(""));
                     info(formatAttentionTitle("Liberty container port information:"));
                 }
+                if (nonDefaultHttpPortUsed || nonDefaultHttpsPortUsed || nonDefaultDebugPortUsed) {
+                    warn(formatAttentionMessage("The Liberty container is using non-default host ports."));
+                }
                 if (containerHttpPort != null) {
                     if (httpPort != null) {
-                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ]"));
-                    }
-                    else {
+                        if (!nonDefaultHttpPortUsed) {
+                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ]"));
+                        } else {
+                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ] <"));
+                        }
+                    } else {
                         info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
                     }
                 }
                 if (containerHttpsPort != null) {
                     if (httpsPort != null) {
-                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ]"));
-                    }
-                    else {
+                        if (!nonDefaultHttpsPortUsed) {
+                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ]"));
+                        } else {
+                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ] <"));
+                        }
+                    } else {
                         info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
                     }
                 }
                 if (libertyDebug) {
-                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
+                    if (!nonDefaultDebugPortUsed) {
+                        info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ] <"));
+                    }
                 }
             }
             else {
