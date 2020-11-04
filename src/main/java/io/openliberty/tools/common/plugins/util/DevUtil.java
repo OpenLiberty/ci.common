@@ -1264,7 +1264,7 @@ public abstract class DevUtil {
                 httpPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTP_PORT, false);
                 httpsPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTPS_PORT, false);
             } catch (IOException x) {
-                debug("IOException trying to findAvailablePort(), using default ports.");
+                error("An error occurred while trying to find a free network port, using default port numbers.", x);
                 httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
                 httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
             }
@@ -1968,8 +1968,7 @@ public abstract class DevUtil {
             if (container) {
                 boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
                 boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
-                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                boolean nonDefaultDebugPortUsed = !skipDefaultPorts && LIBERTY_DEFAULT_DEBUG_PORT != debugPort;
+                boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
                 if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
                     info(formatAttentionMessage(""));
                     info(formatAttentionTitle("Liberty container port information:"));
@@ -2000,6 +1999,7 @@ public abstract class DevUtil {
                     }
                 }
                 if (libertyDebug) {
+                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
                     if (!nonDefaultDebugPortUsed) {
                         info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
                     } else {
