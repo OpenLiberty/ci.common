@@ -120,6 +120,9 @@ public abstract class DevUtil {
             "___jb_tmp___", "___jb_old___" };
 
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
+    private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
+    private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
+    private static final int LIBERTY_DEFAULT_DEBUG_PORT = 7777;
 
     /**
      * Log debug
@@ -1256,7 +1259,17 @@ public abstract class DevUtil {
     private String getContainerCommand() {
         StringBuilder command = new StringBuilder("docker run --rm");
         if (!skipDefaultPorts) {
-            command.append(" -p 9080:9080 -p 9443:9443");
+            int httpPortToUse, httpsPortToUse;
+            try {
+                httpPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTP_PORT, false);
+                httpsPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTPS_PORT, false);
+            } catch (IOException x) {
+                error("An error occurred while trying to find an available network port. Using default port numbers.", x);
+                httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
+                httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
+            }
+            command.append(" -p ").append(httpPortToUse).append(":").append(LIBERTY_DEFAULT_HTTP_PORT);
+            command.append(" -p ").append(httpsPortToUse).append(":").append(LIBERTY_DEFAULT_HTTPS_PORT);
         }
         
         if (libertyDebug) {
@@ -1742,7 +1755,7 @@ public abstract class DevUtil {
     public Map<String, String> getDebugEnvironmentVariables() throws IOException {
         Map<String, String> map = new HashMap<String, String>();
         map.put("WLP_DEBUG_SUSPEND", "n");
-        map.put("WLP_DEBUG_ADDRESS", String.valueOf(findAvailablePort(libertyDebugPort)));
+        map.put("WLP_DEBUG_ADDRESS", String.valueOf(findAvailablePort(libertyDebugPort, true)));
         return map;
     }
 
@@ -1757,7 +1770,7 @@ public abstract class DevUtil {
         enableServerDebug(true);
     }
 
-    private void enableServerDebug(boolean findAvailablePort) throws IOException {
+    private void enableServerDebug(boolean doFindPort) throws IOException {
         if (!libertyDebug) {
             return;
         }
@@ -1793,8 +1806,8 @@ public abstract class DevUtil {
         debug("Creating server.env file: " + serverEnvFile.getCanonicalPath());
         sb.append("WLP_DEBUG_SUSPEND=n\n");
         sb.append("WLP_DEBUG_ADDRESS=");
-        if (findAvailablePort) {
-            sb.append(findAvailablePort(libertyDebugPort));
+        if (doFindPort) {
+            sb.append(findAvailablePort(libertyDebugPort, true));
         } else {
             sb.append(alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
         }
@@ -1813,49 +1826,65 @@ public abstract class DevUtil {
     }
 
     /**
-     * Finds an available port. If the preferred port is not available, returns a
-     * random available port and caches the result, which will override the
-     * preferredPort if this method is called again.
+     * Finds an available port to use. There are two semantics. If looking for a port
+     * for the server debug connection and the port is in use then return an
+     * ephemeral port. If looking for a port for the server http connection then
+     * try sequential port numbers.
      * 
+     * In the case of the server debug connection, if the preferred port is not
+     * available, return a random available port and cache the result which will
+     * override the preferredPort if this method is called again.
+     * 
+     * @param  The number of the port to start the search for an available port.
+     * @param  Whether to choose an ephemeral port. True to choose an ephemeral port,
+     *         false to search sequentially.
      * @return An available port.
      * @throws IOException if it could not find any available port, or there was an
      *                     error when opening a server socket regardless of port.
      */
-    public int findAvailablePort(int preferredPort) throws IOException {
+    public int findAvailablePort(int preferredPort, boolean isDebugPort) throws IOException {
         int portToTry = preferredPort;
-        if (alternativeDebugPort != -1) {
+        if (isDebugPort && alternativeDebugPort != -1) {
             portToTry = alternativeDebugPort;
         }
 
         ServerSocket serverSocket = null;
-        try {
-            serverSocket = new ServerSocket();
-            serverSocket.setReuseAddress(false);
-            // try binding to the loopback address at the port to try
-            serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), portToTry), 1);
-            return serverSocket.getLocalPort();
-        } catch (IOException e) {
-            if (serverSocket != null) {
-                // if binding failed, try binding to a random port
-                serverSocket.bind(null, 1);
-                int availablePort = serverSocket.getLocalPort();
-                if (portToTry == preferredPort) {
-                    warn("The debug port " + preferredPort + " is not available.  Using " + availablePort
-                            + " as the debug port instead.");
+        while (portToTry < 65535) {
+            try {
+                serverSocket = new ServerSocket();
+                serverSocket.setReuseAddress(false);
+                // try binding to the loopback address at the port to try
+                serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), portToTry), 1);
+                return serverSocket.getLocalPort();
+            } catch (IOException e) {
+                if (serverSocket != null) {
+                    if (isDebugPort) {
+                        // if binding failed, try binding to a random port
+                        serverSocket.bind(null, 1);
+                        int availablePort = serverSocket.getLocalPort();
+                        if (portToTry == preferredPort) {
+                            warn("The debug port " + preferredPort + " is not available.  Using " + availablePort
+                                    + " as the debug port instead.");
+                        } else {
+                            debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using "
+                                    + availablePort + " as the debug port instead.");
+                        }
+                        alternativeDebugPort = availablePort;
+                        return availablePort;
+                    } else {
+                        debug("findAvailablePort found port is in use: " + portToTry);
+                        ++portToTry;
+                    }
                 } else {
-                    debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using "
-                            + availablePort + " as the debug port instead.");
+                    throw new IOException("Could not create a server socket.", e);
                 }
-                alternativeDebugPort = availablePort;
-                return availablePort;
-            } else {
-                throw new IOException("Could not create a server socket for debugging.", e);
-            }
-        } finally {
-            if (serverSocket != null) {
-                serverSocket.close();
+            } finally {
+                if (serverSocket != null) {
+                    serverSocket.close();
+                }
             }
         }
+        return preferredPort; // usual return is from the try or the catch
     }
 
     private HotkeyReader hotkeyReader = null;
@@ -1937,29 +1966,45 @@ public abstract class DevUtil {
         }
         if (startup) {
             if (container) {
+                boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
+                boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
+                boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
                 if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
                     info(formatAttentionMessage(""));
                     info(formatAttentionTitle("Liberty container port information:"));
                 }
+                if (nonDefaultHttpPortUsed || nonDefaultHttpsPortUsed || (libertyDebug && nonDefaultDebugPortUsed)) {
+                    warn(formatAttentionMessage("The Liberty container is using non-default host ports."));
+                }
                 if (containerHttpPort != null) {
                     if (httpPort != null) {
-                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ]"));
-                    }
-                    else {
+                        if (!nonDefaultHttpPortUsed) {
+                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ]"));
+                        } else {
+                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ] <"));
+                        }
+                    } else {
                         info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
                     }
                 }
                 if (containerHttpsPort != null) {
                     if (httpsPort != null) {
-                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ]"));
-                    }
-                    else {
+                        if (!nonDefaultHttpsPortUsed) {
+                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ]"));
+                        } else {
+                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ] <"));
+                        }
+                    } else {
                         info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
                     }
                 }
                 if (libertyDebug) {
                     int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
+                    if (!nonDefaultDebugPortUsed) {
+                        info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ] <"));
+                    }
                 }
             }
             else {

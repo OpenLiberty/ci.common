@@ -127,7 +127,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         int preferredPort = getRandomPort();
 
         // verify that findAvailablePort gets the preferred port
-        int availablePort = util.findAvailablePort(preferredPort);
+        int availablePort = util.findAvailablePort(preferredPort, true);
         assertEquals(preferredPort, availablePort);
 
         // bind to it
@@ -139,14 +139,18 @@ public class DevUtilTest extends BaseDevUtilTest {
             serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), availablePort), 1);
 
             // previous port is bound, so calling findAvailablePort again should get another port
-            int availablePort2 = util.findAvailablePort(preferredPort);
+            int availablePort2 = util.findAvailablePort(preferredPort, true);
             assertNotEquals(availablePort, availablePort2);
+
+            // previous port is bound, so calling findAvailablePort again should get the next port in sequence
+            int availablePort5 = util.findAvailablePort(preferredPort, false);
+            assertEquals(preferredPort + 1, availablePort5);
 
             // unbind the port
             serverSocket.close();
 
             // calling findAvailablePort again should return the previous port which was cached, even though the preferred port is available
-            int availablePort3 = util.findAvailablePort(preferredPort);
+            int availablePort3 = util.findAvailablePort(preferredPort, true);
             assertEquals(availablePort2, availablePort3);
 
             // bind to the previous port
@@ -155,7 +159,7 @@ public class DevUtilTest extends BaseDevUtilTest {
             serverSocket2.bind(new InetSocketAddress(InetAddress.getByName(null), availablePort2), 1);
 
             // previous port is now bound, so calling findAvailablePort again should get another port
-            int availablePort4 = util.findAvailablePort(preferredPort);
+            int availablePort4 = util.findAvailablePort(preferredPort, true);
             assertNotEquals(availablePort2, availablePort4);
         } finally {
             if (serverSocket != null) {
