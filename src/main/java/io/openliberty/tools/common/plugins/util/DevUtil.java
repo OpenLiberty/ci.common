@@ -1264,7 +1264,7 @@ public abstract class DevUtil {
                 httpPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTP_PORT, false);
                 httpsPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTPS_PORT, false);
             } catch (IOException x) {
-                error("An error occurred while trying to find a free network port, using default port numbers.", x);
+                error("An error occurred while trying to find an available network port. Using default port numbers.", x);
                 httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
                 httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
             }
@@ -1973,7 +1973,7 @@ public abstract class DevUtil {
                     info(formatAttentionMessage(""));
                     info(formatAttentionTitle("Liberty container port information:"));
                 }
-                if (nonDefaultHttpPortUsed || nonDefaultHttpsPortUsed || nonDefaultDebugPortUsed) {
+                if (nonDefaultHttpPortUsed || nonDefaultHttpsPortUsed || (libertyDebug && nonDefaultDebugPortUsed)) {
                     warn(formatAttentionMessage("The Liberty container is using non-default host ports."));
                 }
                 if (containerHttpPort != null) {
