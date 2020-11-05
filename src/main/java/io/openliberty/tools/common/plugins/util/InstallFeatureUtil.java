@@ -72,22 +72,26 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     /**
      * Initialize the utility and check for unsupported scenarios.
      * 
-     * @param installDirectory The install directory
-     * @param from             The "from" parameter specified in the plugin
-     *                         configuration, or null if not specified
-     * @param to               The "to" parameter specified in the plugin
-     *                         configuration, or null if not specified
-     * @param pluginListedEsas The list of ESAs specified in the plugin
-     *                         configuration, or null if not specified
+     * @param installDirectory   The install directory
+     * @param from               The "from" parameter specified in the plugin
+     *                           configuration, or null if not specified
+     * @param to                 The "to" parameter specified in the plugin
+     *                           configuration, or null if not specified
+     * @param pluginListedEsas   The list of ESAs specified in the plugin
+     *                           configuration, or null if not specified
+     * @param propertiesList     The list of product properties installed
+     *                           with the Open Liberty runtime
+     * @param openLibertyVersion The version of the Open Liberty runtime
      * @throws PluginScenarioException  If the current scenario is not supported
      * @throws PluginExecutionException If properties files cannot be found in the
      *                                  installDirectory/lib/versions
      */
-    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)
-            throws PluginScenarioException, PluginExecutionException {
+    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, 
+            List<ProductProperties> propertiesList, String openLibertyVersion) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
         this.to = to;
-        propertiesList = loadProperties(new File(installDirectory, "lib/versions"));
+        this.propertiesList = propertiesList;
+        this.openLibertyVersion = openLibertyVersion;
         installJarFile = loadInstallJarFile(installDirectory);
         if (installJarFile == null) {
             throw new PluginScenarioException("Install map jar not found.");
@@ -232,8 +236,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
-    private List<ProductProperties> loadProperties(File dir) throws PluginExecutionException {
+    public static List<ProductProperties> loadProperties(File installDir) throws PluginExecutionException {
         List<ProductProperties> list = new ArrayList<ProductProperties>();
+        File dir = new File(installDir, "lib/versions");
 
         File[] propertiesFiles = dir.listFiles(new FilenameFilter() {
             @Override
@@ -263,10 +268,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                                         + propertiesFile.getAbsolutePath()
                                         + ". Ensure the file is valid properties file for the Liberty product or extension.");
                     }
-                    if (productId.equals(OPEN_LIBERTY_PRODUCT_ID)) {
-                        openLibertyVersion = productVersion;
-                    }
-                    list.add(new ProductProperties(productId, productVersion));
+                    list.add(new InstallFeatureUtil.ProductProperties(productId, productVersion));
                 } catch (IOException e) {
                     throw new PluginExecutionException(
                             "Cannot read the product properties file " + propertiesFile.getAbsolutePath(), e);
@@ -283,13 +285,29 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         if (list.isEmpty()) {
             throw new PluginExecutionException("Could not find any properties file in the " + dir
-                    + " directory. Ensure the directory " + installDirectory + " contains a Liberty installation.");
+                    + " directory. Ensure the directory " + installDir + " contains a Liberty installation.");
         }
 
         return list;
     }
 
-    private class ProductProperties {
+    public static String getOpenLibertyVersion(List<ProductProperties> propList) {
+        for (ProductProperties properties : propList) {
+            if (properties.getId().equals(OPEN_LIBERTY_PRODUCT_ID)) {
+                return properties.getVersion();
+            }
+        }
+        return null;
+    }
+
+    public static boolean isOpenLibertyBetaVersion(String olVersion) {
+        if (olVersion != null && olVersion.endsWith("-beta")) {
+            return true;
+        }
+        return false;
+    }
+
+    public static class ProductProperties {
         private String id;
         private String version;
 

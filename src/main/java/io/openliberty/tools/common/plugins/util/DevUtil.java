@@ -108,6 +108,7 @@ public abstract class DevUtil {
     private static final String DEVMODE_CONTAINER_BASE_NAME = "liberty-dev";
     private static final String DEVMODE_IMAGE_SUFFIX = "-dev-mode";
     private static final String DEVMODE_CONFIG_XML = "configDropins/overrides/dev-mode-config.xml";
+    public static final String SKIP_BETA_INSTALL_WARNING = "skipBetaInstallFeatureWarning";
 
     private static final String[] IGNORE_DIRECTORY_PREFIXES = new String[] { "." };
     private static final String[] IGNORE_FILE_PREFIXES = new String[] { "." };
@@ -1479,6 +1480,8 @@ public abstract class DevUtil {
                 }
             }
         }
+        // suppress install feature warning
+        System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
         libertyInstallFeature();
         libertyDeploy();
@@ -2722,6 +2725,9 @@ public abstract class DevUtil {
 
         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
 
+        // reset this property in case it had been set to true
+        System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
+
         // src/main/java directory
         if (directory.startsWith(srcPath)) {
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -2760,6 +2766,8 @@ public abstract class DevUtil {
                                                                                             // files
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY
                     || changeType == ChangeType.CREATE)) {
+                // suppress install feature warning - property must be set before calling copyConfigFolder
+                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, configDirectory, null);
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
 
@@ -2806,6 +2814,8 @@ public abstract class DevUtil {
                 && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                // suppress install feature warning - property must be set before calling copyConfigFolder
+                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
