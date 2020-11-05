@@ -769,7 +769,7 @@ public abstract class DevUtil {
                 try {
                     debug("segment " + i + " is " + vSegments[i]);
                     if (Integer.valueOf(vSegments[i]) > minDockerVersion[i]) {
-                        break; // high version is valid
+                        break; // a higher version is valid
                     } else if (Integer.valueOf(vSegments[i]) < minDockerVersion[i]) {
                         valid = false;
                     }
