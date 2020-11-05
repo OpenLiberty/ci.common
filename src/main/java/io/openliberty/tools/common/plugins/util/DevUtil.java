@@ -578,6 +578,10 @@ public abstract class DevUtil {
             // Set debug variables in server.env if debug enabled
             enableServerDebug();
 
+            if (container) {
+                checkDockerVersion();
+            }
+
             // build Docker image if in container mode
             if (container && buildContainer) {
                 File dockerfileToUse = getDockerfile();
@@ -739,6 +743,43 @@ public abstract class DevUtil {
             parseHostNameAndPorts(serverTask, messagesLogFile);
         } catch (IOException e) {
             throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Retrieve the current docker version and compare to a known value.
+     * Assumes the version number is in the format XX.YY.ZZ.
+     * Throw an exception if there is a problem with the version.
+     */
+    private static int[] minDockerVersion = { 18, 3, 0 }; // Must use Docker 18.03.00 or higher
+    private void checkDockerVersion() throws PluginExecutionException {
+        String versionCmd = "docker version --format {{.Client.Version}}";
+        String dockerVersion = execDockerCmd(versionCmd, 10);
+        if (dockerVersion == null) {
+            return; // can't tell if the version is valid.
+        }
+        String[] vSegments = dockerVersion.trim().split("[.]");
+        debug("detected Docker version >" + dockerVersion + "< segments detected=" + vSegments.length);
+        boolean valid = true;
+        if (vSegments.length != minDockerVersion.length) {
+            valid = false;
+        }
+        if (valid) {
+            for (int i = 0; i < vSegments.length && valid; i++) {
+                try {
+                    debug("segment " + i + " is " + vSegments[i]);
+                    if (Integer.valueOf(vSegments[i]) > minDockerVersion[i]) {
+                        break; // high version is valid
+                    } else if (Integer.valueOf(vSegments[i]) < minDockerVersion[i]) {
+                        valid = false;
+                    }
+                } catch (NumberFormatException n) {
+                    valid = false; // version number must be a number
+                }
+            }
+        }
+        if (!valid) {
+            throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.00 or higher.");
         }
     }
 
