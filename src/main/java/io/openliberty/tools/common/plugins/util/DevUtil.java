@@ -1977,7 +1977,7 @@ public abstract class DevUtil {
                     info(formatAttentionTitle("Liberty container port information:"));
                 }
                 if (nonDefaultHttpPortUsed || nonDefaultHttpsPortUsed || (libertyDebug && nonDefaultDebugPortUsed)) {
-                    warn(formatAttentionMessage("The Liberty container is using non-default host ports."));
+                    warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
                 }
                 if (containerHttpPort != null) {
                     if (httpPort != null) {
