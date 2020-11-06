@@ -1174,14 +1174,12 @@ public abstract class DevUtil {
 
     private void stopContainer() {
         try {
-            if (dockerRunProcess != null) {
-                // see if docker run command (container) is still running before trying to stop it.
-                if (dockerRunProcess.isAlive()) {
-                    info("Stopping container...");
-                    String dockerStopCmd = "docker stop " + containerName;
-                    debug("Stopping container " + containerName);
-                    execDockerCmd(dockerStopCmd, 30);
-                }
+            // see if docker run command (container) is still running before trying to stop it.
+            if (dockerRunProcess != null && dockerRunProcess.isAlive()) {
+                info("Stopping container...");
+                String dockerStopCmd = "docker stop " + containerName;
+                debug("Stopping container " + containerName);
+                execDockerCmd(dockerStopCmd, 30);
             }
         } catch (RuntimeException r) {
             error("Error stopping container: " + r.getMessage());
