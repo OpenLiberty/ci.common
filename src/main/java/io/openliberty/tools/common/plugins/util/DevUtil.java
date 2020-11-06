@@ -84,6 +84,8 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 
+import org.apache.maven.artifact.versioning.ComparableVersion;
+
 import io.openliberty.tools.ant.ServerTask;
 import io.openliberty.tools.common.plugins.config.ServerConfigDropinXmlDocument;
 
@@ -748,37 +750,20 @@ public abstract class DevUtil {
 
     /**
      * Retrieve the current docker version and compare to a known value.
-     * Assumes the version number is in the format XX.YY.ZZ.
+     * The Maven class ComparableVersion allows for numbers, letters and certain words.
      * Throw an exception if there is a problem with the version.
      */
-    private static int[] minDockerVersion = { 18, 3, 0 }; // Must use Docker 18.03.00 or higher
+    private static String minDockerVersion = "18.03.00"; // Must use Docker 18.03.00 or higher
     private void checkDockerVersion() throws PluginExecutionException {
         String versionCmd = "docker version --format {{.Client.Version}}";
         String dockerVersion = execDockerCmd(versionCmd, 10);
         if (dockerVersion == null) {
             return; // can't tell if the version is valid.
         }
-        String[] vSegments = dockerVersion.trim().split("[.]");
-        debug("detected Docker version >" + dockerVersion + "< segments detected=" + vSegments.length);
-        boolean valid = true;
-        if (vSegments.length != minDockerVersion.length) {
-            valid = false;
-        }
-        if (valid) {
-            for (int i = 0; i < vSegments.length && valid; i++) {
-                try {
-                    debug("segment " + i + " is " + vSegments[i]);
-                    if (Integer.valueOf(vSegments[i]) > minDockerVersion[i]) {
-                        break; // a higher version is valid
-                    } else if (Integer.valueOf(vSegments[i]) < minDockerVersion[i]) {
-                        valid = false;
-                    }
-                } catch (NumberFormatException n) {
-                    valid = false; // version number must be a number
-                }
-            }
-        }
-        if (!valid) {
+        debug("Detected Docker version >" + dockerVersion);
+        ComparableVersion minVer = new ComparableVersion(minDockerVersion);
+        ComparableVersion curVer = new ComparableVersion(dockerVersion);
+        if (curVer.compareTo(minVer) < 0) {
             throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.00 or higher.");
         }
     }
