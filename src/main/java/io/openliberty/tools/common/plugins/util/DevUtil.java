@@ -84,6 +84,8 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 
+import org.apache.maven.artifact.versioning.ComparableVersion;
+
 import io.openliberty.tools.ant.ServerTask;
 import io.openliberty.tools.common.plugins.config.ServerConfigDropinXmlDocument;
 
@@ -579,6 +581,10 @@ public abstract class DevUtil {
             // Set debug variables in server.env if debug enabled
             enableServerDebug();
 
+            if (container) {
+                checkDockerVersion();
+            }
+
             // build Docker image if in container mode
             if (container && buildContainer) {
                 File dockerfileToUse = getDockerfile();
@@ -740,6 +746,26 @@ public abstract class DevUtil {
             parseHostNameAndPorts(serverTask, messagesLogFile);
         } catch (IOException e) {
             throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Retrieve the current docker version and compare to a known value.
+     * The Maven class ComparableVersion allows for numbers, letters and certain words.
+     * Throw an exception if there is a problem with the version.
+     */
+    private static final String MIN_DOCKER_VERSION = "18.03.00"; // Must use Docker 18.03.00 or higher
+    private void checkDockerVersion() throws PluginExecutionException {
+        String versionCmd = "docker version --format {{.Client.Version}}";
+        String dockerVersion = execDockerCmd(versionCmd, 10);
+        if (dockerVersion == null) {
+            return; // can't tell if the version is valid.
+        }
+        debug("Detected Docker version >" + dockerVersion);
+        ComparableVersion minVer = new ComparableVersion(MIN_DOCKER_VERSION);
+        ComparableVersion curVer = new ComparableVersion(dockerVersion);
+        if (curVer.compareTo(minVer) < 0) {
+            throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.00 or higher.");
         }
     }
 
