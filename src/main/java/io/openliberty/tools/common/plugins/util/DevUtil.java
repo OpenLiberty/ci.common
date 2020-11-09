@@ -323,12 +323,13 @@ public abstract class DevUtil {
     private String imageName;
     private String containerName;
     private File dockerfile;
-    private Path tempDockerfilePath;
+    private Path tempDockerfilePath = null;
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
     private int dockerBuildTimeout;
     private boolean skipDefaultPorts;
+    private boolean keepTempDockerfile;
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
     private boolean firstStartup = true;
@@ -343,7 +344,7 @@ public abstract class DevUtil {
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
             boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
-            JavaCompilerOptions compilerOptions) {
+            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -388,6 +389,7 @@ public abstract class DevUtil {
         }
         this.skipDefaultPorts = skipDefaultPorts;
         this.compilerOptions = compilerOptions;
+        this.keepTempDockerfile = keepTempDockerfile;
     }
 
     /**
@@ -1012,9 +1014,11 @@ public abstract class DevUtil {
             debug("Creating temp Dockerfile...");
             tempDockerfile = File.createTempFile("tempDockerfile", "");
             debug("temp Dockerfile: " + tempDockerfile);
-            tempDockerfilePath = tempDockerfile.toPath();
-            // set the tempDockerfile to be deleted when the JVM exits
-            tempDockerfile.deleteOnExit();
+            tempDockerfilePath = tempDockerfile.toPath(); // save name to clean up later
+            if (!keepTempDockerfile) {
+                // set the tempDockerfile to be deleted when the JVM exits
+                tempDockerfile.deleteOnExit();
+            }
             Files.write(tempDockerfile.toPath(), dockerfileLines, StandardCharsets.UTF_8);
         } catch (IOException e) {
             error("Failed to create temp Dockerfile");
@@ -1703,7 +1707,7 @@ public abstract class DevUtil {
     }
 
     public void cleanUpTempDockerfile() {
-        if (tempDockerfilePath != null) {
+        if (!keepTempDockerfile && tempDockerfilePath != null) {
             File tempDockerfile = tempDockerfilePath.toFile();
             if (tempDockerfile.exists()) {
                 try {
