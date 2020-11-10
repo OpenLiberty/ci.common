@@ -1016,7 +1016,7 @@ public abstract class DevUtil {
             debug("temp Dockerfile: " + tempDockerfile);
             tempDockerfilePath = tempDockerfile.toPath(); // save name to clean up later
             if (keepTempDockerfile) {
-                info("Saving temporary Dockerfile named:"+tempDockerfilePath);
+                info("Keeping temporary Dockerfile: "+tempDockerfilePath);
             } else {
                 // set the tempDockerfile to be deleted when the JVM exits
                 tempDockerfile.deleteOnExit();
