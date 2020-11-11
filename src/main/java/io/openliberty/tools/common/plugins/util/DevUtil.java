@@ -1408,13 +1408,13 @@ public abstract class DevUtil {
         String result = execDockerCmd(dockerIPAddressCmd, 10, false);
         if (result == null || result.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
             warn("Unable to retrieve container IP address for network '" + network + "'.");
-            result = "<no value>"; // this is what Docker displays when an IP address it not found for a network
+            return "<no value>"; // this is what Docker displays when an IP address it not found for a network
         }
-        return result;
+        return removeSurroundingQuotes(result.trim());
     }
 
     protected static String removeSurroundingQuotes(String str) {
-        if (str != null && str.length() >= 2 && str.startsWith("\"") && str.endsWith("\"")) {
+        if (str != null && str.length() >= 2 && ((str.startsWith("\"") && str.endsWith("\"")) || (str.startsWith("\'") && str.endsWith("\'")))) {
             return str.substring(1, str.length()-1);
         }
         return str;
