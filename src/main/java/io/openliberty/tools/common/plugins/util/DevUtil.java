@@ -559,19 +559,23 @@ public abstract class DevUtil {
     }
 
     public void startServer() throws PluginExecutionException {
-        startServer(true);
+        startServer(true, true);
     }
 
     /**
      * Start the server and keep it running in a background thread.
-     * @param  buildContainer           Force a Docker build when in container mode.
-     *                                  Ignored otherwise.
+     * 
+     * @param buildContainer  Force a Docker build when in container mode. Ignored
+     *                        otherwise.
+     * @param pullParentImage If buildContainer is true, this determines whether the
+     *                        Docker build should also pull the latest parent image.
+     *                        Ignored otherwise.
      * 
      * @throws PluginExecutionException If the server startup could not be verified
      *                                  within the timeout, or server startup
      *                                  failed.
      */
-    public void startServer(boolean buildContainer) throws PluginExecutionException {
+    public void startServer(boolean buildContainer, boolean pullParentImage) throws PluginExecutionException {
         try {
             final ServerTask serverTask;
             try {
@@ -593,7 +597,7 @@ public abstract class DevUtil {
                 debug("Dockerfile to use: " + dockerfileToUse);
                 if (dockerfileToUse.exists()) {
                     File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
-                    buildDockerImage(tempDockerfile, dockerfileToUse);
+                    buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage);
                 } else {
                     // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
                     throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
@@ -1029,14 +1033,19 @@ public abstract class DevUtil {
         return tempDockerfile;
     }
 
-    private void buildDockerImage(File tempDockerfile, File userDockerfile) throws PluginExecutionException {
+    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage) throws PluginExecutionException {
         try {
             info("Building Docker image...");
-            String buildCmd;
             imageName = getProjectName() + DEVMODE_IMAGE_SUFFIX;
             // The image is built using the tempDockerfile, but the build context comes from the user's Dockerfile location
             debug("Docker build context: " + userDockerfile.getParent());
-            buildCmd = "docker build -f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent();
+            StringBuilder sb = new StringBuilder();
+            sb.append("docker build ");
+            if (pullParentImage) {
+                sb.append("--pull ");
+            }
+            sb.append("-f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent());
+            String buildCmd = sb.toString();
             info(buildCmd);
             long startTime = System.currentTimeMillis();
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
@@ -1518,7 +1527,7 @@ public abstract class DevUtil {
         libertyCreate();
         libertyInstallFeature();
         libertyDeploy();
-        startServer(buildContainer);
+        startServer(buildContainer, false);
         setDevStop(false);
         info("The server has been restarted.");
         printDevModeMessages(inputUnavailable.get(), true);
