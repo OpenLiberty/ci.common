@@ -1384,6 +1384,35 @@ public abstract class DevUtil {
         return DEVMODE_CONTAINER_BASE_NAME + ((highestNum != -1) ? "-" + ++highestNum : "");
     }
 
+    private String[] getContainerNetworks(String contName) {
+        String dockerNetworkCmd = "docker inspect -f '{{.NetworkSettings.Networks}}' " + contName;
+        String cmdResult = execDockerCmd(dockerNetworkCmd, 10, false);
+        if (cmdResult == null || cmdResult.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
+            warn("Unable to retrieve container networks.");
+            return null;
+        }
+        else {
+            // Example cmdResult value: map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]
+            String resultSub = cmdResult.substring(cmdResult.indexOf("[") + 1, cmdResult.indexOf("]") -1);
+            String[] networkHash = resultSub.split(" ");
+            String[] networks = new String[networkHash.length];
+            for (int i=0; i < networkHash.length; i++) {
+                networks[i] = networkHash[i].split(":")[0];
+            }
+            return networks;
+        }
+    }
+
+    private String getContainerIPAddress(String contName, String network) {
+        String dockerIPAddressCmd = "docker inspect -f '{{.NetworkSettings.Networks." + network + ".IPAddress}}' " + contName;
+        String result = execDockerCmd(dockerIPAddressCmd, 10, false);
+        if (result == null || result.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
+            warn("Unable to retrieve container IP address for network '" + network + "'.");
+            result = "<no value>"; // this is what Docker displays when an IP address it not found for a network
+        }
+        return result;
+    }
+
     protected static String removeSurroundingQuotes(String str) {
         if (str != null && str.length() >= 2 && str.startsWith("\"") && str.endsWith("\"")) {
             return str.substring(1, str.length()-1);
@@ -2007,6 +2036,16 @@ public abstract class DevUtil {
                         info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
                     } else {
                         info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ] <"));
+                    }
+                }
+                info(formatAttentionMessage(""));
+                info(formatAttentionTitle("Docker network information:"));
+                info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
+
+                String[] networks = getContainerNetworks(containerName);
+                if (networks != null) {
+                    for (String network : networks) {
+                        info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on Docker network [ " + network + " ]"));
                     }
                 }
             }
