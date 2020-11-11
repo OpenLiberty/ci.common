@@ -1393,11 +1393,11 @@ public abstract class DevUtil {
         }
         else {
             // Example cmdResult value: map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]
-            String resultSub = cmdResult.substring(cmdResult.indexOf("[") + 1, cmdResult.indexOf("]") -1);
-            String[] networkHash = resultSub.split(" ");
-            String[] networks = new String[networkHash.length];
-            for (int i=0; i < networkHash.length; i++) {
-                networks[i] = networkHash[i].split(":")[0];
+            String networkMap = cmdResult.substring(cmdResult.indexOf("[") + 1, cmdResult.indexOf("]") -1);
+            String[] networkHex = networkMap.split(" ");
+            String[] networks = new String[networkHex.length];
+            for (int i=0; i < networkHex.length; i++) {
+                networks[i] = networkHex[i].split(":")[0];
             }
             return networks;
         }
