@@ -1308,10 +1308,22 @@ public abstract class DevUtil {
         
         if (libertyDebug) {
             // map debug port
-            int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-            command.append(" -p " + debugPort + ":" + debugPort);
+            int containerDebugPort, hostDebugPort;
+            try {
+                if (alternativeDebugPort == -1) {
+                    // it is possible another JVM has grabbed our port since dev mode last checked
+                    hostDebugPort = findAvailablePort(libertyDebugPort, true);
+                    containerDebugPort = libertyDebugPort;
+                } else {
+                    // dev mode has already selected an ephemeral port
+                    containerDebugPort = hostDebugPort = alternativeDebugPort;
+                }
+            } catch (IOException x) {
+                containerDebugPort = hostDebugPort = libertyDebugPort;
+            }
+            command.append(" -p " + hostDebugPort + ":" + containerDebugPort);
             // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
-            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + debugPort);
+            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort);
         }
 
         // mount .war.xml potential directories - override /config/apps and /config/dropins
