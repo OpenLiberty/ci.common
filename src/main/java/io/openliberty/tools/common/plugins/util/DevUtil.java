@@ -1191,6 +1191,17 @@ public abstract class DevUtil {
                     info(line);
                 } else {
                     error(line);
+
+                    // Look for JVM version error in the line
+                    if (container && line.contains("JVMCFRE003")) {
+                        if (gradle) {
+                            // Gradle doesn't show errors in an obvious way, so use some formatting to make it stand out more
+                            error("***** [ ERROR ] ***** Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Gradle build to correspond to the Java version used in your Dockerfile or its parent image, then restart dev mode.");
+                        } else {
+                            // Maven project should be cleaned before restarting dev mode, otherwise compile does not realize Java version settings have changed
+                            error("Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Maven build to correspond to the Java version used in your Dockerfile or its parent image, then clean the project output and restart dev mode.");
+                        }
+                    }
                 }
             }
         } catch (IOException e) {
