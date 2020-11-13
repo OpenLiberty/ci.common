@@ -1384,6 +1384,11 @@ public abstract class DevUtil {
         return DEVMODE_CONTAINER_BASE_NAME + ((highestNum != -1) ? "-" + ++highestNum : "");
     }
 
+    /**
+     * Retrieves all the networks a container is connected to
+     * @param contName name of the container to check for networks
+     * @return a String array containing the names of the networks the specified container is connected to
+     */
     private String[] getContainerNetworks(String contName) {
         String dockerNetworkCmd = "docker inspect -f '{{.NetworkSettings.Networks}}' " + contName;
         String cmdResult = execDockerCmd(dockerNetworkCmd, 10, false);
@@ -1392,15 +1397,28 @@ public abstract class DevUtil {
             return null;
         }
         else {
-            // Example cmdResult value: map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]
-            String networkMap = cmdResult.substring(cmdResult.indexOf("[") + 1, cmdResult.indexOf("]") -1);
-            String[] networkHex = networkMap.split(" ");
-            String[] networks = new String[networkHex.length];
-            for (int i=0; i < networkHex.length; i++) {
-                networks[i] = networkHex[i].split(":")[0];
-            }
-            return networks;
+            return parseNetworks(removeSurroundingQuotes(cmdResult.trim()));
         }
+    }
+
+     /**
+     * Parses Docker network names from a "docker inspect" command result on a container.
+     * @param dockerResult the result from the command "docker inspect -f '{{.NetworkSettings.Networks}}' containerName"
+     * -> dockerResult must not contain surrounding quotes or leading/trailing whitespace
+     * @return a String array containing the names of the networks contained in the dockerResult parameter
+     */
+    protected static String[] parseNetworks(String dockerResult) {
+        // Example dockerResult value: map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]
+        if (!dockerResult.matches("map\\[(.*?)\\]")) {
+            return null;
+        }
+        String networkMap = dockerResult.substring(dockerResult.indexOf("[")+1, dockerResult.indexOf("]"));
+        String[] networkHex = networkMap.split(" ");
+        String[] networks = new String[networkHex.length];
+        for (int i=0; i < networkHex.length; i++) {
+            networks[i] = networkHex[i].split(":")[0];
+        }
+        return networks;
     }
 
     private String getContainerIPAddress(String contName, String network) {

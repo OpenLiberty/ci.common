@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertArrayEquals;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -434,13 +435,46 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertEquals("liberty_dev", DevUtil.removeSurroundingQuotes("liberty_dev"));
 
         // one-sided quote should not be removed
+        // double quotes
         assertEquals("\"", DevUtil.removeSurroundingQuotes("\""));
         assertEquals("\"liberty_dev", DevUtil.removeSurroundingQuotes("\"liberty_dev"));
         assertEquals("liberty_dev\"", DevUtil.removeSurroundingQuotes("liberty_dev\""));
+        // single quotes
+        assertEquals("\'", DevUtil.removeSurroundingQuotes("\'"));
+        assertEquals("\'liberty_dev", DevUtil.removeSurroundingQuotes("\'liberty_dev"));
+        assertEquals("liberty_dev\'", DevUtil.removeSurroundingQuotes("liberty_dev\'"));
 
         // surrounding quotes should be removed
+        // double quotes
         assertEquals("liberty_dev", DevUtil.removeSurroundingQuotes("\"liberty_dev\""));
         assertEquals("", DevUtil.removeSurroundingQuotes("\"\""));
+        // single quotes
+        assertEquals("liberty_dev", DevUtil.removeSurroundingQuotes("\'liberty_dev\'"));
+        assertEquals("", DevUtil.removeSurroundingQuotes("\'\'"));
+    }
+
+    @Test
+    public void testParseNetworks() {
+        String[] networkArray = new String[]{"bridge"};
+        assertArrayEquals(networkArray, DevUtil.parseNetworks("map[bridge:0xc000622000]"));
+
+        networkArray = new String[]{"bridge", "myNet"};
+        assertArrayEquals(networkArray, DevUtil.parseNetworks("map[bridge:0xc000622000 myNet:0xc0006220c0]"));
+
+        networkArray = new String[]{"bridge", "myNet", "otherNet"};
+        assertArrayEquals(networkArray, DevUtil.parseNetworks("map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]"));
+
+        networkArray = new String[]{"bridge", "myNet"};
+        assertArrayEquals(networkArray, DevUtil.parseNetworks("map[bridge myNet]"));
+
+        networkArray = new String[]{"bridge", ""};
+        assertArrayEquals(networkArray, DevUtil.parseNetworks("map[bridge: :myNet:]"));
+
+        assertArrayEquals(null, DevUtil.parseNetworks("mapbridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]"));
+        assertArrayEquals(null, DevUtil.parseNetworks("map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180"));
+        assertArrayEquals(null, DevUtil.parseNetworks("[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]"));
+        assertArrayEquals(null, DevUtil.parseNetworks("string"));
+        assertArrayEquals(null, DevUtil.parseNetworks(""));
     }
 
 }
