@@ -1449,8 +1449,55 @@ public abstract class DevUtil {
         return DEVMODE_CONTAINER_BASE_NAME + ((highestNum != -1) ? "-" + ++highestNum : "");
     }
 
+    /**
+     * Retrieves all the networks a container is connected to
+     * @param contName name of the container to check for networks
+     * @return a String array containing the names of the networks the specified container is connected to
+     */
+    private String[] getContainerNetworks(String contName) {
+        String dockerNetworkCmd = "docker inspect -f '{{.NetworkSettings.Networks}}' " + contName;
+        String cmdResult = execDockerCmd(dockerNetworkCmd, 10, false);
+        if (cmdResult == null || cmdResult.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
+            warn("Unable to retrieve container networks.");
+            return null;
+        }
+        else {
+            return parseNetworks(removeSurroundingQuotes(cmdResult.trim()));
+        }
+    }
+
+     /**
+     * Parses Docker network names from a "docker inspect" command result on a container.
+     * @param dockerResult the result from the command "docker inspect -f '{{.NetworkSettings.Networks}}' containerName"
+     * -> dockerResult must not contain surrounding quotes or leading/trailing whitespace
+     * @return a String array containing the names of the networks contained in the dockerResult parameter
+     */
+    protected static String[] parseNetworks(String dockerResult) {
+        // Example dockerResult value: map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]
+        if (!dockerResult.matches("map\\[(.*?)\\]")) {
+            return null;
+        }
+        String networkMap = dockerResult.substring(dockerResult.indexOf("[")+1, dockerResult.indexOf("]"));
+        String[] networkHex = networkMap.split(" ");
+        String[] networks = new String[networkHex.length];
+        for (int i=0; i < networkHex.length; i++) {
+            networks[i] = networkHex[i].split(":")[0];
+        }
+        return networks;
+    }
+
+    private String getContainerIPAddress(String contName, String network) {
+        String dockerIPAddressCmd = "docker inspect -f '{{.NetworkSettings.Networks." + network + ".IPAddress}}' " + contName;
+        String result = execDockerCmd(dockerIPAddressCmd, 10, false);
+        if (result == null || result.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
+            warn("Unable to retrieve container IP address for network '" + network + "'.");
+            return "<no value>"; // this is what Docker displays when an IP address it not found for a network
+        }
+        return removeSurroundingQuotes(result.trim());
+    }
+
     protected static String removeSurroundingQuotes(String str) {
-        if (str != null && str.length() >= 2 && str.startsWith("\"") && str.endsWith("\"")) {
+        if (str != null && str.length() >= 2 && ((str.startsWith("\"") && str.endsWith("\"")) || (str.startsWith("\'") && str.endsWith("\'")))) {
             return str.substring(1, str.length()-1);
         }
         return str;
@@ -2072,6 +2119,16 @@ public abstract class DevUtil {
                         info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
                     } else {
                         info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ] <"));
+                    }
+                }
+                info(formatAttentionMessage(""));
+                info(formatAttentionTitle("Docker network information:"));
+                info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
+
+                String[] networks = getContainerNetworks(containerName);
+                if (networks != null) {
+                    for (String network : networks) {
+                        info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on Docker network [ " + network + " ]"));
                     }
                 }
             }
