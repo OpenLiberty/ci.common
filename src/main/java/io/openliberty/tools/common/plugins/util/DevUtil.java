@@ -2088,7 +2088,9 @@ public abstract class DevUtil {
                     info(formatAttentionMessage(""));
                     info(formatAttentionTitle("Liberty container port information:"));
                 }
-                if (nonDefaultHttpPortUsed || nonDefaultHttpsPortUsed || (libertyDebug && nonDefaultDebugPortUsed)) {
+                if ((containerHttpPort != null && nonDefaultHttpPortUsed)
+                        || (containerHttpsPort != null && nonDefaultHttpsPortUsed)
+                        || (libertyDebug && nonDefaultDebugPortUsed)) {
                     warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
                 }
                 if (containerHttpPort != null) {
