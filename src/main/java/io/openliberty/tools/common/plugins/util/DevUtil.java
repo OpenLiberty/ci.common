@@ -2896,7 +2896,7 @@ public abstract class DevUtil {
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    restartOnDockerfileDirectoryChanged();
+                    untrackDockerfileDirectoriesAndRestart();
                 } else {
                     if (changeType == ChangeType.CREATE) {
                         redeployApp();
@@ -2915,7 +2915,7 @@ public abstract class DevUtil {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    restartOnDockerfileDirectoryChanged();
+                    untrackDockerfileDirectoriesAndRestart();
                 } else {
                     if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
@@ -2943,7 +2943,7 @@ public abstract class DevUtil {
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    restartOnDockerfileDirectoryChanged();
+                    untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
                     redeployApp();
                 }
@@ -2954,7 +2954,7 @@ public abstract class DevUtil {
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    restartOnDockerfileDirectoryChanged();
+                    untrackDockerfileDirectoriesAndRestart();
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
@@ -2964,7 +2964,7 @@ public abstract class DevUtil {
             // This is for bootstrap.properties outside of the config folder
             // restart server to load new properties
             if (isDockerfileDirectoryChanged(fileChanged)) {
-                restartOnDockerfileDirectoryChanged();
+                untrackDockerfileDirectoriesAndRestart();
             } else {
                 restartServer(false);
             }
@@ -2974,7 +2974,7 @@ public abstract class DevUtil {
             // This is for jvm.options outside of the config folder
             // restart server to load new options
             if (isDockerfileDirectoryChanged(fileChanged)) {
-                restartOnDockerfileDirectoryChanged();
+                untrackDockerfileDirectoriesAndRestart();
             } else {
                 restartServer(false);
             }
@@ -3013,7 +3013,7 @@ public abstract class DevUtil {
         } else if (fileChanged.equals(dockerfileUsed)
                 && directory.startsWith(dockerfileUsed.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // dockerfile
-            restartServer(true); // rebuild container and restart
+            untrackDockerfileDirectoriesAndRestart(); // untrack all Dockerfile directories, then rebuild container and restart
         } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)) { // properties file
             boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
             // run all tests on properties file change
@@ -3022,7 +3022,7 @@ public abstract class DevUtil {
             }
         } else if (isDockerfileDirectoryChanged(fileChanged)) {
             // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
-            restartOnDockerfileDirectoryChanged();
+            untrackDockerfileDirectoriesAndRestart();
         }
     }
 
@@ -3032,7 +3032,7 @@ public abstract class DevUtil {
      * 
      * @throws PluginExecutionException
      */
-    private void restartOnDockerfileDirectoryChanged() throws PluginExecutionException {
+    private void untrackDockerfileDirectoriesAndRestart() throws PluginExecutionException {
         // Cancel and clear any WatchKeys that were added for to the Dockerfile directories
         for (WatchKey key : dockerfileDirectoriesWatchKeys) {
             key.cancel();
