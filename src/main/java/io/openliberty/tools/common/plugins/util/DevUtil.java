@@ -1965,38 +1965,71 @@ public abstract class DevUtil {
 
         ServerSocket serverSocket = null;
         while (portToTry < 65535) {
-            try {
-                // try binding to the portToTry
-                serverSocket = new ServerSocket(portToTry);
-                return serverSocket.getLocalPort();
-            } catch (IOException e) {
-                if (serverSocket != null) {
-                    serverSocket.close();
-                }
-                if (isDebugPort) {
-                    // if binding failed, try binding to a random port
-                    serverSocket = new ServerSocket(0);
-                    int availablePort = serverSocket.getLocalPort();
-                    if (portToTry == preferredPort) {
-                        warn("The debug port " + preferredPort + " is not available.  Using " + availablePort
-                                + " as the debug port instead.");
-                    } else {
-                        debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using "
-                                + availablePort + " as the debug port instead.");
+            if (OSUtil.isWindows()) {
+                try {
+                    // try binding to the portToTry
+                    serverSocket = new ServerSocket(portToTry);
+                    return serverSocket.getLocalPort();
+                } catch (IOException e) {
+                    if (serverSocket != null) {
+                        serverSocket.close();
                     }
-                    alternativeDebugPort = availablePort;
-                    return availablePort;
-                } else {
-                    debug("findAvailablePort found port is in use: " + portToTry);
-                    ++portToTry;
+                    if (isDebugPort) {
+                        // if binding failed, try binding to a random port
+                        serverSocket = new ServerSocket(0);
+                        int availablePort = serverSocket.getLocalPort();
+                        processAvailableDebugPort(preferredPort, portToTry, availablePort);
+                        return availablePort;
+                    } else {
+                        debug("findAvailablePort found port is in use: " + portToTry);
+                        ++portToTry;
+                    }
+                } finally {
+                    if (serverSocket != null) {
+                        serverSocket.close();
+                    }
                 }
-            } finally {
-                if (serverSocket != null) {
-                    serverSocket.close();
+            } else {
+                try {
+                    serverSocket = new ServerSocket();
+                    serverSocket.setReuseAddress(false);
+                    // try binding to the loopback address at the port to try
+                    serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), portToTry), 1);
+                    return serverSocket.getLocalPort();
+                } catch (IOException e) {
+                    if (serverSocket != null) {
+                        if (isDebugPort) {
+                            // if binding failed, try binding to a random port
+                            serverSocket.bind(null, 1);
+                            int availablePort = serverSocket.getLocalPort();
+                            processAvailableDebugPort(preferredPort, portToTry, availablePort);
+                            return availablePort;
+                        } else {
+                            debug("findAvailablePort found port is in use: " + portToTry);
+                            ++portToTry;
+                        }
+                    } else {
+                        throw new IOException("Could not create a server socket.", e);
+                    }
+                } finally {
+                    if (serverSocket != null) {
+                        serverSocket.close();
+                    }
                 }
             }
         }
         return preferredPort; // usual return is from the try or the catch
+    }
+
+    private void processAvailableDebugPort(int preferredPort, int portToTry, int availablePort) {
+        if (portToTry == preferredPort) {
+            warn("The debug port " + preferredPort + " is not available.  Using " + availablePort
+                    + " as the debug port instead.");
+        } else {
+            debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using "
+                    + availablePort + " as the debug port instead.");
+        }
+        alternativeDebugPort = availablePort;
     }
 
     private HotkeyReader hotkeyReader = null;
