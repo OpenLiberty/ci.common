@@ -135,9 +135,7 @@ public class DevUtilTest extends BaseDevUtilTest {
         ServerSocket serverSocket = null;
         ServerSocket serverSocket2 = null;
         try {
-            serverSocket = new ServerSocket();
-            serverSocket.setReuseAddress(false);
-            serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), availablePort), 1);
+            serverSocket = new ServerSocket(availablePort);
 
             // previous port is bound, so calling findAvailablePort again should get another port
             int availablePort2 = util.findAvailablePort(preferredPort, true);
@@ -155,9 +153,7 @@ public class DevUtilTest extends BaseDevUtilTest {
             assertEquals(availablePort2, availablePort3);
 
             // bind to the previous port
-            serverSocket2 = new ServerSocket();
-            serverSocket2.setReuseAddress(false);
-            serverSocket2.bind(new InetSocketAddress(InetAddress.getByName(null), availablePort2), 1);
+            serverSocket2 = new ServerSocket(availablePort2);
 
             // previous port is now bound, so calling findAvailablePort again should get another port
             int availablePort4 = util.findAvailablePort(preferredPort, true);
