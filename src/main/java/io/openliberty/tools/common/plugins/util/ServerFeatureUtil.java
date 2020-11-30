@@ -455,7 +455,7 @@ public abstract class ServerFeatureUtil {
             while (m.find()) {
                 String variable = m.group(1);
                 
-                String propertyValue = properties.getProperty(variable, "\\$\\{" + variable + "\\}");
+                String propertyValue = properties.getProperty(variable, "${" + variable + "}");
                 
                 // Remove encapsulating ${} characters and validate that a valid liberty directory property was configured
                 propertyValue = removeEncapsulatingEnvVarSyntax(propertyValue, properties); 
