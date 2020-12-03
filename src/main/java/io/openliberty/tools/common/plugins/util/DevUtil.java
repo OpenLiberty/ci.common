@@ -760,7 +760,7 @@ public abstract class DevUtil {
      * The Maven class ComparableVersion allows for numbers, letters and certain words.
      * Throw an exception if there is a problem with the version.
      */
-    private static final String MIN_DOCKER_VERSION = "18.03.00"; // Must use Docker 18.03.00 or higher
+    private static final String MIN_DOCKER_VERSION = "18.03.0"; // Must use Docker 18.03.0 or higher
     private void checkDockerVersion() throws PluginExecutionException {
         String versionCmd = "docker version --format {{.Client.Version}}";
         String dockerVersion = execDockerCmd(versionCmd, 10);
@@ -771,7 +771,7 @@ public abstract class DevUtil {
         ComparableVersion minVer = new ComparableVersion(MIN_DOCKER_VERSION);
         ComparableVersion curVer = new ComparableVersion(dockerVersion);
         if (curVer.compareTo(minVer) < 0) {
-            throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.00 or higher.");
+            throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.0 or higher.");
         }
     }
 
