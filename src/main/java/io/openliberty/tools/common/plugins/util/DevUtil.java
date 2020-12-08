@@ -338,6 +338,7 @@ public abstract class DevUtil {
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
     private final JavaCompilerOptions compilerOptions;
+    private AtomicBoolean externalContainerShutdown;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -390,6 +391,7 @@ public abstract class DevUtil {
         this.skipDefaultPorts = skipDefaultPorts;
         this.compilerOptions = compilerOptions;
         this.keepTempDockerfile = keepTempDockerfile;
+        this.externalContainerShutdown = new AtomicBoolean(false);
     }
 
     /**
@@ -627,7 +629,7 @@ public abstract class DevUtil {
                             // If a runtime exception occurred in the server task, log and set the exception field
                             PluginExecutionException e2;
                             if (container) {
-                                e2 = new PluginExecutionException("An error occurred while starting the container: " + e.getMessage(), e);
+                                e2 = new PluginExecutionException("An error occurred while running the container: " + e.getMessage(), e);
                             } else {
                                 e2 = new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
                             }
@@ -1152,7 +1154,12 @@ public abstract class DevUtil {
             startingProcess.waitFor(timeout, TimeUnit.SECONDS);
         }
         if (startingProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
-            debug("Error running docker command, return value=" + startingProcess.exitValue());
+            // return code 143 corresponds to 'docker stop xxx' so assume user requested to stop
+            if (startingProcess.exitValue() == 143) {
+                setDevStop(true); // indicate intentional shutdown
+                externalContainerShutdown.set(true); // container shut down by external command
+            }
+            debug("Unexpected exit running docker command, return value=" + startingProcess.exitValue());
             // show first message from standard err
             String errorMessage = new String(firstErrorLine).trim() + " RC=" + startingProcess.exitValue();
             throw new RuntimeException(errorMessage);
@@ -2799,7 +2806,7 @@ public abstract class DevUtil {
         if (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED)) {
             // server is restarting if devStop was set to true and we have not called the shutdown hook
             boolean restarting = devStop.get() && !calledShutdownHook.get();
-            if (skipOnRestart && restarting) {
+            if (skipOnRestart && restarting && !externalContainerShutdown.get()) {
                 debug("Server is restarting. Allowing dev mode to continue.");
                 return;
             }
