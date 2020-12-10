@@ -92,7 +92,7 @@ import io.openliberty.tools.common.plugins.config.ServerConfigDropinXmlDocument;
 /**
  * Utility class for dev mode.
  */
-public abstract class DevUtil {
+public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
     private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
@@ -338,6 +338,8 @@ public abstract class DevUtil {
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
     private final JavaCompilerOptions compilerOptions;
+    private boolean shownFeaturesShWarning = false;
+    private final String mavenCacheLocation;
     private AtomicBoolean externalContainerShutdown;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
@@ -345,7 +347,7 @@ public abstract class DevUtil {
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
             boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
-            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile) {
+            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -384,13 +386,14 @@ public abstract class DevUtil {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
         }
         if (dockerBuildTimeout < 1) {
-            this.dockerBuildTimeout = 60;
+            this.dockerBuildTimeout = 600;
         } else {
             this.dockerBuildTimeout = dockerBuildTimeout;
         }
         this.skipDefaultPorts = skipDefaultPorts;
         this.compilerOptions = compilerOptions;
         this.keepTempDockerfile = keepTempDockerfile;
+        this.mavenCacheLocation = mavenCacheLocation;
         this.externalContainerShutdown = new AtomicBoolean(false);
     }
 
@@ -1200,14 +1203,17 @@ public abstract class DevUtil {
                     error(line);
 
                     // Look for JVM version error in the line
-                    if (container && line.contains("JVMCFRE003")) {
-                        if (gradle) {
-                            // Gradle doesn't show errors in an obvious way, so use some formatting to make it stand out more
-                            error("***** [ ERROR ] ***** Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Gradle build to correspond to the Java version used in your Dockerfile or its parent image, then restart dev mode.");
-                        } else {
+                    alertOnServerError(line, "JVMCFRE003",
+                            "Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Gradle build to correspond to the Java version used in your Dockerfile or its parent image, then restart dev mode.",
                             // Maven project should be cleaned before restarting dev mode, otherwise compile does not realize Java version settings have changed
-                            error("Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Maven build to correspond to the Java version used in your Dockerfile or its parent image, then clean the project output and restart dev mode.");
-                        }
+                            "Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Maven build to correspond to the Java version used in your Dockerfile or its parent image, then clean the project output and restart dev mode.",
+                            false);
+
+                    // Look for features not available
+                    String errMsg = "Feature definitions were not found in the container. To install features to the container, specify 'RUN features.sh' in your Dockerfile. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker";
+                    if (!shownFeaturesShWarning) {
+                        boolean alerted = alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true);
+                        shownFeaturesShWarning = alerted;
                     }
                 }
             }
@@ -1221,6 +1227,27 @@ public abstract class DevUtil {
             }
         }
         return firstLine;
+    }
+
+    private boolean alertOnServerError(String line, String errorCode, String gradleMessage, String mavenMessage, boolean warning) {
+        if (container && line.contains(errorCode)) {
+            if (gradle) {
+                // Gradle doesn't show errors in an obvious way, so use some formatting to make it stand out more
+                if (warning) {
+                    warn("***** [ WARNING ] ***** " + gradleMessage);
+                } else {
+                    error("***** [ ERROR ] ***** " + gradleMessage);
+                }
+            } else {
+                if (warning) {
+                    warn(mavenMessage);
+                } else {
+                    error(mavenMessage);
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     private String[] getCommandTokens(String command) {
@@ -1251,64 +1278,6 @@ public abstract class DevUtil {
 
     private String execDockerCmd(String command, int timeout) {
         return execDockerCmd(command, timeout, true);
-    }
-
-    /**
-     * @param timeout unit is seconds
-     * @return the stdout of the command or null for no output on stdout
-     */
-    private String execDockerCmd(String command, int timeout, boolean throwExceptionOnError) {
-        String result = null;
-        try {
-            debug("execDocker, timeout=" + timeout + ", cmd=" + command);
-            Process p = Runtime.getRuntime().exec(command);
-
-            p.waitFor(timeout, TimeUnit.SECONDS);
-
-            // After waiting for the process, handle the error case and normal termination.
-            if (p.exitValue() != 0) {
-                debug("Error running docker command, return value="+p.exitValue());
-                // read messages from standard err
-                char[] d = new char[1023];
-                new InputStreamReader(p.getErrorStream()).read(d);
-                String errorMessage = new String(d).trim()+" RC="+p.exitValue();
-                if (throwExceptionOnError) {
-                    throw new RuntimeException(errorMessage);
-                } else {
-                    return errorMessage;
-                }
-            }
-            result = readStdOut(p);
-        } catch (IllegalThreadStateException  e) {
-            // the timeout was too short and the docker command has not yet completed. There is no exit value.
-            debug("IllegalThreadStateException, message="+e.getMessage());
-            error("The docker command did not complete within the timeout period: " + timeout + " seconds.", e);
-            throw new RuntimeException("The docker command did not complete within the timeout period: " + timeout + " seconds. ");
-        } catch (InterruptedException e) {
-            // If a runtime exception occurred in the server task, log and rethrow
-            error("An interruption error occurred while running a docker command: " + e.getMessage(), e);
-            throw new RuntimeException(e.getMessage());
-        } catch (IOException e) {
-            // If a runtime exception occurred in the server task, log and rethrow
-            error("An error occurred while running a docker command: " + e.getMessage(), e);
-            throw new RuntimeException(e.getMessage());
-        }
-        return result;
-    }
-
-    private String readStdOut(Process p) throws IOException, InterruptedException {
-        String result = null;
-        // Read all the output on stdout and return it to the caller
-        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        StringBuffer allLines = new StringBuffer();
-        while ((line = in.readLine())!= null) {
-            allLines.append(line).append(" ");
-        }
-        if (allLines.length() > 0) {
-            result = allLines.toString();
-        }
-        return result;
     }
 
     /**
@@ -1364,6 +1333,9 @@ public abstract class DevUtil {
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
 
+        // mount the Maven .m2 cache directory for featureUtility to use. For now, featureUtility does not support Gradle cache.
+        command.append(" -v " + mavenCacheLocation + ":/devmode-maven-cache");
+
         // mount all files from COPY commands in the Dockerfile to allow for hot deployment
         command.append(getCopiedFiles());
 
@@ -1377,7 +1349,7 @@ public abstract class DevUtil {
                 error("The Docker option --name is specified with an unsupported value: empty string.");
                 // now generate a name so that the Docker errors make some sense to the user.
             }
-            containerName = getContainerName();
+            containerName = generateNewContainerName();
             command.append(" --name " +  containerName);
         } else {
             containerName = name;
@@ -1422,7 +1394,7 @@ public abstract class DevUtil {
         return null;
     }
 
-    private String getContainerName() {
+    private String generateNewContainerName() {
         String dockerContNamesCmd = "docker ps -a --format \"{{.Names}}\"";
         debug("docker container names list command: " + dockerContNamesCmd);
         String result = execDockerCmd(dockerContNamesCmd, 10);
@@ -1562,6 +1534,10 @@ public abstract class DevUtil {
 
     public abstract void libertyDeploy() throws PluginExecutionException;
 
+    /**
+     * Install features in regular dev mode. This method should not be used in container mode.
+     * @throws PluginExecutionException
+     */
     public abstract void libertyInstallFeature() throws PluginExecutionException;
 
     public void restartServer() throws PluginExecutionException {
@@ -1602,7 +1578,10 @@ public abstract class DevUtil {
         // suppress install feature warning
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
-        libertyInstallFeature();
+        // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
+        if (!container) {
+            libertyInstallFeature();
+        }
         libertyDeploy();
         startServer(buildContainer, false);
         setDevStop(false);
@@ -3829,6 +3808,10 @@ public abstract class DevUtil {
             }
         }
         return properties;
+    }
+
+    public String getContainerName() {
+        return containerName;
     }
 
 }
