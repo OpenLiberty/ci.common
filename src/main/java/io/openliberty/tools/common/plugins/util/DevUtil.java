@@ -966,6 +966,9 @@ public abstract class DevUtil {
                     String dest = srcOrDestArguments.get(srcOrDestArguments.size() - 1);
                     List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
                     for (String src : srcArguments) {
+                        if (isURL(src)) {
+                            continue;
+                        }
                         String sourcePath = buildContext + "/" + src;
                         File sourceFile = new File(sourcePath);
                         if (src.contains("*") || src.contains("?")) {
@@ -999,6 +1002,21 @@ public abstract class DevUtil {
             destMountString += srcMountFile.getName();
         }
         return destMountString;
+    }
+
+    /**
+     * Check the name used in Dockerfile for URL e.g. ADD https://repo.maven.apache.org/maven2/postgres9.jar /lib/
+     * @param name the source name in a copy or add command
+     * @return true if the name is a URL
+     */
+    private boolean isURL(String name) {
+        try {
+            URL url = new URL(name);
+            debug("Checking Dockerfile ADD/COPY filename, URL protocol=" + url.getProtocol());
+        } catch (MalformedURLException m) {
+            return false;
+        }
+        return true;
     }
 
     protected File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
