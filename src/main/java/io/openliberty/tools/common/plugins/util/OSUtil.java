@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package io.openliberty.tools.common.plugins.util;
 
 public class OSUtil {
-    
+
     /**
      * Determines if the current OS is a Windows OS.
      * 
@@ -26,6 +26,16 @@ public class OSUtil {
     public static boolean isWindows() {
         String osName = System.getProperty("os.name", "unknown").toLowerCase();
         return osName.indexOf("windows") >= 0;
+    }
+
+    /**
+     * Determines if the current OS is a Linux OS.
+     * 
+     * @return true if running on Linux, false otherwise
+     */
+    public static boolean isLinux() {
+        String osName = System.getProperty("os.name", "unknown").toLowerCase();
+        return osName.indexOf("linux") >= 0;
     }
 
 }

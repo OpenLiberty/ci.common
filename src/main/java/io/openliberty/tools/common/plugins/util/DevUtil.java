@@ -1097,7 +1097,7 @@ public abstract class DevUtil {
 
     private void startContainer() {
         try {
-            if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+            if (OSUtil.isLinux()) {
                 // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
                 runCmd("mkdir -p " + serverDirectory + "/logs");
             }
@@ -1128,7 +1128,7 @@ public abstract class DevUtil {
     private Process getRunProcess(String command) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
         processBuilder.command(getCommandTokens(command));
-        if (!System.getProperty("os.name").equalsIgnoreCase("linux")){
+        if (!OSUtil.isLinux()){
             Map<String, String> env = processBuilder.environment();
             if (!env.keySet().contains("DOCKER_BUILDKIT")) { // don't touch if already set
                 env.put("DOCKER_BUILDKIT", "0"); // must set 0 on Windows VMs
@@ -1533,7 +1533,7 @@ public abstract class DevUtil {
     }
 
     private String getUserId() {
-        if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+        if (OSUtil.isLinux()) {
             try {
                 String id = runCmd("id -u");
                 if (id != null) {
@@ -2966,7 +2966,7 @@ public abstract class DevUtil {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
                     }
-                    if (container && System.getProperty("os.name").equalsIgnoreCase("linux")) {
+                    if (container && OSUtil.isLinux()) {
                         info("Restarting the container for this change to take effect.");
                         // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
                         try {
