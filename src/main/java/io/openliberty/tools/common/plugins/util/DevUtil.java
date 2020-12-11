@@ -967,6 +967,7 @@ public abstract class DevUtil {
                     List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
                     for (String src : srcArguments) {
                         if (isURL(src)) {
+                            debug("COPY/ADD do not watch/mount URL:" + src);
                             continue;
                         }
                         String sourcePath = buildContext + "/" + src;
@@ -1012,7 +1013,6 @@ public abstract class DevUtil {
     private boolean isURL(String name) {
         try {
             URL url = new URL(name);
-            debug("Checking Dockerfile ADD/COPY filename, URL protocol=" + url.getProtocol());
         } catch (MalformedURLException m) {
             return false;
         }
