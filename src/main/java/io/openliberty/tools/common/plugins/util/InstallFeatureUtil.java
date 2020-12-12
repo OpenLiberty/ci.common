@@ -55,19 +55,21 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     private final File installDirectory;
 
-    private final File installJarFile;
+    private File installJarFile;
 
     private final List<ProductProperties> propertiesList;
 
     private final String to;
 
-    private final Set<File> downloadedJsons;
+    private Set<File> downloadedJsons;
 
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
+
+    private final String containerName;
 
     /**
      * Initialize the utility and check for unsupported scenarios.
@@ -79,31 +81,36 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      *                           configuration, or null if not specified
      * @param pluginListedEsas   The list of ESAs specified in the plugin
      *                           configuration, or null if not specified
-     * @param propertiesList     The list of product properties installed
-     *                           with the Open Liberty runtime
+     * @param propertiesList     The list of product properties installed with the
+     *                           Open Liberty runtime
      * @param openLibertyVersion The version of the Open Liberty runtime
+     * @param containerName      The container name if the features should be
+     *                           installed in a container. Otherwise null.
      * @throws PluginScenarioException  If the current scenario is not supported
      * @throws PluginExecutionException If properties files cannot be found in the
      *                                  installDirectory/lib/versions
      */
     public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, 
-            List<ProductProperties> propertiesList, String openLibertyVersion) throws PluginScenarioException, PluginExecutionException {
+            List<ProductProperties> propertiesList, String openLibertyVersion, String containerName) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
         this.to = to;
         this.propertiesList = propertiesList;
         this.openLibertyVersion = openLibertyVersion;
-        installJarFile = loadInstallJarFile(installDirectory);
-        if (installJarFile == null) {
-            throw new PluginScenarioException("Install map jar not found.");
-        }
-        downloadedJsons = downloadProductJsons();
-        if (downloadedJsons.isEmpty()) {
-            throw new PluginScenarioException(
-                    "Cannot find JSONs for to the installed runtime from the Maven repository.");
-        }
-        if (hasUnsupportedParameters(from, pluginListedEsas)) {
-            throw new PluginScenarioException(
-                    "Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
+        this.containerName = containerName;
+        if (containerName == null) {
+            installJarFile = loadInstallJarFile(installDirectory);
+            if (installJarFile == null) {
+                throw new PluginScenarioException("Install map jar not found.");
+            }
+            downloadedJsons = downloadProductJsons();
+            if (downloadedJsons.isEmpty()) {
+                throw new PluginScenarioException(
+                        "Cannot find JSONs for to the installed runtime from the Maven repository.");
+            }
+            if (hasUnsupportedParameters(from, pluginListedEsas)) {
+                throw new PluginScenarioException(
+                        "Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
+            }
         }
     }
 
@@ -152,6 +159,14 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @param msg
      */
     public abstract void info(String msg);
+
+    /**
+     * Log error
+     * 
+     * @param msg
+     * @param e
+     */
+    public abstract void error(String msg, Throwable e);
 
     /**
      * Returns whether debug is enabled by the current logger
@@ -439,9 +454,16 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     @SuppressWarnings("unchecked")
     public void installFeatures(boolean isAcceptLicense, List<String> featuresToInstall)
             throws PluginExecutionException {
+
+        if (containerName != null) {
+            installFeaturesOnContainer(featuresToInstall, isAcceptLicense);
+            return;
+        }
+
+        info("Installing features: " + featuresToInstall);
+
         List<File> jsonRepos = new ArrayList<File>(downloadedJsons);
         debug("JSON repos: " + jsonRepos);
-        info("Installing features: " + featuresToInstall);
 
         // override license acceptance if installing only Open Liberty features
         boolean acceptLicenseMapValue = isOnlyOpenLibertyFeatures(featuresToInstall) ? true : isAcceptLicense;
@@ -864,4 +886,25 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
+    private void installFeaturesOnContainer(List<String> features, boolean acceptLicense) {
+        if (features == null || features.isEmpty()) {
+            debug("Skipping installing features on container " + containerName + " since no features were specified.");
+            return;
+        }
+
+        info("Installing features " + features + " on container " + containerName);
+
+        StringBuilder featureList = new StringBuilder();
+        for (String feature : features) {
+            featureList.append(feature).append(" ");
+        }
+
+        String featureUtilityCommand = "docker exec -e FEATURE_LOCAL_REPO=/devmode-maven-cache " + containerName + " /liberty/bin/featureUtility installFeature " + featureList;
+        if (acceptLicense) {
+            featureUtilityCommand += "--acceptLicense";
+        }
+        
+        execDockerCmd(featureUtilityCommand, 600, true);
+    }
+    
 }

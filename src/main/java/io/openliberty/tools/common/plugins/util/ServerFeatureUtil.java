@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019.
+ * (C) Copyright IBM Corporation 2019, 2020.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,12 +47,10 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import io.openliberty.tools.common.plugins.config.XmlDocument;
-
 /**
  * Utility class to determine server features
  */
-public abstract class ServerFeatureUtil {
+public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";

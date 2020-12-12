@@ -52,7 +52,7 @@ public class BaseInstallFeatureUtilTest {
     public class InstallFeatureTestUtil extends InstallFeatureUtil {
         public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, 
                 List<ProductProperties> propertiesList, String openLibertyVersion)  throws PluginScenarioException, PluginExecutionException {
-            super(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion);
+            super(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, null);
         }
 
         @Override
@@ -77,6 +77,11 @@ public class BaseInstallFeatureUtilTest {
 
         @Override
         public void info(String msg) {
+            // not needed for tests
+        }
+
+        @Override
+        public void error(String msg, Throwable e) {
             // not needed for tests
         }
 
