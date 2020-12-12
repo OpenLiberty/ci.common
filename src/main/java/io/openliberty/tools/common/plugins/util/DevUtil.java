@@ -1212,8 +1212,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // Look for features not available
                     String errMsg = "Feature definitions were not found in the container. To install features to the container, specify 'RUN features.sh' in your Dockerfile. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker";
                     if (!shownFeaturesShWarning) {
-                        boolean alerted = alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true);
-                        shownFeaturesShWarning = alerted;
+                        shownFeaturesShWarning = alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true);
                     }
                 }
             }
