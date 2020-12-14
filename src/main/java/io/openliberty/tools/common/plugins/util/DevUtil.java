@@ -1039,6 +1039,8 @@ public abstract class DevUtil {
         try {
             info("Building Docker image...");
             imageName = getProjectName() + DEVMODE_IMAGE_SUFFIX;
+            // Name rules: may contain lowercase letters, digits and a period, one or two underscores, or one or more dashes. Cannot start with dash.
+            imageName = imageName.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("^[\\-]+", "").toLowerCase();
             // The image is built using the tempDockerfile, but the build context comes from the user's Dockerfile location
             debug("Docker build context: " + userDockerfile.getParent());
             StringBuilder sb = new StringBuilder();
