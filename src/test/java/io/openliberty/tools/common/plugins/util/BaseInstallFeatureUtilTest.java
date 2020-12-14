@@ -81,6 +81,11 @@ public class BaseInstallFeatureUtilTest {
         }
 
         @Override
+        public void error(String msg) {
+            // not needed for tests
+        }
+
+        @Override
         public void error(String msg, Throwable e) {
             // not needed for tests
         }
