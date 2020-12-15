@@ -266,13 +266,19 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         test.add("FROM open-liberty");
         test.add("RUN configure.sh");
         util.detectFeaturesSh(test);
-        assertEquals(false, util.hasFeaturesSh.get());
+        assertEquals("Should not have detected features.sh", false, util.hasFeaturesSh.get());
 
-        test = new ArrayList<String>();
+        test.clear();
         test.add("FROM open-liberty");
         test.add("RUN features.sh");
         util.detectFeaturesSh(test);
-        assertEquals(true, util.hasFeaturesSh.get());
+        assertEquals("Should have detected features.sh", true, util.hasFeaturesSh.get());
+
+        test.clear();
+        test.add("FROM open-liberty");
+        test.add("RUN configure.sh");
+        util.detectFeaturesSh(test);
+        assertEquals("Should have resetted to not detect features.sh", false, util.hasFeaturesSh.get());
     }
 
 }

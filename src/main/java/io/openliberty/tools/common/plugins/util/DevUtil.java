@@ -339,9 +339,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
     private final JavaCompilerOptions compilerOptions;
-    private boolean shownFeaturesShWarning = false;
     private final String mavenCacheLocation;
     private AtomicBoolean externalContainerShutdown;
+    private AtomicBoolean shownFeaturesShWarning;
     protected AtomicBoolean hasFeaturesSh;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
@@ -397,6 +397,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.keepTempDockerfile = keepTempDockerfile;
         this.mavenCacheLocation = mavenCacheLocation;
         this.externalContainerShutdown = new AtomicBoolean(false);
+        this.shownFeaturesShWarning = new AtomicBoolean(false);
         this.hasFeaturesSh = new AtomicBoolean(false);
     }
 
@@ -927,6 +928,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected void detectFeaturesSh(List<String> dockerfileLines) {
+        // Reset features.sh warning flag
+        shownFeaturesShWarning.set(false);
+
         final String FEATURES_SH_COMMAND_LOWERCASE = "run features.sh";
         for (int i=0; i<dockerfileLines.size(); i++) {
             String line = dockerfileLines.get(i);
@@ -937,6 +941,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return;
             }
         }
+        // if not detected, reset to false in case the Dockerfile is being rebuilt
+        debug("Did not find RUN features.sh command.");
+        hasFeaturesSh.set(false);
     }
 
     protected void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
@@ -1254,9 +1261,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             false);
 
                     // Look for features not available message in server output if features.sh was not defined in Dockerfile
-                    if (!hasFeaturesSh.get() && !shownFeaturesShWarning) {
+                    if (!hasFeaturesSh.get() && !shownFeaturesShWarning.get()) {
                         String errMsg = "Feature definitions were not found in the container. To install features to the container, specify 'RUN features.sh' in your Dockerfile. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker";
-                        shownFeaturesShWarning = alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true);
+                        shownFeaturesShWarning.set(alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true));
                     }
                 }
             }
