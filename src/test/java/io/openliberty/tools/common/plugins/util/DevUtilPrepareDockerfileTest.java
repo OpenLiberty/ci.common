@@ -260,4 +260,19 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertEquals(expectedDockerfileLines, dockerfileLines);
     }
 
+    @Test
+    public void testDetectFeaturesSh() throws Exception {
+        List<String> test = new ArrayList<String>();
+        test.add("FROM open-liberty");
+        test.add("RUN configure.sh");
+        util.detectFeaturesSh(test);
+        assertEquals(false, util.hasFeaturesSh.get());
+
+        test = new ArrayList<String>();
+        test.add("FROM open-liberty");
+        test.add("RUN features.sh");
+        util.detectFeaturesSh(test);
+        assertEquals(true, util.hasFeaturesSh.get());
+    }
+
 }

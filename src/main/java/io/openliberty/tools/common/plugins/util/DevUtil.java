@@ -342,6 +342,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean shownFeaturesShWarning = false;
     private final String mavenCacheLocation;
     private AtomicBoolean externalContainerShutdown;
+    protected AtomicBoolean hasFeaturesSh;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -396,6 +397,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.keepTempDockerfile = keepTempDockerfile;
         this.mavenCacheLocation = mavenCacheLocation;
         this.externalContainerShutdown = new AtomicBoolean(false);
+        this.hasFeaturesSh = new AtomicBoolean(false);
     }
 
     /**
@@ -924,6 +926,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    protected void detectFeaturesSh(List<String> dockerfileLines) {
+        final String FEATURES_SH_COMMAND_LOWERCASE = "run features.sh";
+        for (int i=0; i<dockerfileLines.size(); i++) {
+            String line = dockerfileLines.get(i);
+            // RUN command is case insensitive, so use lowercase matching.
+            if (line.toLowerCase().equals(FEATURES_SH_COMMAND_LOWERCASE)) {
+                debug("Detected RUN features.sh command.");
+                hasFeaturesSh.set(true);
+                return;
+            }
+        }
+    }
+
     protected void processCopyLines(List<String> dockerfileLines, String buildContext) throws PluginExecutionException {
         srcMount.clear();
         destMount.clear();
@@ -1032,6 +1047,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
         processCopyLines(dockerfileLines, dockerfile.getParent());
+        detectFeaturesSh(dockerfileLines);
         disableOpenJ9SCC(dockerfileLines);
         for (String line : dockerfileLines) {
             debug(line);
@@ -1237,9 +1253,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             "Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Maven build to correspond to the Java version used in your Dockerfile or its parent image, then clean the project output and restart dev mode.",
                             false);
 
-                    // Look for features not available
-                    String errMsg = "Feature definitions were not found in the container. To install features to the container, specify 'RUN features.sh' in your Dockerfile. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker";
-                    if (!shownFeaturesShWarning) {
+                    // Look for features not available message in server output if features.sh was not defined in Dockerfile
+                    if (!hasFeaturesSh.get() && !shownFeaturesShWarning) {
+                        String errMsg = "Feature definitions were not found in the container. To install features to the container, specify 'RUN features.sh' in your Dockerfile. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker";
                         shownFeaturesShWarning = alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true);
                     }
                 }
