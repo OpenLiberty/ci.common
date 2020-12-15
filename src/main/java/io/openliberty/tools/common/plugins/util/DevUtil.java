@@ -126,6 +126,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
     private static final int LIBERTY_DEFAULT_DEBUG_PORT = 7777;
+    private static final int DOCKER_TIMEOUT = 20; // seconds
 
     /**
      * Log debug
@@ -768,7 +769,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String MIN_DOCKER_VERSION = "18.03.0"; // Must use Docker 18.03.0 or higher
     private void checkDockerVersion() throws PluginExecutionException {
         String versionCmd = "docker version --format {{.Client.Version}}";
-        String dockerVersion = execDockerCmd(versionCmd, 10);
+        String dockerVersion = execDockerCmd(versionCmd, DOCKER_TIMEOUT);
         if (dockerVersion == null) {
             return; // can't tell if the version is valid.
         }
@@ -1117,7 +1118,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void startContainer() {
         try {
-            if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+            if (OSUtil.isLinux()) {
                 // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
                 runCmd("mkdir -p " + serverDirectory + "/logs");
             }
@@ -1136,7 +1137,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             try {
                 // remove container in case of an error trying to run the container because the docker run --rm will not rm the container
                 String dockerRmCmd = "docker container rm " + containerName;
-                execDockerCmd(dockerRmCmd, 10);
+                execDockerCmd(dockerRmCmd, DOCKER_TIMEOUT);
             } catch (Exception e) {
                 // do not report the "docker container rm" error so that we can instead report the startContainer() error
                 debug("Exception running docker container rm:", e);
@@ -1148,6 +1149,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Process getRunProcess(String command) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
         processBuilder.command(getCommandTokens(command));
+        if (!OSUtil.isLinux()){
+            Map<String, String> env = processBuilder.environment();
+            if (!env.keySet().contains("DOCKER_BUILDKIT")) { // don't touch if already set
+                env.put("DOCKER_BUILDKIT", "0"); // must set 0 on Windows VMs
+                debug("Generating environment for docker build & run: DOCKER_BUILDKIT=0");
+            }
+        }
         return processBuilder.start();
     }
 
@@ -1283,7 +1291,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("Stopping container...");
                 String dockerStopCmd = "docker stop " + containerName;
                 debug("Stopping container " + containerName);
-                execDockerCmd(dockerStopCmd, 30);
+                execDockerCmd(dockerStopCmd, DOCKER_TIMEOUT + 20); // allow extra time for server shutdown
             }
         } catch (RuntimeException r) {
             error("Error stopping container: " + r.getMessage());
@@ -1414,7 +1422,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private String generateNewContainerName() {
         String dockerContNamesCmd = "docker ps -a --format \"{{.Names}}\"";
         debug("docker container names list command: " + dockerContNamesCmd);
-        String result = execDockerCmd(dockerContNamesCmd, 10);
+        String result = execDockerCmd(dockerContNamesCmd, DOCKER_TIMEOUT);
         if (result == null) {
             return DEVMODE_CONTAINER_BASE_NAME;
         }
@@ -1452,7 +1460,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     private String[] getContainerNetworks(String contName) {
         String dockerNetworkCmd = "docker inspect -f '{{.NetworkSettings.Networks}}' " + contName;
-        String cmdResult = execDockerCmd(dockerNetworkCmd, 10, false);
+        String cmdResult = execDockerCmd(dockerNetworkCmd, DOCKER_TIMEOUT, false);
         if (cmdResult == null || cmdResult.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
             warn("Unable to retrieve container networks.");
             return null;
@@ -1484,7 +1492,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private String getContainerIPAddress(String contName, String network) {
         String dockerIPAddressCmd = "docker inspect -f '{{.NetworkSettings.Networks." + network + ".IPAddress}}' " + contName;
-        String result = execDockerCmd(dockerIPAddressCmd, 10, false);
+        String result = execDockerCmd(dockerIPAddressCmd, DOCKER_TIMEOUT, false);
         if (result == null || result.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
             warn("Unable to retrieve container IP address for network '" + network + "'.");
             return "<no value>"; // this is what Docker displays when an IP address it not found for a network
@@ -1514,7 +1522,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private String getUserId() {
-        if (System.getProperty("os.name").equalsIgnoreCase("linux")) {
+        if (OSUtil.isLinux()) {
             try {
                 String id = runCmd("id -u");
                 if (id != null) {
@@ -1737,7 +1745,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private String findLocalPort(String internalContainerPort) {
         String dockerPortCmd = "docker port " + containerName + " " + internalContainerPort;
-        String cmdResult = execDockerCmd(dockerPortCmd, 10, false);
+        String cmdResult = execDockerCmd(dockerPortCmd, DOCKER_TIMEOUT, false);
         if (cmdResult == null) {
             warn("Unable to retrieve locally mapped port.");
             return null;
@@ -2954,7 +2962,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
                     }
-                    if (container && System.getProperty("os.name").equalsIgnoreCase("linux")) {
+                    if (container && OSUtil.isLinux()) {
                         info("Restarting the container for this change to take effect.");
                         // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
                         try {
