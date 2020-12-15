@@ -343,6 +343,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private AtomicBoolean externalContainerShutdown;
     private AtomicBoolean shownFeaturesShWarning;
     protected AtomicBoolean hasFeaturesSh;
+    protected AtomicBoolean serverFullyStarted;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -399,6 +400,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.externalContainerShutdown = new AtomicBoolean(false);
         this.shownFeaturesShWarning = new AtomicBoolean(false);
         this.hasFeaturesSh = new AtomicBoolean(false);
+        this.serverFullyStarted = new AtomicBoolean(false);
     }
 
     /**
@@ -751,6 +753,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 throw new PluginExecutionException("The server has not started within " + serverStartTimeout + " seconds. " +
                         "Consider increasing the server start timeout if this continues to occur. " +
                         "For example, " + getServerStartTimeoutExample());
+            } else {
+                serverFullyStarted.set(true);
             }
             // Check for port already in use error
             String portError = serverTask.findStringInFile(PORT_IN_USE_MESSAGE_PREFIX, messagesLogFile);
@@ -1260,8 +1264,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             "Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Maven build to correspond to the Java version used in your Dockerfile or its parent image, then clean the project output and restart dev mode.",
                             false);
 
-                    // Look for features not available message in server output if features.sh was not defined in Dockerfile
-                    if (!hasFeaturesSh.get() && !shownFeaturesShWarning.get()) {
+                    // Look for features not available message during server startup if features.sh was not defined in Dockerfile
+                    if (!serverFullyStarted.get() && !hasFeaturesSh.get() && !shownFeaturesShWarning.get()) {
                         String errMsg = "Feature definitions were not found in the container. To install features to the container, specify 'RUN features.sh' in your Dockerfile. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker";
                         shownFeaturesShWarning.set(alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true));
                     }
@@ -1311,6 +1315,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void stopContainer() {
         try {
+            serverFullyStarted.set(false);
+
             // see if docker run command (container) is still running before trying to stop it.
             if (dockerRunProcess != null && dockerRunProcess.isAlive()) {
                 info("Stopping container...");
