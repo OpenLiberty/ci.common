@@ -1102,7 +1102,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info(buildCmd);
             long startTime = System.currentTimeMillis();
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
-            checkDockerIgnore(startTime, userDockerfile.getParentFile());
+            checkDockerBuildTime(startTime, userDockerfile.getParentFile());
             info("Completed building Docker image.");
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed.
@@ -1126,11 +1126,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     // Suggest a performance improvement if docker build takes too long.
     private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
-    private void checkDockerIgnore(long startTime, File dockerBuildContext) {
+    private void checkDockerBuildTime(long startTime, File dockerBuildContext) {
         if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
             return;
         }
-        debug("checkDockerIgnore, dockerBuildContext=" + dockerBuildContext.getAbsolutePath());
+        debug("checkDockerBuildTime, dockerBuildContext=" + dockerBuildContext.getAbsolutePath());
+        String message = "The docker build command is slower than expected.";
         File dockerIgnore = new File(dockerBuildContext, ".dockerignore");
         if (!dockerIgnore.exists()) { // provide some advice
             String buildContextPath;
@@ -1139,9 +1140,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } catch (IOException e) {
                 buildContextPath = dockerBuildContext.getAbsolutePath();
             }
-            warn("The docker build command is slower than expected. You may increase performance by adding " +
-                "unneeded files and directories such as any Liberty runtime directories to a .dockerignore file in " +
-                buildContextPath + ".");
+            message += " You may increase performance by adding unneeded files and directories " +
+                "such as any Liberty runtime directories to a .dockerignore file in " +
+                buildContextPath + ".";
+        }
+        if (hasFeaturesSh.get()) {
+            message += " The RUN features.sh command is detected in the Dockerfile and this may increase build time significantly.";
+        }
+        if (!dockerIgnore.exists() || hasFeaturesSh.get()) {
+            warn(message);
         }
     }
 
