@@ -1145,7 +1145,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 buildContextPath + ".";
         }
         if (hasFeaturesSh.get()) {
-            message += " The RUN features.sh command is detected in the Dockerfile and extra time may be necessary for installing features.";
+            message += " The RUN features.sh command is detected in the Dockerfile and extra time may be necessary when installing features.";
         }
         if (!dockerIgnore.exists() || hasFeaturesSh.get()) {
             warn(message);
