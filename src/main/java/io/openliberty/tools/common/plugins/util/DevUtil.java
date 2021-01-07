@@ -1101,7 +1101,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             String buildCmd = sb.toString();
             info(buildCmd);
             if (hasFeaturesSh.get()) {
-                warn("The RUN features.sh command is detected in the Dockerfile and extra time may be necessary when installing features.");
+                info("The RUN features.sh command is detected in the Dockerfile and extra time may be necessary when installing features.");
             }
             long startTime = System.currentTimeMillis();
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
@@ -1142,8 +1142,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } catch (IOException e) {
                 buildContextPath = dockerBuildContext.getAbsolutePath();
             }
-            warn("The docker build command took longer than " + DOCKER_BUILD_SOFT_TIMEOUT / 1000 + " seconds." +
-                " You may increase performance by adding unneeded files and directories " +
+            warn("The docker build command took longer than " + DOCKER_BUILD_SOFT_TIMEOUT / 1000 + " seconds. " +
+                "You may increase performance by adding unneeded files and directories " +
                 "such as any Liberty runtime directories to a .dockerignore file in " +
                 buildContextPath + ".");
         }
