@@ -1125,13 +1125,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     // Suggest a performance improvement if docker build takes too long.
-    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000;
+    private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000; // millis
     private void checkDockerBuildTime(long startTime, File dockerBuildContext) {
         if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
             return;
         }
         debug("checkDockerBuildTime, dockerBuildContext=" + dockerBuildContext.getAbsolutePath());
-        String message = "The docker build command is slower than expected.";
+        String message = "The docker build command took longer than " + DOCKER_BUILD_SOFT_TIMEOUT / 1000 + " seconds.";
         File dockerIgnore = new File(dockerBuildContext, ".dockerignore");
         if (!dockerIgnore.exists()) { // provide some advice
             String buildContextPath;
@@ -1145,7 +1145,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 buildContextPath + ".";
         }
         if (hasFeaturesSh.get()) {
-            message += " The RUN features.sh command is detected in the Dockerfile and this may increase build time significantly.";
+            message += " The RUN features.sh command is detected in the Dockerfile and extra time may be necessary for installing features.";
         }
         if (!dockerIgnore.exists() || hasFeaturesSh.get()) {
             warn(message);
