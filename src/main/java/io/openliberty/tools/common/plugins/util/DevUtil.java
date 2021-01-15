@@ -3657,20 +3657,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException unable to resolve canonical path
      */
     protected Set<File> getClassPath(List<String> artifactPaths, List<File> outputDirs) throws IOException {
-        List<URL> urls = new ArrayList<>();
-        ClassLoader c = Thread.currentThread().getContextClassLoader();
-        while (c != null) {
-            if (c instanceof URLClassLoader) {
-                urls.addAll(Arrays.asList(((URLClassLoader) c).getURLs()));
-            }
-            c = c.getParent();
-        }
-
         Set<String> parsedFiles = new HashSet<>();
         Deque<String> toParse = new ArrayDeque<>();
-        for (URL url : urls) {
-            toParse.add(new File(url.getPath()).getCanonicalPath());
-        }
 
         for (String artifactPath : artifactPaths) {
             toParse.add(new File(artifactPath).getCanonicalPath());
