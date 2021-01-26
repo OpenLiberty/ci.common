@@ -310,11 +310,17 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
             for (int j = 0; j < features.getLength(); j++) {
                 String content = features.item(j).getTextContent();
                 if (content != null) {
-                    if (content.contains(":")) {
-                        debug("The feature " + content + " in the server.xml file is a user feature and its installation will be skipped.");
-                    } else {
-                        result.add(content.trim().toLowerCase());
-                    }
+                	content = content.trim();
+                	if (content.contains(":")) {
+                		String[] contentsplit = content.split(":");
+                		if (contentsplit.length > 2) {
+                			debug("improper feature name format, this features will be skipped: " + content);
+                		} else {
+                			result.add(contentsplit[0] + ":" + contentsplit[1].trim().toLowerCase());
+                		}
+                	} else {
+                		result.add(content.trim().toLowerCase());
+                	}
                 }
             }
         }
