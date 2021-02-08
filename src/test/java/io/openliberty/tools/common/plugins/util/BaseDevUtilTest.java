@@ -100,7 +100,7 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor) {
+        public boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths, List<String> testArtifactPaths, ThreadPoolExecutor executor) {
             // not needed for tests
             return false;
         }
@@ -128,12 +128,6 @@ public class BaseDevUtilTest {
         public boolean compile(File dir) {
             // not needed for tests
             return false;
-        }
-
-        @Override
-        public List<String> getArtifacts() {
-            // not needed for tests
-            return null;
         }
 
         @Override

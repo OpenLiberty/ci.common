@@ -187,21 +187,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract boolean isDebugEnabled();
 
     /**
-     * Updates artifacts of current project
-     */
-    public abstract List<String> getArtifacts();
-
-    /**
      * Recompile the build file
      * 
      * @param buildFile
-     * @param artifactPaths
+     * @param compileArtifactPaths
+     * @param testArtifactPaths
      * @param executor      The thread pool executor
      * @throws PluginExecutionException if there was an error when restarting the
      *                                  server
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor)
+    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths, List<String> testArtifactPaths, ThreadPoolExecutor executor)
             throws PluginExecutionException;
 
     /**
@@ -2307,20 +2303,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     File jvmOptionsFileParent;
     File buildFile;
     File dockerfileUsed;
-    List<String> artifactPaths;
+    List<String> compileArtifactPaths;
+    List<String> testArtifactPaths;
     WatchService watcher;
 
-    // The serverXmlFile parameter can be null when using the server.xml from the
-    // configDirectory, which has a default value.
+    /**
+     * Watch files for changes.
+     * 
+     * @param buildFile
+     * @param outputDirectory
+     * @param testOutputDirectory
+     * @param executor
+     * @param compileArtifactPaths Compile classpath elements, or null if this DevUtil instance has useBuildRecompile=true
+     * @param testArtifactPaths Test classpath elements, or null if this DevUtil instance has useBuildRecompile=true
+     * @param serverXmlFile Can be null when using the server.xml from the configDirectory, which has a default value.
+     * @param bootstrapPropertiesFile
+     * @param jvmOptionsFile
+     * @throws Exception
+     */
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> artifactPaths, File serverXmlFile,
+            final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths, File serverXmlFile,
             File bootstrapPropertiesFile, File jvmOptionsFile) throws Exception {
         this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
         this.bootstrapPropertiesFile = bootstrapPropertiesFile;
         this.jvmOptionsFile = jvmOptionsFile;
-        this.artifactPaths = artifactPaths;
+        this.compileArtifactPaths = compileArtifactPaths;
+        this.testArtifactPaths = testArtifactPaths;
         this.dockerfileUsed = null;
 
         try {
@@ -2431,7 +2441,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
 
-                processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
+                processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths, testArtifactPaths);
 
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
@@ -2746,7 +2756,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
-            List<String> artifactPaths) throws IOException, PluginExecutionException {
+            List<String> compileArtifactPaths, List<String> testArtifactPaths) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
@@ -2764,7 +2774,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
-                if (recompileJavaSource(recompileJavaSources, artifactPaths, executor, outputDirectory,
+                if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
                         testOutputDirectory)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
@@ -2790,7 +2800,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (!failedCompilationJavaTests.isEmpty()) {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
-                    if (recompileJavaTest(recompileJavaTests, artifactPaths, executor, outputDirectory,
+                    if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
                             testOutputDirectory)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
@@ -3056,7 +3066,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
 
-            boolean recompiledBuild = recompileBuildFile(buildFile, artifactPaths, executor);
+            boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, executor);
             // run all tests on build file change
             if (recompiledBuild) {
                 // trigger java source recompile if there are compilation errors
@@ -3571,6 +3581,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     outputDirs.add(outputDirectory);
                 }
+
                 Set<File> classPathElems = getClassPath(artifactPaths, outputDirs);
 
                 JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
