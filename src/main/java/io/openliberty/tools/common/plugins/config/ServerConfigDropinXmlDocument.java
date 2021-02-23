@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019.
+ * (C) Copyright IBM Corporation 2019, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,14 @@ package io.openliberty.tools.common.plugins.config;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.w3c.dom.Node;
 import org.w3c.dom.Element;
 import org.w3c.dom.Comment;
 
 public class ServerConfigDropinXmlDocument extends XmlDocument {
     
+    private Element featureManager = null;
+
     private ServerConfigDropinXmlDocument() {    
     }
     
@@ -54,5 +57,15 @@ public class ServerConfigDropinXmlDocument extends XmlDocument {
         child.setAttribute(valueAttr, varValue);
         elem.appendChild(child);
     }
-        
+
+    public void createFeature(String name) {
+        if (featureManager == null) {
+            featureManager = doc.createElement("featureManager");
+            doc.getDocumentElement().appendChild(featureManager);
+        }
+        Element child = doc.createElement("feature");
+        Node text = doc.createTextNode(name);
+        child.appendChild(text);
+        featureManager.appendChild(child);
+    }
 }
