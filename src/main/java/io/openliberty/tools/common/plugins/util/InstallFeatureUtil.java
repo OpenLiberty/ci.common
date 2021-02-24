@@ -44,6 +44,12 @@ import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
 
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.json.JsonValue;
+
 /**
  * Utility class to install features from Maven repositories.
  */
@@ -66,6 +72,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
+    private static final String LIBERTY_FEATURE_PUBLIC = "PUBLIC";
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
 
@@ -924,5 +931,41 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             debug(cmdResult);
         }
     }
-    
+
+	/**
+	 * Return a list of the names of the visible Liberty server features included in the 
+	 * release. Hidden and internal features are not listed.
+	 * @return the names of all the Liberty features which are visible
+	 */
+    public Set<String> getAllServerFeatures() {
+        Set<String> newServerFeatures = new HashSet<String>();
+
+        for (File file : downloadedJsons) {
+            JsonReader jsonReader = null;
+            try {
+                InputStream stream = new FileInputStream(file);
+                jsonReader = Json.createReader(stream);
+            } catch (FileNotFoundException e) {
+                debug("Unable to read Liberty server features", e);
+                continue;
+            }
+            JsonArray featureList = jsonReader.readArray();
+            for (JsonValue feature : featureList) {
+                try {
+                    JsonObject wlpInfo = ((JsonObject)feature).getJsonObject("wlpInformation");
+
+                    String visible =  wlpInfo.getString("visibility");
+                    if (LIBERTY_FEATURE_PUBLIC.equals(visible)) {
+                        String featureName = wlpInfo.getString("shortName");
+                        newServerFeatures.add(featureName);
+                    }
+                } catch (NullPointerException n) {
+                    debug("NPE getting one of the fields, incorrect field name");
+                }
+            }
+            jsonReader.close();
+        }
+        return newServerFeatures;
+    }
+
 }

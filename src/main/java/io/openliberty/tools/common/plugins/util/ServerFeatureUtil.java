@@ -19,7 +19,6 @@ package io.openliberty.tools.common.plugins.util;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
-import java.io.InputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -36,11 +35,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import javax.json.JsonValue;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -71,13 +65,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     public static final String SHARED_RESOURCES_DIR = "shared.resource.dir";
     public static final String SHARED_STACKGROUP_DIR = "shared.stackgroup.dir";
     public static final String SERVER_CONFIG_DIR = "server.config.dir";
-    private static String LIBERTY_FEATURE_PUBLIC = "PUBLIC";
-    private static final int SELECT_SERVER_LIBERTY = 0;
-    private static final int SELECT_SERVER_WEBSPHERE = 1;
 
     private Map<String,File> libertyDirectoryPropertyToFile = null;
-    private static Set<String> allServerFeatures = null;
-    private static String allServerFeaturesVersion = null;
     
     /**
      * Log debug
@@ -523,66 +512,5 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         returnValue = returnValue.replace("\\","/");
         debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
         return returnValue;
-    }
-
-	/**
-	 * Return a list of the names of the visible Liberty server features included in the 
-	 * specified release. Hidden and internal features are not listed.
-	 * @param selectServer   An integer to select one of the supported Liberty servers
-	 * @param serverVersion  The version of the server in string format e.g. 19.0.0.12
-	 * @return the names of all the visible Liberty features in the specified release
-	 */
-    public Set<String> getAllServerFeatures(int selectServer, String serverVersion) {
-        if (allServerFeaturesVersion != null && !allServerFeaturesVersion.equals(serverVersion)) {
-            allServerFeatures = null; // new version, reload
-            allServerFeaturesVersion = null;
-        }
-        if (allServerFeatures != null) {
-            return allServerFeatures;
-        }
-
-        long startTime = System.currentTimeMillis();
-        Set<String> newServerFeatures = new HashSet<String>();
-        String baseURL;
-        switch(selectServer) {
-            case SELECT_SERVER_WEBSPHERE:
-                baseURL = "https://repo1.maven.org/maven2/com/ibm/websphere/appserver/features/features/";
-                break;
-            case SELECT_SERVER_LIBERTY:
-            default:
-                baseURL = "https://repo1.maven.org/maven2/io/openliberty/features/features/";
-                break;
-        }
-        JsonReader jsonReader = null;
-        try {
-            URL featureURL = new URL(baseURL+serverVersion+"/features-"+serverVersion+".json");
-            InputStream stream = featureURL.openStream();
-            jsonReader = Json.createReader(stream);
-        } catch (IOException x) {
-            debug("Unable to read Liberty server features", x);
-            return null;
-        }
-
-        JsonArray featureList = jsonReader.readArray();
-        for (JsonValue feature : featureList) {
-            try {
-                JsonObject wlpInfo = ((JsonObject)feature).getJsonObject("wlpInformation");
-
-                String visible =  wlpInfo.getString("visibility");
-                if (LIBERTY_FEATURE_PUBLIC.equals(visible)) {
-                    String featureName = wlpInfo.getString("shortName");
-                    newServerFeatures.add(featureName);
-                }
-            } catch (NullPointerException n) {
-                debug("NPE getting one of the fields, incorrect field name");
-            }
-        }
-        if (jsonReader != null) {
-            jsonReader.close();
-        }
-        allServerFeatures = newServerFeatures;
-        allServerFeaturesVersion = serverVersion;
-        debug("getAllServerFeatures() elapsed time="+(System.currentTimeMillis()-startTime)/1000.0+" seconds");
-        return allServerFeatures;
     }
 }
