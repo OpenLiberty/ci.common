@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -932,11 +932,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
-	/**
-	 * Return a list of the names of the visible Liberty server features included in the 
-	 * release. Hidden and internal features are not listed.
-	 * @return the names of all the Liberty features which are visible
-	 */
+    /**
+     * Return a list of the names of the visible Liberty server features included in the 
+     * release. Hidden and internal features are not listed.
+     * @return the names of all the Liberty features which are visible
+     */
     public Set<String> getAllServerFeatures() {
         Set<String> newServerFeatures = new HashSet<String>();
 
