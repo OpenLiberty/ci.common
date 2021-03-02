@@ -1573,6 +1573,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     public abstract void libertyDeploy() throws PluginExecutionException;
 
+    public abstract void libertyGenerateFeatures() throws PluginExecutionException;
+
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
      * @throws PluginExecutionException
@@ -1617,6 +1619,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // suppress install feature warning
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
+        libertyGenerateFeatures();
         // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
         if (!container) {
             libertyInstallFeature();
