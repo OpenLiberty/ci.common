@@ -20,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -213,9 +214,10 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     public void testDockerBuildContext() throws Exception {
         File test = new File(dockerfiles, "dockerBuildContext.txt");
         result = util.prepareTempDockerfile(test, new File("my/context").getAbsolutePath());
-        assertTrue(util.srcMount.get(0).endsWith("my/context/path1/path2/file1.xml"));
+        // use Paths comparison to be OS agnostic
+        assertTrue(Paths.get(util.srcMount.get(0)).endsWith("my/context/path1/path2/file1.xml"));
         assertTrue(util.destMount.get(0).endsWith("/config/file1.xml"));
-        assertTrue(util.srcMount.get(1).endsWith("my/context/path3/file2.xml"));
+        assertTrue(Paths.get(util.srcMount.get(1)).endsWith("my/context/path3/file2.xml"));
         assertTrue(util.destMount.get(1).endsWith("/config/file2.xml"));
         assertEquals(2, util.srcMount.size());
         assertEquals(2, util.destMount.size());
