@@ -1063,6 +1063,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         dockerfileLines = getCleanedLines(dockerfileLines);
         dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
+        removeEarFileLines(dockerfileLines);
         processCopyLines(dockerfileLines, dockerfile.getParent());
         detectFeaturesSh(dockerfileLines);
         disableOpenJ9SCC(dockerfileLines);
