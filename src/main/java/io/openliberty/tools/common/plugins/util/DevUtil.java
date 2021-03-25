@@ -1346,6 +1346,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return execDockerCmd(command, timeout, true);
     }
 
+    public abstract File getMultiModuleProjectDirectory();
+
     /**
      * Build a docker run command with all the ports and directories required to run Open Liberty 
      * inside a container. Also included is the image name and the server run command to override
@@ -1392,8 +1394,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps:/config/apps");
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins:/config/dropins");
 
-        // mount the loose application resources in the container
-        command.append(" -v " + projectDirectory.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+        // mount the loose application resources in the container using the multi module project root or the current project directory
+        File projectRoot = getMultiModuleProjectDirectory();
+        if (projectRoot == null) {
+            projectRoot = projectDirectory;
+        }
+        command.append(" -v " + projectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
