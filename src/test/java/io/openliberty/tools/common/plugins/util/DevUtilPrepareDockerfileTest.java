@@ -281,4 +281,15 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertEquals("Should have resetted to not detect features.sh", false, util.hasFeaturesSh.get());
     }
 
+    @Test
+    public void testRemoveEarFileLines() throws Exception {
+        List<String> dockerfileLines = new ArrayList<String>();
+        List<String> expectedDockerfileLines = new ArrayList<String>();
+        dockerfileLines.add("FROM openliberty/open-liberty");
+        dockerfileLines.add("COPY --chown=1001:0  target/guide-maven-multimodules-ear.ear /config/apps/");
+        util.removeEarFileLines(dockerfileLines);
+        expectedDockerfileLines.add("FROM openliberty/open-liberty");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
+    }
+
 }

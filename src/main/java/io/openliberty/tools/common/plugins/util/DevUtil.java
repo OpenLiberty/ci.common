@@ -886,28 +886,36 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
-        List<String> warFileLines = new ArrayList<String>();
+        removeFileExtensionLines(dockerfileLines, ".war");
+    }
+
+    protected void removeEarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
+        removeFileExtensionLines(dockerfileLines, ".ear");
+    }
+
+    private void removeFileExtensionLines(List<String> dockerfileLines, String extension) throws PluginExecutionException {
+        List<String> fileExtensionLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
-            if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(".war")) {
+            if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(extension)) {
                 // Break the Dockerfile line down into segments based on any amount of whitespace.
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
-                // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
+                // if the line starts with COPY and the second to last segment ends with extension, it is a COPY line of that file type
                 if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) {
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
-                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
-                        warFileLines.add(line);
+                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(extension)) {
+                        fileExtensionLines.add(line);
                     }
                 }
             }
         }
-        debug("WAR file lines: " + warFileLines.toString());
-        dockerfileLines.removeAll(warFileLines);
+        debug(extension + " file lines: " + fileExtensionLines.toString());
+        dockerfileLines.removeAll(fileExtensionLines);
     }
 
     /**
@@ -3146,7 +3154,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 for (File file : files) {
                     // if the file's path is a child of the tracked path, except for the server logs folder or if it's the loose application itself
                     Path filePath = file.getCanonicalFile().toPath();
-                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
+                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml") && !filePath.toString().endsWith(".ear.xml")) {
                         debug("isDockerfileDirectoryChanged=true for directory " + trackedPath + " with file " + file);
                         return true;
                     }
