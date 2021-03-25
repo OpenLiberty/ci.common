@@ -280,6 +280,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File testSourceDirectory;
     private File configDirectory;
     private File projectDirectory;
+    private File multiModuleProjectDirectory;
     private List<File> resourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
@@ -342,7 +343,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
 
-    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
@@ -354,6 +355,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.projectDirectory = projectDirectory;
+        this.multiModuleProjectDirectory = multiModuleProjectDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
@@ -1347,8 +1349,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return execDockerCmd(command, timeout, true);
     }
 
-    public abstract File getMultiModuleProjectDirectory();
-
     /**
      * Build a docker run command with all the ports and directories required to run Open Liberty 
      * inside a container. Also included is the image name and the server run command to override
@@ -1395,12 +1395,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps:/config/apps");
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins:/config/dropins");
 
-        // mount the loose application resources in the container using the multi module project root or the current project directory
-        File projectRoot = getMultiModuleProjectDirectory();
-        if (projectRoot == null) {
-            projectRoot = projectDirectory;
-        }
-        command.append(" -v " + projectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+        // mount the loose application resources in the container using the top level multi module project (or if null, then the current project's directory)
+        File looseApplicationProjectRoot = multiModuleProjectDirectory == null ? projectDirectory : multiModuleProjectDirectory;
+        command.append(" -v " + looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
