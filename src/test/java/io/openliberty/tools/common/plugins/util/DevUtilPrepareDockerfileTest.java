@@ -49,7 +49,7 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     private void testPrepareDockerfile(String testFile, String expectedFile) throws PluginExecutionException, IOException {
         File test = new File(dockerfiles, testFile);
         File expected = new File(dockerfiles, expectedFile);
-        result = util.prepareTempDockerfile(test);
+        result = util.prepareTempDockerfile(test, dockerfiles.getAbsolutePath());
         // trim the overall file content string since the file write can insert an extra line break at the end
         assertEquals(util.readDockerfile(expected), util.readDockerfile(result));
     }

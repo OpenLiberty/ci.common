@@ -321,6 +321,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private String imageName;
     private String containerName;
     private File dockerfile;
+    private File dockerBuildContext;
     private Path tempDockerfilePath = null;
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
@@ -347,7 +348,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
+            boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
             JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
@@ -384,6 +385,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         this.container = container;
         this.dockerfile = dockerfile;
+        this.dockerBuildContext = dockerBuildContext;
         this.dockerRunOpts = dockerRunOpts;
         if (projectDirectory != null) {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
@@ -607,8 +609,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 File dockerfileToUse = getDockerfile();
                 debug("Dockerfile to use: " + dockerfileToUse);
                 if (dockerfileToUse.exists()) {
-                    File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
-                    buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage);
+                    // The build context comes from the specified dockerBuildContext (or the user's Dockerfile location by default)
+                    File buildContext = dockerBuildContext == null ? dockerfileToUse.getParentFile() : dockerBuildContext;
+                    String buildContextString = buildContext.getAbsolutePath();
+                    debug("Docker build context: " + buildContextString);
+
+                    File tempDockerfile = prepareTempDockerfile(dockerfileToUse, buildContextString);
+                    buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage, buildContext);
                 } else {
                     // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
                     throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
@@ -1057,7 +1064,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return true;
     }
 
-    protected File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
+    protected File prepareTempDockerfile(File dockerfile, String buildContextString) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
@@ -1066,7 +1073,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
         removeEarFileLines(dockerfileLines);
-        processCopyLines(dockerfileLines, dockerfile.getParent());
+        processCopyLines(dockerfileLines, buildContextString);
         detectFeaturesSh(dockerfileLines);
         disableOpenJ9SCC(dockerfileLines);
         for (String line : dockerfileLines) {
@@ -1093,20 +1100,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return tempDockerfile;
     }
 
-    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage) throws PluginExecutionException {
+    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage, File buildContext) throws PluginExecutionException {
+        info("Building Docker image...");
+
         try {
-            info("Building Docker image...");
             imageName = getProjectName() + DEVMODE_IMAGE_SUFFIX;
             // Name rules: may contain lowercase letters, digits and a period, one or two underscores, or one or more dashes. Cannot start with dash.
             imageName = imageName.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("^[\\-]+", "").toLowerCase();
-            // The image is built using the tempDockerfile, but the build context comes from the user's Dockerfile location
-            debug("Docker build context: " + userDockerfile.getParent());
+
             StringBuilder sb = new StringBuilder();
             sb.append("docker build ");
             if (pullParentImage) {
                 sb.append("--pull ");
             }
-            sb.append("-f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent());
+            sb.append("-f " + tempDockerfile + " -t " + imageName + " " + buildContext.getAbsolutePath());
             String buildCmd = sb.toString();
             info(buildCmd);
             if (hasFeaturesSh.get()) {
@@ -1114,7 +1121,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             long startTime = System.currentTimeMillis();
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
-            checkDockerBuildTime(startTime, userDockerfile.getParentFile());
+            checkDockerBuildTime(startTime, buildContext);
             info("Completed building Docker image.");
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed.
