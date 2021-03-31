@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2020.
+ * (C) Copyright IBM Corporation 2019, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -74,8 +73,6 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
@@ -83,11 +80,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
-
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
 import io.openliberty.tools.ant.ServerTask;
-import io.openliberty.tools.common.plugins.config.ServerConfigDropinXmlDocument;
 
 /**
  * Utility class for dev mode.
@@ -3711,6 +3706,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             throw new RuntimeException("Failed to open class path file " + file, e);
                         }
                     }
+                } else if (file.isDirectory() && !classPathElements.contains(file)) {
+                    debug("Adding directory to compile class path: " + file);
+                    classPathElements.add(file);
                 }
             }
         }
