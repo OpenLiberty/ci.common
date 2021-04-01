@@ -1371,15 +1371,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected static File getLongestCommonDir(File dir1, File dir2) {
         // based on https://stackoverflow.com/a/54596165
         Path relativePath = dir1.toPath().relativize(dir2.toPath()).normalize();
-        if (relativePath == null || relativePath.toString().isEmpty()) {
-            // paths are equal
-            return dir1;
-        }
         while (relativePath != null && !relativePath.endsWith("..")) {
             relativePath = relativePath.getParent();
         }
-        Path result = dir1.toPath().resolve(relativePath).normalize();
-        return result.toFile();
+        if (relativePath == null || relativePath.toString().isEmpty()) {
+            return dir1;
+        } else {
+            return dir1.toPath().resolve(relativePath).normalize().toFile();
+        }
     }
 
     /**
