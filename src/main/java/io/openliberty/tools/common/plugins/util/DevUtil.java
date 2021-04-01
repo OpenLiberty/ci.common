@@ -1351,6 +1351,38 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
+     * Get the root directory for mounting loose app in container.  This is the longest common directory between the projectDirectory and multiModuleProjectDirectory.
+     * 
+     * @param projectDirectory The current project directory. Must not be null.
+     * @param multiModuleProjectDirectory The multi module project directory. Can be null.
+     * @return The longest common directory, or projectDirectory if multiModuleProjectDirectory is null
+     */
+    public static File getLooseAppProjectRoot(File projectDirectory, File multiModuleProjectDirectory) {
+        if (multiModuleProjectDirectory == null) {
+            return projectDirectory;
+        }
+        try {
+            return getLongestCommonDir(projectDirectory.getCanonicalFile(), multiModuleProjectDirectory.getCanonicalFile());
+        } catch (IOException e) {
+            return getLongestCommonDir(projectDirectory.getAbsoluteFile(), multiModuleProjectDirectory.getAbsoluteFile());
+        }
+    }
+
+    protected static File getLongestCommonDir(File dir1, File dir2) {
+        // based on https://stackoverflow.com/a/54596165
+        Path relativePath = dir1.toPath().relativize(dir2.toPath()).normalize();
+        if (relativePath == null || relativePath.toString().isEmpty()) {
+            // paths are equal
+            return dir1;
+        }
+        while (relativePath != null && !relativePath.endsWith("..")) {
+            relativePath = relativePath.getParent();
+        }
+        Path result = dir1.toPath().resolve(relativePath).normalize();
+        return result.toFile();
+    }
+
+    /**
      * Build a docker run command with all the ports and directories required to run Open Liberty 
      * inside a container. Also included is the image name and the server run command to override
      * the CMD attribute of the Open Liberty docker image. 
@@ -1396,8 +1428,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps:/config/apps");
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins:/config/dropins");
 
-        // mount the loose application resources in the container using the top level multi module project (or if null, then the current project's directory)
-        File looseApplicationProjectRoot = multiModuleProjectDirectory == null ? projectDirectory : multiModuleProjectDirectory;
+        // mount the loose application resources in the container using the appropriate project root
+        File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
         command.append(" -v " + looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
