@@ -120,7 +120,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
-    private static final int LIBERTY_DEFAULT_DEBUG_PORT = 7777;
     private static final int DOCKER_TIMEOUT = 20; // seconds
 
     /**
