@@ -1058,6 +1058,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return true;
     }
 
+    protected void onAnyChange() throws PluginExecutionException {
+    	// no-op - placeholder to override
+    }
+
     protected File prepareTempDockerfile(File dockerfile, String buildContextString) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
 
