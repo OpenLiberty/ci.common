@@ -89,7 +89,7 @@ import io.openliberty.tools.ant.ServerTask;
  */
 public abstract class DevUtil extends AbstractContainerSupportUtil {
 
-    private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
+	private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
     private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
     private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I.*";
     private static final String PORT_IN_USE_MESSAGE_PREFIX = "CWWKO0221E:";
@@ -270,7 +270,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private File serverDirectory;
-    private File sourceDirectory;
+    private File sourceJavaDirectory;
+    private File sourceWebAppDirectory;
     private File testSourceDirectory;
     private File configDirectory;
     private File projectDirectory;
@@ -338,61 +339,318 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
 
-    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceJavaDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
             boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
             JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
-        this.buildDirectory = buildDirectory;
-        this.serverDirectory = serverDirectory;
-        this.sourceDirectory = sourceDirectory;
-        this.testSourceDirectory = testSourceDirectory;
-        this.configDirectory = configDirectory;
-        this.projectDirectory = projectDirectory;
-        this.multiModuleProjectDirectory = multiModuleProjectDirectory;
-        this.resourceDirs = resourceDirs;
-        this.hotTests = hotTests;
-        this.skipTests = skipTests;
-        this.skipUTs = skipUTs;
-        this.skipITs = skipITs;
-        this.applicationId = applicationId;
-        this.serverStartTimeout = serverStartTimeout;
-        this.appStartupTimeout = appStartupTimeout;
-        this.appUpdateTimeout = appUpdateTimeout;
+    	DevUtil(devUtilConfig);
+    }
+    
+    public static class DevUtilConfig {
+
+		public DevUtilConfig setBuildDirectory(File buildDirectory) {
+			this.buildDirectory = buildDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setServerDirectory(File serverDirectory) {
+			this.serverDirectory = serverDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setSourceJavaDirectory(File sourceJavaDirectory) {
+			this.sourceJavaDirectory = sourceJavaDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setSourceWebAppDirectory(File sourceWebAppDirectory) {
+			this.sourceWebAppDirectory = sourceWebAppDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setTestSourceDirectory(File testSourceDirectory) {
+			this.testSourceDirectory = testSourceDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setConfigDirectory(File configDirectory) {
+			this.configDirectory = configDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setProjectDirectory(File projectDirectory) {
+			this.projectDirectory = projectDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setMultiModuleProjectDirectory(File multiModuleProjectDirectory) {
+			this.multiModuleProjectDirectory = multiModuleProjectDirectory;
+            return this;
+		}
+
+		public DevUtilConfig setResourceDirs(List<File> resourceDirs) {
+			this.resourceDirs = resourceDirs;
+            return this;
+		}
+
+		public DevUtilConfig setHotTests(boolean hotTests) {
+			this.hotTests = hotTests;
+            return this;
+		}
+
+		public DevUtilConfig setSkipTests(boolean skipTests) {
+			this.skipTests = skipTests;
+            return this;
+		}
+
+		public DevUtilConfig setSkipUTs(boolean skipUTs) {
+			this.skipUTs = skipUTs;
+            return this;
+		}
+
+		public DevUtilConfig setSkipITs(boolean skipITs) {
+			this.skipITs = skipITs;
+            return this;
+		}
+
+		public DevUtilConfig setApplicationId(String applicationId) {
+			this.applicationId = applicationId;
+            return this;
+		}
+
+		public DevUtilConfig setServerStartTimeout(long serverStartTimeout) {
+			this.serverStartTimeout = serverStartTimeout;
+            return this;
+		}
+
+		public DevUtilConfig setAppStartupTimeout(int appStartupTimeout) {
+			this.appStartupTimeout = appStartupTimeout;
+            return this;
+		}
+
+		public DevUtilConfig setAppUpdateTimeout(int appUpdateTimeout) {
+			this.appUpdateTimeout = appUpdateTimeout;
+            return this;
+		}
+
+		public DevUtilConfig setCompileWaitMillis(long compileWaitMillis) {
+			this.compileWaitMillis = compileWaitMillis;
+            return this;
+		}
+
+		public DevUtilConfig setLibertyDebug(boolean libertyDebug) {
+			this.libertyDebug = libertyDebug;
+            return this;
+		}
+
+		public DevUtilConfig setUseBuildRecompile(boolean useBuildRecompile) {
+			this.useBuildRecompile = useBuildRecompile;
+            return this;
+		}
+
+		public DevUtilConfig setGradle(boolean gradle) {
+			this.gradle = gradle;
+            return this;
+		}
+
+		public DevUtilConfig setPollingTest(boolean pollingTest) {
+			this.pollingTest = pollingTest;
+            return this;
+		}
+
+		public DevUtilConfig setContainer(boolean container) {
+			this.container = container;
+            return this;
+		}
+
+		public DevUtilConfig setDockerfile(File dockerfile) {
+			this.dockerfile = dockerfile;
+            return this;
+		}
+
+		public DevUtilConfig setDockerBuildContext(File dockerBuildContext) {
+			this.dockerBuildContext = dockerBuildContext;
+            return this;
+		}
+
+		public DevUtilConfig setDockerRunOpts(String dockerRunOpts) {
+			this.dockerRunOpts = dockerRunOpts;
+            return this;
+		}
+
+		public DevUtilConfig setDockerBuildTimeout(int dockerBuildTimeout) {
+			this.dockerBuildTimeout = dockerBuildTimeout;
+            return this;
+		}
+
+		public DevUtilConfig setSkipDefaultPorts(boolean skipDefaultPorts) {
+			this.skipDefaultPorts = skipDefaultPorts;
+            return this;
+		}
+
+		public DevUtilConfig setCompilerOptions(JavaCompilerOptions compilerOptions) {
+			this.compilerOptions = compilerOptions;
+            return this;
+		}
+
+		public DevUtilConfig setKeepTempDockerfile(boolean keepTempDockerfile) {
+			this.keepTempDockerfile = keepTempDockerfile;
+            return this;
+		}
+
+		public DevUtilConfig setMavenCacheLocation(String mavenCacheLocation) {
+			this.mavenCacheLocation = mavenCacheLocation;
+            return this;
+		}
+
+		public File buildDirectory;
+		public File serverDirectory;
+		public File sourceJavaDirectory;
+		public File sourceWebAppDirectory;
+		public File testSourceDirectory;
+		public File configDirectory;
+		public File projectDirectory;
+		public File multiModuleProjectDirectory;
+		public List<File> resourceDirs;
+		public boolean hotTests;
+		public boolean skipTests;
+		public boolean skipUTs;
+		public boolean skipITs;
+		public String applicationId;
+		public long serverStartTimeout;
+		public int appStartupTimeout;
+		public int appUpdateTimeout;
+		public long compileWaitMillis;
+		public boolean libertyDebug;
+		public boolean useBuildRecompile;
+		public boolean gradle;
+		public boolean pollingTest;
+		public boolean container;
+		public File dockerfile;
+		public File dockerBuildContext;
+		public String dockerRunOpts;
+		public int dockerBuildTimeout;
+		public boolean skipDefaultPorts;
+		public JavaCompilerOptions compilerOptions;
+		public boolean keepTempDockerfile;
+		public String mavenCacheLocation;
+
+		public DevUtilConfig(File buildDirectory, File serverDirectory, File sourceJavaDirectory,
+				File sourceWebAppDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
+				File multiModuleProjectDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests,
+				boolean skipUTs, boolean skipITs, String applicationId, long serverStartTimeout, int appStartupTimeout,
+				int appUpdateTimeout, long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile,
+				boolean gradle, boolean pollingTest, boolean container, File dockerfile, File dockerBuildContext,
+				String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts,
+				JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
+			this.buildDirectory = buildDirectory;
+			this.serverDirectory = serverDirectory;
+			this.sourceJavaDirectory = sourceJavaDirectory;
+			this.sourceWebAppDirectory = sourceWebAppDirectory;
+			this.testSourceDirectory = testSourceDirectory;
+			this.configDirectory = configDirectory;
+			this.projectDirectory = projectDirectory;
+			this.multiModuleProjectDirectory = multiModuleProjectDirectory;
+			this.resourceDirs = resourceDirs;
+			this.hotTests = hotTests;
+			this.skipTests = skipTests;
+			this.skipUTs = skipUTs;
+			this.skipITs = skipITs;
+			this.applicationId = applicationId;
+			this.serverStartTimeout = serverStartTimeout;
+			this.appStartupTimeout = appStartupTimeout;
+			this.appUpdateTimeout = appUpdateTimeout;
+			this.compileWaitMillis = compileWaitMillis;
+			this.libertyDebug = libertyDebug;
+			this.useBuildRecompile = useBuildRecompile;
+			this.gradle = gradle;
+			this.pollingTest = pollingTest;
+			this.container = container;
+			this.dockerfile = dockerfile;
+			this.dockerBuildContext = dockerBuildContext;
+			this.dockerRunOpts = dockerRunOpts;
+			this.dockerBuildTimeout = dockerBuildTimeout;
+			this.skipDefaultPorts = skipDefaultPorts;
+			this.compilerOptions = compilerOptions;
+			this.keepTempDockerfile = keepTempDockerfile;
+			this.mavenCacheLocation = mavenCacheLocation;
+		}
+
+		public DevUtilConfig() {
+			// TODO Auto-generated constructor stub
+		}
+	}
+
+	/**
+	 * @deprecated Use {@link #DevUtil(DevUtilConfig)} instead
+	 */
+	public DevUtil(File buildDirectory, File serverDirectory, File sourceJavaDirectory, File sourceWebAppDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
+	        List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
+	        String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
+	        long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
+	        boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
+	        JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
+				this(new DevUtilConfig(buildDirectory, serverDirectory, sourceJavaDirectory, sourceWebAppDirectory,
+						testSourceDirectory, configDirectory, projectDirectory, multiModuleProjectDirectory,
+						resourceDirs, hotTests, skipTests, skipUTs, skipITs, applicationId, serverStartTimeout,
+						appStartupTimeout, appUpdateTimeout, compileWaitMillis, libertyDebug, useBuildRecompile, gradle,
+						pollingTest, container, dockerfile, dockerBuildContext, dockerRunOpts, dockerBuildTimeout,
+						skipDefaultPorts, compilerOptions, keepTempDockerfile, mavenCacheLocation));
+			}
+
+	public DevUtil(DevUtilConfig parameterObject) {
+        this.buildDirectory = parameterObject.buildDirectory;
+        this.serverDirectory = parameterObject.serverDirectory;
+        this.sourceJavaDirectory = parameterObject.sourceJavaDirectory;
+        this.sourceWebAppDirectory = parameterObject.sourceWebAppDirectory;
+        this.testSourceDirectory = parameterObject.testSourceDirectory;
+        this.configDirectory = parameterObject.configDirectory;
+        this.projectDirectory = parameterObject.projectDirectory;
+        this.multiModuleProjectDirectory = parameterObject.multiModuleProjectDirectory;
+        this.resourceDirs = parameterObject.resourceDirs;
+        this.hotTests = parameterObject.hotTests;
+        this.skipTests = parameterObject.skipTests;
+        this.skipUTs = parameterObject.skipUTs;
+        this.skipITs = parameterObject.skipITs;
+        this.applicationId = parameterObject.applicationId;
+        this.serverStartTimeout = parameterObject.serverStartTimeout;
+        this.appStartupTimeout = parameterObject.appStartupTimeout;
+        this.appUpdateTimeout = parameterObject.appUpdateTimeout;
         this.devStop = new AtomicBoolean(false);
-        this.compileWaitMillis = compileWaitMillis;
+        this.compileWaitMillis = parameterObject.compileWaitMillis;
         this.inputUnavailable = new AtomicBoolean(false);
-        this.libertyDebug = libertyDebug;
+        this.libertyDebug = parameterObject.libertyDebug;
         this.detectedAppStarted = new AtomicBoolean(false);
-        this.useBuildRecompile = useBuildRecompile;
+        this.useBuildRecompile = parameterObject.useBuildRecompile;
         this.calledShutdownHook = new AtomicBoolean(false);
-        this.gradle = gradle;
+        this.gradle = parameterObject.gradle;
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.cancelledFileObservers = new HashSet<FileAlterationObserver>();
         this.pollingInterval = 100;
-        if (pollingTest) {
+        if (parameterObject.pollingTest) {
             this.trackingMode = FileTrackMode.POLLING;
         } else {
             this.trackingMode = FileTrackMode.NOT_SET;
         }
-        this.container = container;
-        this.dockerfile = dockerfile;
-        this.dockerBuildContext = dockerBuildContext;
-        this.dockerRunOpts = dockerRunOpts;
-        if (projectDirectory != null) {
-            this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
+        this.container = parameterObject.container;
+        this.dockerfile = parameterObject.dockerfile;
+        this.dockerBuildContext = parameterObject.dockerBuildContext;
+        this.dockerRunOpts = parameterObject.dockerRunOpts;
+        if (parameterObject.projectDirectory != null) {
+            this.defaultDockerfile = new File(parameterObject.projectDirectory, "Dockerfile");
         }
-        if (dockerBuildTimeout < 1) {
+        if (parameterObject.dockerBuildTimeout < 1) {
             this.dockerBuildTimeout = 600;
         } else {
-            this.dockerBuildTimeout = dockerBuildTimeout;
+            this.dockerBuildTimeout = parameterObject.dockerBuildTimeout;
         }
-        this.skipDefaultPorts = skipDefaultPorts;
-        this.compilerOptions = compilerOptions;
-        this.keepTempDockerfile = keepTempDockerfile;
-        this.mavenCacheLocation = mavenCacheLocation;
+        this.skipDefaultPorts = parameterObject.skipDefaultPorts;
+        this.compilerOptions = parameterObject.compilerOptions;
+        this.keepTempDockerfile = parameterObject.keepTempDockerfile;
+        this.mavenCacheLocation = parameterObject.mavenCacheLocation;
         this.externalContainerShutdown = new AtomicBoolean(false);
         this.shownFeaturesShWarning = new AtomicBoolean(false);
         this.hasFeaturesSh = new AtomicBoolean(false);
@@ -1058,7 +1316,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return true;
     }
 
-    protected void onAnyChange() throws PluginExecutionException {
+    /**
+     * 
+     * Along with fine-grained actions per specific file update type, (java class vs. resource file, vs. config, etc.),
+     * include this action for any app update (but not test or config update).
+     * 
+     * @throws PluginExecutionException
+     */
+    protected void appChanged() throws PluginExecutionException {
     	// no-op - placeholder to override
     }
 
@@ -2340,6 +2605,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     Collection<File> failedCompilationJavaTests;
     long lastJavaSourceChange;
     long lastJavaTestChange;
+    boolean triggerAppRefresh;
     boolean triggerJavaSourceRecompile;
     boolean triggerJavaTestRecompile;
     File outputDirectory;
@@ -2398,7 +2664,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 jvmOptionsFileParent = jvmOptionsFile.getParentFile();
             }
 
-            Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
+            Path srcPath = this.sourceJavaDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
 
@@ -2409,7 +2675,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
 
-            if (this.sourceDirectory.exists()) {
+            if (this.sourceJavaDirectory.exists()) {
                 registerAll(srcPath, executor);
                 sourceDirRegistered = true;
             }
@@ -2492,13 +2758,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths, testArtifactPaths);
 
                 // check if javaSourceDirectory has been added
-                if (!sourceDirRegistered && this.sourceDirectory.exists()
-                        && this.sourceDirectory.listFiles().length > 0) {
-                    compile(this.sourceDirectory);
+                if (!sourceDirRegistered && this.sourceJavaDirectory.exists()
+                        && this.sourceJavaDirectory.listFiles().length > 0) {
+                    compile(this.sourceJavaDirectory);
                     registerAll(srcPath, executor);
-                    debug("Registering Java source directory: " + this.sourceDirectory);
+                    debug("Registering Java source directory: " + this.sourceJavaDirectory);
                     sourceDirRegistered = true;
-                } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
+                } else if (sourceDirRegistered && !this.sourceJavaDirectory.exists()) {
                     cleanTargetDir(outputDirectory);
                     sourceDirRegistered = false;
                 }
@@ -2814,7 +3080,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (!deleteJavaSources.isEmpty()) {
                 debug("Deleting Java source files: " + deleteJavaSources);
                 for (File file : deleteJavaSources) {
-                    deleteJavaFile(file, outputDirectory, this.sourceDirectory);
+                    deleteJavaFile(file, outputDirectory, this.sourceJavaDirectory);
                 }
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
@@ -2916,8 +3182,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaTestRecompile = false;
 
         // initial source and test compile
-        if (this.sourceDirectory.exists()) {
-            Collection<File> allJavaSources = FileUtils.listFiles(this.sourceDirectory.getCanonicalFile(),
+        if (this.sourceJavaDirectory.exists()) {
+            Collection<File> allJavaSources = FileUtils.listFiles(this.sourceJavaDirectory.getCanonicalFile(),
                     new String[] { "java" }, true);
             recompileJavaSources.addAll(allJavaSources);
         }
@@ -2939,7 +3205,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         debug("Processing file changes for " + fileChanged + ", change type " + changeType);
 
-        Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
+        Path srcPath = this.sourceJavaDirectory.getCanonicalFile().toPath();
         Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
 
@@ -2969,6 +3235,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // reset this property in case it had been set to true
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
 
+        
         // src/main/java directory
         if (directory.startsWith(srcPath)) {
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -2986,7 +3253,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 lastJavaSourceChange = System.currentTimeMillis();
                 deleteJavaSources.add(fileChanged);
             }
-        } else if (directory.startsWith(testSrcPath)) { // src/main/test
+        } else if (directory.startsWith(testSrcPath)) { // src/test/java
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
             javaFilesChanged.add(fileChanged);
             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
@@ -3102,11 +3369,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     || changeType == ChangeType.CREATE)) {
                 copyFile(fileChanged, resourceParent, outputDirectory, null);
 
+                appChanged();
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             } else if (changeType == ChangeType.DELETE) {
                 debug("Resource file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, resourceParent, outputDirectory, null);
+                appChanged();
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
@@ -3601,7 +3870,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean compileResult;
             
             if (useBuildRecompile) {
-                compileResult = compile(tests ? testSourceDirectory : sourceDirectory);
+                compileResult = compile(tests ? testSourceDirectory : sourceJavaDirectory);
             } else {
                 // source root is src/main/java or src/test/java
                 File classesDir = tests ? testOutputDirectory : outputDirectory;
