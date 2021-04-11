@@ -35,8 +35,15 @@ public class BaseDevUtilTest {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory,
                 File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(null, serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null, resourceDirs, hotTests, skipTests, 
-                  false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null, null, 0, false, null, false, null);
+        	super(new DevUtilConfig().
+        			setServerDirectory(serverDirectory).setSourceDirectory(sourceDirectory).setTestSourceDirectory(testSourceDirectory).setConfigDirectory(configDirectory).
+        			setResourceDirs(resourceDirs).setHotTests(hotTests).setSkipTests(skipTests).
+        			setSkipUTs(false).setSkipITs(false).setServerStartTimeout(30).
+        			setAppStartupTimeout(30).setAppUpdateTimeout(5).setCompileWaitMillis(500).setLibertyDebug(true).setUseBuildRecompile(false).
+        			setGradle(false).setPollingTest(false).setContainer(false).
+        			setDockerBuildTimeout(0).setSkipDefaultPorts(false).
+        			setKeepTempDockerfile(false));
+
         }
 
         @Override
