@@ -1076,12 +1076,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * 
-     * Along with fine-grained actions per specific file update type, (java class vs. resource file, vs. config, etc.),
-     * include this action for any app update (but not test or config update).
+     * The intention here is to give a chance to run logic for an app update
+     * but not necessarily a full re-deploy
      * 
      * @throws PluginExecutionException
      */
-    protected void appChanged() throws PluginExecutionException {
+    protected void updateLooseApp() throws PluginExecutionException {
     	// no-op - placeholder to override
     }
 
@@ -2422,10 +2422,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
 
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
+            Path warSrcPath = this.warSourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
 
             boolean sourceDirRegistered = false;
+            boolean warSourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
             boolean configDirRegistered = false;
             boolean serverXmlFileRegistered = false;
@@ -2435,6 +2437,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, executor);
                 sourceDirRegistered = true;
+            }
+
+            if (this.warSourceDirectory.exists()) {
+                registerAll(warSrcPath, executor);
+                warSourceDirRegistered = true;
             }
 
             if (this.testSourceDirectory.exists()) {
@@ -2524,6 +2531,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
                     cleanTargetDir(outputDirectory);
                     sourceDirRegistered = false;
+                }
+
+                // check if warSourceDirectory has been added
+                if (!warSourceDirRegistered && this.warSourceDirectory.exists()
+                        && this.warSourceDirectory.listFiles().length > 0) {
+                    updateLooseApp();
+                    registerAll(warSrcPath, executor);
+                    debug("Registering WAR source directory: " + this.warSourceDirectory);
+                    runTestThread(false, executor, -1, false, false);
+                    warSourceDirRegistered = true;
+                } else if (warSourceDirRegistered && !this.warSourceDirectory.exists()) {
+                    updateLooseApp();
+                    runTestThread(false, executor, -1, false, false);
+                    warSourceDirRegistered = false;
                 }
 
                 // check if testSourceDirectory has been added
@@ -3123,22 +3144,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("Resource dir: " + resourceParent.toString());
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY
                     || changeType == ChangeType.CREATE)) {
-                copyFile(fileChanged, resourceParent, outputDirectory, null);
-
-                appChanged();
+            	resourceModifiedOrCreated(fileChanged, resourceParent, outputDirectory);
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             } else if (changeType == ChangeType.DELETE) {
                 debug("Resource file deleted: " + fileChanged.getName());
-                deleteFile(fileChanged, resourceParent, outputDirectory, null);
-                appChanged();
+                resourceDeleted(fileChanged, resourceParent, outputDirectory);
+
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
         } else if (warSrcPath != null                   // src/main/webapp directory
         		&& directory.startsWith(warSrcPath)) {  
             debug("War source dir changed: " + fileChanged.getName());
-            appChanged();
+            updateLooseApp();
             runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
@@ -3173,7 +3192,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    /**
+	protected void resourceModifiedOrCreated(File fileChanged, File resourceParent, File outputDirectory) throws IOException {
+        copyFile(fileChanged, resourceParent, outputDirectory, null);
+	}
+
+    protected void resourceDeleted(File fileChanged, File resourceParent, File outputDirectory) throws IOException {
+        deleteFile(fileChanged, resourceParent, outputDirectory, null);
+	}
+
+	/**
      * Unwatches all directories that were specified in Dockerfile COPY commands, then does a container
      * rebuild and restart.
      * 
@@ -3692,7 +3719,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (!isLooseApplication()) {
                         redeployApp();
                     } else {
-                    	appChanged();
+                    	updateLooseApp();
                     }
                     info("Source compilation was successful.");
                 }
