@@ -2598,7 +2598,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // check if resourceDirectory has been added
                 for (File resourceDir : resourceDirs) {
                     if (!resourceMap.get(resourceDir) && resourceDir.exists()) {
-                        // added resource directory
+                    	resourceDirectoryCreated();
                         registerAll(resourceDir.getCanonicalFile().toPath(), executor);
                         resourceMap.put(resourceDir, true);
                     } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
@@ -2997,8 +2997,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 resourceParent = resourceDir;
                 break;
             }
-        }
 
+        }
         if (fileChanged.isDirectory()) {
             // if new directory added, watch the entire directory
             if (changeType == ChangeType.CREATE) {
@@ -3191,6 +3191,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             untrackDockerfileDirectoriesAndRestart();
         }
     }
+
+	protected void resourceDirectoryCreated() throws IOException {
+	
+	}
 
 	protected void resourceModifiedOrCreated(File fileChanged, File resourceParent, File outputDirectory) throws IOException {
         copyFile(fileChanged, resourceParent, outputDirectory, null);
