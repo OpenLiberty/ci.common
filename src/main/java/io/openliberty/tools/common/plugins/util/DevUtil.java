@@ -271,7 +271,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private File serverDirectory;
     private File sourceDirectory;
-    private File warSourceDirectory;
+    private List<File> webResourceDirs;
     private File testSourceDirectory;
     private File configDirectory;
     private File projectDirectory;
@@ -362,7 +362,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.buildDirectory = parameterObject.buildDirectory;
         this.serverDirectory = parameterObject.serverDirectory;
         this.sourceDirectory = parameterObject.sourceDirectory;
-        this.warSourceDirectory = parameterObject.warSourceDirectory;
+        this.webResourceDirs = parameterObject.webResourceDirs;
         this.testSourceDirectory = parameterObject.testSourceDirectory;
         this.configDirectory = parameterObject.configDirectory;
         this.projectDirectory = parameterObject.projectDirectory;
@@ -2422,12 +2422,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
 
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
-            Path warSrcPath = this.warSourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
 
             boolean sourceDirRegistered = false;
-            boolean warSourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
             boolean configDirRegistered = false;
             boolean serverXmlFileRegistered = false;
@@ -2437,11 +2435,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, executor);
                 sourceDirRegistered = true;
-            }
-
-            if (this.warSourceDirectory.exists()) {
-                registerAll(warSrcPath, executor);
-                warSourceDirRegistered = true;
             }
 
             if (this.testSourceDirectory.exists()) {
@@ -2483,6 +2476,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (resourceDir.exists()) {
                     registerAll(resourceDir.getCanonicalFile().toPath(), executor);
                     resourceMap.put(resourceDir, true);
+                }
+            }
+
+            HashMap<File, Boolean> webResourceMap = new HashMap<File, Boolean>();
+            for (File webResourceDir : webResourceDirs) {
+                webResourceMap.put(webResourceDir, false);
+                if (webResourceDir.exists()) {
+                    registerAll(webResourceDir.getCanonicalFile().toPath(), executor);
+                    resourceMap.put(webResourceDir, true);
                 }
             }
 
@@ -2533,19 +2535,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     sourceDirRegistered = false;
                 }
 
-                // check if warSourceDirectory has been added
-                if (!warSourceDirRegistered && this.warSourceDirectory.exists()
-                        && this.warSourceDirectory.listFiles().length > 0) {
-                    updateLooseApp();
-                    registerAll(warSrcPath, executor);
-                    debug("Registering WAR source directory: " + this.warSourceDirectory);
-                    runTestThread(false, executor, -1, false, false);
-                    warSourceDirRegistered = true;
-                } else if (warSourceDirRegistered && !this.warSourceDirectory.exists()) {
-                    updateLooseApp();
-                    runTestThread(false, executor, -1, false, false);
-                    warSourceDirRegistered = false;
-                }
 
                 // check if testSourceDirectory has been added
                 if (!testSourceDirRegistered && this.testSourceDirectory.exists()
@@ -2606,6 +2595,23 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         warn("The resource directory " + resourceDir
                                 + " was deleted.  Restart liberty:dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
+                    }
+                }
+
+                // check if webResourceDirectory has been added
+                for (File webResourceDir : webResourceDirs) {
+                    if (!webResourceMap.get(webResourceDir) && webResourceDir.exists()) {
+                    	updateLooseApp();
+                        registerAll(webResourceDir.getCanonicalFile().toPath(), executor);
+                        webResourceMap.put(webResourceDir, true);
+                    	runTestThread(false, executor, -1, false, false);
+                    } else if (webResourceMap.get(webResourceDir) && !webResourceDir.exists()) {
+                        // deleted webResource directory
+                    	updateLooseApp();
+                        warn("The webResource directory " + webResourceDir
+                                + " was deleted.  Restart liberty:dev mode for it to take effect.");
+                        webResourceMap.put(webResourceDir, false);
+                    	runTestThread(false, executor, -1, false, false);
                     }
                 }
 
@@ -2984,7 +2990,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         debug("Processing file changes for " + fileChanged + ", change type " + changeType);
 
         Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
-        Path warSrcPath = this.warSourceDirectory.getCanonicalFile().toPath();
         Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
 
@@ -2995,6 +3000,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         for (File resourceDir : resourceDirs) {
             if (directory.startsWith(resourceDir.getCanonicalFile().toPath())) {
                 resourceParent = resourceDir;
+                break;
+            }
+
+        }
+        // webResource file check
+        File webResourceParent = null;
+        for (File webResourceDir : webResourceDirs) {
+            if (directory.startsWith(webResourceDir.getCanonicalFile().toPath())) {
+                webResourceParent = webResourceDir;
                 break;
             }
 
@@ -3154,9 +3168,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
-        } else if (warSrcPath != null                   // src/main/webapp directory
-        		&& directory.startsWith(warSrcPath)) {  
-            debug("War source dir changed: " + fileChanged.getName());
+        } else if (webResourceParent != null
+                && directory.startsWith(webResourceParent.getCanonicalFile().toPath())) { // webResources
+            debug("webResource dir: " + webResourceParent.toString());
             updateLooseApp();
             runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
         } else if (fileChanged.equals(buildFile)

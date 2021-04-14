@@ -20,8 +20,8 @@ public class DevUtilConfig {
         return this;
 	}
 
-	public DevUtilConfig setWarSourceDirectory(File warSourceDirectory) {
-		this.warSourceDirectory = warSourceDirectory;
+	public DevUtilConfig setWebResourceDirs(List<File> webResourceDirs) {
+		this.webResourceDirs = webResourceDirs;
         return this;
 	}
 
@@ -163,7 +163,7 @@ public class DevUtilConfig {
 	public File buildDirectory;
 	public File serverDirectory;
 	public File sourceDirectory;
-	public File warSourceDirectory;
+	public List<File> webResourceDirs;
 	public File testSourceDirectory;
 	public File configDirectory;
 	public File projectDirectory;
