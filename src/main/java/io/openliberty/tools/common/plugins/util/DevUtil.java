@@ -271,7 +271,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private File serverDirectory;
     private File sourceDirectory;
-    private List<File> webResourceDirs;
+    private List<Path> webResourceDirs;
     private File testSourceDirectory;
     private File configDirectory;
     private File projectDirectory;
@@ -2479,12 +2479,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
 
-            HashMap<File, Boolean> webResourceMap = new HashMap<File, Boolean>();
-            for (File webResourceDir : webResourceDirs) {
+            HashMap<Path, Boolean> webResourceMap = new HashMap<Path, Boolean>();
+            for (Path webResourceDir : webResourceDirs) {
                 webResourceMap.put(webResourceDir, false);
-                if (webResourceDir.exists()) {
-                    registerAll(webResourceDir.getCanonicalFile().toPath(), executor);
-                    resourceMap.put(webResourceDir, true);
+                if (Files.exists(webResourceDir)) {
+                    registerAll(webResourceDir, executor);
+                    webResourceMap.put(webResourceDir, true);
                 }
             }
 
@@ -2599,13 +2599,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 // check if webResourceDirectory has been added
-                for (File webResourceDir : webResourceDirs) {
-                    if (!webResourceMap.get(webResourceDir) && webResourceDir.exists()) {
+                for (Path webResourceDir : webResourceDirs) {
+                    if (!webResourceMap.get(webResourceDir) && Files.exists(webResourceDir)) {
                     	updateLooseApp();
-                        registerAll(webResourceDir.getCanonicalFile().toPath(), executor);
+                        registerAll(webResourceDir, executor);
                         webResourceMap.put(webResourceDir, true);
                     	runTestThread(false, executor, -1, false, false);
-                    } else if (webResourceMap.get(webResourceDir) && !webResourceDir.exists()) {
+                    } else if (webResourceMap.get(webResourceDir) && !Files.exists(webResourceDir)) {
                         // deleted webResource directory
                     	updateLooseApp();
                         warn("The webResource directory " + webResourceDir
@@ -3005,9 +3005,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         }
         // webResource file check
-        File webResourceParent = null;
-        for (File webResourceDir : webResourceDirs) {
-            if (directory.startsWith(webResourceDir.getCanonicalFile().toPath())) {
+        Path webResourceParent = null;
+        for (Path webResourceDir : webResourceDirs) {
+            if (directory.startsWith(webResourceDir)) {
                 webResourceParent = webResourceDir;
                 break;
             }
@@ -3169,7 +3169,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
         } else if (webResourceParent != null
-                && directory.startsWith(webResourceParent.getCanonicalFile().toPath())) { // webResources
+                && directory.startsWith(webResourceParent)) { // webResources
             debug("webResource dir: " + webResourceParent.toString());
             updateLooseApp();
             runTestThread(true, executor, numApplicationUpdatedMessages, false, false);

@@ -1,6 +1,7 @@
 package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.List;
 
 public class DevUtilConfig {
@@ -20,7 +21,7 @@ public class DevUtilConfig {
         return this;
 	}
 
-	public DevUtilConfig setWebResourceDirs(List<File> webResourceDirs) {
+	public DevUtilConfig setWebResourceDirs(List<Path> webResourceDirs) {
 		this.webResourceDirs = webResourceDirs;
         return this;
 	}
@@ -163,7 +164,7 @@ public class DevUtilConfig {
 	public File buildDirectory;
 	public File serverDirectory;
 	public File sourceDirectory;
-	public List<File> webResourceDirs;
+	public List<Path> webResourceDirs;
 	public File testSourceDirectory;
 	public File configDirectory;
 	public File projectDirectory;
