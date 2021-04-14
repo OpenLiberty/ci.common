@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,10 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
+
+
+
 /**
  * Utility class to install features from Maven repositories.
  */
@@ -85,6 +89,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
+    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.6";
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
 
@@ -124,7 +129,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 throw new PluginScenarioException("Install map jar not found.");
             }
             downloadedJsons = downloadProductJsons();
-            if (additionalJsons != null) {
+            if (additionalJsons != null && !additionalJsons.isEmpty()) {
+            	//check if the openliberty kernel meets min required version 21.0.0.6
+            	DefaultArtifactVersion minVersion = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
+            	DefaultArtifactVersion version = new DefaultArtifactVersion(openLibertyVersion);
+            	
+            	if (version.compareTo(minVersion) < 0) {
+            		throw new PluginExecutionException("To install user feature, openliberty version should be greater than 21.0.0.6");
+            	}
+            	
             	Set<File> groupIDJsons = getAdditionalJsons();
                 if (groupIDJsons != null) {
                     downloadedJsons.addAll(groupIDJsons);
@@ -142,6 +155,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
         }
     }
+    
 
     /**
      * Retrieve additional JSONS from the coordinates provided

@@ -1,3 +1,18 @@
+/**
+ * (C) Copyright IBM Corporation 2021.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
@@ -26,6 +41,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 
 public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	
@@ -36,6 +52,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     public static final String FEATURES_JSON_ARTIFACT_ID = "features";
+    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.6";
     
     private File installJarFile;
 	
@@ -43,6 +60,14 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
         this.installDirectory = installDirectory;
         this.openLibertyVersion = openLibertyVersion;
         installJarFile = loadInstallJarFile(installDirectory);
+        
+        //check if the openliberty kernel meets min required version 21.0.0.6
+    	DefaultArtifactVersion minVersion = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
+    	DefaultArtifactVersion version = new DefaultArtifactVersion(openLibertyVersion);
+    	
+    	if (version.compareTo(minVersion) < 0) {
+    		throw new PluginScenarioException("To install user feature, openliberty version should be greater than 21.0.0.6");
+    	}
         if (installJarFile == null) {
             throw new PluginScenarioException("Install map jar not found.");
         }
@@ -119,6 +144,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
                     String artifactId = eElement.getElementsByTagName("artifactId").item(0).getTextContent();
                     String version = eElement.getElementsByTagName("version").item(0).getTextContent();
                     String type = eElement.getElementsByTagName("type").item(0).getTextContent();
+                    
                     File artifactFile = downloadArtifact(groupId, artifactId, type, version);
                     result.put(artifactFile, groupId);
                 }
@@ -191,8 +217,12 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
                 mapBasedInstallKernel.put("individual.esas", esaFileList);
                 mapBasedInstallKernel.put("target.json.dir", targetDir.toFile());
                 mapBasedInstallKernel.put("generate.json.group.id.map", esaFileMap);
-                mapBasedInstallKernel.put("generate.json", true);
+                mapBasedInstallKernel.put("generate.json", true); 
                 json = (File) mapBasedInstallKernel.get("generate.json");
+                
+                if (mapBasedInstallKernel.get("action.error.message") != null) {
+                    debug("generateJson action.exception.stacktrace: " + mapBasedInstallKernel.get("action.error.stacktrace"));                  
+                }
 
             } catch (PrivilegedActionException e) {
                 throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
