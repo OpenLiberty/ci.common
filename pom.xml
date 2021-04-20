@@ -18,7 +18,7 @@
 	<licenses>
 		<license>
 			<name>The Apache Software License, Version 2.0</name>
-			<url>https://raw.github.com/openliberty/ci.common/master/LICENSE</url>
+			<url>https://raw.github.com/openliberty/ci.common/main/LICENSE</url>
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
