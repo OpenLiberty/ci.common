@@ -156,6 +156,11 @@ public class BaseDevUtilTest {
         }
 
         @Override
+        public void libertyGenerateFeatures() {
+            // not needed for tests
+        }
+
+        @Override
         public void redeployApp() throws PluginExecutionException {
             // not needed for tests
         }
