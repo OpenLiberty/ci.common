@@ -10,7 +10,7 @@
 
 	<groupId>io.openliberty.tools</groupId>
 	<artifactId>ci.common</artifactId>
-	<version>1.8.14-SNAPSHOT</version>
+	<version>1.8.15-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>ci.common</name>
@@ -18,7 +18,7 @@
 	<licenses>
 		<license>
 			<name>The Apache Software License, Version 2.0</name>
-			<url>https://raw.github.com/openliberty/ci.common/master/LICENSE</url>
+			<url>https://raw.github.com/openliberty/ci.common/main/LICENSE</url>
 			<distribution>repo</distribution>
 		</license>
 	</licenses>

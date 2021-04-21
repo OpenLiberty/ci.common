@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2020.
+ * (C) Copyright IBM Corporation 2019, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -74,8 +73,6 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
@@ -83,11 +80,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
-
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
 import io.openliberty.tools.ant.ServerTask;
-import io.openliberty.tools.common.plugins.config.ServerConfigDropinXmlDocument;
 
 /**
  * Utility class for dev mode.
@@ -125,7 +120,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
-    private static final int LIBERTY_DEFAULT_DEBUG_PORT = 7777;
     private static final int DOCKER_TIMEOUT = 20; // seconds
 
     /**
@@ -280,6 +274,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File testSourceDirectory;
     private File configDirectory;
     private File projectDirectory;
+    private File multiModuleProjectDirectory;
     private List<File> resourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
@@ -320,6 +315,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private String imageName;
     private String containerName;
     private File dockerfile;
+    private File dockerBuildContext;
     private Path tempDockerfilePath = null;
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
@@ -342,11 +338,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
 
-    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
+            boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
             JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
@@ -354,6 +350,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.projectDirectory = projectDirectory;
+        this.multiModuleProjectDirectory = multiModuleProjectDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
@@ -382,6 +379,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         this.container = container;
         this.dockerfile = dockerfile;
+        this.dockerBuildContext = dockerBuildContext;
         this.dockerRunOpts = dockerRunOpts;
         if (projectDirectory != null) {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
@@ -605,8 +603,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 File dockerfileToUse = getDockerfile();
                 debug("Dockerfile to use: " + dockerfileToUse);
                 if (dockerfileToUse.exists()) {
-                    File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
-                    buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage);
+                    // The build context comes from the specified dockerBuildContext (or the user's Dockerfile location by default)
+                    File buildContext = dockerBuildContext == null ? dockerfileToUse.getParentFile() : dockerBuildContext;
+                    String buildContextString = buildContext.getAbsolutePath();
+                    debug("Docker build context: " + buildContextString);
+
+                    File tempDockerfile = prepareTempDockerfile(dockerfileToUse, buildContextString);
+                    buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage, buildContext);
                 } else {
                     // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
                     throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
@@ -886,28 +889,36 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
-        List<String> warFileLines = new ArrayList<String>();
+        removeFileExtensionLines(dockerfileLines, ".war");
+    }
+
+    protected void removeEarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
+        removeFileExtensionLines(dockerfileLines, ".ear");
+    }
+
+    private void removeFileExtensionLines(List<String> dockerfileLines, String extension) throws PluginExecutionException {
+        List<String> fileExtensionLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
-            if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(".war")) {
+            if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(extension)) {
                 // Break the Dockerfile line down into segments based on any amount of whitespace.
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
-                // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
+                // if the line starts with COPY and the second to last segment ends with extension, it is a COPY line of that file type
                 if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) {
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
-                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
-                        warFileLines.add(line);
+                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(extension)) {
+                        fileExtensionLines.add(line);
                     }
                 }
             }
         }
-        debug("WAR file lines: " + warFileLines.toString());
-        dockerfileLines.removeAll(warFileLines);
+        debug(extension + " file lines: " + fileExtensionLines.toString());
+        dockerfileLines.removeAll(fileExtensionLines);
     }
 
     /**
@@ -1047,7 +1058,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return true;
     }
 
-    protected File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
+    protected File prepareTempDockerfile(File dockerfile, String buildContextString) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
@@ -1055,7 +1066,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         dockerfileLines = getCleanedLines(dockerfileLines);
         dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
-        processCopyLines(dockerfileLines, dockerfile.getParent());
+        removeEarFileLines(dockerfileLines);
+        processCopyLines(dockerfileLines, buildContextString);
         detectFeaturesSh(dockerfileLines);
         disableOpenJ9SCC(dockerfileLines);
         for (String line : dockerfileLines) {
@@ -1082,20 +1094,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return tempDockerfile;
     }
 
-    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage) throws PluginExecutionException {
+    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage, File buildContext) throws PluginExecutionException {
+        info("Building Docker image...");
+
         try {
-            info("Building Docker image...");
             imageName = getProjectName() + DEVMODE_IMAGE_SUFFIX;
             // Name rules: may contain lowercase letters, digits and a period, one or two underscores, or one or more dashes. Cannot start with dash.
             imageName = imageName.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("^[\\-]+", "").toLowerCase();
-            // The image is built using the tempDockerfile, but the build context comes from the user's Dockerfile location
-            debug("Docker build context: " + userDockerfile.getParent());
+
             StringBuilder sb = new StringBuilder();
             sb.append("docker build ");
             if (pullParentImage) {
                 sb.append("--pull ");
             }
-            sb.append("-f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent());
+            sb.append("-f " + tempDockerfile + " -t " + imageName + " " + buildContext.getAbsolutePath());
             String buildCmd = sb.toString();
             info(buildCmd);
             if (hasFeaturesSh.get()) {
@@ -1103,7 +1115,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             long startTime = System.currentTimeMillis();
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
-            checkDockerBuildTime(startTime, userDockerfile.getParentFile());
+            checkDockerBuildTime(startTime, buildContext);
             info("Completed building Docker image.");
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed.
@@ -1339,6 +1351,37 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
+     * Get the root directory for mounting loose app in container.  This is the longest common directory between the projectDirectory and multiModuleProjectDirectory.
+     * 
+     * @param projectDirectory The current project directory. Must not be null.
+     * @param multiModuleProjectDirectory The multi module project directory. Can be null.
+     * @return The longest common directory, or projectDirectory if multiModuleProjectDirectory is null
+     */
+    public static File getLooseAppProjectRoot(File projectDirectory, File multiModuleProjectDirectory) {
+        if (multiModuleProjectDirectory == null) {
+            return projectDirectory;
+        }
+        try {
+            return getLongestCommonDir(projectDirectory.getCanonicalFile(), multiModuleProjectDirectory.getCanonicalFile());
+        } catch (IOException e) {
+            return getLongestCommonDir(projectDirectory.getAbsoluteFile(), multiModuleProjectDirectory.getAbsoluteFile());
+        }
+    }
+
+    protected static File getLongestCommonDir(File dir1, File dir2) {
+        // based on https://stackoverflow.com/a/54596165
+        Path relativePath = dir1.toPath().relativize(dir2.toPath()).normalize();
+        while (relativePath != null && !relativePath.endsWith("..")) {
+            relativePath = relativePath.getParent();
+        }
+        if (relativePath == null || relativePath.toString().isEmpty()) {
+            return dir1;
+        } else {
+            return dir1.toPath().resolve(relativePath).normalize().toFile();
+        }
+    }
+
+    /**
      * Build a docker run command with all the ports and directories required to run Open Liberty 
      * inside a container. Also included is the image name and the server run command to override
      * the CMD attribute of the Open Liberty docker image. 
@@ -1384,8 +1427,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps:/config/apps");
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins:/config/dropins");
 
-        // mount the loose application resources in the container
-        command.append(" -v " + projectDirectory.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+        // mount the loose application resources in the container using the appropriate project root
+        File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
+        command.append(" -v " + looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
@@ -3146,7 +3190,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 for (File file : files) {
                     // if the file's path is a child of the tracked path, except for the server logs folder or if it's the loose application itself
                     Path filePath = file.getCanonicalFile().toPath();
-                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
+                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml") && !filePath.toString().endsWith(".ear.xml")) {
                         debug("isDockerfileDirectoryChanged=true for directory " + trackedPath + " with file " + file);
                         return true;
                     }
@@ -3692,6 +3736,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             throw new RuntimeException("Failed to open class path file " + file, e);
                         }
                     }
+                } else if (file.isDirectory() && !classPathElements.contains(file)) {
+                    debug("Adding directory to compile class path: " + file);
+                    classPathElements.add(file);
                 }
             }
         }
