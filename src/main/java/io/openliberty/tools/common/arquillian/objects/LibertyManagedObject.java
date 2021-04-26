@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017.
+ * (C) Copyright IBM Corporation 2017, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +77,8 @@ public class LibertyManagedObject {
     private final int httpPort;
     private final Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties;
 
+    private String userDirectory;
+
     public LibertyManagedObject(String wlpHome, String serverName, int httpPort,
             Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties) {
         this.wlpHome = wlpHome;
@@ -85,12 +87,22 @@ public class LibertyManagedObject {
         this.arquillianProperties = arquillianProperties;
     }
 
+    public LibertyManagedObject(String wlpHome, String serverName, String userDirectory, int httpPort,
+            Map<LibertyProperty.LibertyPropertyI, String> arquillianProperties) {
+        this(wlpHome, serverName, httpPort, arquillianProperties);
+        this.userDirectory = userDirectory;
+    }
+
     public String getWlpHome() {
         return wlpHome;
     }
 
     public String getServerName() {
         return serverName;
+    }
+
+    public String getUserDirectory() {
+        return userDirectory;
     }
 
     public int getHttpPort() {
@@ -108,11 +120,21 @@ public class LibertyManagedObject {
         xml.append("			<property name=\"serverName\">").append(getServerName()).append("</property>\n");
         xml.append("			<property name=\"httpPort\">").append(getHttpPort()).append("</property>\n");
 
+        boolean containsUsrDirProperty = false;
+
         for (Entry<LibertyProperty.LibertyPropertyI, String> e : arquillianProperties.entrySet()) {
             LibertyManagedProperty property = (LibertyManagedProperty) e.getKey();
             String key = property.name();
+            if (key.equals("usrDir")) {
+                containsUsrDirProperty = true;
+            }
             xml.append("			<property name=\"").append(key).append("\">").append(e.getValue())
                     .append("</property>\n");
+        }
+
+        // if the arquillianProperties contains a usrDir property, do not override with the passed in userDirectory 
+        if ((getUserDirectory() != null) && !containsUsrDirProperty) {
+            xml.append("			<property name=\"usrDir\">").append(getUserDirectory()).append("</property>\n");
         }
 
         xml.append(XML_END);
