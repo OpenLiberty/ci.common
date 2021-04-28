@@ -27,6 +27,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.ProcessHandle.Info;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -80,7 +81,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.artifact.versioning.ComparableVersion;
+import org.apache.maven.model.Build;
+import org.apache.maven.project.MavenProject;
 
 import io.openliberty.tools.ant.ServerTask;
 
@@ -2351,6 +2356,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     List<String> testArtifactPaths;
     WatchService watcher;
 
+    // needed for recompiling upstream projects
+    Collection<File> upstreamRecompileJavaSources;
+    Collection<File> upstreamRecompileJavaTestSources;
+    Set<UpstreamProject> upstreamProjects;
+    // may not need these two booleans as it is only used to trigger recompile after
+    // build file changes
+    boolean triggerUpstreamJavaSourceRecompile;
+    boolean triggerUpstreamJavaTestRecompile;
+    Set<UpstreamProject> upstreamProjectsWithCompilationErrors;
+
     /**
      * Watch files for changes.
      * 
@@ -2363,11 +2378,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param serverXmlFile Can be null when using the server.xml from the configDirectory, which has a default value.
      * @param bootstrapPropertiesFile
      * @param jvmOptionsFile
+     * @param upstreamProjects Upstream Maven projects, or null if a Gradle project or none exist
      * @throws Exception
      */
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths, File serverXmlFile,
-            File bootstrapPropertiesFile, File jvmOptionsFile) throws Exception {
+            final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths,
+            File serverXmlFile, File bootstrapPropertiesFile, File jvmOptionsFile,
+            Set<MavenProject> upstreamMavenProjects) throws Exception {
         this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
@@ -2376,6 +2393,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.dockerfileUsed = null;
+        this.upstreamProjects = new HashSet<UpstreamProject>();
+        this.upstreamProjectsWithCompilationErrors = new HashSet<UpstreamProject>();
 
         try {
             watcher = FileSystems.getDefault().newWatchService();
@@ -2404,6 +2423,39 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean serverXmlFileRegistered = false;
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
+
+            // check for upstream projects
+            if (upstreamMavenProjects != null) {
+                // watch src/main/java dir of upstream projects
+                for (MavenProject p : upstreamMavenProjects) {
+                    List<String> compileArtifacts = new ArrayList<String>();
+                    try {
+                        compileArtifacts.addAll(p.getCompileClasspathElements());
+                    }
+                    catch (DependencyResolutionRequiredException e) {
+                        warn("Could not collect classpath elements for upstream project " + p.getArtifactId());
+                    }
+                    
+                    p.getFile();
+                    Build build = p.getBuild();
+
+                    info("----- UPSTREAM project info ------");
+                    info("build dir: " + p.getFile());
+                    info("src dir: " + build.getSourceDirectory());
+                    info("outputDir: " + build.getOutputDirectory());
+                    info("----------------------------------");
+
+                    UpstreamProject upstreamProject = new UpstreamProject(p.getFile(), compileArtifacts,
+                            new File(build.getSourceDirectory()), new File(build.getOutputDirectory()));
+                    upstreamProjects.add(upstreamProject);
+
+                    // src/main/java dir
+                    File s = upstreamProject.getSourceDirectory();
+                    if (s.exists()) {
+                        registerAll(s.getCanonicalFile().toPath(), executor);
+                    }
+                }
+            }
 
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, executor);
@@ -2484,7 +2536,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     }
                 }
+                // process java compilation for upstream projects
+                processUpstreamJavaCompilation(upstreamProjects, executor);
+                //TODO: do we need to check if a src directory or testsrc dir has been added to an upstream project?
 
+        
+
+                // process java compilation for main project
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths, testArtifactPaths);
 
                 // check if javaSourceDirectory has been added
@@ -2582,7 +2640,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 // skip this file or directory, and continue to the next file or directory
                                 continue;
                             }
-                            debug("Changed: " + changed + "; " + event.kind());
+                            info("Changed: " + changed + "; " + event.kind());
 
                             ChangeType changeType = null;
                             if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
@@ -2602,6 +2660,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } catch (InterruptedException | NullPointerException e) {
                         // do nothing let loop continue
+                        if (e.getMessage() != null) {
+                            // do nothing
+                        }
                     }
                 }
                 if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
@@ -2799,6 +2860,58 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return observer;
     }
 
+    // TODO: handle case where failed compilation is in another upstream project and
+    // need to trigger recompile
+    private void processUpstreamJavaCompilation(Set<UpstreamProject> upstreamProjects,
+            final ThreadPoolExecutor executor) throws PluginExecutionException, IOException {
+        // process java source files if no changes detected after the compile wait time
+        boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
+        if (processSources) {
+            for (UpstreamProject project : upstreamProjects) {
+                // delete before recompiling, so if a file is in both lists, its class
+                // will be deleted then recompiled
+                if (!project.getDeleteJavaSources().isEmpty()) {
+                    info("Deleting upstream project Java source files: " + project.getDeleteJavaSources());
+                    for (File file : project.getDeleteJavaSources()) {
+                        deleteJavaFile(file, project.getOutputDirectory(), project.getSourceDirectory());
+                    }
+                }
+                if (!project.getRecompileJavaSources().isEmpty()) {
+                    if (!project.getFailedCompilationJavaSources().isEmpty()) {
+                        project.addAllFailedCompilationJavaSources();
+                    }
+                    info("---- Recompiling Java source from upstream project: "
+                            + project.getSourceDirectory().getAbsolutePath());
+                    if (recompileJavaSource(project.getRecompileJavaSources(), project.getArtifacts(), executor,
+                            project.getOutputDirectory(), null)) {
+                        // successful compilation so we can clear failedCompilation list
+                        project.clearFailedCompilationJavaSources();
+                        // try to recompile any other projects with compilation errors
+                        if (!this.upstreamProjectsWithCompilationErrors.isEmpty()) {
+                            for (UpstreamProject p : this.upstreamProjectsWithCompilationErrors) {
+                                info("---- Attempting to recompile project: " + p.getSourceDirectory());
+                                if (recompileJavaSource(p.getFailedCompilationJavaSources(), p.getArtifacts(),
+                                        executor, p.getOutputDirectory(), null)) {
+                                    // successful compilation so we can clear failedCompilation list
+                                    p.clearFailedCompilationJavaSources();
+                                    this.upstreamProjectsWithCompilationErrors.remove(p);
+                                }
+                            }
+                        }
+                    } else {
+                        project.addAllCompilationJavaSourcesToFailed();
+                        this.upstreamProjectsWithCompilationErrors.add(project);
+                    }
+                }
+
+                project.clearDeleteJavaSources();
+                project.clearRecompileJavaSources();
+                triggerUpstreamJavaTestRecompile = false;
+                triggerUpstreamJavaSourceRecompile = false;
+            }
+        }
+    }
+
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
             List<String> compileArtifactPaths, List<String> testArtifactPaths) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
@@ -2911,6 +3024,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaSourceRecompile = false;
         triggerJavaTestRecompile = false;
 
+        // upstream projects
+        upstreamRecompileJavaSources = new HashSet<File>();
+        upstreamRecompileJavaTestSources = new HashSet<File>();
+
         // initial source and test compile
         if (this.sourceDirectory.exists()) {
             Collection<File> allJavaSources = FileUtils.listFiles(this.sourceDirectory.getCanonicalFile(),
@@ -2964,6 +3081,32 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         // reset this property in case it had been set to true
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
+
+
+        // upstream projects
+        if (!this.upstreamProjects.isEmpty()) {
+            for (UpstreamProject project : this.upstreamProjects) {
+
+                // src/main/java directory
+                if (directory.startsWith(project.getSourceDirectory().getCanonicalPath())) {
+                    ArrayList<File> upstreamJavaFilesChanged = new ArrayList<File>();
+                    upstreamJavaFilesChanged.add(fileChanged);
+
+                    if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                            && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                        info("Java source file modified: " + fileChanged.getName()
+                                + ". Adding to list for processing.");
+                        lastJavaSourceChange = System.currentTimeMillis();
+                        triggerUpstreamJavaSourceRecompile = true;
+                        project.addRecompileJavaSource(fileChanged);
+                    } else if (changeType == ChangeType.DELETE) {
+                        info("Java file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
+                        lastJavaSourceChange = System.currentTimeMillis();
+                        project.addDeleteJavaSources(fileChanged);
+                    }
+                }
+            }
+        }
 
         // src/main/java directory
         if (directory.startsWith(srcPath)) {
@@ -3109,12 +3252,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
-
+            info("---- recompiling build file: " + buildFile);
             boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, executor);
             // run all tests on build file change
+            info("--- recompiledBuild: " + recompiledBuild);
             if (recompiledBuild) {
                 // trigger java source recompile if there are compilation errors
+                info("--- failedCompilationJavaSource is empty? : " + failedCompilationJavaSources.isEmpty());
                 if (!failedCompilationJavaSources.isEmpty()) {
+                    info("---- triggering java source recompile because there are compilation errors");
                     triggerJavaSourceRecompile = true;
                 }
                 // trigger java test recompile if there are compilation errors
@@ -3903,4 +4049,105 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return containerName;
     }
 
+}
+
+/**
+ * Details properties of an Upstream Maven project Used for multi-module Maven
+ * support
+ */
+class UpstreamProject {
+
+    private File buildFile;
+    private List<String> compileArtifacts;
+    private File sourceDirectory;
+    private File outputDirectory;
+
+    // src/main/java file changes
+    public Collection<File> recompileJavaSources;
+    public Collection<File> deleteJavaSources;
+    public Collection<File> failedCompilationJavaSources;
+
+ 
+    /**
+     * 
+     * @param buildFile
+     * @param compileArtifacts
+     * @param sourceDirectory
+     * @param outputDirectory
+     */
+    public UpstreamProject(File buildFile, List<String> compileArtifacts, File sourceDirectory, File outputDirectory) {
+        this.buildFile = buildFile;
+        this.compileArtifacts = compileArtifacts;
+        this.sourceDirectory = sourceDirectory;
+        this.outputDirectory = outputDirectory;
+
+        // init src/main/java file tracking collections
+        this.recompileJavaSources = new HashSet<File>();
+        this.deleteJavaSources = new HashSet<File>();
+        this.failedCompilationJavaSources = new HashSet<File>();
+    }
+    
+    public File getBuildFile() {
+        return this.buildFile;
+    }
+
+    public void clearFailedCompilationJavaSources() {
+        this.failedCompilationJavaSources.clear();
+    }
+
+    public void addAllCompilationJavaSourcesToFailed() {
+        this.failedCompilationJavaSources.addAll(this.recompileJavaSources);
+    }
+
+    /**
+     * Adds all the failed compilation java sources to the recomile java sources
+     * collection
+     */
+    public void addAllFailedCompilationJavaSources() {
+        this.recompileJavaSources.addAll(this.failedCompilationJavaSources);
+    }
+
+    public void addDeleteJavaSources(File fileChanged) {
+        this.deleteJavaSources.add(fileChanged);
+    }
+
+    public void clearRecompileJavaSources() {
+        this.recompileJavaSources.clear();
+    }
+
+    public void clearDeleteJavaSources() {
+        this.deleteJavaSources.clear();
+    }
+
+    public void addRecompileJavaSource(File fileChanged) {
+        this.recompileJavaSources.add(fileChanged);
+    }
+
+    public Collection<File> getRecompileJavaSources() {
+        return this.recompileJavaSources;
+    }
+
+    public Collection<File> getDeleteJavaSources() {
+        return this.deleteJavaSources;
+    }
+
+    public Collection<File> getFailedCompilationJavaSources() {
+        return this.failedCompilationJavaSources;
+    }
+
+    public void setArtifacts(List<String> artifacts) {
+        this.compileArtifacts = artifacts;
+    }
+
+    public List<String> getArtifacts() {
+        return this.compileArtifacts;
+    }
+
+    public File getSourceDirectory() {
+        return this.sourceDirectory;
+    }
+
+    public File getOutputDirectory() {
+        return this.outputDirectory;
+    }
 }
