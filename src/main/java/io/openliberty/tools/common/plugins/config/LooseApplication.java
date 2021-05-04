@@ -3,6 +3,7 @@ package io.openliberty.tools.common.plugins.config;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 
@@ -36,6 +37,11 @@ public abstract class LooseApplication {
         return config.addArchive(parent, target);
     }
     
+    public void addOutputDir(Element parent, Path outputDirectory, String target) throws DOMException, IOException {
+        addOutputDir(parent, outputDirectory.toFile(), target);
+
+    }
+
     public void addOutputDir(Element parent, File outputDirectory, String target) throws DOMException, IOException {
         config.addDir(parent, outputDirectory, target);
     }
