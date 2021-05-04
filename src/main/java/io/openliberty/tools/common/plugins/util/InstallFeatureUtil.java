@@ -89,6 +89,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
+    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.6";
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
 
@@ -128,11 +129,17 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 throw new PluginScenarioException("Install map jar not found.");
             }
             downloadedJsons = downloadProductJsons();
-            if (additionalJsons != null && !additionalJsons.isEmpty()) {        	
-            	Set<File> groupIDJsons = getAdditionalJsons();
-                if (groupIDJsons != null) {
-                    downloadedJsons.addAll(groupIDJsons);
-                }
+            if (additionalJsons != null && !additionalJsons.isEmpty()) {
+            	//check if the openliberty kernel meets min required version 21.0.0.6
+            	DefaultArtifactVersion minVersion = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
+            	DefaultArtifactVersion version = new DefaultArtifactVersion(openLibertyVersion);
+            	
+            	if (version.compareTo(minVersion) >= 0) {
+            		Set<File> groupIDJsons = getAdditionalJsons();
+                    if (groupIDJsons != null) {
+                        downloadedJsons.addAll(groupIDJsons);
+                    }
+            	}
             }
             
             if (downloadedJsons.isEmpty()) {
@@ -164,8 +171,10 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 				File additionalJson = downloadArtifact(groupId, artifactId, "json", version);
 				Jsons.add(additionalJson);
 			} catch (PluginExecutionException e) {
-                error("Unable to find additional the following features JSON in the connected repositories: " + mavenCoord, e);
+                warn("Unable to find the following additional features JSON in the connected repositories: " + mavenCoord);
+                warn("To install user feature, openliberty version should be greater than 21.0.0.6");
                 warn("Ensure that the prepare-feature task was used to generate a json at the following Maven coordinate: " + mavenCoord);
+                debug("Unable to find additional features JSON: ", e);
             }
         }
 
@@ -752,7 +761,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     String.format("[%s)", openLibertyVersion + ", " + getNextProductVersion(openLibertyVersion)));
         } catch (PluginExecutionException e) {
             debug("Could not find override bundle " + groupId + ":" + artifactId
-                    + " for the current Open Liberty version " + openLibertyVersion, e);
+                    + " for the current Open Liberty version " + openLibertyVersion);
             return null;
         }
     }
