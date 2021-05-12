@@ -2906,13 +2906,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void recompileFailedProjects(ThreadPoolExecutor executor) throws PluginExecutionException {
+        Set<UpstreamProject> resolvedUpstreamProjects = new HashSet<UpstreamProject>();
         for (UpstreamProject project : upstreamProjectsWithCompilationErrors) {
             if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(), executor,
                     project.getOutputDirectory(), null)) {
                 // successful compilation so we can clear failedCompilation list
                 project.failedCompilationJavaSources.clear();
-                this.upstreamProjectsWithCompilationErrors.remove(project);
+                // save project to temp list as we cannot modify as we are iterating
+                resolvedUpstreamProjects.add(project);
             }
+        }
+        if (!resolvedUpstreamProjects.isEmpty()) {
+            upstreamProjectsWithCompilationErrors.removeAll(resolvedUpstreamProjects);
         }
         if (!failedCompilationJavaSources.isEmpty()) {
             triggerJavaSourceRecompile = true;
@@ -3034,6 +3039,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         lastJavaTestChange = System.currentTimeMillis();
         triggerJavaSourceRecompile = false;
         triggerJavaTestRecompile = false;
+
+        for (UpstreamProject project : upstreamProjects) {
+            if (project.getSourceDirectory().exists()) {
+                Collection<File> allJavaSources = FileUtils.listFiles(project.getSourceDirectory().getCanonicalFile(),
+                        new String[] { "java" }, true);
+                project.recompileJavaSources.addAll(allJavaSources);
+            }
+        }
 
         // initial source and test compile
         if (this.sourceDirectory.exists()) {
