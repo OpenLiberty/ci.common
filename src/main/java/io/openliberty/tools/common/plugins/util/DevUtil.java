@@ -2281,6 +2281,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return "*        " + message;
     }
 
+    private String formatMessage(String message, String projectName) {
+        if (projectName != null) {
+            message = message.substring(0,1).toLowerCase() + message.substring(1).toLowerCase();
+            return projectName + " " + message + ".";
+        }
+        return message + ".";
+    }
+
     private class HotkeyReader implements Runnable {
         private Scanner scanner;
         private ThreadPoolExecutor executor;
@@ -2438,14 +2446,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // watch src/main/java dir of upstream projects
                 for (MavenProject p : upstreamMavenProjects) {
                     List<String> compileArtifacts = new ArrayList<String>();
-                    try {
-                        compileArtifacts.addAll(p.getCompileClasspathElements());
-                    } catch (DependencyResolutionRequiredException e) {
-                        warn("Could not collect classpath elements for upstream project " + p.getArtifactId());
-                    }
                     Build build = p.getBuild();
-                    UpstreamProject upstreamProject = new UpstreamProject(p.getFile(), compileArtifacts,
-                            new File(build.getSourceDirectory()), new File(build.getOutputDirectory()));
+                    UpstreamProject upstreamProject = new UpstreamProject(p.getFile(), p.getArtifactId(),
+                            compileArtifacts, new File(build.getSourceDirectory()),
+                            new File(build.getOutputDirectory()));
+                    // delegate resolving compile artifacts to ci.maven
+                    updateArtifactPaths(upstreamProject.getBuildFile(), upstreamProject.getCompileArtifacts(), executor);
                     upstreamProjects.add(upstreamProject);
 
                     // src/main/java dir
@@ -2542,12 +2548,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
                 // process java compilation for upstream projects
-                processUpstreamJavaCompilation(upstreamProjects, executor);
+                if (!upstreamProjects.isEmpty()) {
+                    processUpstreamJavaCompilation(upstreamProjects, executor);
+                    // TODO: Check if a test source directory has been added to an upstream project?
 
-                // TODO: Check if a test source directory has been added to an upstream project?
-
-                // process java compilation for main project
-                processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths, testArtifactPaths);
+                    // process java compilation for main project
+                    processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
+                            testArtifactPaths, applicationId);
+                } else {
+                    // process java compilation for main project
+                    processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
+                            testArtifactPaths, null);
+                }
 
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
@@ -2883,7 +2895,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         project.recompileJavaSources.addAll(project.failedCompilationJavaSources);
                     }
                     if (recompileJavaSource(project.recompileJavaSources, project.getCompileArtifacts(), executor,
-                            project.getOutputDirectory(), null)) {
+                            project.getOutputDirectory(), null, project.getProjectName())) {
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
                         // try to recompile any other projects with compilation errors
@@ -2909,7 +2921,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Set<UpstreamProject> resolvedUpstreamProjects = new HashSet<UpstreamProject>();
         for (UpstreamProject project : upstreamProjectsWithCompilationErrors) {
             if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(), executor,
-                    project.getOutputDirectory(), null)) {
+                    project.getOutputDirectory(), null, project.getProjectName())) {
                 // successful compilation so we can clear failedCompilation list
                 project.failedCompilationJavaSources.clear();
                 // save project to temp list as we cannot modify as we are iterating
@@ -2925,7 +2937,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
-            List<String> compileArtifactPaths, List<String> testArtifactPaths) throws IOException, PluginExecutionException {
+            List<String> compileArtifactPaths, List<String> testArtifactPaths, String projectName) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
@@ -2944,7 +2956,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
-                        testOutputDirectory)) {
+                        testOutputDirectory, projectName)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
                     // if upstream projects exist try recompiling any failed projects
@@ -2974,7 +2986,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
                     if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
-                            testOutputDirectory)) {
+                            testOutputDirectory, projectName)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
                     } else {
@@ -3122,6 +3134,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else if (fileChanged.equals(project.getBuildFile())
                         && directory.startsWith(project.getBuildFile().getParentFile().getCanonicalFile().toPath())
                         && changeType == ChangeType.MODIFY) { // pom.xml
+                    debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
                     // when an upstream project build file changes, get the updated artifact paths
                     boolean updatedArtifactPaths = updateArtifactPaths(project.getBuildFile(),
                             project.getCompileArtifacts(), executor);
@@ -3727,11 +3740,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
+     * @param projectName the name of the current project (artifactId), null if only one project exists
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName)
+            throws PluginExecutionException {
+        return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory,
+                projectName);
     }
 
     /**
@@ -3742,11 +3758,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
+     * @param projectName the name of the current project (artifactId), null if only one project exists
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName)
+            throws PluginExecutionException {
+        return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory,
+                projectName);
     }
 
     /**
@@ -3758,10 +3777,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param tests indicates whether the files changed were test files
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
+     * @param projectName the name of the current project (artifactId), null if only one project exists
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
-            boolean tests, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
+            boolean tests, File outputDirectory, File testOutputDirectory, String projectName) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
@@ -3822,14 +3842,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             if (compileResult) {
                 if (tests) {
-                    info("Tests compilation was successful.");
+                    info(formatMessage("Tests compilation was successful", projectName));
                 } else {
                     // redeploy app after compilation if not loose application
                     if (!isLooseApplication()) {
                         redeployApp();
                     }
 
-                    info("Source compilation was successful.");
+                    info(formatMessage("Source compilation was successful", projectName));
                 }
 
                 // run tests after successful compile
@@ -3843,14 +3863,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return true;
             } else {
                 if (tests) {
-                    info("Tests compilation had errors.");
+                    info(formatMessage("Tests compilation had errors", projectName));
                 } else {
-                    info("Source compilation had errors.");
+                    info(formatMessage("Source compilation had errors", projectName));
                 }
                 return false;
             }
         } catch (Exception e) {
-            error("Error compiling Java files: " + e.getMessage());
+            error(formatMessage("Error compiling Java files", projectName) + ": " + e.getMessage());
             debug(e);
             return false;
         }
@@ -4084,6 +4104,7 @@ class UpstreamProject {
     private List<String> compileArtifacts;
     private File sourceDirectory;
     private File outputDirectory;
+    private String projectName;
 
     // src/main/java file changes
     public Collection<File> recompileJavaSources;
@@ -4098,8 +4119,9 @@ class UpstreamProject {
      * @param sourceDirectory  src/main/java dir
      * @param outputDirectory  src/test/java dir
      */
-    public UpstreamProject(File buildFile, List<String> compileArtifacts, File sourceDirectory, File outputDirectory) {
+    public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts, File sourceDirectory, File outputDirectory) {
         this.buildFile = buildFile;
+        this.projectName = projectName;
         this.compileArtifacts = compileArtifacts;
         this.sourceDirectory = sourceDirectory;
         this.outputDirectory = outputDirectory;
@@ -4110,6 +4132,9 @@ class UpstreamProject {
         this.failedCompilationJavaSources = new HashSet<File>();
     }
 
+    public String getProjectName() {
+        return this.projectName;
+    }
     public File getBuildFile() {
         return this.buildFile;
     }
