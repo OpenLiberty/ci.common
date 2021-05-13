@@ -2378,6 +2378,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     Set<UpstreamProject> upstreamProjects;
     Set<UpstreamProject> upstreamProjectsWithCompilationErrors;
     boolean triggerUpstreamJavaSourceRecompile;
+    boolean initialCompile;
 
     /**
      * Watch files for changes.
@@ -2412,6 +2413,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.dockerfileUsed = null;
         this.upstreamProjects = new HashSet<UpstreamProject>();
         this.upstreamProjectsWithCompilationErrors = new HashSet<UpstreamProject>();
+        this.initialCompile = true;
 
         try {
             watcher = FileSystems.getDefault().newWatchService();
@@ -2918,21 +2920,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void recompileFailedProjects(ThreadPoolExecutor executor) throws PluginExecutionException {
-        Set<UpstreamProject> resolvedUpstreamProjects = new HashSet<UpstreamProject>();
-        for (UpstreamProject project : upstreamProjectsWithCompilationErrors) {
-            if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(), executor,
-                    project.getOutputDirectory(), null, project.getProjectName())) {
-                // successful compilation so we can clear failedCompilation list
-                project.failedCompilationJavaSources.clear();
-                // save project to temp list as we cannot modify as we are iterating
-                resolvedUpstreamProjects.add(project);
+        // skip recompiling failed projects on initial loop to avoid repetitive
+        // compilation calls
+        if (!initialCompile) {
+            Set<UpstreamProject> resolvedUpstreamProjects = new HashSet<UpstreamProject>();
+            // try recompiling upstream projects
+            for (UpstreamProject project : upstreamProjectsWithCompilationErrors) {
+                if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(), executor,
+                        project.getOutputDirectory(), null, project.getProjectName())) {
+                    // successful compilation so we can clear failedCompilation list
+                    project.failedCompilationJavaSources.clear();
+                    // save project to temp list as we cannot modify as we are iterating
+                    resolvedUpstreamProjects.add(project);
+                }
             }
-        }
-        if (!resolvedUpstreamProjects.isEmpty()) {
-            upstreamProjectsWithCompilationErrors.removeAll(resolvedUpstreamProjects);
-        }
-        if (!failedCompilationJavaSources.isEmpty()) {
-            triggerJavaSourceRecompile = true;
+            if (!resolvedUpstreamProjects.isEmpty()) {
+                upstreamProjectsWithCompilationErrors.removeAll(resolvedUpstreamProjects);
+            }
+            // try recompiling main project
+            if (!failedCompilationJavaSources.isEmpty()) {
+                triggerJavaSourceRecompile = true;
+            }
         }
     }
 
@@ -3014,6 +3022,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (processTests) {
                 deleteJavaTests.clear();
                 recompileJavaTests.clear();
+            }
+            if (initialCompile) {
+                initialCompile = false;
             }
         }
     }
@@ -4135,6 +4146,7 @@ class UpstreamProject {
     public String getProjectName() {
         return this.projectName;
     }
+
     public File getBuildFile() {
         return this.buildFile;
     }
