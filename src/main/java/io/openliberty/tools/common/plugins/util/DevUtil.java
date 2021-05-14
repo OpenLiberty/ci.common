@@ -80,7 +80,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
-import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.apache.maven.model.Build;
 import org.apache.maven.project.MavenProject;
@@ -208,6 +207,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public abstract boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
             ThreadPoolExecutor executor) throws PluginExecutionException;
+
+    /**
+     * Gets a list of resource directories for the specified project
+     * 
+     * @param project                MavenProject
+     * @param outputDir output directory of corresponding project
+     * @return List of files, if no resource directories are detected, returns a
+     *         list with the only the default resource dir
+     */
+    public abstract List<File> getResourceDirectories(MavenProject project, File outputDir);
 
     /**
      * Run the unit tests
@@ -2449,11 +2458,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 for (MavenProject p : upstreamMavenProjects) {
                     List<String> compileArtifacts = new ArrayList<String>();
                     Build build = p.getBuild();
+                    File upstreamSourceDir = new File(build.getSourceDirectory());
+                    File upstreamOutputDir = new File(build.getOutputDirectory());
+                    // resource directories
+                    List<File> upstreamResourceDirs = getResourceDirectories(p, upstreamOutputDir);
+
+                    // TODO should we handle adding a resource dir to an upstream project after dev
+                    // mode has started?
                     UpstreamProject upstreamProject = new UpstreamProject(p.getFile(), p.getArtifactId(),
-                            compileArtifacts, new File(build.getSourceDirectory()),
-                            new File(build.getOutputDirectory()));
+                            compileArtifacts, upstreamSourceDir, upstreamOutputDir, upstreamResourceDirs);
                     // delegate resolving compile artifacts to ci.maven
-                    updateArtifactPaths(upstreamProject.getBuildFile(), upstreamProject.getCompileArtifacts(), executor);
+                    updateArtifactPaths(upstreamProject.getBuildFile(), upstreamProject.getCompileArtifacts(),
+                            executor);
                     upstreamProjects.add(upstreamProject);
 
                     // src/main/java dir
@@ -2461,7 +2477,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         registerAll(upstreamProject.getSourceDirectory().getCanonicalFile().toPath(), executor);
                     }
 
-                    // TODO: support for hot compilation of src/main/test dir of upstream projects
+                    // TODO support for hot compilation of src/main/test dir of upstream projects
+
+                    // register resource directories
+                    HashMap<File, Boolean> upstreamResourceMap = new HashMap<File, Boolean>();
+                    for (File upstreamResourceDir : upstreamProject.getResourceDirs()) {
+                        upstreamResourceMap.put(upstreamResourceDir, false);
+                        if (upstreamResourceDir.exists()) {
+                            registerAll(upstreamResourceDir.getCanonicalFile().toPath(), executor);
+                            upstreamResourceMap.put(upstreamResourceDir, true);
+                        }
+                    }
+                    upstreamProject.setResourceMap(upstreamResourceMap);
 
                     // watch pom.xml
                     if (upstreamProject.getBuildFile().exists()) {
@@ -2552,7 +2579,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // process java compilation for upstream projects
                 if (!upstreamProjects.isEmpty()) {
                     processUpstreamJavaCompilation(upstreamProjects, executor);
-                    // TODO: Check if a test source directory has been added to an upstream project?
 
                     // process java compilation for main project
                     processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
@@ -2634,6 +2660,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         warn("The resource directory " + resourceDir
                                 + " was deleted.  Restart liberty:dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
+                    }
+                }
+
+                // check if resourceDirectory of an upstream project has been added
+                for (UpstreamProject p : upstreamProjects) {
+                    for (File resourceDir : p.getResourceDirs()) {
+                        if (!p.getResourceMap().get(resourceDir) && resourceDir.exists()) {
+                            registerAll(resourceDir.getCanonicalFile().toPath(), executor);
+                            p.getResourceMap().put(resourceDir, true);
+                        } else if (p.getResourceMap().get(resourceDir) && !resourceDir.exists()) {
+                            // deleted resource directory
+                            warn("The resource directory " + resourceDir
+                                    + " was deleted.  Restart liberty:dev mode for it to take effect.");
+                            p.getResourceMap().put(resourceDir, false);
+                        }
                     }
                 }
 
@@ -3125,10 +3166,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // reset this property in case it had been set to true
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
 
-
         // upstream project source file changed
         if (!this.upstreamProjects.isEmpty()) {
             for (UpstreamProject project : this.upstreamProjects) {
+                // resource file check
+                File upstreamResourceParent = null;
+                for (File resourceDir : project.getResourceDirs()) {
+                    if (directory.startsWith(resourceDir.getCanonicalFile().toPath())) {
+                        upstreamResourceParent = resourceDir;
+                        break;
+                    }
+                }
+
                 // src/main/java directory
                 if (directory.startsWith(project.getSourceDirectory().getCanonicalPath())) {
                     if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
@@ -3155,6 +3204,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (!project.failedCompilationJavaSources.isEmpty()) {
                             triggerUpstreamJavaSourceRecompile = true;
                         }
+                    }
+                } else if (upstreamResourceParent != null
+                        && directory.startsWith(upstreamResourceParent.getCanonicalFile().toPath())) { // resources
+                    debug("Resource dir: " + upstreamResourceParent.toString());
+                    if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                        copyFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
+                        // TODO run all tests on resource change
+                    } else if (changeType == ChangeType.DELETE) {
+                        debug("Resource file deleted: " + fileChanged.getName());
+                        deleteFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
+                        // TODO run all tests on resource change
                     }
                 }
             }
@@ -4116,6 +4176,8 @@ class UpstreamProject {
     private File sourceDirectory;
     private File outputDirectory;
     private String projectName;
+    private List<File> resourceDirs;
+    HashMap<File, Boolean> resourceMap;
 
     // src/main/java file changes
     public Collection<File> recompileJavaSources;
@@ -4130,17 +4192,30 @@ class UpstreamProject {
      * @param sourceDirectory  src/main/java dir
      * @param outputDirectory  src/test/java dir
      */
-    public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts, File sourceDirectory, File outputDirectory) {
+    public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts, File sourceDirectory,
+            File outputDirectory, List<File> resourceDirs) {
         this.buildFile = buildFile;
         this.projectName = projectName;
         this.compileArtifacts = compileArtifacts;
         this.sourceDirectory = sourceDirectory;
         this.outputDirectory = outputDirectory;
+        this.resourceDirs = resourceDirs;
 
         // init src/main/java file tracking collections
         this.recompileJavaSources = new HashSet<File>();
         this.deleteJavaSources = new HashSet<File>();
         this.failedCompilationJavaSources = new HashSet<File>();
+
+        // resource map
+        this.resourceMap = new HashMap<File, Boolean>();
+    }
+
+    public HashMap<File, Boolean> getResourceMap() {
+        return this.resourceMap;
+    }
+
+    public void setResourceMap(HashMap<File, Boolean> resourceMap) {
+        this.resourceMap = resourceMap;
     }
 
     public String getProjectName() {
@@ -4165,5 +4240,9 @@ class UpstreamProject {
 
     public File getOutputDirectory() {
         return this.outputDirectory;
+    }
+
+    public List<File> getResourceDirs() {
+        return this.resourceDirs;
     }
 }
