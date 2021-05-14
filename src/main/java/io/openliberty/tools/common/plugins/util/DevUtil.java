@@ -81,8 +81,6 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.apache.maven.artifact.versioning.ComparableVersion;
-import org.apache.maven.model.Build;
-import org.apache.maven.project.MavenProject;
 
 import io.openliberty.tools.ant.ServerTask;
 
@@ -207,17 +205,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public abstract boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
             ThreadPoolExecutor executor) throws PluginExecutionException;
-
-    /**
-     * Gets a list of resource directories for the specified project
-     * 
-     * @param project                MavenProject
-     * @param outputDir output directory of corresponding project
-     * @return List of files, if no resource directories are detected, returns a
-     *         list with the only the default resource dir
-     */
-    public abstract List<File> getResourceDirectories(MavenProject project, File outputDir);
-
     /**
      * Run the unit tests
      * 
@@ -2404,14 +2391,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                                configDirectory, which has a default value.
      * @param bootstrapPropertiesFile
      * @param jvmOptionsFile
-     * @param upstreamMavenProjects   Upstream Maven projects, or null if Gradle
-     *                                project or none exist
+     * @param upstreamProjects        Upstream projects, or null if Gradle project
+     *                                or none exist
      * @throws Exception
      */
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
             final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths,
             File serverXmlFile, File bootstrapPropertiesFile, File jvmOptionsFile,
-            Set<MavenProject> upstreamMavenProjects) throws Exception {
+            Set<UpstreamProject> upstreamProjects) throws Exception {
         this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
@@ -2420,7 +2407,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.dockerfileUsed = null;
-        this.upstreamProjects = new HashSet<UpstreamProject>();
+        this.upstreamProjects = upstreamProjects;
         this.upstreamProjectsWithCompilationErrors = new HashSet<UpstreamProject>();
         this.initialCompile = true;
 
@@ -2453,46 +2440,32 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean jvmOptionsFileRegistered = false;
 
             // check for upstream projects
-            if (upstreamMavenProjects != null) {
+            if (upstreamProjects != null) {
                 // watch src/main/java dir of upstream projects
-                for (MavenProject p : upstreamMavenProjects) {
-                    List<String> compileArtifacts = new ArrayList<String>();
-                    Build build = p.getBuild();
-                    File upstreamSourceDir = new File(build.getSourceDirectory());
-                    File upstreamOutputDir = new File(build.getOutputDirectory());
-                    // resource directories
-                    List<File> upstreamResourceDirs = getResourceDirectories(p, upstreamOutputDir);
-
-                    // TODO should we handle adding a resource dir to an upstream project after dev
-                    // mode has started?
-                    UpstreamProject upstreamProject = new UpstreamProject(p.getFile(), p.getArtifactId(),
-                            compileArtifacts, upstreamSourceDir, upstreamOutputDir, upstreamResourceDirs);
-                    // delegate resolving compile artifacts to ci.maven
-                    updateArtifactPaths(upstreamProject.getBuildFile(), upstreamProject.getCompileArtifacts(),
+                for (UpstreamProject p : upstreamProjects) {
+                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(),
                             executor);
-                    upstreamProjects.add(upstreamProject);
-
                     // src/main/java dir
-                    if (upstreamProject.getSourceDirectory().exists()) {
-                        registerAll(upstreamProject.getSourceDirectory().getCanonicalFile().toPath(), executor);
+                    if (p.getSourceDirectory().exists()) {
+                        registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                     }
 
                     // TODO support for hot compilation of src/main/test dir of upstream projects
 
-                    // register resource directories
+                    // watch resource directories
                     HashMap<File, Boolean> upstreamResourceMap = new HashMap<File, Boolean>();
-                    for (File upstreamResourceDir : upstreamProject.getResourceDirs()) {
+                    for (File upstreamResourceDir : p.getResourceDirs()) {
                         upstreamResourceMap.put(upstreamResourceDir, false);
                         if (upstreamResourceDir.exists()) {
                             registerAll(upstreamResourceDir.getCanonicalFile().toPath(), executor);
                             upstreamResourceMap.put(upstreamResourceDir, true);
                         }
                     }
-                    upstreamProject.setResourceMap(upstreamResourceMap);
+                    p.setResourceMap(upstreamResourceMap);
 
                     // watch pom.xml
-                    if (upstreamProject.getBuildFile().exists()) {
-                        registerSingleFile(upstreamProject.getBuildFile(), executor);
+                    if (p.getBuildFile().exists()) {
+                        registerSingleFile(p.getBuildFile(), executor);
                     }
                 }
             }
@@ -2576,8 +2549,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     }
                 }
-                // process java compilation for upstream projects
-                if (!upstreamProjects.isEmpty()) {
+                if (!upstreamProjects.isEmpty()) { // process java compilation for upstream projects
                     processUpstreamJavaCompilation(upstreamProjects, executor);
 
                     // process java compilation for main project
@@ -3104,7 +3076,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaSourceRecompile = false;
         triggerJavaTestRecompile = false;
 
-        for (UpstreamProject project : upstreamProjects) {
+        // initial source compile of upstream projects
+        for (UpstreamProject project : this.upstreamProjects) {
             if (project.getSourceDirectory().exists()) {
                 Collection<File> allJavaSources = FileUtils.listFiles(project.getSourceDirectory().getCanonicalFile(),
                         new String[] { "java" }, true);
@@ -4166,83 +4139,3 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
 }
 
-/**
- * Details properties of an Upstream Maven project used for multi-module support
- */
-class UpstreamProject {
-
-    private File buildFile;
-    private List<String> compileArtifacts;
-    private File sourceDirectory;
-    private File outputDirectory;
-    private String projectName;
-    private List<File> resourceDirs;
-    HashMap<File, Boolean> resourceMap;
-
-    // src/main/java file changes
-    public Collection<File> recompileJavaSources;
-    public Collection<File> deleteJavaSources;
-    public Collection<File> failedCompilationJavaSources;
-
-    /**
-     * Defines an upstream project for supporting multi-module projects
-     * 
-     * @param buildFile        pom.xml
-     * @param compileArtifacts compileArtifacts of project
-     * @param sourceDirectory  src/main/java dir
-     * @param outputDirectory  src/test/java dir
-     */
-    public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts, File sourceDirectory,
-            File outputDirectory, List<File> resourceDirs) {
-        this.buildFile = buildFile;
-        this.projectName = projectName;
-        this.compileArtifacts = compileArtifacts;
-        this.sourceDirectory = sourceDirectory;
-        this.outputDirectory = outputDirectory;
-        this.resourceDirs = resourceDirs;
-
-        // init src/main/java file tracking collections
-        this.recompileJavaSources = new HashSet<File>();
-        this.deleteJavaSources = new HashSet<File>();
-        this.failedCompilationJavaSources = new HashSet<File>();
-
-        // resource map
-        this.resourceMap = new HashMap<File, Boolean>();
-    }
-
-    public HashMap<File, Boolean> getResourceMap() {
-        return this.resourceMap;
-    }
-
-    public void setResourceMap(HashMap<File, Boolean> resourceMap) {
-        this.resourceMap = resourceMap;
-    }
-
-    public String getProjectName() {
-        return this.projectName;
-    }
-
-    public File getBuildFile() {
-        return this.buildFile;
-    }
-
-    public void setCompileArtifacts(List<String> artifacts) {
-        this.compileArtifacts = artifacts;
-    }
-
-    public List<String> getCompileArtifacts() {
-        return this.compileArtifacts;
-    }
-
-    public File getSourceDirectory() {
-        return this.sourceDirectory;
-    }
-
-    public File getOutputDirectory() {
-        return this.outputDirectory;
-    }
-
-    public List<File> getResourceDirs() {
-        return this.resourceDirs;
-    }
-}
