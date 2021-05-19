@@ -2277,14 +2277,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return "*        " + message;
     }
 
-    private String formatMessage(String message, String projectName) {
-        if (projectName != null) {
-            message = message.substring(0,1).toLowerCase() + message.substring(1).toLowerCase();
-            return projectName + " " + message + ".";
-        }
-        return message + ".";
-    }
-
     private class HotkeyReader implements Runnable {
         private Scanner scanner;
         private ThreadPoolExecutor executor;
@@ -2549,7 +2541,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     }
                 }
-                if (!upstreamProjects.isEmpty()) { // process java compilation for upstream projects
+                if (upstreamProjects != null && !upstreamProjects.isEmpty()) { // process java compilation for upstream projects
                     processUpstreamJavaCompilation(upstreamProjects, executor);
 
                     // process java compilation for main project
@@ -2630,22 +2622,24 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
                         // deleted resource directory
                         warn("The resource directory " + resourceDir
-                                + " was deleted.  Restart liberty:dev mode for it to take effect.");
+                                + " was deleted.  Restart dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
                     }
                 }
 
                 // check if resourceDirectory of an upstream project has been added
-                for (UpstreamProject p : upstreamProjects) {
-                    for (File resourceDir : p.getResourceDirs()) {
-                        if (!p.getResourceMap().get(resourceDir) && resourceDir.exists()) {
-                            registerAll(resourceDir.getCanonicalFile().toPath(), executor);
-                            p.getResourceMap().put(resourceDir, true);
-                        } else if (p.getResourceMap().get(resourceDir) && !resourceDir.exists()) {
-                            // deleted resource directory
-                            warn("The resource directory " + resourceDir
-                                    + " was deleted.  Restart liberty:dev mode for it to take effect.");
-                            p.getResourceMap().put(resourceDir, false);
+                if (upstreamProjects != null) {
+                    for (UpstreamProject p : upstreamProjects) {
+                        for (File resourceDir : p.getResourceDirs()) {
+                            if (!p.getResourceMap().get(resourceDir) && resourceDir.exists()) {
+                                registerAll(resourceDir.getCanonicalFile().toPath(), executor);
+                                p.getResourceMap().put(resourceDir, true);
+                            } else if (p.getResourceMap().get(resourceDir) && !resourceDir.exists()) {
+                                // deleted resource directory
+                                warn("The resource directory " + resourceDir
+                                        + " was deleted.  Restart dev mode for it to take effect.");
+                                p.getResourceMap().put(resourceDir, false);
+                            }
                         }
                     }
                 }
@@ -3077,11 +3071,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaTestRecompile = false;
 
         // initial source compile of upstream projects
-        for (UpstreamProject project : this.upstreamProjects) {
-            if (project.getSourceDirectory().exists()) {
-                Collection<File> allJavaSources = FileUtils.listFiles(project.getSourceDirectory().getCanonicalFile(),
-                        new String[] { "java" }, true);
-                project.recompileJavaSources.addAll(allJavaSources);
+        if (upstreamProjects != null) {
+            for (UpstreamProject project : upstreamProjects) {
+                if (project.getSourceDirectory().exists()) {
+                    Collection<File> allJavaSources = FileUtils
+                            .listFiles(project.getSourceDirectory().getCanonicalFile(), new String[] { "java" }, true);
+                    project.recompileJavaSources.addAll(allJavaSources);
+                }
             }
         }
 
@@ -3140,7 +3136,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
 
         // upstream project source file changed
-        if (!this.upstreamProjects.isEmpty()) {
+        if (this.upstreamProjects != null && !this.upstreamProjects.isEmpty()) {
             for (UpstreamProject project : this.upstreamProjects) {
                 // resource file check
                 File upstreamResourceParent = null;
@@ -3886,14 +3882,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             if (compileResult) {
                 if (tests) {
-                    info(formatMessage("Tests compilation was successful", projectName));
+                    if (projectName != null) {
+                        info(projectName + " tests compilation was successful.");
+                    } else {
+                        info("Tests compilation was successful.");
+                    }
                 } else {
                     // redeploy app after compilation if not loose application
                     if (!isLooseApplication()) {
                         redeployApp();
                     }
-
-                    info(formatMessage("Source compilation was successful", projectName));
+                    if (projectName != null) {
+                        info(projectName + " source compilation was successful.");
+                    } else {
+                        info("Source compilation was successful.");
+                    }
                 }
 
                 // run tests after successful compile
@@ -3907,14 +3910,26 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return true;
             } else {
                 if (tests) {
-                    info(formatMessage("Tests compilation had errors", projectName));
+                    if (projectName != null) {
+                        info(projectName + " tests compilation had errors.");
+                    } else {
+                        info("Tests compilation had errors.");
+                    }
                 } else {
-                    info(formatMessage("Source compilation had errors", projectName));
+                    if (projectName != null) {
+                        info(projectName + " source compilation had errors.");
+                    } else {
+                        info("Source compilation had errors.");
+                    }
                 }
                 return false;
             }
         } catch (Exception e) {
-            error(formatMessage("Error compiling Java files", projectName) + ": " + e.getMessage());
+            if (projectName != null) {
+                error(projectName + " error compiling Java files: " + e.getMessage());
+            } else {
+                error("Error compiling Java files: " + e.getMessage());
+            }
             debug(e);
             return false;
         }
