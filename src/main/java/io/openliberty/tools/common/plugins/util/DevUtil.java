@@ -199,12 +199,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param buildFile
      * @param compileArtifactPaths
+     * @param testArtifactPaths
      * @param executor             The thread pool executor
      * @return true if the compile artifact paths are updated
      * @throws PluginExecutionException
      */
     public abstract boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
-            ThreadPoolExecutor executor) throws PluginExecutionException;
+            List<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
+
     /**
      * Run the unit tests
      * 
@@ -2433,16 +2435,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             // check for upstream projects
             if (upstreamProjects != null) {
-                // watch src/main/java dir of upstream projects
                 for (UpstreamProject p : upstreamProjects) {
-                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(),
-                            executor);
-                    // src/main/java dir
+                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), executor);
+                    // watch src/main/java dir
                     if (p.getSourceDirectory().exists()) {
                         registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                     }
 
-                    // TODO support for hot compilation of src/main/test dir of upstream projects
+                    // watch src/test/java dir
+                    if (p.getTestSourceDirectory().exists()) {
+                        registerAll(p.getTestSourceDirectory().getCanonicalFile().toPath(), executor);
+                    }
 
                     // watch resource directories
                     HashMap<File, Boolean> upstreamResourceMap = new HashMap<File, Boolean>();
@@ -2886,6 +2889,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             final ThreadPoolExecutor executor) throws PluginExecutionException, IOException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
+        boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
         if (processSources) {
             if (triggerUpstreamJavaSourceRecompile) { // this is triggered from build file change
                 recompileFailedProjects(executor);
@@ -2900,6 +2904,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
                 if (!project.recompileJavaSources.isEmpty()) {
+                    debug("Recompiling Java source files: " + project.recompileJavaSources);
                     if (!project.failedCompilationJavaSources.isEmpty()) {
                         project.recompileJavaSources.addAll(project.failedCompilationJavaSources);
                     }
@@ -2918,9 +2923,42 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         upstreamProjectsWithCompilationErrors.add(project);
                     }
                 }
+                // additionally, process java test files if no changes detected after a
+                // different timeout
+                // (but source timeout takes precedence i.e. don't recompile tests if someone
+                // keeps changing the source)
+                if (processTests) {
+                    // delete before recompiling, so if a file is in both lists, its class will be
+                    // deleted then recompiled
+                    if (!project.deleteJavaTests.isEmpty()) {
+                        debug("Deleting Java test files: " + project.deleteJavaTests);
+                        for (File file : project.deleteJavaTests) {
+                            deleteJavaFile(file, project.getTestOutputDirectory(), project.getTestSourceDirectory());
+                        }
+                    }
+                    if (!project.recompileJavaTests.isEmpty()) {
+                        debug("Recompiling Java test files: " + project.recompileJavaTests);
+                        if (!project.failedCompilationJavaTests.isEmpty()) {
+                            project.recompileJavaTests.addAll(project.failedCompilationJavaTests);
+                        }
+                        if (recompileJavaTest(project.recompileJavaTests, project.getTestArtifacts(), executor, project.getOutputDirectory(),
+                                project.getTestOutputDirectory(), project.getProjectName())) {
+                            // successful compilation so we can clear failedCompilation list
+                            project.failedCompilationJavaTests.clear();
+                        } else {
+                            project.failedCompilationJavaTests.addAll(project.recompileJavaTests);
+                        }
+                    }
+                }
+
+                // TODO should we run tests if files were deleted without any other changes?
 
                 project.deleteJavaSources.clear();
                 project.recompileJavaSources.clear();
+                if (processTests) {
+                    project.deleteJavaTests.clear();
+                    project.recompileJavaTests.clear();
+                }
             }
             triggerUpstreamJavaSourceRecompile = false;
         }
@@ -2966,6 +3004,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+                debug("Recompiling Java source files: " + recompileJavaSources);
                 // try to recompile java files that previously did not compile successfully
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
@@ -3004,6 +3043,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             testOutputDirectory, projectName)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
+
                     } else {
                         failedCompilationJavaTests.addAll(recompileJavaTests);
                     }
@@ -3070,13 +3110,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaSourceRecompile = false;
         triggerJavaTestRecompile = false;
 
-        // initial source compile of upstream projects
+        // initial source and test compile of upstream projects
         if (upstreamProjects != null) {
             for (UpstreamProject project : upstreamProjects) {
                 if (project.getSourceDirectory().exists()) {
                     Collection<File> allJavaSources = FileUtils
                             .listFiles(project.getSourceDirectory().getCanonicalFile(), new String[] { "java" }, true);
                     project.recompileJavaSources.addAll(allJavaSources);
+                }
+                if (project.getTestSourceDirectory().exists()) {
+                    Collection<File> allJavaTestSources = FileUtils.listFiles(
+                            project.getTestSourceDirectory().getCanonicalFile(), new String[] { "java" }, true);
+                    project.recompileJavaTests.addAll(allJavaTestSources);
                 }
             }
         }
@@ -3160,13 +3205,24 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         lastJavaSourceChange = System.currentTimeMillis();
                         project.deleteJavaSources.add(fileChanged);
                     }
+                } else if (directory.startsWith(project.getTestSourceDirectory().getCanonicalPath())) {
+                    if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                            && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                        debug("Java test file modified: " + fileChanged.getName() + ". Adding to list for processing.");
+                        lastJavaTestChange = System.currentTimeMillis();
+                        project.recompileJavaTests.add(fileChanged);
+                    } else if (changeType == ChangeType.DELETE) {
+                        debug("Java test file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
+                        lastJavaTestChange = System.currentTimeMillis();
+                        project.deleteJavaTests.add(fileChanged);
+                    }
                 } else if (fileChanged.equals(project.getBuildFile())
                         && directory.startsWith(project.getBuildFile().getParentFile().getCanonicalFile().toPath())
                         && changeType == ChangeType.MODIFY) { // pom.xml
                     debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
                     // when an upstream project build file changes, get the updated artifact paths
                     boolean updatedArtifactPaths = updateArtifactPaths(project.getBuildFile(),
-                            project.getCompileArtifacts(), executor);
+                            project.getCompileArtifacts(), project.getTestArtifacts(), executor);
                     if (updatedArtifactPaths) {
                         // trigger java source recompile of all projects if there are compilation errors
                         // in this project

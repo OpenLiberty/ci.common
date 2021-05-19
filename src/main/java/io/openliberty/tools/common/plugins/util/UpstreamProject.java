@@ -10,8 +10,11 @@ public class UpstreamProject {
 
     private File buildFile;
     private List<String> compileArtifacts;
+    private List<String> testArtifacts;
     private File sourceDirectory;
     private File outputDirectory;
+    private File testSourceDirectory;
+    private File testOutputDirectory;
     private String projectName;
     private List<File> resourceDirs;
     private HashMap<File, Boolean> resourceMap;
@@ -21,29 +24,46 @@ public class UpstreamProject {
     public Collection<File> deleteJavaSources;
     public Collection<File> failedCompilationJavaSources;
 
+    // src/test/java file changes
+    public Collection<File> recompileJavaTests;
+    public Collection<File> deleteJavaTests;
+    public Collection<File> failedCompilationJavaTests;
+
     /**
      * Defines an upstream project for supporting multi-module projects
      * 
-     * @param buildFile        pom.xml
-     * @param projectName      project name (artifactId)
-     * @param compileArtifacts compileArtifacts of project
-     * @param sourceDirectory  src/main/java dir
-     * @param outputDirectory  output dir
-     * @param resourceDirs     resource directories
+     * @param buildFile           pom.xml
+     * @param projectName         project name (artifactId)
+     * @param compileArtifacts    compileArtifacts of project
+     * @param testArtifacts       testArtifacts of project
+     * @param sourceDirectory     src/main/java dir
+     * @param outputDirectory     output dir
+     * @param testSourceDirectory src/test/java dir
+     * @param testOutputDirectory test output dir
+     * @param resourceDirs        resource directories
      */
-    public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts, File sourceDirectory,
-            File outputDirectory, List<File> resourceDirs) {
+    public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts,
+            List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
+            File testOutputDirectory, List<File> resourceDirs) {
         this.buildFile = buildFile;
         this.projectName = projectName;
         this.compileArtifacts = compileArtifacts;
+        this.testArtifacts = testArtifacts;
         this.sourceDirectory = sourceDirectory;
         this.outputDirectory = outputDirectory;
+        this.testSourceDirectory = testSourceDirectory;
+        this.testOutputDirectory = testOutputDirectory;
         this.resourceDirs = resourceDirs;
 
         // init src/main/java file tracking collections
         this.recompileJavaSources = new HashSet<File>();
         this.deleteJavaSources = new HashSet<File>();
         this.failedCompilationJavaSources = new HashSet<File>();
+
+        // init src/test/java file tracking collections
+        this.recompileJavaTests = new HashSet<File>();
+        this.deleteJavaTests = new HashSet<File>();
+        this.failedCompilationJavaTests = new HashSet<File>();
 
         // resource map
         this.resourceMap = new HashMap<File, Boolean>();
@@ -65,12 +85,12 @@ public class UpstreamProject {
         return this.buildFile;
     }
 
-    public void setCompileArtifacts(List<String> artifacts) {
-        this.compileArtifacts = artifacts;
-    }
-
     public List<String> getCompileArtifacts() {
         return this.compileArtifacts;
+    }
+
+    public List<String> getTestArtifacts() {
+        return this.testArtifacts;
     }
 
     public File getSourceDirectory() {
@@ -79,6 +99,14 @@ public class UpstreamProject {
 
     public File getOutputDirectory() {
         return this.outputDirectory;
+    }
+
+    public File getTestSourceDirectory() {
+        return this.testSourceDirectory;
+    }
+
+    public File getTestOutputDirectory() {
+        return this.testOutputDirectory;
     }
 
     public List<File> getResourceDirs() {
