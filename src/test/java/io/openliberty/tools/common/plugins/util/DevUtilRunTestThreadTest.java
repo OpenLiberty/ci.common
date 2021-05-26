@@ -19,6 +19,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.InputStream;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -37,7 +38,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
 
         @Override
         public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
-                boolean forceSkipUTs) {
+                boolean forceSkipUTs, File buildFile) {
             counter++;
         }
     }
@@ -50,11 +51,11 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
 
         // manualInvocation=false should not start a thread
-        util.runTestThread(false, executor, -1, false, false);
+        util.runTestThread(false, executor, -1, false, false, null);
         assertEquals(0, executor.getPoolSize());
 
         // manualInvocation=true should start a thread
-        util.runTestThread(false, executor, -1, false, true);
+        util.runTestThread(false, executor, -1, false, true, null);
         assertEquals(1, executor.getPoolSize());
         
         // shutdown executor
@@ -73,7 +74,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
 
         // manualInvocation=false and hotTests=true should start a thread
-        util.runTestThread(false, executor, -1, false, false);
+        util.runTestThread(false, executor, -1, false, false, null);
         assertEquals(1, executor.getPoolSize());
 
         // shutdown executor

@@ -121,7 +121,7 @@ public class BaseDevUtilTest {
 
         @Override
         public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
-                boolean forceSkipUTs) {
+                boolean forceSkipUTs, File buildFile) {
             // not needed for tests
             
         }
@@ -139,12 +139,12 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void runUnitTests() throws PluginScenarioException, PluginExecutionException {
+        public void runUnitTests(File buildFile) throws PluginScenarioException, PluginExecutionException {
             // not needed for tests
         }
 
         @Override
-        public void runIntegrationTests() throws PluginScenarioException, PluginExecutionException {
+        public void runIntegrationTests(File buildFile) throws PluginScenarioException, PluginExecutionException {
             // not needed for tests
         }
 
