@@ -96,11 +96,19 @@ public class BaseDevUtilTest {
         @Override
         public ServerTask getServerTask() throws IOException {
             // not needed for tests
-            return null;            
+            return null;
         }
 
         @Override
-        public boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths, List<String> testArtifactPaths, ThreadPoolExecutor executor) {
+        public boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths,
+                List<String> testArtifactPaths, ThreadPoolExecutor executor) {
+            // not needed for tests
+            return false;
+        }
+
+        @Override
+        public boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
+                ThreadPoolExecutor executor) throws PluginExecutionException {
             // not needed for tests
             return false;
         }
