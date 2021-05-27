@@ -55,6 +55,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	private static final String MIN_USER_FEATURE_VERSION = "21.0.0.6";
 
 	private File installJarFile;
+	private File jsonFile;
 
 	public PrepareFeatureUtil(File installDirectory, String openLibertyVersion)
 			throws PluginScenarioException, PluginExecutionException {
@@ -68,7 +69,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 		if (version.compareTo(minVersion) < 0) {
 			throw new PluginScenarioException(
-					"To install user feature, openliberty version should be greater than 21.0.0.6");
+					"Installing user features on OpenLiberty version "+version+" is not supported. The minimum required version of OpenLiberty for installing user features is "+minVersion+".");
 		}
 		if (installJarFile == null) {
 			throw new PluginScenarioException("Install map jar not found.");
@@ -100,11 +101,12 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			json = downloadArtifact(groupId, FEATURES_JSON_ARTIFACT_ID, "json", version);
 		} catch (PluginExecutionException e) {
 			debug(e);
-			info(String.format("Cannot find json for coordinate %s:%s:%s in connected repositories", groupId,
+			info(String.format("Features.json was not found at the coordinate %s:"+FEATURES_JSON_ARTIFACT_ID+":%s in connected repositories", groupId,
 					artifactId, version));
 		}
 		if (json != null) {
 			info("The features.json already exists at the following location: " + json);
+			jsonFile = json;
 		} else {
 			try {
 				File additionalBOM = downloadArtifact(groupId, artifactId, "pom", version);
@@ -114,11 +116,12 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				Map<File, String> esaFiles = downloadArtifactsFromBOM(additionalBOM);
 				File generatedJson = generateJson(targetJsonFile, esaFiles);
 				if (generatedJson.exists()) {
-					info("Json has been generated at the following location: " + generatedJson);
+					jsonFile = generatedJson;
+					info("Features.json has been generated at the following location: " + generatedJson);
 				}
 			} catch (PluginExecutionException e) {
-				warn("unable to find BOM file for given groupId " + groupId);
-				error("expecting BOM file artifact to be in repository: " + e.getMessage());
+				error(e.getMessage());
+				warn("Provide feautres-bom file at the given groupId " + groupId);
 			}
 		}
 	}
@@ -208,6 +211,8 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @throws PluginExecutionException Throws an error if unable to generate JSON
 	 */
 	public File generateJson(String targetJsonFile, Map<File, String> esaFileMap) throws PluginExecutionException {
+		FileInputStream instream = null;
+		FileOutputStream outstream = null;
 		try {
 			Path targetDir = Files.createTempDirectory("generatedJson");
 			URL installJarURL = null;
@@ -238,20 +243,25 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
 			}
 			File targetFile = new File(targetJsonFile);
-			FileInputStream instream = new FileInputStream(json);
+			instream = new FileInputStream(json);
 			targetFile.getParentFile().mkdirs();
-			FileOutputStream outstream = new FileOutputStream(targetFile);
+			outstream = new FileOutputStream(targetFile);
 			byte[] buffer = new byte[1024];
 			int length;
 			while ((length = instream.read(buffer)) > 0) {
 				outstream.write(buffer, 0, length);
 			}
-			instream.close();
-			outstream.close();
+			
 			return targetFile;
 		} catch (IOException e) {
 			debug(e);
 			throw new PluginExecutionException("Cannot read or create json file " + targetJsonFile, e);
+		} finally {
+			try {
+				instream.close();
+				outstream.close();
+			} catch (IOException e) {			
+			}
 		}
 	}
 

@@ -172,8 +172,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 				Jsons.add(additionalJson);
 			} catch (PluginExecutionException e) {
                 warn("Unable to find the following additional features JSON in the connected repositories: " + mavenCoord);
-                warn("To install user feature, openliberty version should be greater than 21.0.0.6");
-                warn("Ensure that the prepare-feature task was used to generate a json at the following Maven coordinate: " + mavenCoord);
                 debug("Unable to find additional features JSON: ", e);
             }
         }
@@ -607,13 +605,17 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
                 mapBasedInstallKernel.put("action.install", esaFile);
                 String ext = artifactsToExt.get(esaFile);
-                if (to != null) {
-                    mapBasedInstallKernel.put("to.extension", to);
-                    debug("Installing to extension: " + to);
+                
+                if(ext!= null && ext != "" && to != null) {
+                	warn("The \"to\" parameter was specified in both build file and server.xml file.");
+                	warn("To extension from the server.xml file will be used.");
                 }
                 if (ext != null && ext != "") {
                 	mapBasedInstallKernel.put("to.extension", ext);
                 	debug("Installing to extension from server.xml: " + ext);
+                }else if (to != null) {
+                    mapBasedInstallKernel.put("to.extension", to);
+                    debug("Installing to extension: " + to);
                 }
                 
                 Integer ac = (Integer) mapBasedInstallKernel.get("action.result");

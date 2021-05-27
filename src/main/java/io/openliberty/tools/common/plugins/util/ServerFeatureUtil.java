@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2020, 2021
+ * (C) Copyright IBM Corporation 2019, 2021
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -314,7 +314,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
                 	if (content.contains(":")) {
                 		String[] contentsplit = content.split(":");
                 		if (contentsplit.length > 2) {
-                			debug("improper feature name format, this features will be skipped: " + content);
+                			debug("The format of feature " + content + " in the server.xml is not valid and its installation will be skipped.");
                 		} else {
                 			result.add(contentsplit[0] + ":" + contentsplit[1].trim().toLowerCase());
                 		}
