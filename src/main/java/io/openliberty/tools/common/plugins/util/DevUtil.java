@@ -295,6 +295,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Path tempConfigPath;
     private boolean skipTests;
     private boolean skipUTs;
+    private boolean forceSkipUTs;
     private boolean skipITs;
     private String applicationId;
     private int appStartupTimeout;
@@ -354,7 +355,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private final File buildDirectory;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
-            List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
+            List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean forceSkipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
             boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
@@ -370,6 +371,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.hotTests = hotTests;
         this.skipTests = skipTests;
         this.skipUTs = skipUTs;
+        this.forceSkipUTs = forceSkipUTs;
         this.skipITs = skipITs;
         this.applicationId = applicationId;
         this.serverStartTimeout = serverStartTimeout;
@@ -2333,7 +2335,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else {
                         debug("Detected Enter key. Running tests...");
                         // TODO on enter run ALL tests
-                        runTestThread(false, executor, -1, false, true, buildFile);
+                        runTestThread(false, executor, -1, forceSkipUTs, true, buildFile);
                     }
                 }
             } else {
@@ -2578,7 +2580,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     compile(this.testSourceDirectory);
                     registerAll(testSrcPath, executor);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
-                    runTestThread(false, executor, -1, false, false, buildFile);
+                    runTestThread(false, executor, -1, forceSkipUTs, false, buildFile);
                     testSourceDirRegistered = true;
 
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
@@ -2914,7 +2916,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     if (recompileJavaSource(project.recompileJavaSources, project.getCompileArtifacts(), executor,
                             project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
-                            project.getBuildFile())) {
+                            project.getBuildFile(), project.skipUTs())) {
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
                         // try to recompile any other projects with compilation errors
@@ -2946,8 +2948,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (!project.failedCompilationJavaTests.isEmpty()) {
                             project.recompileJavaTests.addAll(project.failedCompilationJavaTests);
                         }
-                        if (recompileJavaTest(project.recompileJavaTests, project.getTestArtifacts(), executor, project.getOutputDirectory(),
-                                project.getTestOutputDirectory(), project.getProjectName(), project.getBuildFile())) {
+                        if (recompileJavaTest(project.recompileJavaTests, project.getTestArtifacts(), executor,
+                                project.getOutputDirectory(), project.getTestOutputDirectory(),
+                                project.getProjectName(), project.getBuildFile(), project.skipUTs())) {
                             // successful compilation so we can clear failedCompilation list
                             project.failedCompilationJavaTests.clear();
                         } else {
@@ -2977,7 +2980,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // try recompiling upstream projects
             for (UpstreamProject project : upstreamProjectsWithCompilationErrors) {
                 if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(), executor,
-                        project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(), project.getBuildFile())) {
+                        project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
+                        project.getBuildFile(), project.skipUTs())) {
                     // successful compilation so we can clear failedCompilation list
                     project.failedCompilationJavaSources.clear();
                     // save project to temp list as we cannot modify as we are iterating
@@ -3015,7 +3019,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
-                        testOutputDirectory, projectName, buildFile)) {
+                        testOutputDirectory, projectName, buildFile, forceSkipUTs)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
                     // if upstream projects exist try recompiling any failed projects
@@ -3045,7 +3049,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
                     if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
-                            testOutputDirectory, projectName, buildFile)) {
+                            testOutputDirectory, projectName, buildFile, forceSkipUTs)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
 
@@ -3060,10 +3064,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
                 // run tests after waiting for app update since app changed
                 int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
+                runTestThread(true, executor, numApplicationUpdatedMessages, forceSkipUTs, false, buildFile);
             } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
                 // run all tests without waiting for app update since only tests changed
-                runTestThread(false, executor, -1, false, false, buildFile);
+                runTestThread(false, executor, -1, forceSkipUTs, false, buildFile);
             }
 
             deleteJavaSources.clear();
@@ -3118,6 +3122,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // initial source and test compile of upstream projects
         if (upstreamProjects != null) {
             for (UpstreamProject project : upstreamProjects) {
+                info("----project; " + project.getProjectName());
                 if (project.getSourceDirectory().exists()) {
                     Collection<File> allJavaSources = FileUtils
                             .listFiles(project.getSourceDirectory().getCanonicalFile(), new String[] { "java" }, true);
@@ -3385,12 +3390,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 copyFile(fileChanged, resourceParent, outputDirectory, null);
 
                 // run all tests on resource change
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
+                runTestThread(true, executor, numApplicationUpdatedMessages, forceSkipUTs, false, buildFile);
             } else if (changeType == ChangeType.DELETE) {
                 debug("Resource file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, resourceParent, outputDirectory, null);
                 // run all tests on resource change
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
+                runTestThread(true, executor, numApplicationUpdatedMessages, forceSkipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
@@ -3406,7 +3411,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (!failedCompilationJavaTests.isEmpty()) {
                     triggerJavaTestRecompile = true;
                 }
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
+                runTestThread(true, executor, numApplicationUpdatedMessages, forceSkipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(dockerfileUsed)
                 && directory.startsWith(dockerfileUsed.getParentFile().getCanonicalFile().toPath())
@@ -3416,7 +3421,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
             // run all tests on properties file change
             if (reloadedPropertyFile) {
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
+                runTestThread(true, executor, numApplicationUpdatedMessages, forceSkipUTs, false, buildFile);
             }
         } else if (isDockerfileDirectoryChanged(fileChanged)) {
             // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
@@ -3843,13 +3848,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
      * @param projectName the name of the current project (artifactId), null if only one project exists
+     * @param projectBuildFile the build file of the current project
+     * @param forceSkipUTs whether to force skipping the unit tests
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName, File projectBuildFile)
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName, File projectBuildFile, boolean forceSkipUTs)
             throws PluginExecutionException {
         return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory,
-                projectName, projectBuildFile);
+                projectName, projectBuildFile, forceSkipUTs);
     }
 
     /**
@@ -3861,13 +3868,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
      * @param projectName the name of the current project (artifactId), null if only one project exists
+     * @param projectBuildFile the build file of the current project
+     * @param forceSkipUTs whether to force skipping the unit tests
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName, File projectBuildFile)
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName, File projectBuildFile, boolean forceSkipUTs)
             throws PluginExecutionException {
         return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory,
-                projectName, projectBuildFile);
+                projectName, projectBuildFile, forceSkipUTs);
     }
 
     /**
@@ -3880,10 +3889,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
      * @param projectName the name of the current project (artifactId), null if only one project exists
+     * @param projectBuildFile the build file of the current project
+     * @param forceSkipUTs whether to force skipping the unit tests
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
-            boolean tests, File outputDirectory, File testOutputDirectory, String projectName, File projectBuildFile) throws PluginExecutionException {
+            boolean tests, File outputDirectory, File testOutputDirectory, String projectName, File projectBuildFile, boolean forceSkipUTs) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
@@ -3964,9 +3975,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (tests) {
                     // if only tests were compiled, don't need to wait for
                     // app to update
-                    runTestThread(false, executor, -1, false, false, projectBuildFile);
+                    runTestThread(false, executor, -1, forceSkipUTs, false, projectBuildFile);
                 } else {
-                    runTestThread(true, executor, messageOccurrences, false, false, projectBuildFile);
+                    runTestThread(true, executor, messageOccurrences, forceSkipUTs, false, projectBuildFile);
                 }
                 return true;
             } else {

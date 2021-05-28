@@ -18,6 +18,7 @@ public class UpstreamProject {
     private String projectName;
     private List<File> resourceDirs;
     private HashMap<File, Boolean> resourceMap;
+    private boolean skipUTs;
 
     // src/main/java file changes
     public Collection<File> recompileJavaSources;
@@ -41,10 +42,11 @@ public class UpstreamProject {
      * @param testSourceDirectory src/test/java dir
      * @param testOutputDirectory test output dir
      * @param resourceDirs        resource directories
+     * @param skipUTs
      */
     public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts,
             List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
-            File testOutputDirectory, List<File> resourceDirs) {
+            File testOutputDirectory, List<File> resourceDirs, boolean skipUTs) {
         this.buildFile = buildFile;
         this.projectName = projectName;
         this.compileArtifacts = compileArtifacts;
@@ -54,6 +56,7 @@ public class UpstreamProject {
         this.testSourceDirectory = testSourceDirectory;
         this.testOutputDirectory = testOutputDirectory;
         this.resourceDirs = resourceDirs;
+        this.skipUTs = skipUTs;
 
         // init src/main/java file tracking collections
         this.recompileJavaSources = new HashSet<File>();
@@ -111,5 +114,9 @@ public class UpstreamProject {
 
     public List<File> getResourceDirs() {
         return this.resourceDirs;
+    }
+
+    public boolean skipUTs() {
+        return this.skipUTs;
     }
 }
