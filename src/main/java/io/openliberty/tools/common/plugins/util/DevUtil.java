@@ -425,7 +425,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                                 updated message has appeared.
      * @param executor                 The thread pool executor
      * @param forceSkipUTs             Whether to force skip the unit tests
-     * @param currentBuildFile         The build file to run tests against
+     * @param currentBuildFiles        The build file(s) to run tests against
      */
     public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
             boolean forceSkipUTs, File currentBuildFile) {
@@ -464,10 +464,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             // skip unit tests if invoked by Gradle
             if (!gradle && !(skipUTs || forceSkipUTs)) {
-                info("Running unit tests...");
+                // TODO tailor tests messages for single module vs multi module scenario
+                info("Running unit tests for " + currentBuildFile + "...");
                 try {
                     runUnitTests(currentBuildFile);
-                    info("Unit tests finished.");
+                    info("Unit tests for " + currentBuildFile + " finished.");
                 } catch (PluginScenarioException e) {
                     debug(e);
                     error(e.getMessage());
@@ -524,14 +525,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (gradle) {
                     info("Running tests...");
                 } else {
-                    info("Running integration tests...");
+                    info("Running integration tests for " + currentBuildFile + "...");
                 }
                 try {
                     runIntegrationTests(currentBuildFile);
                     if (gradle) {
                         info("Tests finished.");
                     } else {
-                        info("Integration tests finished.");
+                        info("Integration tests for " + currentBuildFile + " finished.");
                     }
                 } catch (PluginScenarioException e) {
                     debug(e);
@@ -2333,9 +2334,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             runShutdownHook(executor);
                         }
                     } else {
-                        debug("Detected Enter key. Running tests...");
-                        // TODO on enter run ALL tests
-                        runTestThread(false, executor, -1, forceSkipUTs, true, buildFile);
+                        debug("Detected Enter key. Running tests... ");
+                        if (upstreamProjects != null && !upstreamProjects.isEmpty()) {
+                            // force run tests across all modules in multi module scenario
+                            File[] buildFiles = new File[upstreamProjects.size() + 1];
+                            buildFiles[0] = buildFile;
+                            int count = 1;
+                            for (UpstreamProject project : upstreamProjects) {
+                                buildFiles[count] = project.getBuildFile();
+                                count++;
+                            }
+                            runTestThread(false, executor, -1, forceSkipUTs, true, buildFiles);
+                        } else {
+                            runTestThread(false, executor, -1, forceSkipUTs, true, buildFile);
+                        }
                     }
                 }
             } else {
@@ -4076,15 +4088,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                                 message has occurred in the log
      * @param forceSkipUTs             whether to force skip the unit tests
      * @param manualInvocation         whether the tests were manually invoked
-     * @param currentBuildFile         the build file to run tests against
+     * @param currentBuildFiles        the build file(s) to run tests against
      */
     public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences,
-            boolean forceSkipUTs, boolean manualInvocation, File currentBuildFile) {
+            boolean forceSkipUTs, boolean manualInvocation, File... currentBuildFiles) {
         try {
             if (manualInvocation || hotTests) {
-                executor.execute(
-                        new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs,
-                        manualInvocation, currentBuildFile));
+                executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs,
+                        manualInvocation, currentBuildFiles));
             }
         } catch (RejectedExecutionException e) {
             debug("Cannot add thread since max threads reached", e);
@@ -4097,22 +4108,39 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         private ThreadPoolExecutor executor;
         private boolean forceSkipUTs;
         private boolean manualInvocation;
-        private File currentBuildFile;
+        private File[] currentBuildFiles;
 
         public TestJob(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
-                boolean forceSkipUTs, boolean manualInvocation, File currentBuildFile) {
+                boolean forceSkipUTs, boolean manualInvocation, File... currentBuildFiles) {
             this.waitForApplicationUpdate = waitForApplicationUpdate;
             this.messageOccurrences = messageOccurrences;
             this.executor = executor;
             this.forceSkipUTs = forceSkipUTs;
             this.manualInvocation = manualInvocation;
-            this.currentBuildFile = currentBuildFile;
+            this.currentBuildFiles = currentBuildFiles;
         }
 
         @Override
         public void run() {
             try {
-                runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs, currentBuildFile);
+                if (currentBuildFiles.length >= 1) {
+                    for (File currentBuildFile : currentBuildFiles) {
+                        // match the build file to the upstream project to honour the skipUTs value for
+                        // each project
+                        if (upstreamProjects != null && !upstreamProjects.isEmpty()) {
+                            for (UpstreamProject upstreamProject : upstreamProjects) {
+                                if (upstreamProject.getBuildFile().equals(currentBuildFile)) {
+                                    forceSkipUTs = upstreamProject.skipUTs();
+                                    break;
+                                }
+                            }
+                        }
+                        runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs,
+                                currentBuildFile);
+                    }
+                } else {
+                    runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs, null);
+                }
             } finally {
                 // start watching for hotkey presses if not already started, or re-print message
                 // if thread already running

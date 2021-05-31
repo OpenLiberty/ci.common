@@ -25,7 +25,9 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
 
@@ -43,6 +45,28 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         }
     }
 
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
+
+    @Test
+    public void testMultiModuleTestThread() throws Exception {
+        RunTestThreadUtil util = new RunTestThreadUtil(false);
+        assertEquals(0, util.counter);
+
+        final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<Runnable>(1, true));
+
+        // only one thread should be created when multiple build files are passed in
+        final File tempBuildFile1 = tempFolder.newFile("pom1.xml");
+        final File tempBuildFile2 = tempFolder.newFile("pom2.xml");
+        util.runTestThread(false, executor, -1, false, true, tempBuildFile1, tempBuildFile2);
+        assertEquals(1, executor.getPoolSize());
+
+        // shutdown executor
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+    }
+
     @Test
     public void testRunManualTestThread() throws Exception {
         RunTestThreadUtil util = new RunTestThreadUtil(false);
@@ -51,11 +75,11 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
 
         // manualInvocation=false should not start a thread
-        util.runTestThread(false, executor, -1, false, false, null);
+        util.runTestThread(false, executor, -1, false, false);
         assertEquals(0, executor.getPoolSize());
 
         // manualInvocation=true should start a thread
-        util.runTestThread(false, executor, -1, false, true, null);
+        util.runTestThread(false, executor, -1, false, true);
         assertEquals(1, executor.getPoolSize());
         
         // shutdown executor
@@ -74,7 +98,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
 
         // manualInvocation=false and hotTests=true should start a thread
-        util.runTestThread(false, executor, -1, false, false, null);
+        util.runTestThread(false, executor, -1, false, false);
         assertEquals(1, executor.getPoolSize());
 
         // shutdown executor
