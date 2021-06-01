@@ -101,7 +101,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			json = downloadArtifact(groupId, FEATURES_JSON_ARTIFACT_ID, "json", version);
 		} catch (PluginExecutionException e) {
 			debug(e);
-			info(String.format("Features.json was not found at the coordinate %s:"+FEATURES_JSON_ARTIFACT_ID+":%s in connected repositories", groupId,
+			info(String.format("The features.json file was not found at the expected coordinate %s:"+FEATURES_JSON_ARTIFACT_ID+":%s in connected repositories.", groupId,
 					artifactId, version));
 		}
 		if (json != null) {
@@ -117,11 +117,11 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				File generatedJson = generateJson(targetJsonFile, esaFiles);
 				if (generatedJson.exists()) {
 					jsonFile = generatedJson;
-					info("Features.json has been generated at the following location: " + generatedJson);
+					info("The features.json has been generated at the following location: " + generatedJson);
 				}
 			} catch (PluginExecutionException e) {
 				error(e.getMessage());
-				warn("Provide feautres-bom file at the given groupId " + groupId);
+				warn("A features-bom file must be provided at the given groupId " + groupId + ".");
 			}
 		}
 	}

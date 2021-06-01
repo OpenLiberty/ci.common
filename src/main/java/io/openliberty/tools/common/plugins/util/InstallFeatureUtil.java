@@ -605,15 +605,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
                 mapBasedInstallKernel.put("action.install", esaFile);
                 String ext = artifactsToExt.get(esaFile);
+                mapBasedInstallKernel.put("to.extension", TO_USER);
                 
-                if(ext!= null && ext != "" && to != null) {
-                	warn("The \"to\" parameter was specified in both build file and server.xml file.");
-                	warn("To extension from the server.xml file will be used.");
+                if (ext!= null && ext != "" && to != null) {
+                	warn("The product extension location \""+ext+"\" specified in the server.xml file overrides the to extension \""+to+"\" specified in the build file.");
                 }
                 if (ext != null && ext != "") {
                 	mapBasedInstallKernel.put("to.extension", ext);
                 	debug("Installing to extension from server.xml: " + ext);
-                }else if (to != null) {
+                } else if (to != null) {
                     mapBasedInstallKernel.put("to.extension", to);
                     debug("Installing to extension: " + to);
                 }
@@ -629,7 +629,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 } else if (mapBasedInstallKernel.get("action.install.result") != null) {
                     actionReturnResult.addAll((Collection<String>) mapBasedInstallKernel.get("action.install.result"));
                 }
-                mapBasedInstallKernel.put("to.extension", TO_USER);
             }
             for (String installResult : actionReturnResult) {
                 installedFeaturesBuilder.append(installResult).append(" ");
