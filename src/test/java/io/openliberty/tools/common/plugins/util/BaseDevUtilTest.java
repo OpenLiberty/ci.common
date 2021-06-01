@@ -36,7 +36,7 @@ public class BaseDevUtilTest {
         public DevTestUtil(File serverDirectory, File sourceDirectory,
                 File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
             super(null, serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null, resourceDirs, hotTests, skipTests, 
-                  false, false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null, null, 0, false, null, false, null);
+                  false, false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null, null, 0, false, null, false, null, null);
         }
 
         @Override
@@ -121,9 +121,9 @@ public class BaseDevUtilTest {
 
         @Override
         public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
-                boolean forceSkipUTs, File buildFile) {
+                boolean forceSkipUTs, File buildFile, String projectName) {
             // not needed for tests
-            
+
         }
 
         @Override
