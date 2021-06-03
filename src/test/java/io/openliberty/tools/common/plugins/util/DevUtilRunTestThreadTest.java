@@ -40,7 +40,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
 
         @Override
         public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
-                boolean forceSkipUTs, File buildFile, String projectName) {
+                boolean forceSkipTests, boolean forceSkipUTs, boolean forceSkipITs, File buildFile, String projectName) {
             counter++;
         }
     }
