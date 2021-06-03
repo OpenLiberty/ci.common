@@ -352,15 +352,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean hasFeaturesSh;
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
-    // TODO use sorted set so that test order stays the same
-    private Set<UpstreamProject> upstreamProjects; // supports multi module scenario, null for single module projects
+    private List<UpstreamProject> upstreamProjects; // supports multi module scenario, null for single module projects
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
             boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
-            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation, Set<UpstreamProject> upstreamProjects) {
+            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation, List<UpstreamProject> upstreamProjects) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -473,17 +472,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // skip unit tests if invoked by Gradle
             if (!gradle && !(forceSkipUTs)) {
                 if (projectName != null) {
-                    info("Starting: unit tests for " + projectName);
+                    info("Running unit tests for " + projectName + " ...");
                 } else {
-                    info("Starting: unit tests");
+                    info("Running unit tests...");
                 }
                 try {
                     runUnitTests(currentBuildFile);
                     if (projectName != null) {
-                        info("Complete: unit tests for " + projectName);
+                        info("Unit tests for " + projectName + " finished.");
                         info("");
                     } else {
-                        info("Complete: unit tests");
+                        info("Unit tests finished.");
                         info("");
                     }
                 } catch (PluginScenarioException e) {
@@ -543,9 +542,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     info("Running tests...");
                 } else {
                     if (projectName != null) {
-                        info("Starting: integration tests for " + projectName);
+                        info("Running integration tests for " + projectName + "...");
                     } else {
-                        info("Starting: integration tests");
+                        info("Running integration tests...");
                     }
                 }
                 try {
@@ -554,10 +553,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         info("Tests finished.");
                     } else {
                         if (projectName != null) {
-                            info("Complete: integration tests for " + projectName);
+                            info("Integration tests for " + projectName + " finished.");
                             info("");
                         } else {
-                            info("Complete: integration tests");
+                            info("Integration tests finished.");
                             info("");
                         }
                     }
@@ -2362,15 +2361,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else {
                         debug("Detected Enter key. Running tests... ");
-                        if (upstreamProjects != null && !upstreamProjects.isEmpty()) {
+                        if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
-                            File[] buildFiles = new File[upstreamProjects.size() + 1];
-                            buildFiles[0] = buildFile;
-                            int count = 1;
-                            for (UpstreamProject project : upstreamProjects) {
-                                buildFiles[count] = project.getBuildFile();
-                                count++;
-                            }
+                            File[] buildFiles = getAllBuildFiles();
                             runTestThread(false, executor, -1, skipUTs, true, buildFiles);
                         } else {
                             runTestThread(false, executor, -1, skipUTs, true, buildFile);
@@ -2474,7 +2467,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean jvmOptionsFileRegistered = false;
 
             // check for upstream projects
-            if (upstreamProjects != null) {
+            if (isMultiModuleProject()) {
                 for (UpstreamProject p : upstreamProjects) {
                     updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), executor);
                     // watch src/main/java dir
@@ -2584,7 +2577,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     }
                 }
-                if (upstreamProjects != null && !upstreamProjects.isEmpty()) { // process java compilation for upstream projects
+                if (isMultiModuleProject()) { // process java compilation for upstream projects
                     processUpstreamJavaCompilation(upstreamProjects, executor);
 
                     // process java compilation for main project
@@ -2671,7 +2664,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 // check if resourceDirectory of an upstream project has been added
-                if (upstreamProjects != null) {
+                if (isMultiModuleProject()) {
                     for (UpstreamProject p : upstreamProjects) {
                         for (File resourceDir : p.getResourceDirs()) {
                             if (!p.getResourceMap().get(resourceDir) && resourceDir.exists()) {
@@ -2925,7 +2918,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return observer;
     }
 
-    private void processUpstreamJavaCompilation(Set<UpstreamProject> upstreamProjects,
+    private void processUpstreamJavaCompilation(List<UpstreamProject> upstreamProjects,
             final ThreadPoolExecutor executor) throws PluginExecutionException, IOException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
@@ -3143,15 +3136,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 initialCompile = false;
                 if (hotTests) {
                     // if hot testing, run tests on startup
-                    if (upstreamProjects != null && !upstreamProjects.isEmpty()) {
+                    if (isMultiModuleProject()) {
                         // force run tests across all modules in multi module scenario
-                        File[] buildFiles = new File[upstreamProjects.size() + 1];
-                        buildFiles[0] = buildFile;
-                        int count = 1;
-                        for (UpstreamProject project : upstreamProjects) {
-                            buildFiles[count] = project.getBuildFile();
-                            count++;
-                        }
+                        File[] buildFiles = getAllBuildFiles();
                         runTestThread(false, executor, -1, skipUTs, true, buildFiles);
                     } else if (testSourceDirectory.exists()) {
                         runTestThread(false, executor, -1, skipUTs, false, buildFile);
@@ -3197,7 +3184,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerUpstreamJavaSourceRecompile = false;
 
         // initial source and test compile of upstream projects
-        if (upstreamProjects != null) {
+        if (isMultiModuleProject()) {
             for (UpstreamProject project : upstreamProjects) {
                 if (project.getSourceDirectory().exists()) {
                     Collection<File> allJavaSources = FileUtils
@@ -3973,19 +3960,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Recompile source files
      * 
-     * @param javaFilesChanged collection of Java files changed
-     * @param artifactPaths list of project artifact paths for building the classpath
-     * @param executor the test thread executor
-     * @param tests indicates whether the files changed were test files
-     * @param outputDirectory the directory for compiled classes
+     * @param javaFilesChanged    collection of Java files changed
+     * @param artifactPaths       list of project artifact paths for building the
+     *                            classpath
+     * @param executor            the test thread executor
+     * @param tests               indicates whether the files changed were test
+     *                            files
+     * @param outputDirectory     the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
-     * @param projectName the name of the current project (artifactId), null if only one project exists
-     * @param projectBuildFile the build file of the current project
-     * @param forceSkipUTs whether to force skipping the unit tests
-     * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
+     * @param projectName         the name of the current project (artifactId), null
+     *                            if only one project exists
+     * @param projectBuildFile    the build file of the current project
+     * @param forceSkipUTs        whether to force skipping the unit tests
+     * @param skipRunningTests    whether to skip running tests, takes precendence
+     *                            over the forceSkipUTs param
+     * @throws PluginExecutionException if the classes output directory doesn't
+     *                                  exist and can't be created
      */
-    protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
-            boolean tests, File outputDirectory, File testOutputDirectory, String projectName, File projectBuildFile, boolean forceSkipUTs, boolean skipRunningTests) throws PluginExecutionException {
+    protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths,
+            ThreadPoolExecutor executor, boolean tests, File outputDirectory, File testOutputDirectory,
+            String projectName, File projectBuildFile, boolean forceSkipUTs, boolean skipRunningTests)
+            throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
@@ -4210,8 +4205,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         boolean currentProjForceSkipITs = skipITs;
                         boolean currentProjSkipTests = skipTests;
                         String currentProjName = applicationId;
-                        if (upstreamProjects != null && !upstreamProjects.isEmpty()) {
-                            // multi module project, match the build file to the upstream project to honour the skipUTs value
+                        if (isMultiModuleProject()) {
+                            // multi module project, match the build file to the upstream project to honour
+                            // the skipUTs value
                             for (UpstreamProject upstreamProject : upstreamProjects) {
                                 if (upstreamProject.getBuildFile().equals(currentBuildFile)) {
                                     currentProjForceSkipUTs = upstreamProject.skipUTs();
@@ -4226,15 +4222,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                     currentProjName);
                         } else {
                             // single module project, do not need to pass in project name
-                            runTests(
-                                    waitForApplicationUpdate, messageOccurrences, executor, currentProjSkipTests,
+                            runTests(waitForApplicationUpdate, messageOccurrences, executor, currentProjSkipTests,
                                     currentProjForceSkipUTs, currentProjForceSkipITs, currentBuildFile, null);
                         }
                     }
                 } else {
                     // build file was not indicated, run tests for the main (default) project
-                    runTests(waitForApplicationUpdate, messageOccurrences, executor, skipTests, skipUTs, skipITs,
-                            null, null);
+                    runTests(waitForApplicationUpdate, messageOccurrences, executor, skipTests, skipUTs, skipITs, null,
+                            null);
                 }
             } finally {
                 // start watching for hotkey presses if not already started, or re-print message
@@ -4353,5 +4348,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return containerName;
     }
 
-}
+    /**
+     * Checks if upstreamProjects exist, indicating that this is a multi module
+     * project
+     * 
+     * @return true if this is a multi module project, false if not
+     */
+    private boolean isMultiModuleProject() {
+        if (upstreamProjects != null && !upstreamProjects.isEmpty()) {
+            return true;
+        }
+        return false;
+    }
 
+    /**
+     * Gets an array of all the buildFiles in a multi module project
+     * 
+     * @return File[] array of buildFIles in mulit module project, in reactor build
+     *         order
+     */
+    private File[] getAllBuildFiles() {
+        File[] buildFiles = new File[upstreamProjects.size() + 1];
+        int count = 0;
+        for (UpstreamProject project : upstreamProjects) {
+            buildFiles[count] = project.getBuildFile();
+            count++;
+        }
+        buildFiles[count] = buildFile;
+        return buildFiles;
+    }
+
+}

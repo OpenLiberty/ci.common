@@ -45,9 +45,9 @@ public class UpstreamProject {
      * @param testSourceDirectory src/test/java dir
      * @param testOutputDirectory test output dir
      * @param resourceDirs        resource directories
-     * @param skipTests
-     * @param skipUTs
-     * @param skipITs
+     * @param skipTests           whether to skip tests for this project
+     * @param skipUTs             whether to skip unit tests for this project
+     * @param skipITs             whether to skip integration tests for this project
      */
     public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts,
             List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
