@@ -108,7 +108,8 @@ public class BaseDevUtilTest {
 
         @Override
         public boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
-                List<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException {
+                List<String> testArtifactPaths, boolean redeployCheck, ThreadPoolExecutor executor)
+                throws PluginExecutionException {
             // not needed for tests
             return false;
         }

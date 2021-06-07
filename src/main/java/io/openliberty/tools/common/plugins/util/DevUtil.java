@@ -200,12 +200,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param buildFile
      * @param compileArtifactPaths
      * @param testArtifactPaths
+     * @param redeployCheck        Whether to redeploy the application if changes in
+     *                             the dependencies are detected
      * @param executor             The thread pool executor
      * @return true if the compile artifact paths are updated
      * @throws PluginExecutionException
      */
     public abstract boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
-            List<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
+            List<String> testArtifactPaths, boolean redeployCheck, ThreadPoolExecutor executor)
+            throws PluginExecutionException;
 
     /**
      * Run the unit tests
@@ -2469,7 +2472,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // check for upstream projects
             if (isMultiModuleProject()) {
                 for (UpstreamProject p : upstreamProjects) {
-                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), executor);
+                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), false, executor);
                     // watch src/main/java dir
                     if (p.getSourceDirectory().exists()) {
                         registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
@@ -3295,7 +3298,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
                     // when an upstream project build file changes, get the updated artifact paths
                     boolean updatedArtifactPaths = updateArtifactPaths(project.getBuildFile(),
-                            project.getCompileArtifacts(), project.getTestArtifacts(), executor);
+                            project.getCompileArtifacts(), project.getTestArtifacts(), true, executor);
                     if (updatedArtifactPaths) {
                         // trigger java source recompile of all projects if there are compilation errors
                         // in this project
