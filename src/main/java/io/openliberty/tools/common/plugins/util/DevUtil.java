@@ -4358,10 +4358,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @return true if this is a multi module project, false if not
      */
     private boolean isMultiModuleProject() {
-        if (upstreamProjects != null && !upstreamProjects.isEmpty()) {
-            return true;
-        }
-        return false;
+        return (upstreamProjects != null && !upstreamProjects.isEmpty());
     }
 
     /**
