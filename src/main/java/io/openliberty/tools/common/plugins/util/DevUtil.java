@@ -3143,7 +3143,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // force run tests across all modules in multi module scenario
                         File[] buildFiles = getAllBuildFiles();
                         runTestThread(false, executor, -1, skipUTs, true, buildFiles);
-                    } else if (testSourceDirectory.exists()) {
+                    } else {
                         runTestThread(false, executor, -1, skipUTs, false, buildFile);
                     }
                 }
