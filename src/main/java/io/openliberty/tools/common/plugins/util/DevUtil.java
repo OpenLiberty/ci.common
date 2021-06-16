@@ -2481,6 +2481,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // watch src/test/java dir
                     if (p.getTestSourceDirectory().exists()) {
                         registerAll(p.getTestSourceDirectory().getCanonicalFile().toPath(), executor);
+                        p.testSourceDirRegistered = true;
                     }
 
                     // watch resource directories
@@ -2666,9 +2667,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
 
-                // check if resourceDirectory of an upstream project has been added
                 if (isMultiModuleProject()) {
                     for (UpstreamProject p : upstreamProjects) {
+
+                        // check if resource directory of an upstream project has been added/deleted
                         for (File resourceDir : p.getResourceDirs()) {
                             if (!p.getResourceMap().get(resourceDir) && resourceDir.exists()) {
                                 registerAll(resourceDir.getCanonicalFile().toPath(), executor);
@@ -2679,6 +2681,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                         + " was deleted.  Restart dev mode for it to take effect.");
                                 p.getResourceMap().put(resourceDir, false);
                             }
+                        }
+
+                        // check if test directory of an upstream project has been added/deleted
+                        if (!p.testSourceDirRegistered && p.getTestSourceDirectory().exists()
+                                && p.getTestSourceDirectory().listFiles().length > 0) {
+                            compile(p.getTestSourceDirectory());
+                            registerAll(p.getTestSourceDirectory().getCanonicalFile().toPath(), executor);
+                            debug("Registering Java test directory: " + p.getTestSourceDirectory());
+                            runTestThread(false, executor, -1, p.skipUTs(), false, p.getBuildFile());
+                            p.testSourceDirRegistered = true;
+
+                        } else if (p.testSourceDirRegistered && !p.getTestSourceDirectory().exists()) {
+                            cleanTargetDir(p.getTestOutputDirectory());
+                            p.testSourceDirRegistered = false;
                         }
                     }
                 }

@@ -32,6 +32,7 @@ public class UpstreamProject {
     public Collection<File> deleteJavaTests;
     public Collection<File> failedCompilationJavaTests;
     public boolean triggerJavaTestRecompile;
+    public boolean testSourceDirRegistered;
 
     /**
      * Defines an upstream project for supporting multi-module projects
@@ -75,6 +76,7 @@ public class UpstreamProject {
         this.deleteJavaTests = new HashSet<File>();
         this.failedCompilationJavaTests = new HashSet<File>();
         this.triggerJavaTestRecompile = false;
+        this.testSourceDirRegistered = false;
 
         // resource map
         this.resourceMap = new HashMap<File, Boolean>();
