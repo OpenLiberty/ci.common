@@ -1468,7 +1468,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             command.append(" -p " + hostDebugPort + ":" + containerDebugPort);
             // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
-            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort);
+            // and to allow remote debugging into the container
+            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort + " -e WLP_DEBUG_REMOTE=y");
         }
 
         // mount potential directories containing .war.xml from devc specific folder - override /config/apps and /config/dropins
