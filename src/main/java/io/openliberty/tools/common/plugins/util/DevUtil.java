@@ -90,8 +90,8 @@ import io.openliberty.tools.ant.ServerTask;
 public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
-    private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
-    private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I.*";
+    private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I:";
+    private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I:";
     private static final String PORT_IN_USE_MESSAGE_PREFIX = "CWWKO0221E:";
     private static final String WEB_APP_AVAILABLE_MESSAGE_PREFIX = "CWWKT0016I:";
     private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
@@ -450,7 +450,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             File logFile = getMessagesLogFile(serverTask);
 
-            String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
+            String regexp = UPDATED_APP_MESSAGE_REGEXP;
 
             try {
                 Thread.sleep(500);
@@ -524,7 +524,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     info("Waiting up to " + appStartupTimeout
                             + " seconds to find the application start up or update message...");
                     String startMessage = serverTask.waitForStringInLog(
-                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
+                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + ")",
                             timeout, logFile);
                     if (startMessage == null) {
                         error("Unable to verify if the application was started after " + appStartupTimeout
@@ -587,7 +587,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             try {
                 ServerTask serverTask = getServerTask();
                 File logFile = getMessagesLogFile(serverTask);
-                String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
+                String regexp = UPDATED_APP_MESSAGE_REGEXP;
                 messageOccurrences = serverTask.countStringOccurrencesInFile(regexp, logFile);
                 debug("Message occurrences before compile: " + messageOccurrences);
             } catch (Exception e) {
