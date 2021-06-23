@@ -186,13 +186,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param buildFile
      * @param compileArtifactPaths
      * @param testArtifactPaths
-     * @param executor      The thread pool executor
+     * @param executor             The thread pool executor
      * @throws PluginExecutionException if there was an error when restarting the
      *                                  server
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths, List<String> testArtifactPaths, ThreadPoolExecutor executor)
-            throws PluginExecutionException;
+    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths,
+            List<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
 
     /**
      * Updates the compile artifact paths of the given build file
@@ -348,7 +348,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<Path> dockerfileDirectoriesTracked = new HashSet<Path>();
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
-    private final JavaCompilerOptions compilerOptions;
+    private JavaCompilerOptions compilerOptions;
     private final String mavenCacheLocation;
     private AtomicBoolean externalContainerShutdown;
     private AtomicBoolean shownFeaturesShWarning;
@@ -4374,6 +4374,33 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     public String getContainerName() {
         return containerName;
+    }
+
+    /**
+     * Updates the Java compiler options
+     * @param updatedCompilerOptions
+     */
+    public void updateJavaCompilerOptions(JavaCompilerOptions updatedCompilerOptions) {
+        compilerOptions = updatedCompilerOptions;
+    }
+
+    /**
+     * Given a build file returns the corresponding UpstreamProject otherwise
+     * returns null
+     * 
+     * @param buildFile
+     * @return Upstream Project
+     * @throws IOException
+     */
+    public UpstreamProject getUpstreamProject(File buildFile) throws IOException {
+        if (isMultiModuleProject()) {
+            for (UpstreamProject p : upstreamProjects) {
+                if (p.getBuildFile().getCanonicalPath().equals(buildFile.getCanonicalPath())) {
+                    return p;
+                }
+            }
+        }
+        return null;
     }
 
     /**

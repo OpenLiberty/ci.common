@@ -145,4 +145,8 @@ public class UpstreamProject {
     public JavaCompilerOptions getCompilerOptions() {
         return this.compilerOptions;
     }
+
+    public void setCompilerOptions(JavaCompilerOptions compilerOptions) {
+        this.compilerOptions = compilerOptions;
+    }
 }
