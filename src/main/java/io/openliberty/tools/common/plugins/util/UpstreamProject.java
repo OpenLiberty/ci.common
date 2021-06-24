@@ -23,6 +23,7 @@ public class UpstreamProject {
     private boolean skipITs;
 
     // src/main/java file changes
+    private JavaCompilerOptions compilerOptions;
     public Collection<File> recompileJavaSources;
     public Collection<File> deleteJavaSources;
     public Collection<File> failedCompilationJavaSources;
@@ -49,10 +50,12 @@ public class UpstreamProject {
      * @param skipTests           whether to skip tests for this project
      * @param skipUTs             whether to skip unit tests for this project
      * @param skipITs             whether to skip integration tests for this project
+     * @param compilerOptions     Java compiler options set in pom.xml
      */
     public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts,
             List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
-            File testOutputDirectory, List<File> resourceDirs, boolean skipTests, boolean skipUTs, boolean skipITs) {
+            File testOutputDirectory, List<File> resourceDirs, boolean skipTests, boolean skipUTs, boolean skipITs,
+            JavaCompilerOptions compilerOptions) {
         this.buildFile = buildFile;
         this.projectName = projectName;
         this.compileArtifacts = compileArtifacts;
@@ -67,6 +70,7 @@ public class UpstreamProject {
         this.skipITs = skipITs;
 
         // init src/main/java file tracking collections
+        this.compilerOptions = compilerOptions;
         this.recompileJavaSources = new HashSet<File>();
         this.deleteJavaSources = new HashSet<File>();
         this.failedCompilationJavaSources = new HashSet<File>();
@@ -136,5 +140,13 @@ public class UpstreamProject {
 
     public boolean skipITs() {
         return this.skipITs;
+    }
+
+    public JavaCompilerOptions getCompilerOptions() {
+        return this.compilerOptions;
+    }
+
+    public void setCompilerOptions(JavaCompilerOptions compilerOptions) {
+        this.compilerOptions = compilerOptions;
     }
 }

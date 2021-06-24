@@ -186,13 +186,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param buildFile
      * @param compileArtifactPaths
      * @param testArtifactPaths
-     * @param executor      The thread pool executor
+     * @param executor             The thread pool executor
      * @throws PluginExecutionException if there was an error when restarting the
      *                                  server
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths, List<String> testArtifactPaths, ThreadPoolExecutor executor)
-            throws PluginExecutionException;
+    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths,
+            List<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
 
     /**
      * Updates the compile artifact paths of the given build file
@@ -348,7 +348,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<Path> dockerfileDirectoriesTracked = new HashSet<Path>();
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
-    private final JavaCompilerOptions compilerOptions;
+    private JavaCompilerOptions compilerOptions;
     private final String mavenCacheLocation;
     private AtomicBoolean externalContainerShutdown;
     private AtomicBoolean shownFeaturesShWarning;
@@ -2967,7 +2967,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     if (recompileJavaSource(project.recompileJavaSources, project.getCompileArtifacts(), executor,
                             project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
-                            project.getBuildFile(), project.skipUTs(), skipRunningTests)) {
+                            project.getBuildFile(), project.getCompilerOptions(), project.skipUTs(),
+                            skipRunningTests)) {
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
                         // try to recompile any other projects with compilation errors
@@ -3005,7 +3006,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                         if (recompileJavaTest(project.recompileJavaTests, project.getTestArtifacts(), executor,
                                 project.getOutputDirectory(), project.getTestOutputDirectory(),
-                                project.getProjectName(), project.getBuildFile(), project.skipUTs(), skipRunningTests)) {
+                                project.getProjectName(), project.getBuildFile(), project.getCompilerOptions(),
+                                project.skipUTs(), skipRunningTests)) {
                             // successful compilation so we can clear failedCompilation list
                             project.failedCompilationJavaTests.clear();
                         } else {
@@ -3046,7 +3048,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             for (UpstreamProject project : upstreamProjectsWithCompilationErrors) {
                 if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(), executor,
                         project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
-                        project.getBuildFile(), project.skipUTs(), false)) {
+                        project.getBuildFile(), project.getCompilerOptions(), project.skipUTs(), false)) {
                     // successful compilation so we can clear failedCompilation list
                     project.failedCompilationJavaSources.clear();
                     // save project to temp list as we cannot modify as we are iterating
@@ -3088,7 +3090,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     skipRunningTests = true;
                 }
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
-                        testOutputDirectory, projectName, buildFile, skipUTs, skipRunningTests)) {
+                        testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
                     // if upstream projects exist try recompiling any failed projects
@@ -3122,7 +3124,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         skipRunningTests = true;
                     }
                     if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
-                            testOutputDirectory, projectName, buildFile, skipUTs, skipRunningTests)) {
+                            testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
 
@@ -3945,15 +3947,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param testOutputDirectory the directory for compiled test classes
      * @param projectName the name of the current project (artifactId), null if only one project exists
      * @param projectBuildFile the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current project
      * @param forceSkipUTs whether to force skipping the unit tests
      * @param skipRunningTests whether to skip running tests, takes precendence over the forceSkipUTs param
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
-            File projectBuildFile, boolean forceSkipUTs, boolean skipRunningTests) throws PluginExecutionException {
+            File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
+            boolean skipRunningTests) throws PluginExecutionException {
         return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory,
-                projectName, projectBuildFile, forceSkipUTs, skipRunningTests);
+                projectName, projectBuildFile, projectCompilerOptions, forceSkipUTs, skipRunningTests);
     }
 
     /**
@@ -3966,41 +3970,45 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param testOutputDirectory the directory for compiled test classes
      * @param projectName the name of the current project (artifactId), null if only one project exists
      * @param projectBuildFile the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current project
      * @param forceSkipUTs whether to force skipping the unit tests
      * @param skipRunningTests whether to skip running tests, takes precendence over the forceSkipUTs param
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
-            File projectBuildFile, boolean forceSkipUTs, boolean skipRunningTests) throws PluginExecutionException {
+            File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
+            boolean skipRunningTests) throws PluginExecutionException {
         return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory,
-                projectName, projectBuildFile, forceSkipUTs, skipRunningTests);
+                projectName, projectBuildFile, projectCompilerOptions, forceSkipUTs, skipRunningTests);
     }
 
     /**
      * Recompile source files
      * 
-     * @param javaFilesChanged    collection of Java files changed
-     * @param artifactPaths       list of project artifact paths for building the
-     *                            classpath
-     * @param executor            the test thread executor
-     * @param tests               indicates whether the files changed were test
-     *                            files
-     * @param outputDirectory     the directory for compiled classes
-     * @param testOutputDirectory the directory for compiled test classes
-     * @param projectName         the name of the current project (artifactId), null
-     *                            if only one project exists
-     * @param projectBuildFile    the build file of the current project
-     * @param forceSkipUTs        whether to force skipping the unit tests
-     * @param skipRunningTests    whether to skip running tests, takes precendence
-     *                            over the forceSkipUTs param
+     * @param javaFilesChanged       collection of Java files changed
+     * @param artifactPaths          list of project artifact paths for building the
+     *                               classpath
+     * @param executor               the test thread executor
+     * @param tests                  indicates whether the files changed were test
+     *                               files
+     * @param outputDirectory        the directory for compiled classes
+     * @param testOutputDirectory    the directory for compiled test classes
+     * @param projectName            the name of the current project (artifactId),
+     *                               null if only one project exists
+     * @param projectBuildFile       the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current
+     *                               project
+     * @param forceSkipUTs           whether to force skipping the unit tests
+     * @param skipRunningTests       whether to skip running tests, takes
+     *                               precendence over the forceSkipUTs param
      * @throws PluginExecutionException if the classes output directory doesn't
      *                                  exist and can't be created
      */
     protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, boolean tests, File outputDirectory, File testOutputDirectory,
-            String projectName, File projectBuildFile, boolean forceSkipUTs, boolean skipRunningTests)
-            throws PluginExecutionException {
+            String projectName, File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
+            boolean skipRunningTests) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
@@ -4021,8 +4029,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 List<String> combinedCompilerOptions = new ArrayList<>(Arrays.asList(DEFAULT_COMPILER_OPTIONS));
-                if (compilerOptions != null) {
-                    combinedCompilerOptions.addAll(compilerOptions.getOptions());
+                if (projectCompilerOptions != null) {
+                    combinedCompilerOptions.addAll(projectCompilerOptions.getOptions());
                 }
                 debug("Compiler options: " + combinedCompilerOptions);
 
@@ -4366,6 +4374,33 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     public String getContainerName() {
         return containerName;
+    }
+
+    /**
+     * Updates the Java compiler options
+     * @param updatedCompilerOptions
+     */
+    public void updateJavaCompilerOptions(JavaCompilerOptions updatedCompilerOptions) {
+        compilerOptions = updatedCompilerOptions;
+    }
+
+    /**
+     * Given a build file returns the corresponding UpstreamProject otherwise
+     * returns null
+     * 
+     * @param buildFile
+     * @return Upstream Project
+     * @throws IOException
+     */
+    public UpstreamProject getUpstreamProject(File buildFile) throws IOException {
+        if (isMultiModuleProject()) {
+            for (UpstreamProject p : upstreamProjects) {
+                if (p.getBuildFile().getCanonicalPath().equals(buildFile.getCanonicalPath())) {
+                    return p;
+                }
+            }
+        }
+        return null;
     }
 
     /**
