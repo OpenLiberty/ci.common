@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,9 +51,8 @@ public class BaseInstallFeatureUtilTest {
     }
     
     public class InstallFeatureTestUtil extends InstallFeatureUtil {
-        public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, 
-                List<ProductProperties> propertiesList, String openLibertyVersion)  throws PluginScenarioException, PluginExecutionException {
-            super(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, null);
+        public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, List<String> additionalJsons)  throws PluginScenarioException, PluginExecutionException {
+            super(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, null, additionalJsons);
         }
 
         @Override
@@ -108,8 +108,9 @@ public class BaseInstallFeatureUtilTest {
     public InstallFeatureUtil getNewInstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginExecutionException, PluginScenarioException {
         List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDirectory);
         String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
+        List<String> additionalJsons = new ArrayList<String>();
 
-        return new InstallFeatureTestUtil(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion);
+        return new InstallFeatureTestUtil(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, additionalJsons);
     }
     
 }

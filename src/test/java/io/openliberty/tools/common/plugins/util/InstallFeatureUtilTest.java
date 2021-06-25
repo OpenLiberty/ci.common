@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -195,7 +195,8 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testDownloadOverrideBundle() throws Exception {
         List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir);
         String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion) {
+        List<String> additionalJsons = new ArrayList<String>();
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion, additionalJsons) {
             @Override
             public File downloadArtifact(String groupId, String artifactId, String type, String version)
                     throws PluginExecutionException {

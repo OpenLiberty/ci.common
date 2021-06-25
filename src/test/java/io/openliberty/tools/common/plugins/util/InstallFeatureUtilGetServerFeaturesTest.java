@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -535,11 +535,13 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
      * @throws Exception
      */
     @Test
-    public void testUserFeatures() throws Exception{
+    public void testUserFeaturesImproper() throws Exception{
         copyAsName("server_user_features.xml", "server.xml");
 
         Set<String> expected = new HashSet<String>();
+        expected.add("myExt:feature2");
         expected.add("feature3");
+        
 
         verifyServerFeatures(expected);
     }

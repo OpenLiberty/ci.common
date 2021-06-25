@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <server description="new server">
     <featureManager>
-        <feature>usr:feature1</feature>
+        <feature>usr:test:feature1</feature>
         <feature>myExt:feature2</feature>
         <feature>feature3</feature>
     </featureManager>
