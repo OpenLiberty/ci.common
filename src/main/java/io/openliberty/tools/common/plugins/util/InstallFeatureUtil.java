@@ -669,8 +669,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             return downloadArtifact(groupId, artifactId, "jar",
                     String.format("[%s)", openLibertyVersion + ", " + getNextProductVersion(openLibertyVersion)));
         } catch (PluginExecutionException e) {
-            debug("Could not find override bundle " + groupId + ":" + artifactId
-                    + " for the current Open Liberty version " + openLibertyVersion, e);
+            debug("Using jar from Liberty directory for " + artifactId + " bundle.");
             return null;
         }
     }
