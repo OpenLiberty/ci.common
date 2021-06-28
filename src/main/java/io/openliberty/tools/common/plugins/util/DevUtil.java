@@ -3208,30 +3208,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
             for (UpstreamProject project : upstreamProjects) {
-                if (project.getSourceDirectory().exists()) {
-                    Collection<File> allJavaSources = FileUtils
-                            .listFiles(project.getSourceDirectory().getCanonicalFile(), new String[] { "java" }, true);
-                    project.recompileJavaSources.addAll(allJavaSources);
-                }
-                if (project.getTestSourceDirectory().exists()) {
-                    Collection<File> allJavaTestSources = FileUtils.listFiles(
-                            project.getTestSourceDirectory().getCanonicalFile(), new String[] { "java" }, true);
-                    project.recompileJavaTests.addAll(allJavaTestSources);
-                }
+                compileUpstreamModule(project, false);
             }
         }
 
         // initial source and test compile
-        if (this.sourceDirectory.exists()) {
-            Collection<File> allJavaSources = FileUtils.listFiles(this.sourceDirectory.getCanonicalFile(),
-                    new String[] { "java" }, true);
-            recompileJavaSources.addAll(allJavaSources);
-        }
-        if (this.testSourceDirectory.exists()) {
-            Collection<File> allJavaTestSources = FileUtils.listFiles(this.testSourceDirectory.getCanonicalFile(),
-                    new String[] { "java" }, true);
-            recompileJavaTests.addAll(allJavaTestSources);
-        }
+        compileMainModule(false);
     }
 
     private void processFileChanges(
@@ -4428,6 +4410,53 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         buildFiles[count] = buildFile;
         return buildFiles;
+    }
+
+    /**
+     * Compile the entire main module. The main module is the module with the
+     * Liberty configuration.
+     * 
+     * @param testsOnly True if only tests need to be compiled.
+     * @throws IOException
+     */
+    protected void compileMainModule(boolean testsOnly) throws IOException {
+        compileEntireProject(this.sourceDirectory, recompileJavaSources, this.testSourceDirectory, recompileJavaTests,
+                testsOnly);
+    }
+
+    /**
+     * Compile the entire specified module. This is only used in a multi-module
+     * scenario
+     * 
+     * @param project   UpstreamProject, the module to be compiled
+     * @param testsOnly True if only tests need to be compiled
+     * @throws IOException
+     */
+    protected void compileUpstreamModule(UpstreamProject project, boolean testsOnly) throws IOException {
+        compileEntireProject(project.getSourceDirectory(), project.recompileJavaSources,
+                project.getTestSourceDirectory(), project.recompileJavaTests, testsOnly);
+
+    }
+
+    private void compileEntireProject(File sourceDir, Collection<File> recompileJavaSourceSet, File testSourceDir,
+            Collection<File> recompileJavaTestSet, boolean testsOnly) throws IOException {
+
+        // recompile source
+        if (!testsOnly) {
+            if (sourceDir.exists()) {
+                Collection<File> allJavaSources = FileUtils.listFiles(sourceDir.getCanonicalFile(),
+                        new String[] { "java" }, true);
+                recompileJavaSourceSet.addAll(allJavaSources);
+            }
+        }
+
+        // recompile tests
+        if (testSourceDir.exists()) {
+            Collection<File> allJavaTestSources = FileUtils.listFiles(testSourceDir.getCanonicalFile(),
+                    new String[] { "java" }, true);
+            recompileJavaTestSet.addAll(allJavaTestSources);
+        }
+
     }
 
 }
