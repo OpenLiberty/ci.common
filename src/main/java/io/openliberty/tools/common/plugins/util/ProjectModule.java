@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-public class UpstreamProject {
+public class ProjectModule {
 
     private File buildFile;
     private List<String> compileArtifacts;
@@ -35,8 +35,12 @@ public class UpstreamProject {
     public boolean triggerJavaTestRecompile;
     public boolean testSourceDirRegistered;
 
+    // modules that depend on the current module, listed in the build order
+    private List<File> dependentModules;
+    public boolean disableDependencyCompile;
+
     /**
-     * Defines an upstream project for supporting multi-module projects
+     * Defines a project module for supporting multi-module projects
      * 
      * @param buildFile           pom.xml
      * @param projectName         project name (artifactId)
@@ -52,10 +56,10 @@ public class UpstreamProject {
      * @param skipITs             whether to skip integration tests for this project
      * @param compilerOptions     Java compiler options set in pom.xml
      */
-    public UpstreamProject(File buildFile, String projectName, List<String> compileArtifacts,
+    public ProjectModule(File buildFile, String projectName, List<String> compileArtifacts,
             List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
             File testOutputDirectory, List<File> resourceDirs, boolean skipTests, boolean skipUTs, boolean skipITs,
-            JavaCompilerOptions compilerOptions) {
+            JavaCompilerOptions compilerOptions, List<File> dependentModules) {
         this.buildFile = buildFile;
         this.projectName = projectName;
         this.compileArtifacts = compileArtifacts;
@@ -68,6 +72,8 @@ public class UpstreamProject {
         this.skipTests = skipTests;
         this.skipUTs = skipUTs;
         this.skipITs = skipITs;
+        this.dependentModules = dependentModules;
+        this.disableDependencyCompile = false;
 
         // init src/main/java file tracking collections
         this.compilerOptions = compilerOptions;
@@ -148,5 +154,13 @@ public class UpstreamProject {
 
     public void setCompilerOptions(JavaCompilerOptions compilerOptions) {
         this.compilerOptions = compilerOptions;
+    }
+
+    public List<File> getDependentModules() {
+        return this.dependentModules;
+    }
+
+    public void setDependentModules(List<File> dependentModules) {
+        this.dependentModules = dependentModules;
     }
 }
