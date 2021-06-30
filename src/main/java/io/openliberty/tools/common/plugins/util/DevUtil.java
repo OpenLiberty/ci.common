@@ -356,13 +356,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
     private List<UpstreamProject> upstreamProjects; // supports multi module scenario, null for single module projects
+    private boolean recompileDependencies;
 
-    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
-            List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
-            String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
-            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation, List<UpstreamProject> upstreamProjects) {
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
+            File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
+            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, String applicationId,
+            long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
+            boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
+            File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
+            boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
+            String mavenCacheLocation, List<UpstreamProject> upstreamProjects, boolean recompileDependencies) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -413,6 +416,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.keepTempDockerfile = keepTempDockerfile;
         this.mavenCacheLocation = mavenCacheLocation;
         this.upstreamProjects = upstreamProjects;
+        this.recompileDependencies = recompileDependencies;
         this.externalContainerShutdown = new AtomicBoolean(false);
         this.shownFeaturesShWarning = new AtomicBoolean(false);
         this.hasFeaturesSh = new AtomicBoolean(false);
@@ -2948,6 +2952,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 recompileFailedProjects(executor);
             }
             for (UpstreamProject project : upstreamProjects) {
+
                 // delete before recompiling, so if a file is in both lists, its class
                 // will be deleted then recompiled
                 if (!project.deleteJavaSources.isEmpty()) {
@@ -3035,6 +3040,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     project.recompileJavaTests.clear();
                 }
             }
+
             triggerUpstreamJavaSourceRecompile = false;
         }
     }
@@ -3276,22 +3282,37 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Java source file modified: " + fileChanged.getName()
                                 + ". Adding to list for processing.");
                         lastJavaSourceChange = System.currentTimeMillis();
-                        project.recompileJavaSources.add(fileChanged);
+                        if (recompileDependencies) {
+                            // TODO recompile entire module if recompileDependencies=true
+                            compileUpstreamModule(project, false);
+                        } else {
+                            project.recompileJavaSources.add(fileChanged);
+                        }
                     } else if (changeType == ChangeType.DELETE) {
                         debug("Java file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
                         lastJavaSourceChange = System.currentTimeMillis();
                         project.deleteJavaSources.add(fileChanged);
+                        if (recompileDependencies) {
+                            compileUpstreamModule(project, false);
+                        }
                     }
                 } else if (directory.startsWith(project.getTestSourceDirectory().getCanonicalPath())) {
                     if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
                             && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                         debug("Java test file modified: " + fileChanged.getName() + ". Adding to list for processing.");
                         lastJavaTestChange = System.currentTimeMillis();
-                        project.recompileJavaTests.add(fileChanged);
+                        if (recompileDependencies) {
+                            compileUpstreamModule(project, true);
+                        } else {
+                            project.recompileJavaTests.add(fileChanged);
+                        }
                     } else if (changeType == ChangeType.DELETE) {
                         debug("Java test file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
                         lastJavaTestChange = System.currentTimeMillis();
                         project.deleteJavaTests.add(fileChanged);
+                        if (recompileDependencies) {
+                            compileUpstreamModule(project, true);
+                        }
                     }
                 } else if (fileChanged.equals(project.getBuildFile())
                         && directory.startsWith(project.getBuildFile().getParentFile().getCanonicalFile().toPath())
@@ -3301,6 +3322,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     boolean updatedArtifactPaths = updateArtifactPaths(project.getBuildFile(),
                             project.getCompileArtifacts(), project.getTestArtifacts(), true, executor);
                     if (updatedArtifactPaths) {
+                        // TODO check if recompileDependencies = true and trigger a recompile of entire module
+
                         // trigger java source recompile of all projects if there are compilation errors
                         // in this project
                         if (!project.failedCompilationJavaSources.isEmpty()) {
