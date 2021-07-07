@@ -494,7 +494,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // if unit tests failed, don't run integration tests
                     return;
                 } catch (PluginExecutionException e) {
-                    error(e.getMessage());
+                    error(e.getMessage(), e);
                 }
             }
 
@@ -569,7 +569,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // if unit tests failed, don't run integration tests
                     return;
                 } catch (PluginExecutionException e) {
-                    error(e.getMessage());
+                    error(e.getMessage(), e);
                 }
             }
         }
