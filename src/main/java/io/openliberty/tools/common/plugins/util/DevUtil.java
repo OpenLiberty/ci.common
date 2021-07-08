@@ -2979,7 +2979,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                     // try recompiling failing project modules that are not dependent on the current
                     // module (upstream of the current module)
-                    if (!project.disableDependencyCompile && recompileDependencies && !initialCompile) {
+                    if (shouldRecompileDependencies(project)) {
                         compileFailingProjects(project, false, executor);
                     }
                     // TODO support hotTests scenario and trigger tests to run on current project
@@ -2995,7 +2995,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         project.failedCompilationJavaSources.addAll(project.recompileJavaSources);
                     }
                     // compile all of the dependent modules (in build order)
-                    if (!project.disableDependencyCompile && recompileDependencies && !initialCompile) {
+                    if (shouldRecompileDependencies(project)) {
                         for (File dependentModule : project.getDependentModules()) {
                             compileModuleForBuildFile(dependentModule, false);
                         }
@@ -3027,7 +3027,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                         // try recompiling failing project modules that are not dependent on the current
                         // module (upstream of the current module)
-                        if (!project.disableDependencyCompile && recompileDependencies && !initialCompile) {
+                        if (shouldRecompileDependencies(project)) {
                             compileFailingProjects(project, true, executor);
                         }
 
@@ -3041,7 +3041,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             project.failedCompilationJavaTests.addAll(project.recompileJavaTests);
                         }
                         // compile all of the dependent modules' tests (in build order)
-                        if (!project.disableDependencyCompile && recompileDependencies && !initialCompile) {
+                        if (shouldRecompileDependencies(project)) {
                             for (File dependentModule : project.getDependentModules()) {
                                 compileModuleForBuildFile(dependentModule, true);
                             }
@@ -4590,6 +4590,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             recompileJavaTestSet.addAll(allJavaTestSources);
         }
 
+    }
+
+    // indicates whether to recompile dependencies for the given project module
+    private boolean shouldRecompileDependencies(ProjectModule project) {
+        return (!project.disableDependencyCompile && recompileDependencies && !initialCompile);
     }
 
 }
