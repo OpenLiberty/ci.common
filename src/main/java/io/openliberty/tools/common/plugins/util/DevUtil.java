@@ -2363,6 +2363,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not restart the server.", e);
                             runShutdownHook(executor);
                         }
+                    } else if (line != null && (line.trim().equalsIgnoreCase("q") || line.trim().equalsIgnoreCase("help")
+                    || line.trim().equalsIgnoreCase("help"))) {
+                        if (container) {
+                            info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+                        } else {
+                            info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+                        }
+        
+                        info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+                        info(formatAttentionMessage("To see the help menu type ‘h’ and press Enter."));
                     } else {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
