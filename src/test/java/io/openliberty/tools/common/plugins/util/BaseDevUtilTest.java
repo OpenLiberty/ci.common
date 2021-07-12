@@ -35,8 +35,8 @@ public class BaseDevUtilTest {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory,
                 File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(null, serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, resourceDirs, hotTests, skipTests, 
-                  false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null, 0, false, null, false, null);
+            super(null, serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null, resourceDirs, hotTests, skipTests, 
+                  false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null, null, 0, false, null, false, null, null, false);
         }
 
         @Override
@@ -96,11 +96,20 @@ public class BaseDevUtilTest {
         @Override
         public ServerTask getServerTask() throws IOException {
             // not needed for tests
-            return null;            
+            return null;
         }
 
         @Override
-        public boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths, List<String> testArtifactPaths, ThreadPoolExecutor executor) {
+        public boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths,
+                List<String> testArtifactPaths, ThreadPoolExecutor executor) {
+            // not needed for tests
+            return false;
+        }
+
+        @Override
+        public boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
+                List<String> testArtifactPaths, boolean redeployCheck, ThreadPoolExecutor executor)
+                throws PluginExecutionException {
             // not needed for tests
             return false;
         }
@@ -113,9 +122,9 @@ public class BaseDevUtilTest {
 
         @Override
         public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
-                boolean forceSkipUTs) {
+                boolean forceSkipTests, boolean forceSkipUTs, boolean forceSkipITs, File buildFile, String projectName) {
             // not needed for tests
-            
+
         }
 
         @Override
@@ -131,12 +140,12 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void runUnitTests() throws PluginScenarioException, PluginExecutionException {
+        public void runUnitTests(File buildFile) throws PluginScenarioException, PluginExecutionException {
             // not needed for tests
         }
 
         @Override
-        public void runIntegrationTests() throws PluginScenarioException, PluginExecutionException {
+        public void runIntegrationTests(File buildFile) throws PluginScenarioException, PluginExecutionException {
             // not needed for tests
         }
 

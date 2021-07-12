@@ -20,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,7 +50,7 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     private void testPrepareDockerfile(String testFile, String expectedFile) throws PluginExecutionException, IOException {
         File test = new File(dockerfiles, testFile);
         File expected = new File(dockerfiles, expectedFile);
-        result = util.prepareTempDockerfile(test);
+        result = util.prepareTempDockerfile(test, dockerfiles.getAbsolutePath());
         // trim the overall file content string since the file write can insert an extra line break at the end
         assertEquals(util.readDockerfile(expected), util.readDockerfile(result));
     }
@@ -210,6 +211,19 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     }
 
     @Test
+    public void testDockerBuildContext() throws Exception {
+        File test = new File(dockerfiles, "dockerBuildContext.txt");
+        result = util.prepareTempDockerfile(test, new File("my/context").getAbsolutePath());
+        // use Paths comparison to be OS agnostic
+        assertTrue(Paths.get(util.srcMount.get(0)).endsWith("my/context/path1/path2/file1.xml"));
+        assertTrue(util.destMount.get(0).endsWith("/config/file1.xml"));
+        assertTrue(Paths.get(util.srcMount.get(1)).endsWith("my/context/path3/file2.xml"));
+        assertTrue(util.destMount.get(1).endsWith("/config/file2.xml"));
+        assertEquals(2, util.srcMount.size());
+        assertEquals(2, util.destMount.size());
+    }
+
+    @Test
     public void testDisableOpenJ9SCC_lowercase() throws Exception {
         List<String> dockerfileLines = new ArrayList<String>();
         List<String> expectedDockerfileLines = new ArrayList<String>();
@@ -279,6 +293,17 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         test.add("RUN configure.sh");
         util.detectFeaturesSh(test);
         assertEquals("Should have resetted to not detect features.sh", false, util.hasFeaturesSh.get());
+    }
+
+    @Test
+    public void testRemoveEarFileLines() throws Exception {
+        List<String> dockerfileLines = new ArrayList<String>();
+        List<String> expectedDockerfileLines = new ArrayList<String>();
+        dockerfileLines.add("FROM openliberty/open-liberty");
+        dockerfileLines.add("COPY --chown=1001:0  target/guide-maven-multimodules-ear.ear /config/apps/");
+        util.removeEarFileLines(dockerfileLines);
+        expectedDockerfileLines.add("FROM openliberty/open-liberty");
+        assertEquals(expectedDockerfileLines, dockerfileLines);
     }
 
 }

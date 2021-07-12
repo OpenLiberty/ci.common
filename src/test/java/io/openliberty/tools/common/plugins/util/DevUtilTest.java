@@ -485,4 +485,24 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertArrayEquals(null, DevUtil.parseNetworks(""));
     }
 
+    @Test
+    public void testLongestCommonDir() throws Exception {
+        // These Unix style paths should also work with Windows if they are all on the same drive
+        assertEquals("Same paths", new File("/a/b/c"), DevUtil.getLongestCommonDir(new File("/a/b/c"), new File("/a/b/c")));
+
+        assertEquals("dir1 should be subdirectory of dir2", new File("/a/b"), DevUtil.getLongestCommonDir(new File("/a/b"), new File("/a/b/c")));
+        assertEquals("dir1 should be subdirectory of dir2", new File("/a"), DevUtil.getLongestCommonDir(new File("/a"), new File("/a/b/c/d")));
+        assertEquals("dir1 should be subdirectory of dir2", new File("/"), DevUtil.getLongestCommonDir(new File("/"), new File("/a/b/c/d")));
+
+        assertEquals("dir2 should be subdirectory of dir1", new File("/a/b"), DevUtil.getLongestCommonDir(new File("/a/b/c"), new File("/a/b")));
+        assertEquals("dir2 should be subdirectory of dir1", new File("/a"), DevUtil.getLongestCommonDir(new File("/a/b/c/d"), new File("/a")));
+        assertEquals("dir2 should be subdirectory of dir1", new File("/"), DevUtil.getLongestCommonDir(new File("/a/b/c/d"), new File("/")));
+
+        assertEquals("Sibling directories", new File("/a/b/c"), DevUtil.getLongestCommonDir(new File("/a/b/c/1"), new File("/a/b/c/2")));
+
+        assertEquals("Nested sibling directories", new File("/a/b/c"), DevUtil.getLongestCommonDir(new File("/a/b/c/1/2/3"), new File("/a/b/c/4/5/6")));
+
+        assertEquals("Parent should be the drive root", new File("/"), DevUtil.getLongestCommonDir(new File("/a/b/c"), new File("/d/e/f")));
+    }
+
 }

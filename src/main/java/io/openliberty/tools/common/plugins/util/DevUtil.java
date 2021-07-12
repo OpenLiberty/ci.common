@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -74,8 +73,6 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
@@ -83,11 +80,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
-
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
 import io.openliberty.tools.ant.ServerTask;
-import io.openliberty.tools.common.plugins.config.ServerConfigDropinXmlDocument;
 
 /**
  * Utility class for dev mode.
@@ -95,8 +90,8 @@ import io.openliberty.tools.common.plugins.config.ServerConfigDropinXmlDocument;
 public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
-    private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I.*";
-    private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I.*";
+    private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I:";
+    private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I:";
     private static final String PORT_IN_USE_MESSAGE_PREFIX = "CWWKO0221E:";
     private static final String WEB_APP_AVAILABLE_MESSAGE_PREFIX = "CWWKT0016I:";
     private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
@@ -125,7 +120,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
-    private static final int LIBERTY_DEFAULT_DEBUG_PORT = 7777;
     private static final int DOCKER_TIMEOUT = 20; // seconds
 
     /**
@@ -192,29 +186,47 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param buildFile
      * @param compileArtifactPaths
      * @param testArtifactPaths
-     * @param executor      The thread pool executor
+     * @param executor             The thread pool executor
      * @throws PluginExecutionException if there was an error when restarting the
      *                                  server
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths, List<String> testArtifactPaths, ThreadPoolExecutor executor)
+    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths,
+            List<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
+
+    /**
+     * Updates the compile artifact paths of the given build file
+     * 
+     * @param buildFile
+     * @param compileArtifactPaths
+     * @param testArtifactPaths
+     * @param redeployCheck        Whether to redeploy the application if changes in
+     *                             the dependencies are detected
+     * @param executor             The thread pool executor
+     * @return true if the compile artifact paths are updated
+     * @throws PluginExecutionException
+     */
+    public abstract boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
+            List<String> testArtifactPaths, boolean redeployCheck, ThreadPoolExecutor executor)
             throws PluginExecutionException;
 
     /**
      * Run the unit tests
      * 
+     * @param buildFile corresponding build file to run tests on
      * @throws PluginScenarioException  if unit tests failed
      * @throws PluginExecutionException if unit tests could not be run
      */
-    public abstract void runUnitTests() throws PluginScenarioException, PluginExecutionException;
+    public abstract void runUnitTests(File buildFile) throws PluginScenarioException, PluginExecutionException;
 
     /**
      * Run the integration tests
      * 
+     * @param buildFile corresponding buildFile to run tests on
      * @throws PluginScenarioException  if integration tests failed
      * @throws PluginExecutionException if integration tests could not be run
      */
-    public abstract void runIntegrationTests() throws PluginScenarioException, PluginExecutionException;
+    public abstract void runIntegrationTests(File buildFile) throws PluginScenarioException, PluginExecutionException;
 
     /**
      * Check the configuration file for new features
@@ -280,6 +292,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File testSourceDirectory;
     private File configDirectory;
     private File projectDirectory;
+    private File multiModuleProjectDirectory;
     private List<File> resourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
@@ -320,6 +333,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private String imageName;
     private String containerName;
     private File dockerfile;
+    private File dockerBuildContext;
     private Path tempDockerfilePath = null;
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
@@ -334,26 +348,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<Path> dockerfileDirectoriesTracked = new HashSet<Path>();
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
-    private final JavaCompilerOptions compilerOptions;
+    private JavaCompilerOptions compilerOptions;
     private final String mavenCacheLocation;
     private AtomicBoolean externalContainerShutdown;
     private AtomicBoolean shownFeaturesShWarning;
     protected AtomicBoolean hasFeaturesSh;
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
+    private List<ProjectModule> upstreamProjects; // supports multi module scenario, null for single module projects
+    private boolean recompileDependencies;
 
-    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
-            List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
-            String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
-            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
+            File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
+            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, String applicationId,
+            long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
+            boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
+            File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
+            boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
+            String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
         this.configDirectory = configDirectory;
         this.projectDirectory = projectDirectory;
+        this.multiModuleProjectDirectory = multiModuleProjectDirectory;
         this.resourceDirs = resourceDirs;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
@@ -382,6 +401,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         this.container = container;
         this.dockerfile = dockerfile;
+        this.dockerBuildContext = dockerBuildContext;
         this.dockerRunOpts = dockerRunOpts;
         if (projectDirectory != null) {
             this.defaultDockerfile = new File(projectDirectory, "Dockerfile");
@@ -395,6 +415,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.compilerOptions = compilerOptions;
         this.keepTempDockerfile = keepTempDockerfile;
         this.mavenCacheLocation = mavenCacheLocation;
+        this.upstreamProjects = upstreamProjects;
+        this.recompileDependencies = recompileDependencies;
         this.externalContainerShutdown = new AtomicBoolean(false);
         this.shownFeaturesShWarning = new AtomicBoolean(false);
         this.hasFeaturesSh = new AtomicBoolean(false);
@@ -409,11 +431,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param messageOccurrences       The previous number of times the application
      *                                 updated message has appeared.
      * @param executor                 The thread pool executor
+     * @param forceSkipTests           Whether to force skip all tests
      * @param forceSkipUTs             Whether to force skip the unit tests
+     * @param forceSkipITs             Whether to force skip the integration tests
+     * @param currentBuildFile         The build file to run tests against
+     * @param projectName              The name of the current project, null if only
+     *                                 one project exists
      */
     public void runTests(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
-            boolean forceSkipUTs) {
-        if (!skipTests) {
+            boolean forceSkipTests, boolean forceSkipUTs, boolean forceSkipITs, File currentBuildFile,
+            String projectName) {
+        debug("Running tests for: " + currentBuildFile + "; skipTests: " + forceSkipTests + "; skipITs: " + forceSkipITs
+                + "; skipUTs: " + forceSkipUTs);
+        if (!forceSkipTests) {
             ServerTask serverTask = null;
             try {
                 serverTask = getServerTask();
@@ -424,7 +454,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             File logFile = getMessagesLogFile(serverTask);
 
-            String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
+            String regexp = UPDATED_APP_MESSAGE_REGEXP;
 
             try {
                 Thread.sleep(500);
@@ -447,18 +477,28 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
 
             // skip unit tests if invoked by Gradle
-            if (!gradle && !(skipUTs || forceSkipUTs)) {
-                info("Running unit tests...");
+            if (!gradle && !(forceSkipUTs)) {
+                if (projectName != null) {
+                    info("Running unit tests for " + projectName + " ...");
+                } else {
+                    info("Running unit tests...");
+                }
                 try {
-                    runUnitTests();
-                    info("Unit tests finished.");
+                    runUnitTests(currentBuildFile);
+                    if (projectName != null) {
+                        info("Unit tests for " + projectName + " finished.");
+                        info("");
+                    } else {
+                        info("Unit tests finished.");
+                        info("");
+                    }
                 } catch (PluginScenarioException e) {
                     debug(e);
                     error(e.getMessage());
                     // if unit tests failed, don't run integration tests
                     return;
                 } catch (PluginExecutionException e) {
-                    error(e.getMessage());
+                    error(e.getMessage(), e);
                 }
             }
 
@@ -476,7 +516,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return;
             }
 
-            if (!skipITs) {
+            if (!forceSkipITs) {
                 if (!detectedAppStarted.get()) {
                     if (appStartupTimeout < 0) {
                         warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
@@ -488,7 +528,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     info("Waiting up to " + appStartupTimeout
                             + " seconds to find the application start up or update message...");
                     String startMessage = serverTask.waitForStringInLog(
-                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + applicationId + ")",
+                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + ")",
                             timeout, logFile);
                     if (startMessage == null) {
                         error("Unable to verify if the application was started after " + appStartupTimeout
@@ -508,14 +548,24 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (gradle) {
                     info("Running tests...");
                 } else {
-                    info("Running integration tests...");
+                    if (projectName != null) {
+                        info("Running integration tests for " + projectName + "...");
+                    } else {
+                        info("Running integration tests...");
+                    }
                 }
                 try {
-                    runIntegrationTests();
+                    runIntegrationTests(currentBuildFile);
                     if (gradle) {
                         info("Tests finished.");
                     } else {
-                        info("Integration tests finished.");
+                        if (projectName != null) {
+                            info("Integration tests for " + projectName + " finished.");
+                            info("");
+                        } else {
+                            info("Integration tests finished.");
+                            info("");
+                        }
                     }
                 } catch (PluginScenarioException e) {
                     debug(e);
@@ -523,7 +573,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // if unit tests failed, don't run integration tests
                     return;
                 } catch (PluginExecutionException e) {
-                    error(e.getMessage());
+                    error(e.getMessage(), e);
                 }
             }
         }
@@ -541,7 +591,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             try {
                 ServerTask serverTask = getServerTask();
                 File logFile = getMessagesLogFile(serverTask);
-                String regexp = UPDATED_APP_MESSAGE_REGEXP + applicationId;
+                String regexp = UPDATED_APP_MESSAGE_REGEXP;
                 messageOccurrences = serverTask.countStringOccurrencesInFile(regexp, logFile);
                 debug("Message occurrences before compile: " + messageOccurrences);
             } catch (Exception e) {
@@ -605,8 +655,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 File dockerfileToUse = getDockerfile();
                 debug("Dockerfile to use: " + dockerfileToUse);
                 if (dockerfileToUse.exists()) {
-                    File tempDockerfile = prepareTempDockerfile(dockerfileToUse);
-                    buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage);
+                    // The build context comes from the specified dockerBuildContext (or the user's Dockerfile location by default)
+                    File buildContext = dockerBuildContext == null ? dockerfileToUse.getParentFile() : dockerBuildContext;
+                    String buildContextString = buildContext.getAbsolutePath();
+                    debug("Docker build context: " + buildContextString);
+
+                    File tempDockerfile = prepareTempDockerfile(dockerfileToUse, buildContextString);
+                    buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage, buildContext);
                 } else {
                     // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
                     throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
@@ -704,7 +759,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         throw new PluginExecutionException(e);
                     }
                 } catch (Exception e) {
-                    error("An error occured while waiting for the server to update messages.log: " + e.getMessage(), e);
+                    error("An error occurred while waiting for the server to update messages.log: " + e.getMessage(), e);
                 } finally {
                     try {
                         observer.destroy();
@@ -729,7 +784,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         throw new PluginExecutionException(e);
                     }
                 } catch (Exception e) {
-                    error("An error occured while waiting for the server to create messages.log: " + e.getMessage(), e);
+                    error("An error occurred while waiting for the server to create messages.log: " + e.getMessage(), e);
                 }
             }
             // Set server start timeout
@@ -886,28 +941,36 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
-        List<String> warFileLines = new ArrayList<String>();
+        removeFileExtensionLines(dockerfileLines, ".war");
+    }
+
+    protected void removeEarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
+        removeFileExtensionLines(dockerfileLines, ".ear");
+    }
+
+    private void removeFileExtensionLines(List<String> dockerfileLines, String extension) throws PluginExecutionException {
+        List<String> fileExtensionLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
-            if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(".war")) {
+            if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(extension)) {
                 // Break the Dockerfile line down into segments based on any amount of whitespace.
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
-                // if the line starts with COPY and the second to last segment ends with ".war", it is a WAR file COPY line
+                // if the line starts with COPY and the second to last segment ends with extension, it is a COPY line of that file type
                 if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) {
                         throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
                         "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
-                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(".war")) {
-                        warFileLines.add(line);
+                    if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(extension)) {
+                        fileExtensionLines.add(line);
                     }
                 }
             }
         }
-        debug("WAR file lines: " + warFileLines.toString());
-        dockerfileLines.removeAll(warFileLines);
+        debug(extension + " file lines: " + fileExtensionLines.toString());
+        dockerfileLines.removeAll(fileExtensionLines);
     }
 
     /**
@@ -1047,7 +1110,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return true;
     }
 
-    protected File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
+    protected File prepareTempDockerfile(File dockerfile, String buildContextString) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
@@ -1055,7 +1118,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         dockerfileLines = getCleanedLines(dockerfileLines);
         dockerfileLines = getCombinedLines(dockerfileLines, escape);
         removeWarFileLines(dockerfileLines);
-        processCopyLines(dockerfileLines, dockerfile.getParent());
+        removeEarFileLines(dockerfileLines);
+        processCopyLines(dockerfileLines, buildContextString);
         detectFeaturesSh(dockerfileLines);
         disableOpenJ9SCC(dockerfileLines);
         for (String line : dockerfileLines) {
@@ -1082,20 +1146,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return tempDockerfile;
     }
 
-    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage) throws PluginExecutionException {
+    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage, File buildContext) throws PluginExecutionException {
+        info("Building Docker image...");
+
         try {
-            info("Building Docker image...");
             imageName = getProjectName() + DEVMODE_IMAGE_SUFFIX;
             // Name rules: may contain lowercase letters, digits and a period, one or two underscores, or one or more dashes. Cannot start with dash.
             imageName = imageName.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("^[\\-]+", "").toLowerCase();
-            // The image is built using the tempDockerfile, but the build context comes from the user's Dockerfile location
-            debug("Docker build context: " + userDockerfile.getParent());
+
             StringBuilder sb = new StringBuilder();
             sb.append("docker build ");
             if (pullParentImage) {
                 sb.append("--pull ");
             }
-            sb.append("-f " + tempDockerfile + " -t " + imageName + " " + userDockerfile.getParent());
+            sb.append("-f " + tempDockerfile + " -t " + imageName + " " + buildContext.getAbsolutePath());
             String buildCmd = sb.toString();
             info(buildCmd);
             if (hasFeaturesSh.get()) {
@@ -1103,7 +1167,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             long startTime = System.currentTimeMillis();
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
-            checkDockerBuildTime(startTime, userDockerfile.getParentFile());
+            checkDockerBuildTime(startTime, buildContext);
             info("Completed building Docker image.");
         } catch (IllegalThreadStateException  e) {
             // the timeout was too short and the docker command has not yet completed.
@@ -1339,6 +1403,37 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
+     * Get the root directory for mounting loose app in container.  This is the longest common directory between the projectDirectory and multiModuleProjectDirectory.
+     * 
+     * @param projectDirectory The current project directory. Must not be null.
+     * @param multiModuleProjectDirectory The multi module project directory. Can be null.
+     * @return The longest common directory, or projectDirectory if multiModuleProjectDirectory is null
+     */
+    public static File getLooseAppProjectRoot(File projectDirectory, File multiModuleProjectDirectory) {
+        if (multiModuleProjectDirectory == null) {
+            return projectDirectory;
+        }
+        try {
+            return getLongestCommonDir(projectDirectory.getCanonicalFile(), multiModuleProjectDirectory.getCanonicalFile());
+        } catch (IOException e) {
+            return getLongestCommonDir(projectDirectory.getAbsoluteFile(), multiModuleProjectDirectory.getAbsoluteFile());
+        }
+    }
+
+    protected static File getLongestCommonDir(File dir1, File dir2) {
+        // based on https://stackoverflow.com/a/54596165
+        Path relativePath = dir1.toPath().relativize(dir2.toPath()).normalize();
+        while (relativePath != null && !relativePath.endsWith("..")) {
+            relativePath = relativePath.getParent();
+        }
+        if (relativePath == null || relativePath.toString().isEmpty()) {
+            return dir1;
+        } else {
+            return dir1.toPath().resolve(relativePath).normalize().toFile();
+        }
+    }
+
+    /**
      * Build a docker run command with all the ports and directories required to run Open Liberty 
      * inside a container. Also included is the image name and the server run command to override
      * the CMD attribute of the Open Liberty docker image. 
@@ -1377,15 +1472,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             command.append(" -p " + hostDebugPort + ":" + containerDebugPort);
             // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
-            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort);
+            // and to allow remote debugging into the container
+            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort + " -e WLP_DEBUG_REMOTE=y");
         }
 
         // mount potential directories containing .war.xml from devc specific folder - override /config/apps and /config/dropins
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps:/config/apps");
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins:/config/dropins");
 
-        // mount the loose application resources in the container
-        command.append(" -v " + projectDirectory.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+        // mount the loose application resources in the container using the appropriate project root
+        File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
+        command.append(" -v " + looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
@@ -1418,7 +1515,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             command.append(" "+dockerRunOpts);
         }
 
-        // Options must preceed this in any order. Image name and command code follows.
+        // Options must precede this in any order. Image name and command code follows.
         command.append(" " + imageName);
         // Command to start the server
         command.append(" /opt/ol/wlp/bin/server" + ((libertyDebug) ? " debug " : " run ")  + "defaultServer");
@@ -2079,21 +2176,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("Started hotkey reader.");
             startedNewHotkeyReader = true;
         }
-        if (!skipTests) {
-            synchronized (inputUnavailable) {
-                try {
-                    if (startedNewHotkeyReader) {
-                        // if new hotkey reader started, wait for it to try getting the input to see if
-                        // it's available
-                        inputUnavailable.wait(500);
-                    }
-                    printDevModeMessages(inputUnavailable.get(), firstStartup);
-                    firstStartup = false;
-                } catch (InterruptedException e) {
-                    debug("Interrupted while waiting to determine whether input can be read", e);
+
+        synchronized (inputUnavailable) {
+            try {
+                if (startedNewHotkeyReader) {
+                    // if new hotkey reader started, wait for it to try getting the input to see if
+                    // it's available
+                    inputUnavailable.wait(500);
                 }
+                printDevModeMessages(inputUnavailable.get(), firstStartup);
+                firstStartup = false;
+            } catch (InterruptedException e) {
+                debug("Interrupted while waiting to determine whether input can be read", e);
             }
         }
+
     }
 
     /**
@@ -2274,8 +2371,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             runShutdownHook(executor);
                         }
                     } else {
-                        debug("Detected Enter key. Running tests...");
-                        runTestThread(false, executor, -1, false, true);
+                        debug("Detected Enter key. Running tests... ");
+                        if (isMultiModuleProject()) {
+                            // force run tests across all modules in multi module scenario
+                            runTestThread(false, executor, -1, skipUTs, true, getAllBuildFiles());
+                        } else {
+                            runTestThread(false, executor, -1, skipUTs, true, buildFile);
+                        }
                     }
                 }
             } else {
@@ -2310,6 +2412,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     List<String> testArtifactPaths;
     WatchService watcher;
 
+    // used for multi module projects
+    boolean triggerUpstreamJavaSourceRecompile;
+    boolean initialCompile;
+    boolean disableDependencyCompile;
+
     /**
      * Watch files for changes.
      * 
@@ -2317,16 +2424,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param outputDirectory
      * @param testOutputDirectory
      * @param executor
-     * @param compileArtifactPaths Compile classpath elements, or null if this DevUtil instance has useBuildRecompile=true
-     * @param testArtifactPaths Test classpath elements, or null if this DevUtil instance has useBuildRecompile=true
-     * @param serverXmlFile Can be null when using the server.xml from the configDirectory, which has a default value.
+     * @param compileArtifactPaths    Compile classpath elements, or null if this
+     *                                DevUtil instance has useBuildRecompile=true
+     * @param testArtifactPaths       Test classpath elements, or null if this
+     *                                DevUtil instance has useBuildRecompile=true
+     * @param serverXmlFile           Can be null when using the server.xml from the
+     *                                configDirectory, which has a default value.
      * @param bootstrapPropertiesFile
      * @param jvmOptionsFile
      * @throws Exception
      */
     public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths, File serverXmlFile,
-            File bootstrapPropertiesFile, File jvmOptionsFile) throws Exception {
+            final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths,
+            File serverXmlFile, File bootstrapPropertiesFile, File jvmOptionsFile) throws Exception {
         this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
@@ -2335,6 +2445,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.dockerfileUsed = null;
+        this.initialCompile = true;
+        this.disableDependencyCompile = false;
 
         try {
             watcher = FileSystems.getDefault().newWatchService();
@@ -2363,6 +2475,39 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean serverXmlFileRegistered = false;
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
+
+            // check for upstream projects
+            if (isMultiModuleProject()) {
+                for (ProjectModule p : upstreamProjects) {
+                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), false, executor);
+                    // watch src/main/java dir
+                    if (p.getSourceDirectory().exists()) {
+                        registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
+                    }
+
+                    // watch src/test/java dir
+                    if (p.getTestSourceDirectory().exists()) {
+                        registerAll(p.getTestSourceDirectory().getCanonicalFile().toPath(), executor);
+                        p.testSourceDirRegistered = true;
+                    }
+
+                    // watch resource directories
+                    HashMap<File, Boolean> upstreamResourceMap = new HashMap<File, Boolean>();
+                    for (File upstreamResourceDir : p.getResourceDirs()) {
+                        upstreamResourceMap.put(upstreamResourceDir, false);
+                        if (upstreamResourceDir.exists()) {
+                            registerAll(upstreamResourceDir.getCanonicalFile().toPath(), executor);
+                            upstreamResourceMap.put(upstreamResourceDir, true);
+                        }
+                    }
+                    p.setResourceMap(upstreamResourceMap);
+
+                    // watch pom.xml
+                    if (p.getBuildFile().exists()) {
+                        registerSingleFile(p.getBuildFile(), executor);
+                    }
+                }
+            }
 
             if (this.sourceDirectory.exists()) {
                 registerAll(srcPath, executor);
@@ -2443,8 +2588,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     }
                 }
+                if (isMultiModuleProject()) { // process java compilation for upstream projects
+                    processUpstreamJavaCompilation(upstreamProjects, executor);
 
-                processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths, testArtifactPaths);
+                    // process java compilation for main project
+                    processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
+                            testArtifactPaths, applicationId);
+                } else {
+                    // process java compilation for main project
+                    processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
+                            testArtifactPaths, null);
+                }
 
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
@@ -2464,7 +2618,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     compile(this.testSourceDirectory);
                     registerAll(testSrcPath, executor);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
-                    runTestThread(false, executor, -1, false, false);
+                    runTestThread(false, executor, -1, skipUTs, false, buildFile);
                     testSourceDirRegistered = true;
 
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
@@ -2515,8 +2669,40 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
                         // deleted resource directory
                         warn("The resource directory " + resourceDir
-                                + " was deleted.  Restart liberty:dev mode for it to take effect.");
+                                + " was deleted.  Restart dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
+                    }
+                }
+
+                if (isMultiModuleProject()) {
+                    for (ProjectModule p : upstreamProjects) {
+
+                        // check if resource directory of an upstream project has been added/deleted
+                        for (File resourceDir : p.getResourceDirs()) {
+                            if (!p.getResourceMap().get(resourceDir) && resourceDir.exists()) {
+                                registerAll(resourceDir.getCanonicalFile().toPath(), executor);
+                                p.getResourceMap().put(resourceDir, true);
+                            } else if (p.getResourceMap().get(resourceDir) && !resourceDir.exists()) {
+                                // deleted resource directory
+                                warn("The resource directory " + resourceDir
+                                        + " was deleted.  Restart dev mode for it to take effect.");
+                                p.getResourceMap().put(resourceDir, false);
+                            }
+                        }
+
+                        // check if test directory of an upstream project has been added/deleted
+                        if (!p.testSourceDirRegistered && p.getTestSourceDirectory().exists()
+                                && p.getTestSourceDirectory().listFiles().length > 0) {
+                            compile(p.getTestSourceDirectory());
+                            registerAll(p.getTestSourceDirectory().getCanonicalFile().toPath(), executor);
+                            debug("Registering Java test directory: " + p.getTestSourceDirectory());
+                            runTestThread(false, executor, -1, p.skipUTs(), false, getAllBuildFiles(p));
+                            p.testSourceDirRegistered = true;
+
+                        } else if (p.testSourceDirRegistered && !p.getTestSourceDirectory().exists()) {
+                            cleanTargetDir(p.getTestOutputDirectory());
+                            p.testSourceDirRegistered = false;
+                        }
                     }
                 }
 
@@ -2744,7 +2930,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             disablePolling();
                         }
                     } catch (Exception e) {
-                        error("An error occured attempting to retrieve the watch key or close the file watcher. " + e.getMessage(), e);
+                        error("An error occurred attempting to retrieve the watch key or close the file watcher. " + e.getMessage(), e);
                     }
                 }
                 try {
@@ -2758,8 +2944,188 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return observer;
     }
 
+    private void processUpstreamJavaCompilation(List<ProjectModule> upstreamProjects,
+            final ThreadPoolExecutor executor) throws PluginExecutionException, IOException {
+        // process java source files if no changes detected after the compile wait time
+        boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
+        boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
+        if (processSources) {
+            if (triggerUpstreamJavaSourceRecompile) { // this is triggered from build file change
+                compileFailingProjects(null, false, executor);
+                // compile main project
+                if (!failedCompilationJavaSources.isEmpty()) {
+                    triggerJavaSourceRecompile = true;
+                }
+                if (!failedCompilationJavaTests.isEmpty()) {
+                    triggerJavaTestRecompile = true;
+                }
+            }
+            for (ProjectModule project : upstreamProjects) {
+
+                // delete before recompiling, so if a file is in both lists, its class
+                // will be deleted then recompiled
+                if (!project.deleteJavaSources.isEmpty()) {
+                    debug("Deleting Java source files: " + project.deleteJavaSources);
+                    for (File file : project.deleteJavaSources) {
+                        deleteJavaFile(file, project.getOutputDirectory(), project.getSourceDirectory());
+                    }
+                }
+                if (!project.recompileJavaSources.isEmpty()) {
+                    debug("Recompiling Java source files: " + project.recompileJavaSources);
+                    if (!project.failedCompilationJavaSources.isEmpty()) {
+                        project.recompileJavaSources.addAll(project.failedCompilationJavaSources);
+                    }
+                    boolean skipRunningTests = false;
+                    if (initialCompile) {
+                        skipRunningTests = true;
+                    }
+
+                    // try recompiling failing project modules that are not dependent on the current
+                    // module (upstream of the current module)
+                    if (shouldRecompileDependencies(project)) {
+                        compileFailingProjects(project, false, executor);
+                    }
+                    // TODO support hotTests scenario and trigger tests to run on current project
+                    // and all dependent projects
+                    if (recompileJavaSource(project.recompileJavaSources, project.getCompileArtifacts(), executor,
+                            project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
+                            project.getBuildFile(), project.getCompilerOptions(), project.skipUTs(),
+                            skipRunningTests)) {
+
+                        // successful compilation so we can clear failedCompilation list
+                        project.failedCompilationJavaSources.clear();
+                    } else {
+                        project.failedCompilationJavaSources.addAll(project.recompileJavaSources);
+                    }
+                    // compile all of the dependent modules (in build order)
+                    if (shouldRecompileDependencies(project)) {
+                        for (File dependentModule : project.getDependentModules()) {
+                            compileModuleForBuildFile(dependentModule, false);
+                        }
+                        project.disableDependencyCompile = true;
+                    }
+                }
+                // additionally, process java test files if no changes detected after a
+                // different timeout
+                // (but source timeout takes precedence i.e. don't recompile tests if someone
+                // keeps changing the source)
+                if (processTests) {
+                    // delete before recompiling, so if a file is in both lists, its class will be
+                    // deleted then recompiled
+                    if (!project.deleteJavaTests.isEmpty()) {
+                        debug("Deleting Java test files: " + project.deleteJavaTests);
+                        for (File file : project.deleteJavaTests) {
+                            deleteJavaFile(file, project.getTestOutputDirectory(), project.getTestSourceDirectory());
+                        }
+                    }
+                    if (!project.recompileJavaTests.isEmpty() || project.triggerJavaTestRecompile) {
+                        debug("Recompiling Java test files: " + project.recompileJavaTests);
+                        if (!project.failedCompilationJavaTests.isEmpty()) {
+                            project.recompileJavaTests.addAll(project.failedCompilationJavaTests);
+                        }
+                        boolean skipRunningTests = false;
+                        if (initialCompile) {
+                            skipRunningTests = true;
+                        }
+
+                        // try recompiling failing project modules that are not dependent on the current
+                        // module (upstream of the current module)
+                        if (shouldRecompileDependencies(project)) {
+                            compileFailingProjects(project, true, executor);
+                        }
+
+                        if (recompileJavaTest(project.recompileJavaTests, project.getTestArtifacts(), executor,
+                                project.getOutputDirectory(), project.getTestOutputDirectory(),
+                                project.getProjectName(), project.getBuildFile(), project.getCompilerOptions(),
+                                project.skipUTs(), skipRunningTests)) {
+                            // successful compilation so we can clear failedCompilation list
+                            project.failedCompilationJavaTests.clear();
+                        } else {
+                            project.failedCompilationJavaTests.addAll(project.recompileJavaTests);
+                        }
+                        // compile all of the dependent modules' tests (in build order)
+                        if (shouldRecompileDependencies(project)) {
+                            for (File dependentModule : project.getDependentModules()) {
+                                compileModuleForBuildFile(dependentModule, true);
+                            }
+                        }
+                    }
+                }
+                // run tests if files were deleted without any other changes, since
+                // recompileJavaSource won't run (which normally handles tests)
+                if (!project.deleteJavaSources.isEmpty() && project.recompileJavaSources.isEmpty()) {
+                    // run tests after waiting for app update since app changed
+                    int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
+                    runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false, getAllBuildFiles(project));
+                } else if (processTests && !project.deleteJavaTests.isEmpty() && project.recompileJavaTests.isEmpty()) {
+                    // run tests without waiting for app update since only tests changed
+                    runTestThread(false, executor, -1, project.skipUTs(), false, getAllBuildFiles(project));
+                }
+
+                project.deleteJavaSources.clear();
+                project.recompileJavaSources.clear();
+                project.triggerJavaTestRecompile = false;
+                if (processTests) {
+                    project.deleteJavaTests.clear();
+                    project.recompileJavaTests.clear();
+                }
+                if (project.disableDependencyCompile) {
+                    project.disableDependencyCompile = false;
+                }
+            }
+
+            triggerUpstreamJavaSourceRecompile = false;
+        }
+    }
+
+    /**
+     * Compile failing source or test classes from upstream projects
+     * 
+     * @param currentProject Compile all projects of upstream of this project, if
+     *                       null it is referring to main project
+     * @param testsOnly      True if only tests need to be compiled
+     * @param executor       ThreadPoolExecutor
+     * @throws PluginExecutionException
+     */
+    private void compileFailingProjects(ProjectModule currentProject, boolean testsOnly, ThreadPoolExecutor executor)
+            throws PluginExecutionException {
+        // skip recompiling failed projects on initial loop to avoid repetitive
+        // compilation calls
+        if (!initialCompile) {
+            // compile failing upstream projects
+            for (int i = 0; i < upstreamProjects.size(); i++) {
+                ProjectModule project = upstreamProjects.get(i);
+                // stop at current project
+                if (currentProject != null && upstreamProjects.get(i).equals(currentProject)) {
+                    return;
+                }
+                // compile failing source
+                if (!testsOnly && !project.failedCompilationJavaSources.isEmpty()) {
+                    if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(),
+                            executor, project.getOutputDirectory(), project.getTestOutputDirectory(),
+                            project.getProjectName(), project.getBuildFile(), project.getCompilerOptions(),
+                            project.skipUTs(), false)) {
+                        // successful compilation so we can clear failedCompilation list
+                        project.failedCompilationJavaSources.clear();
+
+                    }
+                }
+                // compile failing tests
+                if (!project.failedCompilationJavaTests.isEmpty()) {
+                    if (recompileJavaTest(project.failedCompilationJavaTests, project.getTestArtifacts(), executor,
+                            project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
+                            project.getBuildFile(), project.getCompilerOptions(), project.skipUTs(), false)) {
+                        // successful compilation so we can clear failedCompilation list
+                        project.failedCompilationJavaTests.clear();
+
+                    }
+                }
+            }
+        }
+    }
+
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
-            List<String> compileArtifactPaths, List<String> testArtifactPaths) throws IOException, PluginExecutionException {
+            List<String> compileArtifactPaths, List<String> testArtifactPaths, String projectName) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
@@ -2773,12 +3139,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+                debug("Recompiling Java source files: " + recompileJavaSources);
                 // try to recompile java files that previously did not compile successfully
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
+                boolean skipRunningTests = false;
+                if (initialCompile) {
+                    skipRunningTests = true;
+                }
+                // if upstream projects exist try recompiling any failed projects
+                if (!disableDependencyCompile && isMultiModuleProject()) {
+                    compileFailingProjects(null, false, executor);
+                }
+
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
-                        testOutputDirectory)) {
+                        testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
                 } else {
@@ -2803,8 +3179,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (!failedCompilationJavaTests.isEmpty()) {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
+                    boolean skipRunningTests = false;
+                    if (initialCompile) {
+                        skipRunningTests = true;
+                    }
+                    // if upstream projects exist try recompiling any failing upstream tests
+                    if (!disableDependencyCompile && isMultiModuleProject()) {
+                        compileFailingProjects(null, true, executor);
+                    }
                     if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
-                            testOutputDirectory)) {
+                            testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
                     } else {
@@ -2818,10 +3202,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
                 // run tests after waiting for app update since app changed
                 int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
                 // run all tests without waiting for app update since only tests changed
-                runTestThread(false, executor, -1, false, false);
+                runTestThread(false, executor, -1, skipUTs, false, buildFile);
             }
 
             deleteJavaSources.clear();
@@ -2832,6 +3216,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (processTests) {
                 deleteJavaTests.clear();
                 recompileJavaTests.clear();
+            }
+            if (disableDependencyCompile) {
+                disableDependencyCompile = false;
+            }
+            if (initialCompile) {
+                initialCompile = false;
+                if (hotTests) {
+                    // if hot testing, run tests on startup
+                    if (isMultiModuleProject()) {
+                        // force run tests across all modules in multi module scenario
+                        runTestThread(false, executor, -1, skipUTs, true, getAllBuildFiles());
+                    } else {
+                        runTestThread(false, executor, -1, skipUTs, false, buildFile);
+                    }
+                }
             }
         }
     }
@@ -2869,18 +3268,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         lastJavaTestChange = System.currentTimeMillis();
         triggerJavaSourceRecompile = false;
         triggerJavaTestRecompile = false;
+        triggerUpstreamJavaSourceRecompile = false;
+
+        // initial source and test compile of upstream projects
+        if (isMultiModuleProject()) {
+            for (ProjectModule project : upstreamProjects) {
+                compileUpstreamModule(project, false);
+            }
+        }
 
         // initial source and test compile
-        if (this.sourceDirectory.exists()) {
-            Collection<File> allJavaSources = FileUtils.listFiles(this.sourceDirectory.getCanonicalFile(),
-                    new String[] { "java" }, true);
-            recompileJavaSources.addAll(allJavaSources);
-        }
-        if (this.testSourceDirectory.exists()) {
-            Collection<File> allJavaTestSources = FileUtils.listFiles(this.testSourceDirectory.getCanonicalFile(),
-                    new String[] { "java" }, true);
-            recompileJavaTests.addAll(allJavaTestSources);
-        }
+        compileMainModule(false);
     }
 
     private void processFileChanges(
@@ -2924,7 +3322,101 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // reset this property in case it had been set to true
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
 
-        // src/main/java directory
+        // upstream project source file changed
+        if (this.upstreamProjects != null && !this.upstreamProjects.isEmpty()) {
+            for (ProjectModule project : this.upstreamProjects) {
+                // resource file check
+                File upstreamResourceParent = null;
+                for (File resourceDir : project.getResourceDirs()) {
+                    if (directory.startsWith(resourceDir.getCanonicalFile().toPath())) {
+                        upstreamResourceParent = resourceDir;
+                        break;
+                    }
+                }
+
+                // src/main/java directory
+                if (directory.startsWith(project.getSourceDirectory().getCanonicalPath())) {
+                    if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                            && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                        debug("Java source file modified: " + fileChanged.getName()
+                                + ". Adding to list for processing.");
+                        lastJavaSourceChange = System.currentTimeMillis();
+                        if (recompileDependencies) {
+                            compileUpstreamModule(project, false);
+                        } else {
+                            project.recompileJavaSources.add(fileChanged);
+                        }
+                    } else if (changeType == ChangeType.DELETE) {
+                        debug("Java file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
+                        lastJavaSourceChange = System.currentTimeMillis();
+                        project.deleteJavaSources.add(fileChanged);
+                        if (recompileDependencies) {
+                            compileUpstreamModule(project, false);
+                        }
+                    }
+                } else if (directory.startsWith(project.getTestSourceDirectory().getCanonicalPath())) {
+                    if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
+                            && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                        debug("Java test file modified: " + fileChanged.getName() + ". Adding to list for processing.");
+                        lastJavaTestChange = System.currentTimeMillis();
+                        if (recompileDependencies) {
+                            compileUpstreamModule(project, true);
+                        } else {
+                            project.recompileJavaTests.add(fileChanged);
+                        }
+                    } else if (changeType == ChangeType.DELETE) {
+                        debug("Java test file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
+                        lastJavaTestChange = System.currentTimeMillis();
+                        project.deleteJavaTests.add(fileChanged);
+                        if (recompileDependencies) {
+                            compileUpstreamModule(project, true);
+                        }
+                    }
+                } else if (fileChanged.equals(project.getBuildFile())
+                        && directory.startsWith(project.getBuildFile().getParentFile().getCanonicalFile().toPath())
+                        && changeType == ChangeType.MODIFY) { // pom.xml
+                    debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
+                    // when an upstream project build file changes, get the updated artifact paths
+                    boolean updatedArtifactPaths = updateArtifactPaths(project.getBuildFile(),
+                            project.getCompileArtifacts(), project.getTestArtifacts(), true, executor);
+                    if (updatedArtifactPaths) {
+                        if (recompileDependencies) {
+                            // recompile the entire module
+                            compileUpstreamModule(project, false);
+                        } else {
+                            // trigger java source recompile of all projects if there are compilation errors
+                            // in this project
+                            if (!project.failedCompilationJavaSources.isEmpty()) {
+                                triggerUpstreamJavaSourceRecompile = true;
+                            }
+                            // trigger java test recompile of just this project if there are existing test
+                            // compilation errors
+                            if (!project.failedCompilationJavaTests.isEmpty()) {
+                                project.triggerJavaTestRecompile = true;
+                            }
+                        }
+                    }
+                } else if (upstreamResourceParent != null
+                        && directory.startsWith(upstreamResourceParent.getCanonicalFile().toPath())) { // resources
+                    debug("Resource dir: " + upstreamResourceParent.toString());
+                    if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                        copyFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
+
+                        // run all tests on resource change
+                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
+                                getAllBuildFiles(project));
+                    } else if (changeType == ChangeType.DELETE) {
+                        debug("Resource file deleted: " + fileChanged.getName());
+                        deleteFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
+
+                        // run all tests on resource change
+                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
+                                getAllBuildFiles(project));
+                    }
+                }
+            }
+        }
+
         if (directory.startsWith(srcPath)) {
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
             javaFilesChanged.add(fileChanged);
@@ -2934,12 +3426,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 debug("Java source file modified: " + fileChanged.getName()
                         + ". Adding to list for processing.");
                 lastJavaSourceChange = System.currentTimeMillis();
-                recompileJavaSources.add(fileChanged);
+                if (recompileDependencies) {
+                    compileMainModule(false);
+                } else {
+                    recompileJavaSources.add(fileChanged);
+                }
             } else if (changeType == ChangeType.DELETE) {
                 debug("Java file deleted: " + fileChanged.getName()
                         + ". Adding to list for processing.");
                 lastJavaSourceChange = System.currentTimeMillis();
                 deleteJavaSources.add(fileChanged);
+                if (recompileDependencies) {
+                    compileMainModule(false);
+                }
             }
         } else if (directory.startsWith(testSrcPath)) { // src/main/test
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
@@ -2950,12 +3449,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 debug("Java test file modified: " + fileChanged.getName()
                         + ". Adding to list for processing.");
                 lastJavaTestChange = System.currentTimeMillis();
-                recompileJavaTests.add(fileChanged);
+                if (recompileDependencies) {
+                    compileMainModule(true);
+                } else {
+                    recompileJavaTests.add(fileChanged);
+                }
             } else if (changeType == ChangeType.DELETE) {
                 debug("Java test file deleted: " + fileChanged.getName()
                         + ". Adding to list for processing.");
                 lastJavaTestChange = System.currentTimeMillis();
                 deleteJavaTests.add(fileChanged);
+                if (recompileDependencies) {
+                    compileMainModule(true);
+                }
             }
         } else if (directory.startsWith(configPath)
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
@@ -2982,7 +3488,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         restartServer(false);
                     }
                 }
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
@@ -3004,7 +3511,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         restartServer(false);
                     }    
                 }
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
             }
         } else if (serverXmlFileParent != null
                 && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
@@ -3019,7 +3527,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else if (changeType == ChangeType.CREATE) {
                     redeployApp();
                 }
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
 
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
@@ -3028,7 +3537,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 }
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
             }
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
@@ -3058,29 +3568,32 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 copyFile(fileChanged, resourceParent, outputDirectory, null);
 
                 // run all tests on resource change
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             } else if (changeType == ChangeType.DELETE) {
                 debug("Resource file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, resourceParent, outputDirectory, null);
                 // run all tests on resource change
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
-
             boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, executor);
             // run all tests on build file change
             if (recompiledBuild) {
-                // trigger java source recompile if there are compilation errors
-                if (!failedCompilationJavaSources.isEmpty()) {
-                    triggerJavaSourceRecompile = true;
+                if (recompileDependencies) {
+                    compileMainModule(false);
+                } else {
+                    // trigger java source recompile if there are compilation errors
+                    if (!failedCompilationJavaSources.isEmpty()) {
+                        triggerJavaSourceRecompile = true;
+                    }
+                    // trigger java test recompile if there are compilation errors
+                    if (!failedCompilationJavaTests.isEmpty()) {
+                        triggerJavaTestRecompile = true;
+                    }
                 }
-                // trigger java test recompile if there are compilation errors
-                if (!failedCompilationJavaTests.isEmpty()) {
-                    triggerJavaTestRecompile = true;
-                }
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(dockerfileUsed)
                 && directory.startsWith(dockerfileUsed.getParentFile().getCanonicalFile().toPath())
@@ -3090,7 +3603,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
             // run all tests on properties file change
             if (reloadedPropertyFile) {
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (isDockerfileDirectoryChanged(fileChanged)) {
             // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
@@ -3149,7 +3662,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 for (File file : files) {
                     // if the file's path is a child of the tracked path, except for the server logs folder or if it's the loose application itself
                     Path filePath = file.getCanonicalFile().toPath();
-                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
+                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml") && !filePath.toString().endsWith(".ear.xml")) {
                         debug("isDockerfileDirectoryChanged=true for directory " + trackedPath + " with file " + file);
                         return true;
                     }
@@ -3516,11 +4029,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
+     * @param projectName the name of the current project (artifactId), null if only one project exists
+     * @param projectBuildFile the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current project
+     * @param forceSkipUTs whether to force skipping the unit tests
+     * @param skipRunningTests whether to skip running tests, takes precedence over the forceSkipUTs param
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
+            File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
+            boolean skipRunningTests) throws PluginExecutionException {
+        return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory,
+                projectName, projectBuildFile, projectCompilerOptions, forceSkipUTs, skipRunningTests);
     }
 
     /**
@@ -3531,26 +4052,47 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param executor the test thread executor
      * @param outputDirectory the directory for compiled classes
      * @param testOutputDirectory the directory for compiled test classes
+     * @param projectName the name of the current project (artifactId), null if only one project exists
+     * @param projectBuildFile the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current project
+     * @param forceSkipUTs whether to force skipping the unit tests
+     * @param skipRunningTests whether to skip running tests, takes precedence over the forceSkipUTs param
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
+            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
+            File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
+            boolean skipRunningTests) throws PluginExecutionException {
+        return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory,
+                projectName, projectBuildFile, projectCompilerOptions, forceSkipUTs, skipRunningTests);
     }
 
     /**
      * Recompile source files
      * 
-     * @param javaFilesChanged collection of Java files changed
-     * @param artifactPaths list of project artifact paths for building the classpath
-     * @param executor the test thread executor
-     * @param tests indicates whether the files changed were test files
-     * @param outputDirectory the directory for compiled classes
-     * @param testOutputDirectory the directory for compiled test classes
-     * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
+     * @param javaFilesChanged       collection of Java files changed
+     * @param artifactPaths          list of project artifact paths for building the
+     *                               classpath
+     * @param executor               the test thread executor
+     * @param tests                  indicates whether the files changed were test
+     *                               files
+     * @param outputDirectory        the directory for compiled classes
+     * @param testOutputDirectory    the directory for compiled test classes
+     * @param projectName            the name of the current project (artifactId),
+     *                               null if only one project exists
+     * @param projectBuildFile       the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current
+     *                               project
+     * @param forceSkipUTs           whether to force skipping the unit tests
+     * @param skipRunningTests       whether to skip running tests, takes
+     *                               precedence over the forceSkipUTs param
+     * @throws PluginExecutionException if the classes output directory doesn't
+     *                                  exist and can't be created
      */
-    protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
-            boolean tests, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
+    protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths,
+            ThreadPoolExecutor executor, boolean tests, File outputDirectory, File testOutputDirectory,
+            String projectName, File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
+            boolean skipRunningTests) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
@@ -3571,8 +4113,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 List<String> combinedCompilerOptions = new ArrayList<>(Arrays.asList(DEFAULT_COMPILER_OPTIONS));
-                if (compilerOptions != null) {
-                    combinedCompilerOptions.addAll(compilerOptions.getOptions());
+                if (projectCompilerOptions != null) {
+                    combinedCompilerOptions.addAll(projectCompilerOptions.getOptions());
                 }
                 debug("Compiler options: " + combinedCompilerOptions);
 
@@ -3611,35 +4153,55 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             if (compileResult) {
                 if (tests) {
-                    info("Tests compilation was successful.");
+                    if (projectName != null) {
+                        info(projectName + " tests compilation was successful.");
+                    } else {
+                        info("Tests compilation was successful.");
+                    }
                 } else {
                     // redeploy app after compilation if not loose application
                     if (!isLooseApplication()) {
                         redeployApp();
                     }
-
-                    info("Source compilation was successful.");
+                    if (projectName != null) {
+                        info(projectName + " source compilation was successful.");
+                    } else {
+                        info("Source compilation was successful.");
+                    }
                 }
-
                 // run tests after successful compile
-                if (tests) {
-                    // if only tests were compiled, don't need to wait for
-                    // app to update
-                    runTestThread(false, executor, -1, false, false);
-                } else {
-                    runTestThread(true, executor, messageOccurrences, false, false);
+                if (!skipRunningTests) {
+                    if (tests) {
+                        // if only tests were compiled, don't need to wait for
+                        // app to update
+                        runTestThread(false, executor, -1, skipUTs, false, projectBuildFile);
+                    } else {
+                        runTestThread(true, executor, messageOccurrences, skipUTs, false, projectBuildFile);
+                    }
                 }
                 return true;
             } else {
                 if (tests) {
-                    info("Tests compilation had errors.");
+                    if (projectName != null) {
+                        info(projectName + " tests compilation had errors.");
+                    } else {
+                        info("Tests compilation had errors.");
+                    }
                 } else {
-                    info("Source compilation had errors.");
+                    if (projectName != null) {
+                        info(projectName + " source compilation had errors.");
+                    } else {
+                        info("Source compilation had errors.");
+                    }
                 }
                 return false;
             }
         } catch (Exception e) {
-            error("Error compiling Java files: " + e.getMessage());
+            if (projectName != null) {
+                error(projectName + " error compiling Java files: " + e.getMessage());
+            } else {
+                error("Error compiling Java files: " + e.getMessage());
+            }
             debug(e);
             return false;
         }
@@ -3695,6 +4257,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             throw new RuntimeException("Failed to open class path file " + file, e);
                         }
                     }
+                } else if (file.isDirectory() && !classPathElements.contains(file)) {
+                    debug("Adding directory to compile class path: " + file);
+                    classPathElements.add(file);
                 }
             }
         }
@@ -3709,15 +4274,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param executor                 the thread pool executor
      * @param messageOccurrences       how many times the application updated
      *                                 message has occurred in the log
-     * @param forceSkipUTs             whether to force skip the unit tests
+     * @param skipUnitTests            whether to skip the unit tests
      * @param manualInvocation         whether the tests were manually invoked
+     * @param currentBuildFiles        the build file(s) to run tests against
      */
     public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences,
-            boolean forceSkipUTs, boolean manualInvocation) {
+            boolean skipUnitTests, boolean manualInvocation, File... currentBuildFiles) {
         try {
             if (manualInvocation || hotTests) {
-                executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs,
-                        manualInvocation));
+                executor.execute(new TestJob(waitForApplicationUpdate, messageOccurrences, executor, skipUnitTests,
+                        manualInvocation, currentBuildFiles));
             }
         } catch (RejectedExecutionException e) {
             debug("Cannot add thread since max threads reached", e);
@@ -3728,23 +4294,58 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         private boolean waitForApplicationUpdate;
         private int messageOccurrences;
         private ThreadPoolExecutor executor;
-        private boolean forceSkipUTs;
+        private boolean skipUnitTests;
         private boolean manualInvocation;
+        private File[] currentBuildFiles;
 
-        public TestJob(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor, boolean forceSkipUTs, boolean manualInvocation) {
+        public TestJob(boolean waitForApplicationUpdate, int messageOccurrences, ThreadPoolExecutor executor,
+                boolean skipUnitTests, boolean manualInvocation, File... currentBuildFiles) {
             this.waitForApplicationUpdate = waitForApplicationUpdate;
             this.messageOccurrences = messageOccurrences;
             this.executor = executor;
-            this.forceSkipUTs = forceSkipUTs;
+            this.skipUnitTests = skipUnitTests;
             this.manualInvocation = manualInvocation;
+            this.currentBuildFiles = currentBuildFiles;
         }
 
         @Override
         public void run() {
             try {
-                runTests(waitForApplicationUpdate, messageOccurrences, executor, forceSkipUTs);
+                if (currentBuildFiles.length >= 1) {
+                    for (File currentBuildFile : currentBuildFiles) {
+                        boolean currentProjForceSkipUTs = skipUnitTests;
+                        boolean currentProjForceSkipITs = skipITs;
+                        boolean currentProjSkipTests = skipTests;
+                        String currentProjName = applicationId;
+                        if (isMultiModuleProject()) {
+                            // multi module project, match the build file to the upstream project to honour
+                            // the skipUTs value
+                            for (ProjectModule upstreamProject : upstreamProjects) {
+                                if (upstreamProject.getBuildFile().equals(currentBuildFile)) {
+                                    currentProjForceSkipUTs = upstreamProject.skipUTs();
+                                    currentProjForceSkipITs = upstreamProject.skipITs();
+                                    currentProjSkipTests = upstreamProject.skipTests();
+                                    currentProjName = upstreamProject.getProjectName();
+                                    break;
+                                }
+                            }
+                            runTests(waitForApplicationUpdate, messageOccurrences, executor, currentProjSkipTests,
+                                    currentProjForceSkipUTs, currentProjForceSkipITs, currentBuildFile,
+                                    currentProjName);
+                        } else {
+                            // single module project, do not need to pass in project name
+                            runTests(waitForApplicationUpdate, messageOccurrences, executor, currentProjSkipTests,
+                                    currentProjForceSkipUTs, currentProjForceSkipITs, currentBuildFile, null);
+                        }
+                    }
+                } else {
+                    // build file was not indicated, run tests for the main (default) project
+                    runTests(waitForApplicationUpdate, messageOccurrences, executor, skipTests, skipUTs, skipITs, null,
+                            null);
+                }
             } finally {
-                // start watching for hotkey presses if not already started, or re-print message if thread already running
+                // start watching for hotkey presses if not already started, or re-print message
+                // if thread already running
                 runHotkeyReaderThread(executor);
             }
         }
@@ -3857,6 +4458,146 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     public String getContainerName() {
         return containerName;
+    }
+
+    /**
+     * Updates the Java compiler options
+     * @param updatedCompilerOptions
+     */
+    public void updateJavaCompilerOptions(JavaCompilerOptions updatedCompilerOptions) {
+        compilerOptions = updatedCompilerOptions;
+    }
+
+    /**
+     * Given a build file returns the corresponding ProjectModule otherwise
+     * returns null
+     * 
+     * @param buildFile
+     * @return Project module
+     * @throws IOException
+     */
+    public ProjectModule getProjectModule(File buildFile) throws IOException {
+        if (isMultiModuleProject()) {
+            for (ProjectModule p : upstreamProjects) {
+                if (p.getBuildFile().getCanonicalPath().equals(buildFile.getCanonicalPath())) {
+                    return p;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks if upstreamProjects exist, indicating that this is a multi module
+     * project
+     * 
+     * @return true if this is a multi module project, false if not
+     */
+    private boolean isMultiModuleProject() {
+        return (upstreamProjects != null && !upstreamProjects.isEmpty());
+    }
+
+    /**
+     * Gets an array of all the buildFiles in a multi module project
+     * 
+     * @return File[] array of buildFiles in multi module project, in build order
+     */
+    private File[] getAllBuildFiles() {
+        File[] buildFiles = new File[upstreamProjects.size() + 1];
+        int count = 0;
+        for (ProjectModule project : upstreamProjects) {
+            buildFiles[count] = project.getBuildFile();
+            count++;
+        }
+        buildFiles[count] = buildFile;
+        return buildFiles;
+    }
+
+    /**
+     * Gets an array of all the build files for the specified project module and
+     * dependent projects
+     * 
+     * @param currentProject ProjectModule
+     * @return File[] array of buildFiles for specified project, in build order
+     */
+    private File[] getAllBuildFiles(ProjectModule currentProject) {
+        List<File> dependentModuleBuildFiles = currentProject.getDependentModules();
+        File[] buildFiles = new File[dependentModuleBuildFiles.size() + 1];
+        buildFiles[0] = currentProject.getBuildFile();
+        int count = 1;
+        for (File buildFile : dependentModuleBuildFiles) {
+            buildFiles[count] = buildFile;
+            count++;
+        }
+        return buildFiles;
+    }
+
+    protected void compileModuleForBuildFile(File moduleBuildFile, boolean testsOnly) throws IOException {
+        if (moduleBuildFile.getCanonicalPath().equals(buildFile.getCanonicalPath())) {
+            debug("recompileDependencies is set to true, recompiling the entire module for " + moduleBuildFile.getCanonicalPath());
+            disableDependencyCompile = true;
+            compileMainModule(testsOnly);
+            return;
+        }
+        for (ProjectModule project : upstreamProjects) {
+            if (moduleBuildFile.getCanonicalPath().equals(project.getBuildFile().getCanonicalPath())) {
+                debug("recompileDependencies is set to true, recompiling the entire module for " + moduleBuildFile.getCanonicalPath());
+                project.disableDependencyCompile = true;
+                compileUpstreamModule(project, testsOnly);
+            }
+        }
+    }
+
+    /**
+     * Compile the entire main module. The main module is the module with the
+     * Liberty configuration.
+     * 
+     * @param testsOnly True if only tests need to be compiled.
+     * @throws IOException
+     */
+    protected void compileMainModule(boolean testsOnly) throws IOException {
+        compileEntireProject(this.sourceDirectory, recompileJavaSources, this.testSourceDirectory, recompileJavaTests,
+                testsOnly);
+    }
+
+    /**
+     * Compile the entire specified module. This is only used in a multi-module
+     * scenario
+     * 
+     * @param project   ProjectModule, the module to be compiled
+     * @param testsOnly True if only tests need to be compiled
+     * @throws IOException
+     */
+    protected void compileUpstreamModule(ProjectModule project, boolean testsOnly) throws IOException {
+        compileEntireProject(project.getSourceDirectory(), project.recompileJavaSources,
+                project.getTestSourceDirectory(), project.recompileJavaTests, testsOnly);
+
+    }
+
+    private void compileEntireProject(File sourceDir, Collection<File> recompileJavaSourceSet, File testSourceDir,
+            Collection<File> recompileJavaTestSet, boolean testsOnly) throws IOException {
+
+        // recompile source
+        if (!testsOnly) {
+            if (sourceDir.exists()) {
+                Collection<File> allJavaSources = FileUtils.listFiles(sourceDir.getCanonicalFile(),
+                        new String[] { "java" }, true);
+                recompileJavaSourceSet.addAll(allJavaSources);
+            }
+        }
+
+        // recompile tests
+        if (testSourceDir.exists()) {
+            Collection<File> allJavaTestSources = FileUtils.listFiles(testSourceDir.getCanonicalFile(),
+                    new String[] { "java" }, true);
+            recompileJavaTestSet.addAll(allJavaTestSources);
+        }
+
+    }
+
+    // indicates whether to recompile dependencies for the given project module
+    private boolean shouldRecompileDependencies(ProjectModule project) {
+        return (!project.disableDependencyCompile && recompileDependencies && !initialCompile);
     }
 
 }
