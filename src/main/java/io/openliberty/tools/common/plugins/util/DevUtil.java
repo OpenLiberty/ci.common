@@ -305,9 +305,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Thread serverThread;
     private PluginExecutionException serverThreadException;
 
-    /** If user stopped dev mode manually, this is true. If an external process caused dev mode to stop, this is false */
+    /**
+     * If user stopped dev mode manually, this is true. If an external process
+     * caused dev mode to stop, this is false
+     */
     private AtomicBoolean devStop;
-    
+
     private String hostName;
     private String httpPort;
     private String httpsPort;
@@ -357,12 +360,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private final File buildDirectory;
     private List<UpstreamProject> upstreamProjects; // supports multi module scenario, null for single module projects
 
-    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory, File multiModuleProjectDirectory,
-            List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
-            String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
-            long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
-            boolean container, File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
-            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation, List<UpstreamProject> upstreamProjects) {
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
+            File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
+            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, String applicationId,
+            long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
+            boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
+            File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
+            boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
+            String mavenCacheLocation, List<UpstreamProject> upstreamProjects) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -524,8 +529,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     info("Waiting up to " + appStartupTimeout
                             + " seconds to find the application start up or update message...");
                     String startMessage = serverTask.waitForStringInLog(
-                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + ")",
-                            timeout, logFile);
+                            "(" + START_APP_MESSAGE_REGEXP + "|" + UPDATED_APP_MESSAGE_REGEXP + ")", timeout, logFile);
                     if (startMessage == null) {
                         error("Unable to verify if the application was started after " + appStartupTimeout
                                 + " seconds.  Consider increasing the verifyTimeout value if this continues to occur.");
@@ -598,7 +602,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Get the log file from server directory if using container, or from server task otherwise.
+     * Get the log file from server directory if using container, or from server
+     * task otherwise.
      * 
      * @param serverTask the server task
      * @return the messages log file for the server
@@ -608,7 +613,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (container) {
             logFile = new File(serverDirectory, "logs/messages.log");
         } else {
-            logFile = serverTask.getLogFile();           
+            logFile = serverTask.getLogFile();
         }
         return logFile;
     }
@@ -651,16 +656,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 File dockerfileToUse = getDockerfile();
                 debug("Dockerfile to use: " + dockerfileToUse);
                 if (dockerfileToUse.exists()) {
-                    // The build context comes from the specified dockerBuildContext (or the user's Dockerfile location by default)
-                    File buildContext = dockerBuildContext == null ? dockerfileToUse.getParentFile() : dockerBuildContext;
+                    // The build context comes from the specified dockerBuildContext (or the user's
+                    // Dockerfile location by default)
+                    File buildContext = dockerBuildContext == null ? dockerfileToUse.getParentFile()
+                            : dockerBuildContext;
                     String buildContextString = buildContext.getAbsolutePath();
                     debug("Docker build context: " + buildContextString);
 
                     File tempDockerfile = prepareTempDockerfile(dockerfileToUse, buildContextString);
                     buildDockerImage(tempDockerfile, dockerfileToUse, pullParentImage, buildContext);
                 } else {
-                    // this message is mainly for the default dockerfile scenario, since the dockerfile parameter was already validated in Maven/Gradle plugin.
-                    throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath() + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
+                    // this message is mainly for the default dockerfile scenario, since the
+                    // dockerfile parameter was already validated in Maven/Gradle plugin.
+                    throw new PluginExecutionException("No Dockerfile was found at " + dockerfileToUse.getAbsolutePath()
+                            + ". Create a Dockerfile at the specified location to use dev mode with container support. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker");
                 }
             }
 
@@ -684,12 +693,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } catch (RuntimeException e) {
                         // If devStop is true server was stopped with Ctl-c, do not throw exception
                         if (devStop.get() == false) {
-                            // If a runtime exception occurred in the server task, log and set the exception field
+                            // If a runtime exception occurred in the server task, log and set the exception
+                            // field
                             PluginExecutionException e2;
                             if (container) {
-                                e2 = new PluginExecutionException("An error occurred while running the container: " + e.getMessage(), e);
+                                e2 = new PluginExecutionException(
+                                        "An error occurred while running the container: " + e.getMessage(), e);
                             } else {
-                                e2 = new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+                                e2 = new PluginExecutionException(
+                                        "An error occurred while starting the server: " + e.getMessage(), e);
                             }
                             error(e2.getMessage());
                             serverThreadException = e2;
@@ -703,7 +715,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // that the server stopped
             setDevStop(false);
 
-            // If there were already logs from a previous server run, wait for it to be updated.
+            // If there were already logs from a previous server run, wait for it to be
+            // updated.
             if (logsExist) {
                 final AtomicBoolean messagesModified = new AtomicBoolean(false);
 
@@ -799,9 +812,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     stopServer();
                 }
-                throw new PluginExecutionException("The server has not started within " + serverStartTimeout + " seconds. " +
-                        "Consider increasing the server start timeout if this continues to occur. " +
-                        "For example, " + getServerStartTimeoutExample());
+                throw new PluginExecutionException("The server has not started within " + serverStartTimeout
+                        + " seconds. " + "Consider increasing the server start timeout if this continues to occur. "
+                        + "For example, " + getServerStartTimeoutExample());
             } else {
                 serverFullyStarted.set(true);
             }
@@ -818,11 +831,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Retrieve the current docker version and compare to a known value.
-     * The Maven class ComparableVersion allows for numbers, letters and certain words.
-     * Throw an exception if there is a problem with the version.
+     * Retrieve the current docker version and compare to a known value. The Maven
+     * class ComparableVersion allows for numbers, letters and certain words. Throw
+     * an exception if there is a problem with the version.
      */
     private static final String MIN_DOCKER_VERSION = "18.03.0"; // Must use Docker 18.03.0 or higher
+
     private void checkDockerVersion() throws PluginExecutionException {
         String versionCmd = "docker version --format {{.Client.Version}}";
         String dockerVersion = execDockerCmd(versionCmd, DOCKER_TIMEOUT);
@@ -833,7 +847,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         ComparableVersion minVer = new ComparableVersion(MIN_DOCKER_VERSION);
         ComparableVersion curVer = new ComparableVersion(dockerVersion);
         if (curVer.compareTo(minVer) < 0) {
-            throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.0 or higher.");
+            throw new PluginExecutionException("The detected Docker client version number is not supported:"
+                    + dockerVersion.trim() + ". Docker version must be 18.03.0 or higher.");
         }
     }
 
@@ -855,7 +870,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Get escape character from the escape directive at the top of the Dockerfile.
-     * Docker documents a couple of directives, but it seems escape must always be the first line to work.
+     * Docker documents a couple of directives, but it seems escape must always be
+     * the first line to work.
      */
     protected static char getEscapeCharacter(List<String> dockerfileLines) throws PluginExecutionException {
         if (dockerfileLines.size() > 0) {
@@ -881,8 +897,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Trim all lines and get them without comments or empty lines after the first FROM command
-     * (so that directives at the beginning of the file are preserved)
+     * Trim all lines and get them without comments or empty lines after the first
+     * FROM command (so that directives at the beginning of the file are preserved)
      */
     protected static List<String> getCleanedLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> result = new ArrayList<String>();
@@ -913,21 +929,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Combine multi-line commands into single lines. Requires that getCleanedLines() be called first.
+     * Combine multi-line commands into single lines. Requires that
+     * getCleanedLines() be called first.
      */
-    protected static List<String> getCombinedLines(List<String> dockerfileLines, char escape) throws PluginExecutionException {
+    protected static List<String> getCombinedLines(List<String> dockerfileLines, char escape)
+            throws PluginExecutionException {
         List<String> result = new ArrayList<String>();
         int i = 0;
         while (i < dockerfileLines.size()) {
             String pendingLine = dockerfileLines.get(i).trim();
             int multilineIndex;
-            int j = i+1;
-            while (pendingLine.length() > 0 && !pendingLine.startsWith("#") && (pendingLine.charAt(pendingLine.length() - 1) == escape) && j < dockerfileLines.size()) {
+            int j = i + 1;
+            while (pendingLine.length() > 0 && !pendingLine.startsWith("#")
+                    && (pendingLine.charAt(pendingLine.length() - 1) == escape) && j < dockerfileLines.size()) {
                 multilineIndex = pendingLine.length() - 1;
                 String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
                 String nextLine = dockerfileLines.get(j);
                 String combined = contentBeforeSymbol + nextLine;
-                pendingLine = combined.trim(); // trim the combined string to remove whitespace around any further line escapes
+                pendingLine = combined.trim(); // trim the combined string to remove whitespace around any further line
+                                               // escapes
                 j++;
             }
             result.add(pendingLine);
@@ -944,20 +964,23 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         removeFileExtensionLines(dockerfileLines, ".ear");
     }
 
-    private void removeFileExtensionLines(List<String> dockerfileLines, String extension) throws PluginExecutionException {
+    private void removeFileExtensionLines(List<String> dockerfileLines, String extension)
+            throws PluginExecutionException {
         List<String> fileExtensionLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
             if (!trimLine.startsWith("#") && trimLine.toLowerCase().contains(extension)) {
-                // Break the Dockerfile line down into segments based on any amount of whitespace.
+                // Break the Dockerfile line down into segments based on any amount of
+                // whitespace.
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
-                // if the line starts with COPY and the second to last segment ends with extension, it is a COPY line of that file type
+                // if the line starts with COPY and the second to last segment ends with
+                // extension, it is a COPY line of that file type
                 if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) {
-                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
-                        "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line
+                                + "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
                     if (cmdSegments[cmdSegments.length - 2].toLowerCase().endsWith(extension)) {
                         fileExtensionLines.add(line);
@@ -970,14 +993,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Disables OpenJ9 SCC to speed up build times by injecting environment variable before "RUN configure.sh" is called.
-     * Reference: https://github.com/OpenLiberty/ci.docker#openj9-shared-class-cache-scc
-     * <br>
-     * Note: lines must have been trimmed and cleaned of comments using getCleanedLines() before calling this.
+     * Disables OpenJ9 SCC to speed up build times by injecting environment variable
+     * before "RUN configure.sh" is called. Reference:
+     * https://github.com/OpenLiberty/ci.docker#openj9-shared-class-cache-scc <br>
+     * Note: lines must have been trimmed and cleaned of comments using
+     * getCleanedLines() before calling this.
      */
     protected void disableOpenJ9SCC(List<String> dockerfileLines) {
         final String RUN_CONFIGURE_COMMAND_LOWERCASE = "run configure.sh";
-        for (int i=0; i<dockerfileLines.size(); i++) {
+        for (int i = 0; i < dockerfileLines.size(); i++) {
             String line = dockerfileLines.get(i);
             // RUN command is case insensitive, so use lowercase matching.
             if (line.toLowerCase().equals(RUN_CONFIGURE_COMMAND_LOWERCASE)) {
@@ -993,7 +1017,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         shownFeaturesShWarning.set(false);
 
         final String FEATURES_SH_COMMAND_LOWERCASE = "run features.sh";
-        for (int i=0; i<dockerfileLines.size(); i++) {
+        for (int i = 0; i < dockerfileLines.size(); i++) {
             String line = dockerfileLines.get(i);
             // RUN command is case insensitive, so use lowercase matching.
             if (line.toLowerCase().equals(FEATURES_SH_COMMAND_LOWERCASE)) {
@@ -1014,17 +1038,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // Remove white space from the beginning and end of the line
             String trimLine = line.trim();
             if (!trimLine.startsWith("#")) {
-                // Break the Dockerfile line down into segments based on any amount of whitespace.
+                // Break the Dockerfile line down into segments based on any amount of
+                // whitespace.
                 // The command must be to the left of any comments.
                 String[] cmdSegments = trimLine.split("#")[0].split("\\s+");
                 // If the line starts with COPY or ADD
                 if (cmdSegments[0].equalsIgnoreCase("COPY") || cmdSegments[0].equalsIgnoreCase("ADD")) {
                     if (cmdSegments.length < 3) { // preliminary check but some of these segments could be options
-                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
-                        "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line
+                                + "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
                     if (line.contains("$")) {
-                        warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY or ADD commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
+                        warn("The Dockerfile line '" + line
+                                + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support environment variables in COPY or ADD commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         continue;
                     }
                     List<String> srcOrDestArguments = new ArrayList<String>();
@@ -1033,7 +1059,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         String segment = cmdSegments[i];
                         if (segment.startsWith("--from")) {
                             // multi-stage build, COPY only (not ADD), give a warning
-                            warn("The Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support hot deployment with multi-stage COPY commands.");
+                            warn("The Dockerfile line '" + line
+                                    + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support hot deployment with multi-stage COPY commands.");
                             skipLine = true; // don't mount the dirs in this COPY command
                             break;
                         } else if (segment.startsWith("--")) {
@@ -1046,8 +1073,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         continue;
                     }
                     if (srcOrDestArguments.size() < 2) { // proper check for number of src and dest args
-                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line + 
-                        "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
+                        throw new PluginExecutionException("Incorrect syntax on this line in the Dockerfile: '" + line
+                                + "'. There must be at least two arguments for the COPY or ADD command, a source path and a destination path.");
                     }
                     // dest is the last argument
                     String dest = srcOrDestArguments.get(srcOrDestArguments.size() - 1);
@@ -1060,15 +1087,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         String sourcePath = buildContext + "/" + src;
                         File sourceFile = new File(sourcePath);
                         if (src.contains("*") || src.contains("?")) {
-                            warn("The COPY or ADD source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY or ADD commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
+                            warn("The COPY or ADD source " + src + " in the Dockerfile line '" + line
+                                    + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY or ADD commands. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         } else if (sourceFile.isDirectory() || cmdSegments[0].equalsIgnoreCase("ADD")) {
-                            synchronized(dockerfileDirectoriesToWatch) {
+                            synchronized (dockerfileDirectoriesToWatch) {
                                 try {
                                     dockerfileDirectoriesToWatch.add(sourceFile.getCanonicalFile().toPath());
-                                    debug("COPY/ADD line=" + line + ", src=" + sourcePath + ", added to dockerfileDirectoriesToWatch: " + sourceFile);
+                                    debug("COPY/ADD line=" + line + ", src=" + sourcePath
+                                            + ", added to dockerfileDirectoriesToWatch: " + sourceFile);
                                 } catch (IOException e) {
-                                    // Do not fail here.  Let the Docker build fail instead.
-                                    error("Could not resolve the canonical path of the directory specified in the Dockerfile: " + sourcePath, e);
+                                    // Do not fail here. Let the Docker build fail instead.
+                                    error("Could not resolve the canonical path of the directory specified in the Dockerfile: "
+                                            + sourcePath, e);
                                 }
                             }
                         } else {
@@ -1085,7 +1115,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private String formatDestMount(String destMountString, File srcMountFile) {
-        // Cannot mount a file onto a directory, so must add a filename to the end of the destination argument for mounting
+        // Cannot mount a file onto a directory, so must add a filename to the end of
+        // the destination argument for mounting
         if (destMountString.endsWith("/") || destMountString.endsWith("\\")) {
             destMountString += srcMountFile.getName();
         }
@@ -1093,7 +1124,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Check the name used in Dockerfile for URL e.g. ADD https://repo.maven.apache.org/maven2/postgres9.jar /lib/
+     * Check the name used in Dockerfile for URL e.g. ADD
+     * https://repo.maven.apache.org/maven2/postgres9.jar /lib/
+     * 
      * @param name the source name in a copy or add command
      * @return true if the name is a URL
      */
@@ -1129,7 +1162,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("temp Dockerfile: " + tempDockerfile);
             tempDockerfilePath = tempDockerfile.toPath(); // save name to clean up later
             if (keepTempDockerfile) {
-                info("Keeping temporary Dockerfile: "+tempDockerfilePath);
+                info("Keeping temporary Dockerfile: " + tempDockerfilePath);
             } else {
                 // set the tempDockerfile to be deleted when the JVM exits
                 tempDockerfile.deleteOnExit();
@@ -1142,12 +1175,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return tempDockerfile;
     }
 
-    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage, File buildContext) throws PluginExecutionException {
+    private void buildDockerImage(File tempDockerfile, File userDockerfile, boolean pullParentImage, File buildContext)
+            throws PluginExecutionException {
         info("Building Docker image...");
 
         try {
             imageName = getProjectName() + DEVMODE_IMAGE_SUFFIX;
-            // Name rules: may contain lowercase letters, digits and a period, one or two underscores, or one or more dashes. Cannot start with dash.
+            // Name rules: may contain lowercase letters, digits and a period, one or two
+            // underscores, or one or more dashes. Cannot start with dash.
             imageName = imageName.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("^[\\-]+", "").toLowerCase();
 
             StringBuilder sb = new StringBuilder();
@@ -1165,28 +1200,33 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             execDockerCmdAndLog(getRunProcess(buildCmd), dockerBuildTimeout);
             checkDockerBuildTime(startTime, buildContext);
             info("Completed building Docker image.");
-        } catch (IllegalThreadStateException  e) {
+        } catch (IllegalThreadStateException e) {
             // the timeout was too short and the docker command has not yet completed.
-            debug("IllegalThreadStateException, message="+e.getMessage());
-            throw new PluginExecutionException("The docker build command did not complete within the timeout period: " + dockerBuildTimeout + " seconds. " +
-                "Use the dockerBuildTimeout option to specify a longer period or " +
-                "add files not needed in the container to the .dockerignore file", e);
+            debug("IllegalThreadStateException, message=" + e.getMessage());
+            throw new PluginExecutionException(
+                    "The docker build command did not complete within the timeout period: " + dockerBuildTimeout
+                            + " seconds. " + "Use the dockerBuildTimeout option to specify a longer period or "
+                            + "add files not needed in the container to the .dockerignore file",
+                    e);
         } catch (IOException e) {
             error("Input or output error building Docker image: " + e.getMessage());
             throw new RuntimeException(e);
         } catch (InterruptedException e) {
             debug("Thread InterruptedException while building the Docker image: " + e.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " +
-                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + e.getMessage(), e);
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: "
+                    + userDockerfile.getAbsolutePath()
+                    + ". Address the following docker build error and then start dev mode again: " + e.getMessage(), e);
         } catch (RuntimeException r) {
             debug("RuntimeException building Docker image: " + r.getMessage());
-            throw new PluginExecutionException("Could not build Docker image using Dockerfile: " + 
-                userDockerfile.getAbsolutePath() + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
+            throw new PluginExecutionException("Could not build Docker image using Dockerfile: "
+                    + userDockerfile.getAbsolutePath()
+                    + ". Address the following docker build error and then start dev mode again: " + r.getMessage(), r);
         }
     }
 
     // Suggest a performance improvement if docker build takes too long.
     private static final long DOCKER_BUILD_SOFT_TIMEOUT = 30000; // millis
+
     private void checkDockerBuildTime(long startTime, File dockerBuildContext) {
         if (System.currentTimeMillis() - startTime < DOCKER_BUILD_SOFT_TIMEOUT) {
             return;
@@ -1200,17 +1240,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } catch (IOException e) {
                 buildContextPath = dockerBuildContext.getAbsolutePath();
             }
-            warn("The docker build command took longer than " + DOCKER_BUILD_SOFT_TIMEOUT / 1000 + " seconds. " +
-                "You may increase performance by adding unneeded files and directories " +
-                "such as any Liberty runtime directories to a .dockerignore file in " +
-                buildContextPath + ".");
+            warn("The docker build command took longer than " + DOCKER_BUILD_SOFT_TIMEOUT / 1000 + " seconds. "
+                    + "You may increase performance by adding unneeded files and directories "
+                    + "such as any Liberty runtime directories to a .dockerignore file in " + buildContextPath + ".");
         }
     }
 
     private void startContainer() {
         try {
             if (OSUtil.isLinux()) {
-                // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
+                // Allow the server to write to the log files. If we don't create it here docker
+                // daemon will create it as root.
                 runCmd("mkdir -p " + serverDirectory + "/logs");
             }
 
@@ -1226,11 +1266,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             error("Thread was interrupted while starting the container: " + e.getMessage());
         } catch (RuntimeException r) {
             try {
-                // remove container in case of an error trying to run the container because the docker run --rm will not rm the container
+                // remove container in case of an error trying to run the container because the
+                // docker run --rm will not rm the container
                 String dockerRmCmd = "docker container rm " + containerName;
                 execDockerCmd(dockerRmCmd, DOCKER_TIMEOUT);
             } catch (Exception e) {
-                // do not report the "docker container rm" error so that we can instead report the startContainer() error
+                // do not report the "docker container rm" error so that we can instead report
+                // the startContainer() error
                 debug("Exception running docker container rm:", e);
             }
             throw r;
@@ -1240,7 +1282,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Process getRunProcess(String command) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
         processBuilder.command(getCommandTokens(command));
-        if (!OSUtil.isLinux()){
+        if (!OSUtil.isLinux()) {
             Map<String, String> env = processBuilder.environment();
             if (!env.keySet().contains("DOCKER_BUILDKIT")) { // don't touch if already set
                 env.put("DOCKER_BUILDKIT", "0"); // must set 0 on Windows VMs
@@ -1273,8 +1315,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else {
             startingProcess.waitFor(timeout, TimeUnit.SECONDS);
         }
-        if (startingProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to stop dev mode
-            // return code 143 corresponds to 'docker stop xxx' so assume user requested to stop
+        if (startingProcess.exitValue() != 0 && !devStop.get()) { // if there was an error and the user didn't choose to
+                                                                  // stop dev mode
+            // return code 143 corresponds to 'docker stop xxx' so assume user requested to
+            // stop
             if (startingProcess.exitValue() == 143) {
                 setDevStop(true); // indicate intentional shutdown
                 externalContainerShutdown.set(true); // container shut down by external command
@@ -1302,7 +1346,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Copies the process output to the Maven/Gradle logs
      * 
      * @param stream The stream to copy
-     * @param info If true, log as info. Else log as error.
+     * @param info   If true, log as info. Else log as error.
      * @throws RuntimeException if there was an error reading the process output
      * @return The first line from the stream
      */
@@ -1322,11 +1366,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // Look for JVM version error in the line
                     alertOnServerError(line, "JVMCFRE003",
                             "Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Gradle build to correspond to the Java version used in your Dockerfile or its parent image, then restart dev mode.",
-                            // Maven project should be cleaned before restarting dev mode, otherwise compile does not realize Java version settings have changed
+                            // Maven project should be cleaned before restarting dev mode, otherwise compile
+                            // does not realize Java version settings have changed
                             "Java classes were compiled with a higher version of Java than the JVM in the container. To resolve this issue, set the source and target Java versions in your Maven build to correspond to the Java version used in your Dockerfile or its parent image, then clean the project output and restart dev mode.",
                             false);
 
-                    // Look for features not available message during server startup if features.sh was not defined in Dockerfile
+                    // Look for features not available message during server startup if features.sh
+                    // was not defined in Dockerfile
                     if (!serverFullyStarted.get() && !hasFeaturesSh.get() && !shownFeaturesShWarning.get()) {
                         String errMsg = "Feature definitions were not found in the container. To install features to the container, specify 'RUN features.sh' in your Dockerfile. For an example of how to configure a Dockerfile, see https://github.com/OpenLiberty/ci.docker";
                         shownFeaturesShWarning.set(alertOnServerError(line, "CWWKF0001E", errMsg, errMsg, true));
@@ -1345,10 +1391,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return firstLine;
     }
 
-    private boolean alertOnServerError(String line, String errorCode, String gradleMessage, String mavenMessage, boolean warning) {
+    private boolean alertOnServerError(String line, String errorCode, String gradleMessage, String mavenMessage,
+            boolean warning) {
         if (container && line.contains(errorCode)) {
             if (gradle) {
-                // Gradle doesn't show errors in an obvious way, so use some formatting to make it stand out more
+                // Gradle doesn't show errors in an obvious way, so use some formatting to make
+                // it stand out more
                 if (warning) {
                     warn("***** [ WARNING ] ***** " + gradleMessage);
                 } else {
@@ -1379,7 +1427,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             serverFullyStarted.set(false);
 
-            // see if docker run command (container) is still running before trying to stop it.
+            // see if docker run command (container) is still running before trying to stop
+            // it.
             if (dockerRunProcess != null && dockerRunProcess.isAlive()) {
                 info("Stopping container...");
                 String dockerStopCmd = "docker stop " + containerName;
@@ -1399,20 +1448,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Get the root directory for mounting loose app in container.  This is the longest common directory between the projectDirectory and multiModuleProjectDirectory.
+     * Get the root directory for mounting loose app in container. This is the
+     * longest common directory between the projectDirectory and
+     * multiModuleProjectDirectory.
      * 
-     * @param projectDirectory The current project directory. Must not be null.
-     * @param multiModuleProjectDirectory The multi module project directory. Can be null.
-     * @return The longest common directory, or projectDirectory if multiModuleProjectDirectory is null
+     * @param projectDirectory            The current project directory. Must not be
+     *                                    null.
+     * @param multiModuleProjectDirectory The multi module project directory. Can be
+     *                                    null.
+     * @return The longest common directory, or projectDirectory if
+     *         multiModuleProjectDirectory is null
      */
     public static File getLooseAppProjectRoot(File projectDirectory, File multiModuleProjectDirectory) {
         if (multiModuleProjectDirectory == null) {
             return projectDirectory;
         }
         try {
-            return getLongestCommonDir(projectDirectory.getCanonicalFile(), multiModuleProjectDirectory.getCanonicalFile());
+            return getLongestCommonDir(projectDirectory.getCanonicalFile(),
+                    multiModuleProjectDirectory.getCanonicalFile());
         } catch (IOException e) {
-            return getLongestCommonDir(projectDirectory.getAbsoluteFile(), multiModuleProjectDirectory.getAbsoluteFile());
+            return getLongestCommonDir(projectDirectory.getAbsoluteFile(),
+                    multiModuleProjectDirectory.getAbsoluteFile());
         }
     }
 
@@ -1430,9 +1486,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Build a docker run command with all the ports and directories required to run Open Liberty 
-     * inside a container. Also included is the image name and the server run command to override
-     * the CMD attribute of the Open Liberty docker image. 
+     * Build a docker run command with all the ports and directories required to run
+     * Open Liberty inside a container. Also included is the image name and the
+     * server run command to override the CMD attribute of the Open Liberty docker
+     * image.
+     * 
      * @return the command string to use to start the container
      */
     private String getContainerCommand() {
@@ -1443,14 +1501,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 httpPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTP_PORT, false);
                 httpsPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTPS_PORT, false);
             } catch (IOException x) {
-                error("An error occurred while trying to find an available network port. Using default port numbers.", x);
+                error("An error occurred while trying to find an available network port. Using default port numbers.",
+                        x);
                 httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
                 httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
             }
             command.append(" -p ").append(httpPortToUse).append(":").append(LIBERTY_DEFAULT_HTTP_PORT);
             command.append(" -p ").append(httpsPortToUse).append(":").append(LIBERTY_DEFAULT_HTTPS_PORT);
         }
-        
+
         if (libertyDebug) {
             // map debug port
             int containerDebugPort, hostDebugPort;
@@ -1467,26 +1526,33 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 containerDebugPort = hostDebugPort = libertyDebugPort;
             }
             command.append(" -p " + hostDebugPort + ":" + containerDebugPort);
-            // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
+            // set environment variables in the container to ensure debug mode does not
+            // suspend the server, and to enable a custom debug port to be used
             // and to allow remote debugging into the container
-            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort + " -e WLP_DEBUG_REMOTE=y");
+            command.append(
+                    " -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort + " -e WLP_DEBUG_REMOTE=y");
         }
 
-        // mount potential directories containing .war.xml from devc specific folder - override /config/apps and /config/dropins
+        // mount potential directories containing .war.xml from devc specific folder -
+        // override /config/apps and /config/dropins
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps:/config/apps");
         command.append(" -v " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins:/config/dropins");
 
-        // mount the loose application resources in the container using the appropriate project root
+        // mount the loose application resources in the container using the appropriate
+        // project root
         File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
         command.append(" -v " + looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
-        // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
+        // mount the server logs directory over the /logs used by the open liberty
+        // container as defined by the LOG_DIR env. var.
         command.append(" -v " + serverDirectory.getAbsolutePath() + "/logs:/logs");
 
-        // mount the Maven .m2 cache directory for featureUtility to use. For now, featureUtility does not support Gradle cache.
+        // mount the Maven .m2 cache directory for featureUtility to use. For now,
+        // featureUtility does not support Gradle cache.
         command.append(" -v " + mavenCacheLocation + ":/devmode-maven-cache");
 
-        // mount all files from COPY commands in the Dockerfile to allow for hot deployment
+        // mount all files from COPY commands in the Dockerfile to allow for hot
+        // deployment
         command.append(getCopiedFiles());
 
         // Add a --user option when running Linux
@@ -1500,34 +1566,36 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // now generate a name so that the Docker errors make some sense to the user.
             }
             containerName = generateNewContainerName();
-            command.append(" --name " +  containerName);
+            command.append(" --name " + containerName);
         } else {
             containerName = name;
         }
         debug("containerName: " + containerName + ".");
 
-        // Allow the user to add their own options to this command via a system property.
+        // Allow the user to add their own options to this command via a system
+        // property.
         if (dockerRunOpts != null) {
-            command.append(" "+dockerRunOpts);
+            command.append(" " + dockerRunOpts);
         }
 
         // Options must preceed this in any order. Image name and command code follows.
         command.append(" " + imageName);
         // Command to start the server
-        command.append(" /opt/ol/wlp/bin/server" + ((libertyDebug) ? " debug " : " run ")  + "defaultServer");
+        command.append(" /opt/ol/wlp/bin/server" + ((libertyDebug) ? " debug " : " run ") + "defaultServer");
         // All the Liberty variable definitions must appear after the -- option.
         // Important: other Liberty options must appear before --
-        command.append(" -- --"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
+        command.append(" -- --" + DEVMODE_PROJECT_ROOT + "=" + DEVMODE_DIR_NAME);
 
         return command.toString();
     }
 
     /**
      * Obtain a given Docker run option from the dockerRunOpts parameter
+     * 
      * @param optionName the name of the option to extract from the dockerRunOpts
      * @return a string representation of the value of the option or null
      *
-     * The option of interest must not use a quoted string.
+     *         The option of interest must not use a quoted string.
      */
     private String getDockerOption(String optionName) {
         if (dockerRunOpts == null || dockerRunOpts.isEmpty()) {
@@ -1536,9 +1604,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         String[] options = dockerRunOpts.split("\\s+"); // split on whitespace
         for (int i = 0; i < options.length; i++) {
             if (options[i].equals(optionName)) { // --name ABC format
-                return (i < options.length - 1) ? options[i+1] : null;
+                return (i < options.length - 1) ? options[i + 1] : null;
             } else if (options[i].startsWith(optionName + "=")) { // --name=ABC format
-                return options[i].substring(optionName.length()+1); // could be empty string
+                return options[i].substring(optionName.length() + 1); // could be empty string
             }
         }
         return null;
@@ -1553,7 +1621,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         String[] containerNames = result.split(" ");
         int highestNum = -1;
-        for(int i = 0; i < containerNames.length; i++) {
+        for (int i = 0; i < containerNames.length; i++) {
             String name = removeSurroundingQuotes(containerNames[i]);
             int num = -1;
             if (name.equals(DEVMODE_CONTAINER_BASE_NAME)) {
@@ -1574,14 +1642,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 highestNum = num;
             }
         }
-        
+
         return DEVMODE_CONTAINER_BASE_NAME + ((highestNum != -1) ? "-" + ++highestNum : "");
     }
 
     /**
      * Retrieves all the networks a container is connected to
+     * 
      * @param contName name of the container to check for networks
-     * @return a String array containing the names of the networks the specified container is connected to
+     * @return a String array containing the names of the networks the specified
+     *         container is connected to
      */
     private String[] getContainerNetworks(String contName) {
         String dockerNetworkCmd = "docker inspect -f '{{.NetworkSettings.Networks}}' " + contName;
@@ -1589,34 +1659,40 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (cmdResult == null || cmdResult.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
             warn("Unable to retrieve container networks.");
             return null;
-        }
-        else {
+        } else {
             return parseNetworks(removeSurroundingQuotes(cmdResult.trim()));
         }
     }
 
-     /**
-     * Parses Docker network names from a "docker inspect" command result on a container.
-     * @param dockerResult the result from the command "docker inspect -f '{{.NetworkSettings.Networks}}' containerName"
-     * -> dockerResult must not contain surrounding quotes or leading/trailing whitespace
-     * @return a String array containing the names of the networks contained in the dockerResult parameter
+    /**
+     * Parses Docker network names from a "docker inspect" command result on a
+     * container.
+     * 
+     * @param dockerResult the result from the command "docker inspect -f
+     *                     '{{.NetworkSettings.Networks}}' containerName" ->
+     *                     dockerResult must not contain surrounding quotes or
+     *                     leading/trailing whitespace
+     * @return a String array containing the names of the networks contained in the
+     *         dockerResult parameter
      */
     protected static String[] parseNetworks(String dockerResult) {
-        // Example dockerResult value: map[bridge:0xc000622000 myNet:0xc0006220c0 otherNet:0xc000622180]
+        // Example dockerResult value: map[bridge:0xc000622000 myNet:0xc0006220c0
+        // otherNet:0xc000622180]
         if (!dockerResult.matches("map\\[(.*?)\\]")) {
             return null;
         }
-        String networkMap = dockerResult.substring(dockerResult.indexOf("[")+1, dockerResult.indexOf("]"));
+        String networkMap = dockerResult.substring(dockerResult.indexOf("[") + 1, dockerResult.indexOf("]"));
         String[] networkHex = networkMap.split(" ");
         String[] networks = new String[networkHex.length];
-        for (int i=0; i < networkHex.length; i++) {
+        for (int i = 0; i < networkHex.length; i++) {
             networks[i] = networkHex[i].split(":")[0];
         }
         return networks;
     }
 
     private String getContainerIPAddress(String contName, String network) {
-        String dockerIPAddressCmd = "docker inspect -f '{{.NetworkSettings.Networks." + network + ".IPAddress}}' " + contName;
+        String dockerIPAddressCmd = "docker inspect -f '{{.NetworkSettings.Networks." + network + ".IPAddress}}' "
+                + contName;
         String result = execDockerCmd(dockerIPAddressCmd, DOCKER_TIMEOUT, false);
         if (result == null || result.contains(" RC=")) { // RC is added in execDockerCmd if there is an error
             warn("Unable to retrieve container IP address for network '" + network + "'.");
@@ -1626,8 +1702,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected static String removeSurroundingQuotes(String str) {
-        if (str != null && str.length() >= 2 && ((str.startsWith("\"") && str.endsWith("\"")) || (str.startsWith("\'") && str.endsWith("\'")))) {
-            return str.substring(1, str.length()-1);
+        if (str != null && str.length() >= 2
+                && ((str.startsWith("\"") && str.endsWith("\"")) || (str.startsWith("\'") && str.endsWith("\'")))) {
+            return str.substring(1, str.length() - 1);
         }
         return str;
     }
@@ -1635,12 +1712,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     // Read all the files from the array list.
     private String getCopiedFiles() {
         StringBuilder param = new StringBuilder(256); // estimate of size needed
-        for (int i=0; i < srcMount.size(); i++) {
+        for (int i = 0; i < srcMount.size(); i++) {
             if (new File(srcMount.get(i)).exists()) { // only Files are in this list
                 param.append(" -v ").append(srcMount.get(i)).append(":").append(destMount.get(i));
             } else {
-                error("A file referenced by the Dockerfile is not found: " + srcMount.get(i) +
-                    ". Update the Dockerfile or ensure the file is in the correct location.");
+                error("A file referenced by the Dockerfile is not found: " + srcMount.get(i)
+                        + ". Update the Dockerfile or ensure the file is in the correct location.");
             }
         }
         return param.toString();
@@ -1667,7 +1744,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void libertyDeploy() throws PluginExecutionException;
 
     /**
-     * Install features in regular dev mode. This method should not be used in container mode.
+     * Install features in regular dev mode. This method should not be used in
+     * container mode.
+     * 
      * @throws PluginExecutionException
      */
     public abstract void libertyInstallFeature() throws PluginExecutionException;
@@ -1678,7 +1757,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Stop the server, set up Liberty and restart it.
-     * @param buildContainer  Force a Docker build when in container mode. Ignored otherwise.
+     * 
+     * @param buildContainer Force a Docker build when in container mode. Ignored
+     *                       otherwise.
      */
     public void restartServer(boolean buildContainer) throws PluginExecutionException {
         info("Restarting server...");
@@ -1692,7 +1773,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 try {
                     serverThread.join(threadShutdownTimeoutSeconds * 1000);
                     if (serverThread.isAlive()) {
-                        throw new PluginExecutionException("Could not stop the server after " + threadShutdownTimeoutSeconds
+                        throw new PluginExecutionException("Could not stop the server after "
+                                + threadShutdownTimeoutSeconds
                                 + " seconds.  Ensure that the server has been stopped, then start dev mode again.");
                     }
                 } catch (InterruptedException e) {
@@ -1710,7 +1792,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // suppress install feature warning
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
-        // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
+        // Skip installing features on container during restart, since the Dockerfile
+        // should have 'RUN features.sh'
         if (!container) {
             libertyInstallFeature();
         }
@@ -1760,8 +1843,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
 
         if (protocolIndex < 0) {
-            throw new PluginExecutionException(
-                    "Could not parse the host name from the log message: " + webAppMessage);
+            throw new PluginExecutionException("Could not parse the host name from the log message: " + webAppMessage);
         }
 
         int portPrefixIndex = webAppMessage.indexOf(":", hostNameIndex);
@@ -1793,8 +1875,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (container) {
             httpPort = findLocalPort(parsedHttpPort);
             containerHttpPort = parsedHttpPort;
-        }
-        else {
+        } else {
             httpPort = parsedHttpPort;
         }
     }
@@ -1813,8 +1894,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (container) {
                             httpsPort = findLocalPort(parsedHttpsPort);
                             containerHttpsPort = parsedHttpsPort;
-                        }
-                        else {
+                        } else {
                             httpsPort = parsedHttpsPort;
                         }
                         return;
@@ -1858,7 +1938,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             return null;
         }
         if (cmdResult.contains(" RC=")) { // This piece of the string is added in execDockerCmd if there is an error
-            warn("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult.split(" RC=")[0] + "\". Ensure the Docker ports are mapped correctly.");
+            warn("Unable to retrieve locally mapped port. Docker result: \"" + cmdResult.split(" RC=")[0]
+                    + "\". Ensure the Docker ports are mapped correctly.");
             return null;
         }
         String[] cmdResultSplit = cmdResult.split(":");
@@ -2059,18 +2140,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Finds an available port to use. There are two semantics. If looking for a port
-     * for the server debug connection and the port is in use then return an
-     * ephemeral port. If looking for a port for the server http connection then
-     * try sequential port numbers.
+     * Finds an available port to use. There are two semantics. If looking for a
+     * port for the server debug connection and the port is in use then return an
+     * ephemeral port. If looking for a port for the server http connection then try
+     * sequential port numbers.
      * 
      * In the case of the server debug connection, if the preferred port is not
      * available, return a random available port and cache the result which will
      * override the preferredPort if this method is called again.
      * 
-     * @param  The number of the port to start the search for an available port.
-     * @param  Whether to choose an ephemeral port. True to choose an ephemeral port,
-     *         false to search sequentially.
+     * @param The     number of the port to start the search for an available port.
+     * @param Whether to choose an ephemeral port. True to choose an ephemeral port,
+     *                false to search sequentially.
      * @return An available port.
      * @throws IOException if it could not find any available port, or there was an
      *                     error when opening a server socket regardless of port.
@@ -2144,8 +2225,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             warn("The debug port " + preferredPort + " is not available.  Using " + availablePort
                     + " as the debug port instead.");
         } else {
-            debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using "
-                    + availablePort + " as the debug port instead.");
+            debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using " + availablePort
+                    + " as the debug port instead.");
         }
         alternativeDebugPort = availablePort;
     }
@@ -2189,15 +2270,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Print the dev mode startup and/or run tests messages.
      * 
-     * @param inputUnavailable If true, indicates that the console is non-interactive so hotkey messages should not be printed.
-     * @param startup If true, include attention barriers (asterisks lines) and overall dev mode startup messages such as list of hotkeys and ports.
+     * @param inputUnavailable If true, indicates that the console is
+     *                         non-interactive so hotkey messages should not be
+     *                         printed.
+     * @param startup          If true, include attention barriers (asterisks lines)
+     *                         and overall dev mode startup messages such as list of
+     *                         hotkeys and ports.
      */
     private void printDevModeMessages(boolean inputUnavailable, boolean startup) {
         // the following will be printed only on startup or restart
         if (startup) {
             // print barrier header
             info(formatAttentionBarrier());
-
+            info(formatAttentionTitle("🛸 Liberty developer mode:"));
+            info(formatAttentionBarrier());
             info(formatAttentionTitle("Liberty is running in dev mode."));
         }
 
@@ -2207,19 +2293,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
                 info(startup ? formatAttentionMessage(message) : message);
             } else {
-                String message = "To run tests on demand, press Enter.";
+                String message = "📝 To run tests on demand, press Enter.";
                 info(startup ? formatAttentionMessage(message) : message);
             }
 
             // the following will be printed only on startup or restart
             if (startup) {
                 if (container) {
-                    info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+                    info(formatAttentionMessage(
+                            "🛠️ To rebuild the Docker image and restart the container, type 'r' and press Enter."));
                 } else {
-                    info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+                    info(formatAttentionMessage("⚙️  To restart the server, type 'r' and press Enter."));
                 }
-
-                info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+                info(formatAttentionMessage("📖 To see the help menu type ‘h’ and press Enter."));
+                info(formatAttentionMessage(
+                        "🛑 To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
             }
         } else {
             debug("Cannot read user input, setting hotTests to true.");
@@ -2229,9 +2317,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         if (startup) {
             if (container) {
-                boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
-                boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
-                boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
+                boolean nonDefaultHttpPortUsed = !skipDefaultPorts
+                        && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
+                boolean nonDefaultHttpsPortUsed = !skipDefaultPorts
+                        && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
+                boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral
+                                                                              // port is selected
                 if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
                     info(formatAttentionMessage(""));
                     info(formatAttentionTitle("Liberty container port information:"));
@@ -2239,14 +2330,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
                         || (containerHttpsPort != null && httpsPort != null && nonDefaultHttpsPortUsed)
                         || (libertyDebug && nonDefaultDebugPortUsed)) {
-                    warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
+                    warn(formatAttentionMessage(
+                            "The Liberty container is using non-default host ports to avoid port conflict errors."));
                 }
                 if (containerHttpPort != null) {
                     if (httpPort != null) {
                         if (!nonDefaultHttpPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ]"));
+                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort
+                                    + " ] is mapped to Docker host port [ " + httpPort + " ]"));
                         } else {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to Docker host port [ " + httpPort + " ] <"));
+                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort
+                                    + " ] is mapped to Docker host port [ " + httpPort + " ] <"));
                         }
                     } else {
                         info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
@@ -2255,9 +2349,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (containerHttpsPort != null) {
                     if (httpsPort != null) {
                         if (!nonDefaultHttpsPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ]"));
+                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort
+                                    + " ] is mapped to Docker host port [ " + httpsPort + " ]"));
                         } else {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to Docker host port [ " + httpsPort + " ] <"));
+                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort
+                                    + " ] is mapped to Docker host port [ " + httpsPort + " ] <"));
                         }
                     } else {
                         info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
@@ -2266,9 +2362,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (libertyDebug) {
                     int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
                     if (!nonDefaultDebugPortUsed) {
-                        info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
+                        info(formatAttentionMessage(
+                                "🐞 Liberty debug port mapped to Docker host port: [ " + debugPort + " ]"));
                     } else {
-                        info(formatAttentionMessage("Liberty debug port mapped to Docker host port: [ " + debugPort + " ] <"));
+                        info(formatAttentionMessage(
+                                "🐞 Liberty debug port mapped to Docker host port: [ " + debugPort + " ] <"));
                     }
                 }
                 info(formatAttentionMessage(""));
@@ -2278,24 +2376,24 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 String[] networks = getContainerNetworks(containerName);
                 if (networks != null) {
                     for (String network : networks) {
-                        info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on Docker network [ " + network + " ]"));
+                        info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network)
+                                + " ] on Docker network [ " + network + " ]"));
                     }
                 }
-            }
-            else {
+            } else {
                 if (httpPort != null || httpsPort != null || libertyDebug) {
                     info(formatAttentionMessage(""));
                     info(formatAttentionTitle("Liberty server port information:"));
                 }
                 if (httpPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
+                    info(formatAttentionMessage("🛥️  Liberty server HTTP port: [ " + httpPort + " ]"));
                 }
                 if (httpsPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
+                    info(formatAttentionMessage("🛡️  Liberty server HTTPS port: [ " + httpsPort + " ]"));
                 }
                 if (libertyDebug) {
                     int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
+                    info(formatAttentionMessage("🐞 Liberty debug port: [ " + debugPort + " ]"));
                 }
             }
             // print barrier footer
@@ -2304,15 +2402,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private String formatAttentionBarrier() {
-        return "************************************************************************";
+        return "------------------------------------------------------------------------";
     }
 
     private String formatAttentionTitle(String message) {
-        return "*    " + message;
+        return "-    " + message;
     }
 
     private String formatAttentionMessage(String message) {
-        return "*        " + message;
+        return "-        " + message;
     }
 
     private class HotkeyReader implements Runnable {
@@ -2327,7 +2425,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         @Override
         public void run() {
             debug("Running hotkey reader thread");
-            scanner = new Scanner(new CloseShieldInputStream(System.in)); // shield allows us to close the scanner without closing System.in.
+            scanner = new Scanner(new CloseShieldInputStream(System.in)); // shield allows us to close the scanner
+                                                                          // without closing System.in.
             try {
                 readInput();
             } finally {
@@ -2363,16 +2462,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not restart the server.", e);
                             runShutdownHook(executor);
                         }
-                    } else if (line != null && (line.trim().equalsIgnoreCase("q") || line.trim().equalsIgnoreCase("help")
-                    || line.trim().equalsIgnoreCase("help"))) {
+                    } else if (line != null && (line.trim().equalsIgnoreCase("h")
+                            || line.trim().equalsIgnoreCase("help") || line.trim().equalsIgnoreCase("help"))) {
+                        info(formatAttentionBarrier());
                         if (container) {
-                            info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+                            info(formatAttentionMessage(
+                                    "🛠️  To rebuild the Docker image and restart the container, type 'r' and press Enter."));
                         } else {
-                            info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+                            info(formatAttentionMessage("⚙️  To restart the server, type 'r' and press Enter."));
                         }
-        
-                        info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
-                        info(formatAttentionMessage("To see the help menu type ‘h’ and press Enter."));
+
+                        info(formatAttentionMessage(
+                                "🛑 To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+                        info(formatAttentionMessage("📖 To see the help menu type ‘h’ and press Enter."));
+                        info(formatAttentionBarrier());
                     } else {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
@@ -2483,7 +2586,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // check for upstream projects
             if (isMultiModuleProject()) {
                 for (UpstreamProject p : upstreamProjects) {
-                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), false, executor);
+                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), false,
+                            executor);
                     // watch src/main/java dir
                     if (p.getSourceDirectory().exists()) {
                         registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
@@ -2534,7 +2638,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 serverXmlFileRegistered = true;
             }
 
-            if (bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists() && bootstrapPropertiesFileParent.exists()) {
+            if (bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists()
+                    && bootstrapPropertiesFileParent.exists()) {
                 Path bootstrapPropertiesFilePath = bootstrapPropertiesFileParent.getCanonicalFile().toPath();
                 registerAll(bootstrapPropertiesFilePath, executor);
                 bootstrapPropertiesFileRegistered = true;
@@ -2571,11 +2676,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             initWatchLoop();
 
             while (true) {
-                // Check the server and stop dev mode by throwing an exception if the server stopped.
+                // Check the server and stop dev mode by throwing an exception if the server
+                // stopped.
                 checkStopDevMode(true);
 
                 if (container) {
-                    synchronized(dockerfileDirectoriesToWatch) {
+                    synchronized (dockerfileDirectoriesToWatch) {
                         if (!dockerfileDirectoriesToWatch.isEmpty()) {
                             for (Path path : dockerfileDirectoriesToWatch) {
                                 File f = path.toFile();
@@ -2650,7 +2756,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             + " has been added. Restart dev mode for it to take effect.");
                 }
 
-                if (!bootstrapPropertiesFileRegistered && bootstrapPropertiesFile != null && bootstrapPropertiesFile.exists()) {
+                if (!bootstrapPropertiesFileRegistered && bootstrapPropertiesFile != null
+                        && bootstrapPropertiesFile.exists()) {
                     bootstrapPropertiesFileRegistered = true;
                     debug("Bootstrap properties file has been added: " + bootstrapPropertiesFile);
                     warn("The bootstrap properties file " + bootstrapPropertiesFile
@@ -2806,16 +2913,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param registerFile             the file of interest
      * @param executor                 the test thread executor
-     * @param removeOnContainerRebuild whether the files should be unwatched if the container is rebuilt
+     * @param removeOnContainerRebuild whether the files should be unwatched if the
+     *                                 container is rebuilt
      * @throws IOException unable to read the canonical path name
      */
-    private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor, boolean removeOnContainerRebuild) throws IOException {
+    private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor,
+            boolean removeOnContainerRebuild) throws IOException {
         if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
             String parentPath = registerFile.getParentFile().getCanonicalPath();
 
             debug("Registering single file polling for " + registerFile.toString());
 
-            // synchronize on the new observer set since only those are being updated in separate threads
+            // synchronize on the new observer set since only those are being updated in
+            // separate threads
             synchronized (newFileObservers) {
                 Set<FileAlterationObserver> tempCombinedObservers = new HashSet<FileAlterationObserver>();
                 tempCombinedObservers.addAll(fileObservers);
@@ -2824,7 +2934,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // if this path is already observed, ignore it
                 for (FileAlterationObserver observer : tempCombinedObservers) {
                     if (parentPath.equals(observer.getDirectory().getCanonicalPath())) {
-                        debug("Skipping single file polling for " + registerFile.toString() + " since its parent directory is already being observed");
+                        debug("Skipping single file polling for " + registerFile.toString()
+                                + " since its parent directory is already being observed");
                         return;
                     }
                 }
@@ -2858,12 +2969,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }
         if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
-            debug("Adding directory to WatchService " + registerFile.getParentFile().toPath() + " for single file " + registerFile.getName());
+            debug("Adding directory to WatchService " + registerFile.getParentFile().toPath() + " for single file "
+                    + registerFile.getName());
             WatchKey key = registerFile.getParentFile().toPath().register(
-                watcher, 
-                new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
-                        StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
-                SensitivityWatchEventModifier.HIGH);
+                    watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+                            StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
+                    SensitivityWatchEventModifier.HIGH);
             if (removeOnContainerRebuild) {
                 debug("Adding file to dockerfileDirectoriesWatchKeys: " + registerFile.getName());
                 dockerfileDirectoriesWatchKeys.add(key);
@@ -2871,15 +2982,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private FileAlterationObserver addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath, FileFilter filter)
-            throws Exception {
+    private FileAlterationObserver addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath,
+            FileFilter filter) throws Exception {
         FileAlterationObserver observer = getFileAlterationObserver(executor, parentPath, filter);
         observer.initialize();
         newFileObservers.add(observer);
         return observer;
     }
 
-    private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final String parentPath, FileFilter filter) {
+    private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final String parentPath,
+            FileFilter filter) {
         FileAlterationObserver observer = new FileAlterationObserver(parentPath, filter);
         observer.addListener(new FileAlterationListenerAdaptor() {
             @Override
@@ -2934,12 +3046,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             disablePolling();
                         }
                     } catch (Exception e) {
-                        error("An error occured attempting to retrieve the watch key or close the file watcher. " + e.getMessage(), e);
+                        error("An error occured attempting to retrieve the watch key or close the file watcher. "
+                                + e.getMessage(), e);
                     }
                 }
                 try {
                     processFileChanges(executor, file, outputDirectory, isDirectory, changeType);
-                } catch(Exception e) {
+                } catch (Exception e) {
                     debug(e);
                     error("Could not file process changes for " + file.getAbsolutePath() + ": " + e.getMessage());
                 }
@@ -3075,8 +3188,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
-            List<String> compileArtifactPaths, List<String> testArtifactPaths, String projectName) throws IOException, PluginExecutionException {
+    private void processJavaCompilation(File outputDirectory, File testOutputDirectory,
+            final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths,
+            String projectName) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
@@ -3179,11 +3293,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }
     }
- 
+
     private void checkStopDevMode(boolean skipOnRestart) throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
         if (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED)) {
-            // server is restarting if devStop was set to true and we have not called the shutdown hook
+            // server is restarting if devStop was set to true and we have not called the
+            // shutdown hook
             boolean restarting = devStop.get() && !calledShutdownHook.get();
             if (skipOnRestart && restarting && !externalContainerShutdown.get()) {
                 debug("Server is restarting. Allowing dev mode to continue.");
@@ -3244,9 +3359,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private void processFileChanges(
-        final ThreadPoolExecutor executor, File fileChanged, File outputDirectory,
-        boolean isDirectory, ChangeType changeType) throws IOException, PluginExecutionException {
+    private void processFileChanges(final ThreadPoolExecutor executor, File fileChanged, File outputDirectory,
+            boolean isDirectory, ChangeType changeType) throws IOException, PluginExecutionException {
 
         if (ignoreFileOrDir(fileChanged)) {
             // skip this file or directory, and continue to the next file or directory
@@ -3365,15 +3479,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
             javaFilesChanged.add(fileChanged);
             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
-                    && (changeType == ChangeType.MODIFY
-                            || changeType == ChangeType.CREATE)) {
-                debug("Java source file modified: " + fileChanged.getName()
-                        + ". Adding to list for processing.");
+                    && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                debug("Java source file modified: " + fileChanged.getName() + ". Adding to list for processing.");
                 lastJavaSourceChange = System.currentTimeMillis();
                 recompileJavaSources.add(fileChanged);
             } else if (changeType == ChangeType.DELETE) {
-                debug("Java file deleted: " + fileChanged.getName()
-                        + ". Adding to list for processing.");
+                debug("Java file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
                 lastJavaSourceChange = System.currentTimeMillis();
                 deleteJavaSources.add(fileChanged);
             }
@@ -3381,24 +3492,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
             javaFilesChanged.add(fileChanged);
             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
-                    && (changeType == ChangeType.MODIFY
-                            || changeType == ChangeType.CREATE)) {
-                debug("Java test file modified: " + fileChanged.getName()
-                        + ". Adding to list for processing.");
+                    && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                debug("Java test file modified: " + fileChanged.getName() + ". Adding to list for processing.");
                 lastJavaTestChange = System.currentTimeMillis();
                 recompileJavaTests.add(fileChanged);
             } else if (changeType == ChangeType.DELETE) {
-                debug("Java test file deleted: " + fileChanged.getName()
-                        + ". Adding to list for processing.");
+                debug("Java test file deleted: " + fileChanged.getName() + ". Adding to list for processing.");
                 lastJavaTestChange = System.currentTimeMillis();
                 deleteJavaTests.add(fileChanged);
             }
         } else if (directory.startsWith(configPath)
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
                                                                                             // files
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY
-                    || changeType == ChangeType.CREATE)) {
-                // suppress install feature warning - property must be set before calling copyConfigFolder
+            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                // suppress install feature warning - property must be set before calling
+                // copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, configDirectory, null);
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
@@ -3412,8 +3520,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
-                    } else if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
-                         || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
+                    } else if ((fileChanged.getName().equals("bootstrap.properties")
+                            && bootstrapPropertiesFileParent == null)
+                            || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
                         // restart server to load new properties
                         restartServer(false);
                     }
@@ -3432,23 +3541,24 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     if (container && OSUtil.isLinux()) {
                         info("Restarting the container for this change to take effect.");
-                        // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
+                        // Allow a 1 second grace period to replace the file in case the user changes
+                        // the file with a script or a tool like vim.
                         try {
                             Thread.sleep(1000);
                         } catch (InterruptedException e) {
                             debug("Unexpected InterruptedException handling config file deletion.", e);
                         }
                         restartServer(false);
-                    }    
+                    }
                 }
                 // always skip UTs
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
             }
-        } else if (serverXmlFileParent != null
-                && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
+        } else if (serverXmlFileParent != null && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                // suppress install feature warning - property must be set before calling copyConfigFolder
+                // suppress install feature warning - property must be set before calling
+                // copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
@@ -3463,7 +3573,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
-                // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
+                // Let this restart if needed for container mode. Otherwise, nothing else needs
+                // to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 }
@@ -3471,8 +3582,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
             }
         } else if (bootstrapPropertiesFileParent != null
-                   && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
-                   && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
+                && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
+                && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
             // This is for bootstrap.properties outside of the config folder
             // restart server to load new properties
             if (isDockerfileDirectoryChanged(fileChanged)) {
@@ -3480,8 +3591,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } else {
                 restartServer(false);
             }
-        } else if (jvmOptionsFileParent != null
-                && directory.equals(jvmOptionsFileParent.getCanonicalFile().toPath())
+        } else if (jvmOptionsFileParent != null && directory.equals(jvmOptionsFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(jvmOptionsFile.getName())) {
             // This is for jvm.options outside of the config folder
             // restart server to load new options
@@ -3490,11 +3600,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } else {
                 restartServer(false);
             }
-        } else if (resourceParent != null
-                && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
+        } else if (resourceParent != null && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
             debug("Resource dir: " + resourceParent.toString());
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY
-                    || changeType == ChangeType.CREATE)) {
+            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 copyFile(fileChanged, resourceParent, outputDirectory, null);
 
                 // run all tests on resource change
@@ -3524,7 +3632,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (fileChanged.equals(dockerfileUsed)
                 && directory.startsWith(dockerfileUsed.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // dockerfile
-            untrackDockerfileDirectoriesAndRestart(); // untrack all Dockerfile directories, then rebuild container and restart
+            untrackDockerfileDirectoriesAndRestart(); // untrack all Dockerfile directories, then rebuild container and
+                                                      // restart
         } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)) { // properties file
             boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
             // run all tests on properties file change
@@ -3532,28 +3641,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (isDockerfileDirectoryChanged(fileChanged)) {
-            // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
+            // If contents within a directory specified in a Dockerfile COPY command were
+            // changed, and not already processed by one of the other conditions above.
             untrackDockerfileDirectoriesAndRestart();
         }
     }
 
     /**
-     * Unwatches all directories that were specified in Dockerfile COPY commands, then does a container
-     * rebuild and restart.
+     * Unwatches all directories that were specified in Dockerfile COPY commands,
+     * then does a container rebuild and restart.
      * 
      * @throws PluginExecutionException
      */
     private void untrackDockerfileDirectoriesAndRestart() throws PluginExecutionException {
-        // Cancel and clear any WatchKeys that were added for to the Dockerfile directories
+        // Cancel and clear any WatchKeys that were added for to the Dockerfile
+        // directories
         for (WatchKey key : dockerfileDirectoriesWatchKeys) {
             key.cancel();
         }
         dockerfileDirectoriesWatchKeys.clear();
 
-        // Cancel and clear any FileAlterationObservers that were added for the Dockerfile directories
+        // Cancel and clear any FileAlterationObservers that were added for the
+        // Dockerfile directories
         synchronized (cancelledFileObservers) {
             for (FileAlterationObserver observer : dockerfileDirectoriesFileObservers) {
-                // add the observer to be cancelled 
+                // add the observer to be cancelled
                 cancelledFileObservers.add(observer);
                 try {
                     // destroy the observer
@@ -3572,11 +3684,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * If container mode, check if any of the files are within a directory specified in one of the Dockerfile's
-     * COPY commands.  If not container mode, does nothing.
+     * If container mode, check if any of the files are within a directory specified
+     * in one of the Dockerfile's COPY commands. If not container mode, does
+     * nothing.
      * 
      * @param file The files to check, in the same order.
-     * @return true if container mode and any of the files are within a directory specified in one of the Dockerfile's COPY commands.
+     * @return true if container mode and any of the files are within a directory
+     *         specified in one of the Dockerfile's COPY commands.
      * @throws IOException if there was an error getting canonical paths
      */
     private boolean isDockerfileDirectoryChanged(File... files) throws IOException {
@@ -3586,9 +3700,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
 
                 for (File file : files) {
-                    // if the file's path is a child of the tracked path, except for the server logs folder or if it's the loose application itself
+                    // if the file's path is a child of the tracked path, except for the server logs
+                    // folder or if it's the loose application itself
                     Path filePath = file.getCanonicalFile().toPath();
-                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml") && !filePath.toString().endsWith(".ear.xml")) {
+                    if (filePath.startsWith(trackedPath) && !filePath.startsWith(logsPath)
+                            && !filePath.toString().endsWith(".war.xml") && !filePath.toString().endsWith(".ear.xml")) {
                         debug("isDockerfileDirectoryChanged=true for directory " + trackedPath + " with file " + file);
                         return true;
                     }
@@ -3754,8 +3870,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } catch (IllegalArgumentException e) {
                     debug("Could not delete the directory " + targetFile.getCanonicalPath() + ". " + e.getMessage());
                 } catch (IOException e) {
-                    error("An error encountered while deleting the directory " + targetFile.getCanonicalPath()
-                            + ". " + e.getMessage());
+                    error("An error encountered while deleting the directory " + targetFile.getCanonicalPath() + ". "
+                            + e.getMessage());
                 }
             } else {
                 if (targetFile.delete()) {
@@ -3791,15 +3907,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private enum ChangeType {
-        CREATE,
-        DELETE,
-        MODIFY
+        CREATE, DELETE, MODIFY
     };
 
     /**
      * Register the parent directory and all sub-directories with the WatchService
      * 
-     * @param start   parent directory
+     * @param start    parent directory
      * @param executor the test thread executor
      * @throws IOException unable to walk through file tree
      */
@@ -3810,12 +3924,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Register the parent directory and all sub-directories with the WatchService
      * 
-     * @param start   parent directory
-     * @param executor the test thread executor
-     * @param removeOnContainerRebuild whether the files should be unwatched if the container is rebuilt
+     * @param start                    parent directory
+     * @param executor                 the test thread executor
+     * @param removeOnContainerRebuild whether the files should be unwatched if the
+     *                                 container is rebuilt
      * @throws IOException unable to walk through file tree
      */
-    protected void registerAll(final Path start, final ThreadPoolExecutor executor, final boolean removeOnContainerRebuild) throws IOException {
+    protected void registerAll(final Path start, final ThreadPoolExecutor executor,
+            final boolean removeOnContainerRebuild) throws IOException {
         debug("Registering all files in directory: " + start.toString());
 
         // register directory and sub-directories
@@ -3823,12 +3939,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             @Override
             public FileVisitResult preVisitDirectory(final Path dir, BasicFileAttributes attrs) throws IOException {
                 if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
-                    // synchronize on the new observer set since only those are being updated in separate threads
+                    // synchronize on the new observer set since only those are being updated in
+                    // separate threads
                     synchronized (newFileObservers) {
                         Set<FileAlterationObserver> tempCombinedObservers = new HashSet<FileAlterationObserver>();
                         tempCombinedObservers.addAll(fileObservers);
                         tempCombinedObservers.addAll(newFileObservers);
-        
+
                         // if this path is already observed, ignore it
                         for (FileAlterationObserver observer : tempCombinedObservers) {
                             if (dir.equals(observer.getDirectory().getCanonicalFile().toPath())) {
@@ -3836,7 +3953,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 return FileVisitResult.CONTINUE;
                             }
                         }
-        
+
                         FileFilter singleDirectoryFilter = new FileFilter() {
                             @Override
                             public boolean accept(File file) {
@@ -3851,10 +3968,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 return false;
                             }
                         };
-            
+
                         try {
                             debug("Adding subdirectory to file observers: " + dir.toString());
-                            FileAlterationObserver observer = addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
+                            FileAlterationObserver observer = addFileAlterationObserver(executor, dir.toString(),
+                                    singleDirectoryFilter);
                             if (removeOnContainerRebuild) {
                                 debug("Adding to dockerfileDirectoriesFileObservers: " + dir);
                                 dockerfileDirectoriesFileObservers.add(observer);
@@ -3863,7 +3981,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not observe directory " + dir.toString(), e);
                         }
                     }
-                } 
+                }
                 if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
                     debug("Adding subdirectory to WatchService: " + dir.toString());
                     WatchKey key = dir.register(watcher,
@@ -3884,7 +4002,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Get the file from the configDirectory if it exists
      * 
-     * @param file 
+     * @param file
      * @return file or null if it does not exist
      */
     protected File getFileFromConfigDirectory(String file) {
@@ -3950,17 +4068,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Recompile Java source files and run tests after application update
      * 
-     * @param javaFilesChanged collection of Java files changed
-     * @param artifactPaths list of project artifact paths for building the classpath
-     * @param executor the test thread executor
-     * @param outputDirectory the directory for compiled classes
-     * @param testOutputDirectory the directory for compiled test classes
-     * @param projectName the name of the current project (artifactId), null if only one project exists
-     * @param projectBuildFile the build file of the current project
-     * @param projectCompilerOptions the Java compiler options of the current project
-     * @param forceSkipUTs whether to force skipping the unit tests
-     * @param skipRunningTests whether to skip running tests, takes precendence over the forceSkipUTs param
-     * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
+     * @param javaFilesChanged       collection of Java files changed
+     * @param artifactPaths          list of project artifact paths for building the
+     *                               classpath
+     * @param executor               the test thread executor
+     * @param outputDirectory        the directory for compiled classes
+     * @param testOutputDirectory    the directory for compiled test classes
+     * @param projectName            the name of the current project (artifactId),
+     *                               null if only one project exists
+     * @param projectBuildFile       the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current
+     *                               project
+     * @param forceSkipUTs           whether to force skipping the unit tests
+     * @param skipRunningTests       whether to skip running tests, takes
+     *                               precendence over the forceSkipUTs param
+     * @throws PluginExecutionException if the classes output directory doesn't
+     *                                  exist and can't be created
      */
     protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
@@ -3973,17 +4096,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Recompile test source files and run tests immediately
      * 
-     * @param javaFilesChanged collection of Java files changed
-     * @param artifactPaths list of project artifact paths for building the classpath
-     * @param executor the test thread executor
-     * @param outputDirectory the directory for compiled classes
-     * @param testOutputDirectory the directory for compiled test classes
-     * @param projectName the name of the current project (artifactId), null if only one project exists
-     * @param projectBuildFile the build file of the current project
-     * @param projectCompilerOptions the Java compiler options of the current project
-     * @param forceSkipUTs whether to force skipping the unit tests
-     * @param skipRunningTests whether to skip running tests, takes precendence over the forceSkipUTs param
-     * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
+     * @param javaFilesChanged       collection of Java files changed
+     * @param artifactPaths          list of project artifact paths for building the
+     *                               classpath
+     * @param executor               the test thread executor
+     * @param outputDirectory        the directory for compiled classes
+     * @param testOutputDirectory    the directory for compiled test classes
+     * @param projectName            the name of the current project (artifactId),
+     *                               null if only one project exists
+     * @param projectBuildFile       the build file of the current project
+     * @param projectCompilerOptions the Java compiler options of the current
+     *                               project
+     * @param forceSkipUTs           whether to force skipping the unit tests
+     * @param skipRunningTests       whether to skip running tests, takes
+     *                               precendence over the forceSkipUTs param
+     * @throws PluginExecutionException if the classes output directory doesn't
+     *                                  exist and can't be created
      */
     protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
@@ -4022,7 +4150,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
-            
+
             if (useBuildRecompile) {
                 compileResult = compile(tests ? testSourceDirectory : sourceDirectory);
             } else {
@@ -4030,9 +4158,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 File classesDir = tests ? testOutputDirectory : outputDirectory;
                 if (!classesDir.exists()) {
                     if (!classesDir.mkdirs()) {
-                        throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath()
-                                + " does not exist and cannot be created.");
-                    } else if (classesDir.exists() && Objects.equals(classesDir.getCanonicalFile(), outputDirectory.getCanonicalFile())) {
+                        throw new PluginExecutionException("The classes output directory "
+                                + classesDir.getAbsolutePath() + " does not exist and cannot be created.");
+                    } else if (classesDir.exists()
+                            && Objects.equals(classesDir.getCanonicalFile(), outputDirectory.getCanonicalFile())) {
                         // redeploy application when class directory has been created
                         redeployApp();
                     }
@@ -4066,14 +4195,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (file.exists() && file.isFile()) {
                         for (JavaFileObject o : fileManager.getJavaFileObjects(file)) {
                             compilationUnits.add(o);
-                        }    
+                        }
                     } else {
                         debug("The Java file " + file + " does not exist and will not be compiled.");
                     }
                 }
 
-                JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, combinedCompilerOptions, null,
-                        compilationUnits);
+                JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, combinedCompilerOptions,
+                        null, compilationUnits);
 
                 compileResult = task.call();
             }
@@ -4137,7 +4266,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Gets the class path for the specified artifactPaths and outputDirs.
      * 
      * @param artifactPaths list of artifacts for the current project
-     * @param outputDirs list of output directories for the current project
+     * @param outputDirs    list of output directories for the current project
      * @return set of classpath files
      * @throws IOException unable to resolve canonical path
      */
@@ -4283,6 +4412,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Gets the Liberty server's host name.
+     * 
      * @return hostName the host name, or null if the server is not started
      */
     public String getHostName() {
@@ -4291,7 +4421,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Gets the Liberty server's http port.
-     * @return httpPort the http port, or null if the server is not started or there is no http port bound
+     * 
+     * @return httpPort the http port, or null if the server is not started or there
+     *         is no http port bound
      */
     public String getHttpPort() {
         return httpPort;
@@ -4299,7 +4431,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Gets the Liberty server's https port.
-     * @return httpsPort the https port, or null if the server is not started or there is no https port bound
+     * 
+     * @return httpsPort the https port, or null if the server is not started or
+     *         there is no https port bound
      */
     public String getHttpsPort() {
         return httpsPort;
@@ -4318,14 +4452,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Reload the property file by restarting the server if there were changes.
      * 
      * @param propertyFile The property file that was changed.
-     * @throws PluginExecutionException if there was an error when reloading the file
+     * @throws PluginExecutionException if there was an error when reloading the
+     *                                  file
      * @return true if the property file was reloaded with changes
      */
     private boolean reloadPropertyFile(File propertyFile) throws PluginExecutionException {
         Properties properties = readPropertiesFromFile(propertyFile);
         if (!Objects.equals(properties, propertyFilesMap.get(propertyFile))) {
             debug("Properties file " + propertyFile.getAbsolutePath() + " has changed. Restarting server...");
-            propertyFilesMap.put(propertyFile, properties);    
+            propertyFilesMap.put(propertyFile, properties);
             restartServer();
             return true;
         } else {
@@ -4337,8 +4472,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * This is needed for Gradle only.
      * 
-     * Sets additional property files that may be used by the build.
-     * Loads the properties for later comparison of changes.
+     * Sets additional property files that may be used by the build. Loads the
+     * properties for later comparison of changes.
      * 
      * @param propertyFiles list of property files
      */
@@ -4356,7 +4491,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Read properties from file.  If file does not exist or an IO exception occurred, returns null.
+     * Read properties from file. If file does not exist or an IO exception
+     * occurred, returns null.
      */
     private Properties readPropertiesFromFile(File propertyFile) {
         Properties properties = null;
@@ -4388,6 +4524,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Updates the Java compiler options
+     * 
      * @param updatedCompilerOptions
      */
     public void updateJavaCompilerOptions(JavaCompilerOptions updatedCompilerOptions) {
