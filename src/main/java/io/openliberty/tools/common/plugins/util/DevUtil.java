@@ -357,6 +357,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private final File buildDirectory;
     private List<ProjectModule> upstreamProjects; // supports multi module scenario, null for single module projects
     private boolean recompileDependencies;
+    private String packagingType;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
@@ -365,7 +366,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
             File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
-            String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies) {
+            String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
+            String packagingType) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -421,6 +423,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.shownFeaturesShWarning = new AtomicBoolean(false);
         this.hasFeaturesSh = new AtomicBoolean(false);
         this.serverFullyStarted = new AtomicBoolean(false);
+        this.packagingType = packagingType;
     }
 
     /**
@@ -2477,9 +2480,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (isMultiModuleProject()) {
                 for (ProjectModule p : upstreamProjects) {
                     updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), false, executor);
-                    // watch src/main/java dir
-                    if (p.getSourceDirectory().exists()) {
-                        registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
+
+                    if (shouldIncludeSources(p.getPackagingType())) {
+                        // watch src/main/java dir
+                        if (p.getSourceDirectory().exists()) {
+                            registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
+                        }
                     }
 
                     // watch src/test/java dir
@@ -2506,11 +2512,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
 
-            if (this.sourceDirectory.exists()) {
-                registerAll(srcPath, executor);
-                sourceDirRegistered = true;
+            if (shouldIncludeSources(packagingType)) {
+                if (this.sourceDirectory.exists()) {
+                    registerAll(srcPath, executor);
+                    sourceDirRegistered = true;
+                }
             }
-
+    
             if (this.testSourceDirectory.exists()) {
                 registerAll(testSrcPath, executor);
                 testSourceDirRegistered = true;
@@ -2597,16 +2605,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             testArtifactPaths, null);
                 }
 
-                // check if javaSourceDirectory has been added
-                if (!sourceDirRegistered && this.sourceDirectory.exists()
-                        && this.sourceDirectory.listFiles().length > 0) {
-                    compile(this.sourceDirectory);
-                    registerAll(srcPath, executor);
-                    debug("Registering Java source directory: " + this.sourceDirectory);
-                    sourceDirRegistered = true;
-                } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
-                    cleanTargetDir(outputDirectory);
-                    sourceDirRegistered = false;
+                if (shouldIncludeSources(packagingType)) {
+                    // check if javaSourceDirectory has been added
+                    if (!sourceDirRegistered && this.sourceDirectory.exists()
+                            && this.sourceDirectory.listFiles().length > 0) {
+                        compile(this.sourceDirectory);
+                        registerAll(srcPath, executor);
+                        debug("Registering Java source directory: " + this.sourceDirectory);
+                        sourceDirRegistered = true;
+                    } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
+                        cleanTargetDir(outputDirectory);
+                        sourceDirRegistered = false;
+                    }
                 }
 
                 // check if testSourceDirectory has been added
@@ -2772,6 +2782,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
         }
+    }
+
+    /**
+     * Whether source files should be watched/included for compilation for this packaging type.
+     */
+    private boolean shouldIncludeSources(String packaging) {
+        return !("ear".equals(packaging) || "pom".equals(packaging));
     }
 
     /**
@@ -4554,7 +4571,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     protected void compileMainModule(boolean testsOnly) throws IOException {
         compileEntireProject(this.sourceDirectory, recompileJavaSources, this.testSourceDirectory, recompileJavaTests,
-                testsOnly);
+                testsOnly, packagingType);
     }
 
     /**
@@ -4567,15 +4584,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     protected void compileUpstreamModule(ProjectModule project, boolean testsOnly) throws IOException {
         compileEntireProject(project.getSourceDirectory(), project.recompileJavaSources,
-                project.getTestSourceDirectory(), project.recompileJavaTests, testsOnly);
-
+                project.getTestSourceDirectory(), project.recompileJavaTests, testsOnly, project.getPackagingType());
     }
 
     private void compileEntireProject(File sourceDir, Collection<File> recompileJavaSourceSet, File testSourceDir,
-            Collection<File> recompileJavaTestSet, boolean testsOnly) throws IOException {
+            Collection<File> recompileJavaTestSet, boolean testsOnly, String packagingType) throws IOException {
 
         // recompile source
-        if (!testsOnly) {
+        if (!testsOnly && shouldIncludeSources(packagingType)) {
             if (sourceDir.exists()) {
                 Collection<File> allJavaSources = FileUtils.listFiles(sourceDir.getCanonicalFile(),
                         new String[] { "java" }, true);

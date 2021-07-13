@@ -32,6 +32,8 @@ public class ProjectModule {
     private File testSourceDirectory;
     private File testOutputDirectory;
     private String projectName;
+    private String packagingType;
+
     private List<File> resourceDirs;
     private HashMap<File, Boolean> resourceMap;
     private boolean skipUTs;
@@ -60,6 +62,7 @@ public class ProjectModule {
      * 
      * @param buildFile           pom.xml
      * @param projectName         project name (artifactId)
+     * @param packagingType       packaging type
      * @param compileArtifacts    compileArtifacts of project
      * @param testArtifacts       testArtifacts of project
      * @param sourceDirectory     src/main/java dir
@@ -72,12 +75,13 @@ public class ProjectModule {
      * @param skipITs             whether to skip integration tests for this project
      * @param compilerOptions     Java compiler options set in pom.xml
      */
-    public ProjectModule(File buildFile, String projectName, List<String> compileArtifacts,
+    public ProjectModule(File buildFile, String projectName, String packagingType, List<String> compileArtifacts,
             List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
             File testOutputDirectory, List<File> resourceDirs, boolean skipTests, boolean skipUTs, boolean skipITs,
             JavaCompilerOptions compilerOptions, List<File> dependentModules) {
         this.buildFile = buildFile;
         this.projectName = projectName;
+        this.packagingType = packagingType;
         this.compileArtifacts = compileArtifacts;
         this.testArtifacts = testArtifacts;
         this.sourceDirectory = sourceDirectory;
@@ -118,6 +122,10 @@ public class ProjectModule {
 
     public String getProjectName() {
         return this.projectName;
+    }
+
+    public String getPackagingType() {
+        return packagingType;
     }
 
     public File getBuildFile() {
