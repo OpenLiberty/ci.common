@@ -2975,7 +2975,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             for (ProjectModule project : upstreamProjects) {
-
                 // delete before recompiling, so if a file is in both lists, its class
                 // will be deleted then recompiled
                 if (!project.deleteJavaSources.isEmpty()) {
@@ -2989,22 +2988,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (!project.failedCompilationJavaSources.isEmpty()) {
                         project.recompileJavaSources.addAll(project.failedCompilationJavaSources);
                     }
-                    boolean skipRunningTests = false;
-                    if (initialCompile) {
-                        skipRunningTests = true;
-                    }
-
                     // try recompiling failing project modules that are not dependent on the current
                     // module (upstream of the current module)
                     if (shouldRecompileDependencies(project)) {
                         compileFailingProjects(project, false, executor);
                     }
-                    // TODO support hotTests scenario and trigger tests to run on current project
-                    // and all dependent projects
+                    // always skip running tests through recompileJavaSource on upstream projects
+                    // since tests need to run on all dependent projects, runTestThread is called
+                    // directly in logic below
                     if (recompileJavaSource(project.recompileJavaSources, project.getCompileArtifacts(), executor,
                             project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
                             project.getBuildFile(), project.getCompilerOptions(), project.skipUTs(),
-                            skipRunningTests)) {
+                            true)) {
 
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
@@ -3016,8 +3011,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         for (File dependentModule : project.getDependentModules()) {
                             compileModuleForBuildFile(dependentModule, false);
                         }
-                        project.disableDependencyCompile = true;
                     }
+                    // run tests for current project and all dependent projects
+                    int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
+                    runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false,
+                            getAllBuildFiles(project));
+
                 }
                 // additionally, process java test files if no changes detected after a
                 // different timeout
@@ -3037,10 +3036,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (!project.failedCompilationJavaTests.isEmpty()) {
                             project.recompileJavaTests.addAll(project.failedCompilationJavaTests);
                         }
-                        boolean skipRunningTests = false;
-                        if (initialCompile) {
-                            skipRunningTests = true;
-                        }
 
                         // try recompiling failing project modules that are not dependent on the current
                         // module (upstream of the current module)
@@ -3048,10 +3043,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             compileFailingProjects(project, true, executor);
                         }
 
+                        // always skip running tests through recompileJavaTest on upstream projects
+                        // since tests need to run on all dependent projects, runTestThread is called
+                        // directly in logic below
                         if (recompileJavaTest(project.recompileJavaTests, project.getTestArtifacts(), executor,
                                 project.getOutputDirectory(), project.getTestOutputDirectory(),
                                 project.getProjectName(), project.getBuildFile(), project.getCompilerOptions(),
-                                project.skipUTs(), skipRunningTests)) {
+                                project.skipUTs(), true)) {
                             // successful compilation so we can clear failedCompilation list
                             project.failedCompilationJavaTests.clear();
                         } else {
@@ -3063,6 +3061,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 compileModuleForBuildFile(dependentModule, true);
                             }
                         }
+                        // run tests for current project and all dependent projects without waiting for
+                        // app update since only tests changed
+                        runTestThread(false, executor, -1, project.skipUTs(), false, getAllBuildFiles(project));
                     }
                 }
                 // run tests if files were deleted without any other changes, since
@@ -3159,14 +3160,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
                 boolean skipRunningTests = false;
-                if (initialCompile) {
+                if (initialCompile || disableDependencyCompile) {
+                    // skip running tests when disableDependencyCompile is set as tests will be run
+                    // through upstream project logic
                     skipRunningTests = true;
                 }
                 // if upstream projects exist try recompiling any failed projects
                 if (!disableDependencyCompile && isMultiModuleProject()) {
                     compileFailingProjects(null, false, executor);
                 }
-
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
                         testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
@@ -3194,7 +3196,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
                     boolean skipRunningTests = false;
-                    if (initialCompile) {
+                    if (initialCompile || disableDependencyCompile) {
+                        // skip running tests when disableDependencyCompile is set as tests will be run
+                        // through upstream project logic
                         skipRunningTests = true;
                     }
                     // if upstream projects exist try recompiling any failing upstream tests
