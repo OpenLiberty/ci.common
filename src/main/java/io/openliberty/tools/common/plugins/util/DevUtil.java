@@ -2990,7 +2990,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     // try recompiling failing project modules that are not dependent on the current
                     // module (upstream of the current module)
-                    if (shouldRecompileDependencies(project)) {
+                    if (shouldRecompileDependencies(project) || !recompileDependencies) {
                         compileFailingProjects(project, false, executor);
                     }
                     // always skip running tests through recompileJavaSource on upstream projects
@@ -3005,6 +3005,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         project.failedCompilationJavaSources.clear();
                     } else {
                         project.failedCompilationJavaSources.addAll(project.recompileJavaSources);
+                    }
+                    // if recompileDeps = false, compile only failing classes from downstream modules
+                    if (!recompileDependencies) {
+                        for (File dependentModule : project.getDependentModules()) {
+                            compileFailingClasses(getProjectModule(dependentModule), false, executor);
+                        }
                     }
                     // compile all of the dependent modules (in build order)
                     if (shouldRecompileDependencies(project)) {
@@ -3039,7 +3045,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                         // try recompiling failing project modules that are not dependent on the current
                         // module (upstream of the current module)
-                        if (shouldRecompileDependencies(project)) {
+                        if (shouldRecompileDependencies(project) || !recompileDependencies) {
                             compileFailingProjects(project, true, executor);
                         }
 
@@ -3054,6 +3060,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             project.failedCompilationJavaTests.clear();
                         } else {
                             project.failedCompilationJavaTests.addAll(project.recompileJavaTests);
+                        }
+                        // if recompileDeps = false, compile only failing tests from downstream modules
+                        if (!recompileDependencies) {
+                            for (File dependentModule : project.getDependentModules()) {
+                                compileFailingClasses(getProjectModule(dependentModule), true, executor);
+                            }
                         }
                         // compile all of the dependent modules' tests (in build order)
                         if (shouldRecompileDependencies(project)) {
@@ -3106,35 +3118,55 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             throws PluginExecutionException {
         // skip recompiling failed projects on initial loop to avoid repetitive
         // compilation calls
-        if (!initialCompile) {
-            // compile failing upstream projects
-            for (int i = 0; i < upstreamProjects.size(); i++) {
-                ProjectModule project = upstreamProjects.get(i);
-                // stop at current project
-                if (currentProject != null && upstreamProjects.get(i).equals(currentProject)) {
-                    return;
-                }
-                // compile failing source
-                if (!testsOnly && !project.failedCompilationJavaSources.isEmpty()) {
-                    if (recompileJavaSource(project.failedCompilationJavaSources, project.getCompileArtifacts(),
-                            executor, project.getOutputDirectory(), project.getTestOutputDirectory(),
-                            project.getProjectName(), project.getBuildFile(), project.getCompilerOptions(),
-                            project.skipUTs(), false)) {
-                        // successful compilation so we can clear failedCompilation list
-                        project.failedCompilationJavaSources.clear();
+        if (initialCompile) {
+            return;
+        }
+        // compile failing upstream projects
+        for (int i = 0; i < upstreamProjects.size(); i++) {
+            ProjectModule project = upstreamProjects.get(i);
+            // stop at current project
+            if (currentProject != null && upstreamProjects.get(i).equals(currentProject)) {
+                return;
+            }
+            compileFailingClasses(project, testsOnly, executor);
+        }
 
-                    }
-                }
-                // compile failing tests
-                if (!project.failedCompilationJavaTests.isEmpty()) {
-                    if (recompileJavaTest(project.failedCompilationJavaTests, project.getTestArtifacts(), executor,
-                            project.getOutputDirectory(), project.getTestOutputDirectory(), project.getProjectName(),
-                            project.getBuildFile(), project.getCompilerOptions(), project.skipUTs(), false)) {
-                        // successful compilation so we can clear failedCompilation list
-                        project.failedCompilationJavaTests.clear();
+    }
 
-                    }
-                }
+    private void compileFailingClasses(ProjectModule currentProject, boolean testsOnly, ThreadPoolExecutor executor)
+            throws PluginExecutionException {
+        if (initialCompile) {
+            return;
+        }
+        // main project
+        if (currentProject == null) {
+            if (!testsOnly && !failedCompilationJavaSources.isEmpty()) {
+                triggerJavaSourceRecompile = true;
+            }
+            if (!failedCompilationJavaTests.isEmpty()) {
+                triggerJavaTestRecompile = true;
+            }
+            return;
+        }
+
+        // compile failing source
+        if (!testsOnly && !currentProject.failedCompilationJavaSources.isEmpty()) {
+            if (recompileJavaSource(currentProject.failedCompilationJavaSources, currentProject.getCompileArtifacts(),
+                    executor, currentProject.getOutputDirectory(), currentProject.getTestOutputDirectory(),
+                    currentProject.getProjectName(), currentProject.getBuildFile(), currentProject.getCompilerOptions(),
+                    currentProject.skipUTs(), false)) {
+                // successful compilation so we can clear failedCompilation list
+                currentProject.failedCompilationJavaSources.clear();
+            }
+        }
+        // compile failing tests
+        if (!currentProject.failedCompilationJavaTests.isEmpty()) {
+            if (recompileJavaTest(currentProject.failedCompilationJavaTests, currentProject.getTestArtifacts(),
+                    executor, currentProject.getOutputDirectory(), currentProject.getTestOutputDirectory(),
+                    currentProject.getProjectName(), currentProject.getBuildFile(), currentProject.getCompilerOptions(),
+                    currentProject.skipUTs(), false)) {
+                // successful compilation so we can clear failedCompilation list
+                currentProject.failedCompilationJavaTests.clear();
             }
         }
     }
@@ -3166,7 +3198,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     skipRunningTests = true;
                 }
                 // if upstream projects exist try recompiling any failed projects
-                if (!disableDependencyCompile && isMultiModuleProject()) {
+                if (isMultiModuleProject() && (!disableDependencyCompile || !recompileDependencies) ) {
                     compileFailingProjects(null, false, executor);
                 }
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
@@ -3202,7 +3234,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         skipRunningTests = true;
                     }
                     // if upstream projects exist try recompiling any failing upstream tests
-                    if (!disableDependencyCompile && isMultiModuleProject()) {
+                    if (isMultiModuleProject() && (!disableDependencyCompile || !recompileDependencies) ) {
                         compileFailingProjects(null, true, executor);
                     }
                     if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
