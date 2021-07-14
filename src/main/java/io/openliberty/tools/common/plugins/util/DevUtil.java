@@ -3014,7 +3014,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                     // run tests for current project and all dependent projects
                     int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                    runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false,
+                    runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
                             getAllBuildFiles(project));
 
                 }
