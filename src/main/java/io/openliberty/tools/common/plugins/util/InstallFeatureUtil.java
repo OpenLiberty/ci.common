@@ -490,6 +490,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             mapBasedInstallKernel.put("single.json.file", jsonRepos);
             mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
             mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
+            mapBasedInstallKernel.put("is.install.server.feature", true);
 
             if (isDebugEnabled()) {
                 mapBasedInstallKernel.put("debug", Level.FINEST);
