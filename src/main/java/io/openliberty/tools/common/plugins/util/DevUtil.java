@@ -2439,6 +2439,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
 
         private void readInput() {
+            HotKey q = new HotKey("q", "Detected exit command");
+            HotKey h = new HotKey("h", "message");
+            HotKey r = new HotKey("r", "Detected restart command");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
@@ -2449,12 +2452,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         break;
                     }
                     String line = scanner.nextLine();
-                    if (line != null && (line.trim().equalsIgnoreCase("q") || line.trim().equalsIgnoreCase("quit")
-                            || line.trim().equalsIgnoreCase("exit"))) {
-                        debug("Detected exit command");
+                    if (q.checkKeyPress(line, "quit")){
+                        debug(q.printMessage());
                         runShutdownHook(executor);
-                    } else if (line != null && line.trim().equalsIgnoreCase("r")) {
-                        debug("Detected restart command");
+                    } else if (r.checkKeyPress(line, "restart")){
+                        debug(r.printMessage());
                         try {
                             restartServer(true);
                         } catch (PluginExecutionException e) {
@@ -2462,8 +2464,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not restart the server.", e);
                             runShutdownHook(executor);
                         }
-                    } else if (line != null && (line.trim().equalsIgnoreCase("h")
-                            || line.trim().equalsIgnoreCase("help") || line.trim().equalsIgnoreCase("help"))) {
+                    } else if (h.checkKeyPress(line, "help")){
                         info(formatAttentionBarrier());
                         if (container) {
                             info(formatAttentionMessage(
