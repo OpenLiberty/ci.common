@@ -186,6 +186,12 @@ public class BaseDevUtilTest {
             // not needed for tests
             return true;
         }
+
+        @Override
+        public boolean compile(File dir, ProjectModule project) {
+            // not needed for tests
+            return false;
+        }
         
     }
     
