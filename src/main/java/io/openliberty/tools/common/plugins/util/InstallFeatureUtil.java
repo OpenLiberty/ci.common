@@ -571,6 +571,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             mapBasedInstallKernel.put("single.json.file", jsonRepos);
             mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
             mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
+            mapBasedInstallKernel.put("is.install.server.feature", true);
 
             if (isDebugEnabled()) {
                 mapBasedInstallKernel.put("debug", Level.FINEST);
@@ -761,8 +762,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             return downloadArtifact(groupId, artifactId, "jar",
                     String.format("[%s)", openLibertyVersion + ", " + getNextProductVersion(openLibertyVersion)));
         } catch (PluginExecutionException e) {
-            debug("Could not find override bundle " + groupId + ":" + artifactId
-                    + " for the current Open Liberty version " + openLibertyVersion);
+            debug("Using jar from Liberty directory for " + artifactId + " bundle.");
             return null;
         }
     }

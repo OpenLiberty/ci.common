@@ -10,7 +10,7 @@
 
 	<groupId>io.openliberty.tools</groupId>
 	<artifactId>ci.common</artifactId>
-	<version>1.8.15-SNAPSHOT</version>
+	<version>1.8.16-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>ci.common</name>
@@ -58,7 +58,7 @@
         <dependency>
             <groupId>io.openliberty.tools</groupId>
             <artifactId>liberty-ant-tasks</artifactId>
-            <version>1.9.8-SNAPSHOT</version>
+            <version>1.9.8</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
