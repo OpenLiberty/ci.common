@@ -45,6 +45,7 @@ public class ProjectModule {
     public Collection<File> recompileJavaSources;
     public Collection<File> deleteJavaSources;
     public Collection<File> failedCompilationJavaSources;
+    public boolean sourceDirRegistered;
 
     // src/test/java file changes
     public Collection<File> recompileJavaTests;
@@ -100,6 +101,7 @@ public class ProjectModule {
         this.recompileJavaSources = new HashSet<File>();
         this.deleteJavaSources = new HashSet<File>();
         this.failedCompilationJavaSources = new HashSet<File>();
+        this.sourceDirRegistered = false;
 
         // init src/test/java file tracking collections
         this.recompileJavaTests = new HashSet<File>();
