@@ -2494,6 +2494,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // watch src/main/java dir
                         if (p.getSourceDirectory().exists()) {
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
+                            p.sourceDirRegistered = true;
                         }
                     }
 
@@ -2706,6 +2707,24 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 warn("The resource directory " + resourceDir
                                         + " was deleted.  Restart dev mode for it to take effect.");
                                 p.getResourceMap().put(resourceDir, false);
+                            }
+                        }
+
+                        // Adding a src/main/java dir to an upstream project is not currently supported
+                        // for multi module projects. See
+                        // https://github.com/OpenLiberty/ci.maven/issues/1202
+                        if (shouldIncludeSources(p.getPackagingType())) {
+                            if (!p.sourceDirRegistered && p.getSourceDirectory().exists()
+                                    && p.getSourceDirectory().listFiles().length > 0) {
+                                p.sourceDirRegistered = true;
+                                warn("The source directory " + p.getSourceDirectory()
+                                        + " was added.  Restart dev mode for it to take effect.");
+
+                            } else if (p.sourceDirRegistered && !p.getSourceDirectory().exists()) {
+                                p.sourceDirRegistered = false;
+                                warn("The source directory " + p.getSourceDirectory()
+                                        + " was deleted.  Restart dev mode for it to take effect.");
+                                cleanTargetDir(p.getOutputDirectory());
                             }
                         }
 
