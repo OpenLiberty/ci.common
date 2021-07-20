@@ -2494,6 +2494,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // watch src/main/java dir
                         if (p.getSourceDirectory().exists()) {
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
+                            p.sourceDirRegistered = true;
                         }
                     }
 
@@ -2706,6 +2707,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 warn("The resource directory " + resourceDir
                                         + " was deleted.  Restart dev mode for it to take effect.");
                                 p.getResourceMap().put(resourceDir, false);
+                            }
+                        }
+
+                        // Adding a src/main/java dir to an upstream project is not currently supported
+                        // for multi module projects. See
+                        // https://github.com/OpenLiberty/ci.maven/issues/1202
+                        if (shouldIncludeSources(p.getPackagingType())) {
+                            if (!p.sourceDirRegistered && p.getSourceDirectory().exists()
+                                    && p.getSourceDirectory().listFiles().length > 0) {
+                                p.sourceDirRegistered = true;
+                                warn("The source directory " + p.getSourceDirectory()
+                                        + " was added.  This may result in compilation errors between dependent modules.  Restart dev mode for it to take effect.");
+                            } else if (p.sourceDirRegistered && !p.getSourceDirectory().exists()) {
+                                p.sourceDirRegistered = false;
+                                warn("The source directory " + p.getSourceDirectory()
+                                        + " was deleted.  This may result in compilation errors between dependent modules.  Restart dev mode for it to take effect.");
                             }
                         }
 
@@ -3381,7 +3398,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (fileChanged.isDirectory()) {
             // if new directory added, watch the entire directory
             if (changeType == ChangeType.CREATE) {
-                registerAll(fileChanged.toPath(), executor);
+                if (!isUpstreamSourceDir(fileChanged)) { // adding a src/main/java dir to an upstream project is not currently supported
+                    registerAll(fileChanged.toPath(), executor);
+                }
             }
             // otherwise if a directory was modified, just continue to the next entry
             // (if delete, can't tell if it was a directory since it doesn't exist anymore)
@@ -4670,4 +4689,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return (!project.disableDependencyCompile && recompileDependencies && !initialCompile);
     }
 
+    // returns true if directory is a src/main/java dir of an upstream module
+    private boolean isUpstreamSourceDir(File dirAdded) {
+        try {
+            if (isMultiModuleProject()) {
+                for (ProjectModule p : upstreamProjects) {
+                    if (p.getSourceDirectory().getCanonicalPath().startsWith(dirAdded.getCanonicalPath())) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } catch (IOException e) {
+            return false;
+        }
+    }
 }
