@@ -4106,7 +4106,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
         } else {
-            warn("File deleted but could not find corresponding file or folder in the target directory: "
+            debug("File deleted but could not find corresponding file or folder in the target directory: "
                     + fileChanged.getCanonicalPath() + ".");
         }
     }
