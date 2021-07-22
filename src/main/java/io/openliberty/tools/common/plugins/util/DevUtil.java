@@ -2406,6 +2406,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     Collection<File> failedCompilationJavaTests;
     long lastJavaSourceChange;
     long lastJavaTestChange;
+    Map<File, Long> lastBuildFileChange;
     boolean triggerJavaSourceRecompile;
     boolean triggerJavaTestRecompile;
     File outputDirectory;
@@ -3001,6 +3002,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
+        
         if (processSources) {
             if (triggerUpstreamJavaSourceRecompile) { // this is triggered from build file change
                 compileFailingProjects(null, false, executor);
@@ -3013,6 +3015,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             for (ProjectModule project : upstreamProjects) {
+                boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(project.getBuildFile()) + compileWaitMillis;
+                if (!pastBuildFileWaitPeriod) {
+                    continue;
+                }
+
                 // delete before recompiling, so if a file is in both lists, its class
                 // will be deleted then recompiled
                 if (!project.deleteJavaSources.isEmpty()) {
@@ -3214,7 +3221,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
-        if (processSources) {
+        boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
+        if (processSources && pastBuildFileWaitPeriod) {
             // delete before recompiling, so if a file is in both lists, its class will be
             // deleted then recompiled
             if (!deleteJavaSources.isEmpty()) {
@@ -3357,16 +3365,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaSourceRecompile = false;
         triggerJavaTestRecompile = false;
         triggerUpstreamJavaSourceRecompile = false;
+        lastBuildFileChange = new HashMap<File, Long>();
 
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
             for (ProjectModule project : upstreamProjects) {
                 compileUpstreamModule(project, false);
+                // build file tracking of upstream projects
+                lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
             }
         }
 
         // initial source and test compile
         compileMainModule(false);
+        // build file tracking of main project
+        lastBuildFileChange.put(buildFile, System.currentTimeMillis());
     }
 
     private void processFileChanges(
@@ -3466,6 +3479,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         && directory.startsWith(project.getBuildFile().getParentFile().getCanonicalFile().toPath())
                         && changeType == ChangeType.MODIFY) { // pom.xml
                     debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
+                    lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                     // when an upstream project build file changes, get the updated artifact paths
                     boolean updatedArtifactPaths = updateArtifactPaths(project.getBuildFile(),
                             project.getCompileArtifacts(), project.getTestArtifacts(), true, executor);
@@ -3668,6 +3682,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
+            lastBuildFileChange.put(buildFile, System.currentTimeMillis());
             boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, executor);
             // run all tests on build file change
             if (recompiledBuild) {
