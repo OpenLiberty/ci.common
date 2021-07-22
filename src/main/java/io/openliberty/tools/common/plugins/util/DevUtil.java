@@ -2589,15 +2589,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
                 if (isMultiModuleProject()) { // process java compilation for upstream projects
-                    processUpstreamJavaCompilation(upstreamProjects, executor);
+                    boolean change = processUpstreamJavaCompilation(upstreamProjects, executor);
 
                     // process java compilation for main project
                     processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
-                            testArtifactPaths, applicationId);
+                            testArtifactPaths, applicationId, change);
                 } else {
                     // process java compilation for main project
                     processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
-                            testArtifactPaths, null);
+                            testArtifactPaths, null, false);
                 }
 
                 // check if javaSourceDirectory has been added
@@ -2944,8 +2944,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return observer;
     }
 
-    private void processUpstreamJavaCompilation(List<ProjectModule> upstreamProjects,
+    private boolean processUpstreamJavaCompilation(List<ProjectModule> upstreamProjects,
             final ThreadPoolExecutor executor) throws PluginExecutionException, IOException {
+        boolean change = false;
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
@@ -2959,6 +2960,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (!failedCompilationJavaTests.isEmpty()) {
                     triggerJavaTestRecompile = true;
                 }
+                change = true;
             }
             for (ProjectModule project : upstreamProjects) {
 
@@ -2969,6 +2971,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     for (File file : project.deleteJavaSources) {
                         deleteJavaFile(file, project.getOutputDirectory(), project.getSourceDirectory());
                     }
+                    change = true;
                 }
                 if (!project.recompileJavaSources.isEmpty()) {
                     debug("Recompiling Java source files: " + project.recompileJavaSources);
@@ -2994,6 +2997,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
+                        change = true;
                     } else {
                         project.failedCompilationJavaSources.addAll(project.recompileJavaSources);
                     }
@@ -3003,6 +3007,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             compileModuleForBuildFile(dependentModule, false);
                         }
                         project.disableDependencyCompile = true;
+                        change = true; // TODO check if recompile dependencies really changes the class files
                     }
                 }
                 // additionally, process java test files if no changes detected after a
@@ -3076,6 +3081,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             triggerUpstreamJavaSourceRecompile = false;
         }
+        return change;
     }
 
     /**
@@ -3107,7 +3113,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             project.skipUTs(), false)) {
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
-
                     }
                 }
                 // compile failing tests
@@ -3125,10 +3130,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
-            List<String> compileArtifactPaths, List<String> testArtifactPaths, String projectName) throws IOException, PluginExecutionException {
+            List<String> compileArtifactPaths, List<String> testArtifactPaths, String projectName, boolean upstreamBuilt) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
+        boolean builtJava = upstreamBuilt;
         if (processSources) {
             // delete before recompiling, so if a file is in both lists, its class will be
             // deleted then recompiled
@@ -3137,6 +3143,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 for (File file : deleteJavaSources) {
                     deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                 }
+                builtJava = true;
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
                 debug("Recompiling Java source files: " + recompileJavaSources);
@@ -3151,16 +3158,23 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // if upstream projects exist try recompiling any failed projects
                 if (!disableDependencyCompile && isMultiModuleProject()) {
                     compileFailingProjects(null, false, executor);
+                    builtJava = true;
                 }
 
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
                         testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
+                    builtJava = true;
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
             }
+            // after compiling Java scan for Liberty features.
+            if (builtJava) {
+                libertyGenerateFeatures();
+            }
+
             // additionally, process java test files if no changes detected after a
             // different timeout
             // (but source timeout takes precedence i.e. don't recompile tests if someone
@@ -3476,6 +3490,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
+                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null) {
+                        libertyGenerateFeatures();
+                    }
                     if (changeType == ChangeType.CREATE) {
                         redeployApp();
                     }
@@ -3496,7 +3513,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
-                    if (fileChanged.getName().equals("server.env")) {
+                    // TODO Can server.xml be removed?
+                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null) {
+                        libertyGenerateFeatures();
+                    } else if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
                     }
@@ -3517,11 +3537,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (serverXmlFileParent != null
                 && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
+            // This is for server.xml outside of the config folder
+            // server will load new properties
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 // suppress install feature warning - property must be set before calling copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
+                libertyGenerateFeatures();
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -3533,6 +3556,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
+                libertyGenerateFeatures();
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();

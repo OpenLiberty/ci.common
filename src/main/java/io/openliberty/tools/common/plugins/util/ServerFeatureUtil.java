@@ -104,6 +104,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      * @param serverDirectory The server directory containing the server.xml
      * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
      * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
+     *         or null if there are no valid xml files or they have no featureManager section
      */
     public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles) {
         if (libertyDirPropFiles != null) {
