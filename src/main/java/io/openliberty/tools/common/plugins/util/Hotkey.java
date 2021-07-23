@@ -1,12 +1,16 @@
 package io.openliberty.tools.common.plugins.util;
 
 public class HotKey {
-    HotKey(char key, String message){
+
+    private String key; 
+    private String message; 
+
+    public HotKey(String key, String message){
         this.key = key;
         this.message = message;
     }
 
-    public void printMessage(){
+    public String printMessage(){
         return this.message;
     }
 
