@@ -3477,6 +3477,36 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     compileMainModule(true);
                 }
             }
+        } else if (serverXmlFileParent != null
+                && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
+                && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
+            // This is for server.xml specified by the configuration parameter
+            // server will load new properties
+            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                // suppress install feature warning - property must be set before calling copyConfigFolder
+                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
+                copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
+                copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
+                libertyGenerateFeatures();
+                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                    untrackDockerfileDirectoriesAndRestart();
+                } else if (changeType == ChangeType.CREATE) {
+                    redeployApp();
+                }
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+
+            } else if (changeType == ChangeType.DELETE) {
+                info("Config file deleted: " + fileChanged.getName());
+                deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
+                libertyGenerateFeatures();
+                // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
+                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                    untrackDockerfileDirectoriesAndRestart();
+                }
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+            }
         } else if (directory.startsWith(configPath)
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
                                                                                             // files
@@ -3530,36 +3560,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                         restartServer(false);
                     }    
-                }
-                // always skip UTs
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-            }
-        } else if (serverXmlFileParent != null
-                && directory.equals(serverXmlFileParent.getCanonicalFile().toPath())
-                && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
-            // This is for server.xml outside of the config folder
-            // server will load new properties
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                // suppress install feature warning - property must be set before calling copyConfigFolder
-                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
-                copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-                libertyGenerateFeatures();
-                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    untrackDockerfileDirectoriesAndRestart();
-                } else if (changeType == ChangeType.CREATE) {
-                    redeployApp();
-                }
-                // always skip UTs
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-
-            } else if (changeType == ChangeType.DELETE) {
-                info("Config file deleted: " + fileChanged.getName());
-                deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
-                libertyGenerateFeatures();
-                // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
-                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    untrackDockerfileDirectoriesAndRestart();
                 }
                 // always skip UTs
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
