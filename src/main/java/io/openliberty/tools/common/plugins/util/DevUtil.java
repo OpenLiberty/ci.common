@@ -4691,39 +4691,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Compile all classes in the module corresponding to the build file
-     * 
-     * @param moduleBuildFile build file
-     * @param testsOnly       true if only test classes should be compiled
-     * @param executor        ThreadPoolExecutor
-     * @return true if compilation is successful
-     * @throws IOException
-     * @throws PluginExecutionException
-     */
-    private boolean compileModuleForBuildFile(File moduleBuildFile, boolean testsOnly, ThreadPoolExecutor executor)
-            throws IOException, PluginExecutionException {
-        if (moduleBuildFile.getCanonicalPath().equals(buildFile.getCanonicalPath())) {
-            debug("recompileDependencies is set to true, recompiling the entire module for "
-                    + moduleBuildFile.getCanonicalPath());
-            disableDependencyCompile = true;
-            return compileAllClasses(testsOnly, executor);
-        }
-        for (ProjectModule project : upstreamProjects) {
-            if (moduleBuildFile.getCanonicalPath().equals(project.getBuildFile().getCanonicalPath())) {
-                debug("recompileDependencies is set to true, recompiling the entire module for "
-                        + moduleBuildFile.getCanonicalPath());
-                project.disableDependencyCompile = true;
-                return compileAllClasses(project, testsOnly, executor);
-            }
-        }
-        return false;
-    }
-
-    /**
      * Trigger a compile of the entire main module. The main module is the module
-     * with the Liberty configuration.
+     * with the Liberty configuration.Adds all Java files to the to be compiled list
+     * so that they will be compiled on next watch loop.
      * 
-     * @param testsOnly True if only tests need to be compiled.
+     * @param testsOnly true if ONLY tests should be compiled
      * @throws IOException
      */
     protected void triggerMainModuleCompile(boolean testsOnly) throws IOException {
@@ -4733,10 +4705,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Trigger a compile of the entire specified module. This is only used in a
-     * multi-module scenario
+     * multi-module scenario. Adds all Java files to the to be compiled list so that
+     * they will be compiled on next watch loop.
      * 
      * @param project   ProjectModule, the module to be compiled
-     * @param testsOnly True if only tests need to be compiled
+     * @param testsOnly true if ONLY tests should be compiled
      * @throws IOException
      */
     protected void triggerUpstreamModuleCompile(ProjectModule project, boolean testsOnly) throws IOException {
@@ -4764,12 +4737,65 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private boolean compileAllClasses(boolean tests, ThreadPoolExecutor executor) throws PluginExecutionException, IOException {
+    /**
+     * Compile all classes in the module corresponding to the build file.
+     * 
+     * @param moduleBuildFile build file
+     * @param testsOnly       true if test classes should be compiled
+     * @param executor        ThreadPoolExecutor
+     * @return true if compilation is successful
+     * @throws IOException
+     * @throws PluginExecutionException
+     */
+    private boolean compileModuleForBuildFile(File moduleBuildFile, boolean testsOnly, ThreadPoolExecutor executor)
+            throws IOException, PluginExecutionException {
+        if (moduleBuildFile.getCanonicalPath().equals(buildFile.getCanonicalPath())) {
+            debug("recompileDependencies is set to true, recompiling the entire module for "
+                    + moduleBuildFile.getCanonicalPath());
+            disableDependencyCompile = true;
+            return compileAllClasses(testsOnly, executor);
+        }
+        for (ProjectModule project : upstreamProjects) {
+            if (moduleBuildFile.getCanonicalPath().equals(project.getBuildFile().getCanonicalPath())) {
+                debug("recompileDependencies is set to true, recompiling the entire module for "
+                        + moduleBuildFile.getCanonicalPath());
+                project.disableDependencyCompile = true;
+                return compileAllClasses(project, testsOnly, executor);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Compiles all the Java files in the source directory of the main module.
+     * Compilation occurs immediately (not on next watch loop).
+     * 
+     * @param tests    true if Java files in the test source directory should also
+     *                 be compiled
+     * @param executor ThreadPoolExecutor
+     * @return true if compilation is successful
+     * @throws PluginExecutionException
+     * @throws IOException
+     */
+    private boolean compileAllClasses(boolean tests, ThreadPoolExecutor executor)
+            throws PluginExecutionException, IOException {
         return compileAllClasses(this.sourceDirectory, this.testSourceDirectory, packagingType, compileArtifactPaths,
                 testArtifactPaths, outputDirectory, testOutputDirectory, getProjectName(), buildFile, compilerOptions,
                 skipUTs, failedCompilationJavaSources, failedCompilationJavaTests, tests, executor);
     }
 
+    /**
+     * Compiles all the Java files in the source directory of the corresponding
+     * module. Compilation occurs immediately (not on next watch loop).
+     * 
+     * @param project  ProjectModule, the module to be compiled
+     * @param tests    true if Java files in the test source directory should also
+     *                 be compiled
+     * @param executor ThreadPoolExecutor
+     * @return true if compilation is successful
+     * @throws IOException
+     * @throws PluginExecutionException
+     */
     private boolean compileAllClasses(ProjectModule project, boolean tests, ThreadPoolExecutor executor)
             throws IOException, PluginExecutionException {
         return compileAllClasses(project.getSourceDirectory(), project.getTestSourceDirectory(),
