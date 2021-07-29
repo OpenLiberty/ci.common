@@ -21,12 +21,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class ProjectModule {
 
     private File buildFile;
-    private List<String> compileArtifacts;
-    private List<String> testArtifacts;
+    private Set<String> compileArtifacts;
+    private Set<String> testArtifacts;
     private File sourceDirectory;
     private File outputDirectory;
     private File testSourceDirectory;
@@ -76,8 +77,8 @@ public class ProjectModule {
      * @param skipITs             whether to skip integration tests for this project
      * @param compilerOptions     Java compiler options set in pom.xml
      */
-    public ProjectModule(File buildFile, String projectName, String packagingType, List<String> compileArtifacts,
-            List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
+    public ProjectModule(File buildFile, String projectName, String packagingType, Set<String> compileArtifacts,
+            Set<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
             File testOutputDirectory, List<File> resourceDirs, boolean skipTests, boolean skipUTs, boolean skipITs,
             JavaCompilerOptions compilerOptions, List<File> dependentModules) {
         this.buildFile = buildFile;
@@ -134,11 +135,11 @@ public class ProjectModule {
         return this.buildFile;
     }
 
-    public List<String> getCompileArtifacts() {
+    public Set<String> getCompileArtifacts() {
         return this.compileArtifacts;
     }
 
-    public List<String> getTestArtifacts() {
+    public Set<String> getTestArtifacts() {
         return this.testArtifacts;
     }
 
