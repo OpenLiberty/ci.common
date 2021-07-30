@@ -2395,9 +2395,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
-                            runTestThread(false, executor, -1, skipUTs, true, getAllBuildFiles());
+                            runTestThread(false, executor, -1, true, getAllBuildFiles());
                         } else {
-                            runTestThread(false, executor, -1, skipUTs, true, buildFile);
+                            runTestThread(false, executor, -1, true, buildFile);
                         }
                     }
                 }
@@ -2646,7 +2646,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Registering Java source directory: " + this.sourceDirectory);
                         // run tests after waiting for app update since app changed
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
                         sourceDirRegistered = true;
                     } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
                         cleanTargetDir(outputDirectory);
@@ -2660,7 +2660,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     compile(this.testSourceDirectory);
                     registerAll(testSrcPath, executor);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
-                    runTestThread(false, executor, -1, skipUTs, false, buildFile);
+                    runTestThread(false, executor, -1, false, buildFile);
                     testSourceDirRegistered = true;
 
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
@@ -2765,7 +2765,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                     compile(this.testSourceDirectory);
                                 }
                             }
-                            runTestThread(false, executor, -1, p.skipUTs(), false, getAllBuildFiles(p));
+                            runTestThread(false, executor, -1, false, getAllBuildFiles(p));
                         } else if (p.testSourceDirRegistered && !p.getTestSourceDirectory().exists()) {
                             cleanTargetDir(p.getTestOutputDirectory());
                             p.testSourceDirRegistered = false;
@@ -3142,8 +3142,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (successfulCompilation) {
                         // run tests on current module and dependent modules
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
-                                getAllBuildFiles(project));
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                     }
                 } else if (compileDownstreamTest) { // compile downstream modules' test classes
                     for (File dependentModule : project.getDependentModules()) {
@@ -3164,7 +3163,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (successfulCompilation) {
                         // run tests on current module and dependent modules without waiting for app
                         // update since only tests changed
-                        runTestThread(false, executor, -1, project.skipUTs(), false, getAllBuildFiles(project));
+                        runTestThread(false, executor, -1, false, getAllBuildFiles(project));
                     }
                 }
 
@@ -3173,11 +3172,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (!project.deleteJavaSources.isEmpty() && project.recompileJavaSources.isEmpty()) {
                     // run tests after waiting for app update since app changed
                     int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                    runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
-                            getAllBuildFiles(project));
+                    runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                 } else if (processTests && !project.deleteJavaTests.isEmpty() && project.recompileJavaTests.isEmpty()) {
                     // run tests without waiting for app update since only tests changed
-                    runTestThread(false, executor, -1, project.skipUTs(), false, getAllBuildFiles(project));
+                    runTestThread(false, executor, -1, false, getAllBuildFiles(project));
                 }
 
                 project.deleteJavaSources.clear();
@@ -3370,10 +3368,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
                 // run tests after waiting for app update since app changed
                 int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
+                runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
             } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
                 // run all tests without waiting for app update since only tests changed
-                runTestThread(false, executor, -1, skipUTs, false, buildFile);
+                runTestThread(false, executor, -1, false, buildFile);
             }
 
             deleteJavaSources.clear();
@@ -3394,9 +3392,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // if hot testing, run tests on startup
                     if (isMultiModuleProject()) {
                         // force run tests across all modules in multi module scenario
-                        runTestThread(false, executor, -1, skipUTs, true, getAllBuildFiles());
+                        runTestThread(false, executor, -1, true, getAllBuildFiles());
                     } else {
-                        runTestThread(false, executor, -1, skipUTs, false, buildFile);
+                        runTestThread(false, executor, -1, false, buildFile);
                     }
                 }
             }
@@ -3610,15 +3608,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         copyFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
 
                         // run all tests on resource change
-                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false,
                                 getAllBuildFiles(project));
                     } else if (changeType == ChangeType.DELETE) {
                         debug("Resource file deleted: " + fileChanged.getName());
                         deleteFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
 
                         // run all tests on resource change
-                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
-                                getAllBuildFiles(project));
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                     }
                 }
             }
@@ -3832,7 +3829,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private ProjectModule getFirstProjectModule(ProjectModule project, File buildFileChanged) throws IOException {
-        warn("searching project module: " + project.getProjectName());
         List<String> childBuildFiles = this.parentBuildFiles.get(buildFileChanged.getCanonicalPath());
         for (String childBuildPath : childBuildFiles) {
             if (childBuildPath.equals(project.getBuildFile().getCanonicalPath())) {
@@ -4502,6 +4498,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Run tests in a new thread.
+     * 
+     * @param waitForApplicationUpdate whether it should wait for the application to
+     *                                 update before running integration tests
+     * @param executor                 the thread pool executor
+     * @param messageOccurrences       how many times the application updated
+     *                                 message has occurred in the log
+     * @param manualInvocation         whether the tests were manually invoked
+     * @param currentBuildFiles        the build file(s) to run tests against
+     */
+    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences,
+            boolean manualInvocation, File... currentBuildFiles) {
+        // always pass in skip unit tests value for main project
+        runTestThread(waitForApplicationUpdate, executor, messageOccurrences, this.skipUTs, manualInvocation,
+                currentBuildFiles);
+    }
+
+    /**
+     * Run tests in a new thread. Only call this method directly if you want to
+     * override the skip unit tests value.
      * 
      * @param waitForApplicationUpdate whether it should wait for the application to
      *                                 update before running integration tests
