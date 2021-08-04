@@ -191,24 +191,32 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                                  server
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths,
-            List<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
+    public abstract boolean recompileBuildFile(File buildFile, Set<String> compileArtifactPaths,
+            Set<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
 
     /**
-     * Updates the compile artifact paths of the given build file
+     * Updates the compile artifact paths of the given project module. Only used in
+     * multi module scenario.
      * 
-     * @param buildFile
-     * @param compileArtifactPaths
-     * @param testArtifactPaths
-     * @param redeployCheck        Whether to redeploy the application if changes in
-     *                             the dependencies are detected
-     * @param executor             The thread pool executor
+     * @param projectModule The corresponding project module to update artifact
+     *                      paths for
+     * @param redeployCheck Whether to redeploy the application if changes in the
+     *                      dependencies are detected
+     * @param executor      The thread pool executor
      * @return true if the compile artifact paths are updated
      * @throws PluginExecutionException
      */
-    public abstract boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
-            List<String> testArtifactPaths, boolean redeployCheck, ThreadPoolExecutor executor)
-            throws PluginExecutionException;
+    public abstract boolean updateArtifactPaths(ProjectModule projectModule, boolean redeployCheck,
+            ThreadPoolExecutor executor) throws PluginExecutionException;
+
+    /**
+     * Update the compile artifact paths of any child modules of the given build
+     * file.
+     * 
+     * @param parentBuildFile The parent build file
+     * @return true if the compile artifact paths are updated
+     */
+    public abstract boolean updateArtifactPaths(File parentBuildFile);
 
     /**
      * Run the unit tests
@@ -367,6 +375,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private List<ProjectModule> upstreamProjects; // supports multi module scenario, null for single module projects
     private boolean recompileDependencies;
     private String packagingType;
+    protected File buildFile;
+    protected Map<String, List<String>> parentBuildFiles;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
@@ -376,7 +386,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
-            String packagingType) {
+            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -433,6 +443,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.hasFeaturesSh = new AtomicBoolean(false);
         this.serverFullyStarted = new AtomicBoolean(false);
         this.packagingType = packagingType;
+        this.buildFile = buildFile;
+        this.parentBuildFiles = parentBuildFiles;
     }
 
     /**
@@ -2383,9 +2395,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
-                            runTestThread(false, executor, -1, skipUTs, true, getAllBuildFiles());
+                            runTestThread(false, executor, -1, true, getAllBuildFiles());
                         } else {
-                            runTestThread(false, executor, -1, skipUTs, true, buildFile);
+                            runTestThread(false, executor, -1, true, buildFile);
                         }
                     }
                 }
@@ -2417,10 +2429,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     File bootstrapPropertiesFileParent;
     File jvmOptionsFile;
     File jvmOptionsFileParent;
-    File buildFile;
     File dockerfileUsed;
-    List<String> compileArtifactPaths;
-    List<String> testArtifactPaths;
+    Set<String> compileArtifactPaths;
+    Set<String> testArtifactPaths;
     WatchService watcher;
 
     // used for multi module projects
@@ -2431,7 +2442,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Watch files for changes.
      * 
-     * @param buildFile
      * @param outputDirectory
      * @param testOutputDirectory
      * @param executor
@@ -2445,10 +2455,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param jvmOptionsFile
      * @throws Exception
      */
-    public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
-            final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths,
+    public void watchFiles(File outputDirectory, File testOutputDirectory,
+            final ThreadPoolExecutor executor, Set<String> compileArtifactPaths, Set<String> testArtifactPaths,
             File serverXmlFile, File bootstrapPropertiesFile, File jvmOptionsFile) throws Exception {
-        this.buildFile = buildFile;
         this.outputDirectory = outputDirectory;
         this.testOutputDirectory = testOutputDirectory;
         this.serverXmlFile = serverXmlFile;
@@ -2488,10 +2497,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
 
+            // register parent poms
+            if (!parentBuildFiles.isEmpty()) {
+                for (String key : parentBuildFiles.keySet()) {
+                    File parentBuildFile = new File(key);
+                    if (parentBuildFile.exists()) {
+                        registerSingleFile(parentBuildFile, executor);
+                    }
+                }
+            }
+
             // check for upstream projects
             if (isMultiModuleProject()) {
                 for (ProjectModule p : upstreamProjects) {
-                    updateArtifactPaths(p.getBuildFile(), p.getCompileArtifacts(), p.getTestArtifacts(), false, executor);
+                    updateArtifactPaths(p, false, executor);
 
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
@@ -2627,7 +2646,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Registering Java source directory: " + this.sourceDirectory);
                         // run tests after waiting for app update since app changed
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
                         sourceDirRegistered = true;
                     } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
                         cleanTargetDir(outputDirectory);
@@ -2641,7 +2660,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     compile(this.testSourceDirectory);
                     registerAll(testSrcPath, executor);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
-                    runTestThread(false, executor, -1, skipUTs, false, buildFile);
+                    runTestThread(false, executor, -1, false, buildFile);
                     testSourceDirRegistered = true;
 
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
@@ -2746,7 +2765,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                     compile(this.testSourceDirectory);
                                 }
                             }
-                            runTestThread(false, executor, -1, p.skipUTs(), false, getAllBuildFiles(p));
+                            runTestThread(false, executor, -1, false, getAllBuildFiles(p));
                         } else if (p.testSourceDirRegistered && !p.getTestSourceDirectory().exists()) {
                             cleanTargetDir(p.getTestOutputDirectory());
                             p.testSourceDirRegistered = false;
@@ -3123,8 +3142,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (successfulCompilation) {
                         // run tests on current module and dependent modules
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
-                                getAllBuildFiles(project));
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                     }
                 } else if (compileDownstreamTest) { // compile downstream modules' test classes
                     for (File dependentModule : project.getDependentModules()) {
@@ -3145,7 +3163,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (successfulCompilation) {
                         // run tests on current module and dependent modules without waiting for app
                         // update since only tests changed
-                        runTestThread(false, executor, -1, project.skipUTs(), false, getAllBuildFiles(project));
+                        runTestThread(false, executor, -1, false, getAllBuildFiles(project));
                     }
                 }
 
@@ -3154,11 +3172,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (!project.deleteJavaSources.isEmpty() && project.recompileJavaSources.isEmpty()) {
                     // run tests after waiting for app update since app changed
                     int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                    runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
-                            getAllBuildFiles(project));
+                    runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                 } else if (processTests && !project.deleteJavaTests.isEmpty() && project.recompileJavaTests.isEmpty()) {
                     // run tests without waiting for app update since only tests changed
-                    runTestThread(false, executor, -1, project.skipUTs(), false, getAllBuildFiles(project));
+                    runTestThread(false, executor, -1, false, getAllBuildFiles(project));
                 }
 
                 project.deleteJavaSources.clear();
@@ -3266,7 +3283,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
-            List<String> compileArtifactPaths, List<String> testArtifactPaths, String projectName) throws IOException, PluginExecutionException {
+            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, String projectName) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
@@ -3351,10 +3368,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
                 // run tests after waiting for app update since app changed
                 int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
+                runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
             } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
                 // run all tests without waiting for app update since only tests changed
-                runTestThread(false, executor, -1, skipUTs, false, buildFile);
+                runTestThread(false, executor, -1, false, buildFile);
             }
 
             deleteJavaSources.clear();
@@ -3375,9 +3392,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // if hot testing, run tests on startup
                     if (isMultiModuleProject()) {
                         // force run tests across all modules in multi module scenario
-                        runTestThread(false, executor, -1, skipUTs, true, getAllBuildFiles());
+                        runTestThread(false, executor, -1, true, getAllBuildFiles());
                     } else {
-                        runTestThread(false, executor, -1, skipUTs, false, buildFile);
+                        runTestThread(false, executor, -1, false, buildFile);
                     }
                 }
             }
@@ -3478,6 +3495,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // reset this property in case it had been set to true
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.FALSE.toString());
 
+        // parent build file changed
+        if (!this.parentBuildFiles.isEmpty() && this.parentBuildFiles.containsKey(fileChanged.getCanonicalPath())
+                && changeType == ChangeType.MODIFY) {
+            debug("Change detected in parent build file: " + fileChanged + ". Updating compile artifact paths.");
+            updateArtifactPaths(fileChanged);
+            // compile child modules
+            if (recompileDependencies) {
+                // upstream projects are in build order
+                // search for first upstream project that is a child module
+                if (isMultiModuleProject()) {
+                    ProjectModule project = getFirstProjectModule(fileChanged);
+                    if (project != null) {
+                        triggerUpstreamModuleCompile(project, false);
+                    } else {
+                        triggerMainModuleCompile(false);
+                    }
+                } else {
+                    triggerMainModuleCompile(false);
+                }
+            } else {
+                // trigger recompile of failing source and test
+                compileFailingProjects(null, false, executor);
+            }
+        }
+
         // upstream project source file changed
         if (this.upstreamProjects != null && !this.upstreamProjects.isEmpty()) {
             for (ProjectModule project : this.upstreamProjects) {
@@ -3534,12 +3576,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
                     lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                     // when an upstream project build file changes, get the updated artifact paths
-                    boolean updatedArtifactPaths = updateArtifactPaths(project.getBuildFile(),
-                            project.getCompileArtifacts(), project.getTestArtifacts(), true, executor);
+                    boolean updatedArtifactPaths = updateArtifactPaths(project, true, executor);
                     if (updatedArtifactPaths) {
                         if (recompileDependencies) {
                             // recompile the entire module
-                            triggerUpstreamModuleCompile(project, false);
+                            if (!project.getSourceDirectory().exists() && !project.getTestSourceDirectory().exists()
+                                    && !project.getDependentModules().isEmpty()) {
+                                // parent project, trigger compile on first dependent module
+                                triggerUpstreamModuleCompile(getProjectModule(project.getDependentModules().get(0)),
+                                        false);
+                            } else {
+                                triggerUpstreamModuleCompile(project, false);
+                            }
                         } else {
                             // trigger java source recompile of all projects if there are compilation errors
                             // in this project
@@ -3560,15 +3608,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         copyFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
 
                         // run all tests on resource change
-                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false,
                                 getAllBuildFiles(project));
                     } else if (changeType == ChangeType.DELETE) {
                         debug("Resource file deleted: " + fileChanged.getName());
                         deleteFile(fileChanged, upstreamResourceParent, project.getOutputDirectory(), null);
 
                         // run all tests on resource change
-                        runTestThread(true, executor, numApplicationUpdatedMessages, project.skipUTs(), false,
-                                getAllBuildFiles(project));
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                     }
                 }
             }
@@ -3767,6 +3814,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
             untrackDockerfileDirectoriesAndRestart();
         }
+    }
+
+    // given the parent build file changed, return the first dependent project in
+    // the reactor build
+    private ProjectModule getFirstProjectModule(File buildFileChanged) throws IOException {
+        for (ProjectModule project : this.upstreamProjects) {
+            ProjectModule match = getFirstProjectModule(project, buildFileChanged);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    private ProjectModule getFirstProjectModule(ProjectModule project, File buildFileChanged) throws IOException {
+        List<String> childBuildFiles = this.parentBuildFiles.get(buildFileChanged.getCanonicalPath());
+        for (String childBuildPath : childBuildFiles) {
+            if (childBuildPath.equals(project.getBuildFile().getCanonicalPath())) {
+                // found match
+                return project;
+            } else if (this.parentBuildFiles.containsKey(childBuildPath)) {
+                return getFirstProjectModule(project, new File(childBuildPath));
+            }
+        }
+        return null;
     }
 
     /**
@@ -4194,7 +4266,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param skipRunningTests whether to skip running tests, takes precedence over the forceSkipUTs param
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
+    protected boolean recompileJavaSource(Collection<File> javaFilesChanged, Set<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
             File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
             boolean skipRunningTests) throws PluginExecutionException {
@@ -4217,7 +4289,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param skipRunningTests whether to skip running tests, takes precedence over the forceSkipUTs param
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
-    protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
+    protected boolean recompileJavaTest(Collection<File> javaFilesChanged, Set<String> artifactPaths,
             ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory, String projectName,
             File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
             boolean skipRunningTests) throws PluginExecutionException {
@@ -4247,7 +4319,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws PluginExecutionException if the classes output directory doesn't
      *                                  exist and can't be created
      */
-    protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths,
+    protected boolean recompileJava(Collection<File> javaFilesChanged, Set<String> artifactPaths,
             ThreadPoolExecutor executor, boolean tests, File outputDirectory, File testOutputDirectory,
             String projectName, File projectBuildFile, JavaCompilerOptions projectCompilerOptions, boolean forceSkipUTs,
             boolean skipRunningTests) throws PluginExecutionException {
@@ -4373,7 +4445,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @return set of classpath files
      * @throws IOException unable to resolve canonical path
      */
-    protected Set<File> getClassPath(List<String> artifactPaths, List<File> outputDirs) throws IOException {
+    protected Set<File> getClassPath(Set<String> artifactPaths, List<File> outputDirs) throws IOException {
         Set<String> parsedFiles = new HashSet<>();
         Deque<String> toParse = new ArrayDeque<>();
 
@@ -4426,6 +4498,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Run tests in a new thread.
+     * 
+     * @param waitForApplicationUpdate whether it should wait for the application to
+     *                                 update before running integration tests
+     * @param executor                 the thread pool executor
+     * @param messageOccurrences       how many times the application updated
+     *                                 message has occurred in the log
+     * @param manualInvocation         whether the tests were manually invoked
+     * @param currentBuildFiles        the build file(s) to run tests against
+     */
+    public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences,
+            boolean manualInvocation, File... currentBuildFiles) {
+        // always pass in skip unit tests value for main project
+        runTestThread(waitForApplicationUpdate, executor, messageOccurrences, this.skipUTs, manualInvocation,
+                currentBuildFiles);
+    }
+
+    /**
+     * Run tests in a new thread. Only call this method directly if you want to
+     * override the skip unit tests value.
      * 
      * @param waitForApplicationUpdate whether it should wait for the application to
      *                                 update before running integration tests
@@ -4618,6 +4709,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return containerName;
     }
 
+    public Set<String> getCompileArtifacts() {
+        return compileArtifactPaths;
+    }
+
+    public Set<String> getTestArtifacts() {
+        return testArtifactPaths;
+    }
+
     /**
      * Updates the Java compiler options
      * @param updatedCompilerOptions
@@ -4651,7 +4750,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @return true if this is a multi module project, false if not
      */
-    private boolean isMultiModuleProject() {
+    public boolean isMultiModuleProject() {
         return (upstreamProjects != null && !upstreamProjects.isEmpty());
     }
 
@@ -4806,7 +4905,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private boolean compileAllClasses(File sourceDir, File testSourceDir, String packagingType,
-            List<String> compileArtifactPaths, List<String> testArtifactPaths, File outputDir, File testOutputDir,
+            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, File outputDir, File testOutputDir,
             String projectName, File buildFile, JavaCompilerOptions compilerOptions, boolean skipUTs,
             Collection<File> failedCompilationJavaSources, Collection<File> failedCompilationJavaTests, boolean tests,
             ThreadPoolExecutor executor) throws IOException, PluginExecutionException {
