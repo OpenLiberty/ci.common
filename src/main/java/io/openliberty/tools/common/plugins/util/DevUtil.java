@@ -444,7 +444,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.serverFullyStarted = new AtomicBoolean(false);
         this.packagingType = packagingType;
         this.buildFile = buildFile;
-        this.parentBuildFiles = parentBuildFiles;
+        if (parentBuildFiles == null) {
+            this.parentBuildFiles = new HashMap<String, List<String>>();
+        } else {
+            this.parentBuildFiles = parentBuildFiles;
+        }
     }
 
     /**
