@@ -376,6 +376,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean recompileDependencies;
     private String packagingType;
     protected File buildFile;
+    /** Map of parent build files (parent build file, list of children build files) */
     protected Map<String, List<String>> parentBuildFiles;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
