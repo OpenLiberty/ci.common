@@ -728,7 +728,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         debug("install.kernel.init.code: " + mapBasedInstallKernel.get("install.kernel.init.code"));
         debug("install.kernel.init.error.message: " + mapBasedInstallKernel.get("install.kernel.init.error.message"));
-        File usrDir = new File(installDirectory, "usr/tmp");
+        File usrDir = new File(installDirectory, "usr");
         mapBasedInstallKernel.put("target.user.directory", usrDir);
         return mapBasedInstallKernel;
     }

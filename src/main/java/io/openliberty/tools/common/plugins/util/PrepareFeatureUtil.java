@@ -42,6 +42,8 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
+import org.apache.commons.io.FileUtils;
+
 
 public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
@@ -56,6 +58,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	private File installJarFile;
 	private File jsonFile;
+	
 
 	public PrepareFeatureUtil(File installDirectory, String openLibertyVersion)
 			throws PluginScenarioException, PluginExecutionException {
@@ -113,6 +116,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
 				String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
 						version);
+				
 				Map<File, String> esaFiles = downloadArtifactsFromBOM(additionalBOM);
 				File generatedJson = generateJson(targetJsonFile, esaFiles);
 				if (generatedJson.exists()) {
@@ -176,9 +180,15 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 */
 	private String createArtifactFilePath(String repoLocation, String groupId, String artifactId, String fileType,
 			String version) {
-		groupId = groupId.replace(".", "/");
-		return String.format("%s%s/%s/%s/%s-%s.%s", repoLocation, groupId, artifactId, version, artifactId, version,
-				fileType);
+		if (OSUtil.isWindows()) {
+			groupId = groupId.replace(".", "\\");
+			return String.format("%s%s\\%s\\%s\\%s-%s.%s", repoLocation, groupId, artifactId, version, artifactId, version,
+					fileType);
+		} else {
+			groupId = groupId.replace(".", "/");
+			return String.format("%s%s/%s/%s/%s-%s.%s", repoLocation, groupId, artifactId, version, artifactId, version,
+					fileType);
+		}
 	}
 
 	/**
@@ -195,10 +205,17 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	private String parseRepositoryLocation(File fileFromRepo, String groupId, String artifactId, String fileType,
 			String version) {
 		String absFileFromRepo = fileFromRepo.getAbsolutePath();
-		groupId = groupId.replace(".", "/");
-		String fileSubString = String.format("%s/%s/%s/%s-%s.%s", groupId, artifactId, version, artifactId, version,
-				fileType);
-
+		String fileSubString = "";
+		if (OSUtil.isWindows()) {
+			groupId = groupId.replace(".", "\\");
+			fileSubString = String.format("%s\\%s\\%s\\%s-%s.%s", groupId, artifactId, version, artifactId, version,
+					fileType);
+		}  else {
+			groupId = groupId.replace(".", "/");
+			fileSubString = String.format("%s/%s/%s/%s-%s.%s", groupId, artifactId, version, artifactId, version,
+					fileType);
+		}
+		
 		return absFileFromRepo.replace(fileSubString, "");
 	}
 
@@ -233,11 +250,11 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				mapBasedInstallKernel.put("generate.json.group.id.map", esaFileMap);
 				mapBasedInstallKernel.put("generate.json", true);
 				json = (File) mapBasedInstallKernel.get("generate.json");
-
+				
 				if (mapBasedInstallKernel.get("action.error.message") != null) {
 					debug("generateJson action.exception.stacktrace: "
 							+ mapBasedInstallKernel.get("action.error.stacktrace"));
-				}
+				}	
 
 			} catch (PrivilegedActionException e) {
 				throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
@@ -324,7 +341,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		}
 		debug("install.kernel.init.code: " + mapBasedInstallKernel.get("install.kernel.init.code"));
 		debug("install.kernel.init.error.message: " + mapBasedInstallKernel.get("install.kernel.init.error.message"));
-		File usrDir = new File(installDirectory, "usr/tmp");
+		File usrDir = new File(installDirectory, "usr");
 		mapBasedInstallKernel.put("target.user.directory", usrDir);
 		return mapBasedInstallKernel;
 	}
