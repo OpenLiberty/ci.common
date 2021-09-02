@@ -89,7 +89,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
-    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.9";
+    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.10";
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
 
@@ -130,7 +130,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
             downloadedJsons = downloadProductJsons();
             if (additionalJsons != null && !additionalJsons.isEmpty()) {
-            	//check if the openliberty kernel meets min required version 21.0.0.9
+            	//check if the openliberty kernel meets min required version 21.0.0.10
             	DefaultArtifactVersion minVersion = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
             	DefaultArtifactVersion version = new DefaultArtifactVersion(openLibertyVersion);
             	

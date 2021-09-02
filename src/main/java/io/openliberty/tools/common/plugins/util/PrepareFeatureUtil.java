@@ -54,7 +54,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
 	public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
 	public static final String FEATURES_JSON_ARTIFACT_ID = "features";
-	private static final String MIN_USER_FEATURE_VERSION = "21.0.0.9";
+	private static final String MIN_USER_FEATURE_VERSION = "21.0.0.10";
 
 	private File installJarFile;
 	private File jsonFile;
@@ -66,7 +66,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		this.openLibertyVersion = openLibertyVersion;
 		installJarFile = loadInstallJarFile(installDirectory);
 
-		// check if the openliberty kernel meets min required version 21.0.0.9
+		// check if the openliberty kernel meets min required version 21.0.0.10
 		DefaultArtifactVersion minVersion = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
 		DefaultArtifactVersion version = new DefaultArtifactVersion(openLibertyVersion);
 
