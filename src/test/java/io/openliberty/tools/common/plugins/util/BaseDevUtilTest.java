@@ -19,6 +19,7 @@ package io.openliberty.tools.common.plugins.util;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.junit.Rule;
@@ -33,10 +34,11 @@ public class BaseDevUtilTest {
 
     public class DevTestUtil extends DevUtil {
 
-        public DevTestUtil(File serverDirectory, File sourceDirectory,
-                File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(null, serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null, resourceDirs, hotTests, skipTests, 
-                  false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null, null, 0, false, null, false, null, null, false);
+        public DevTestUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
+                List<File> resourceDirs, boolean hotTests, boolean skipTests) {
+            super(null, serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null,
+                    resourceDirs, hotTests, skipTests, false, false, null, 30, 30, 5, 500, true, false, false, false,
+                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null);
         }
 
         @Override
@@ -100,16 +102,21 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public boolean recompileBuildFile(File buildFile, List<String> compileArtifactPaths,
-                List<String> testArtifactPaths, ThreadPoolExecutor executor) {
+        public boolean recompileBuildFile(File buildFile, Set<String> compileArtifactPaths,
+                Set<String> testArtifactPaths, ThreadPoolExecutor executor) {
             // not needed for tests
             return false;
         }
 
         @Override
-        public boolean updateArtifactPaths(File buildFile, List<String> compileArtifactPaths,
-                List<String> testArtifactPaths, boolean redeployCheck, ThreadPoolExecutor executor)
-                throws PluginExecutionException {
+        public boolean updateArtifactPaths(ProjectModule projectModule, boolean redeployCheck,
+                ThreadPoolExecutor executor) throws PluginExecutionException {
+            // not needed for tests
+            return false;
+        }
+
+        @Override
+        public boolean updateArtifactPaths(File parentBuildFile) {
             // not needed for tests
             return false;
         }
@@ -190,6 +197,12 @@ public class BaseDevUtilTest {
         public boolean isLooseApplication() {
             // not needed for tests
             return true;
+        }
+
+        @Override
+        public boolean compile(File dir, ProjectModule project) {
+            // not needed for tests
+            return false;
         }
         
     }

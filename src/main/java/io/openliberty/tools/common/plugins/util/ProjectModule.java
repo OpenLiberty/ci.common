@@ -21,17 +21,20 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class ProjectModule {
 
     private File buildFile;
-    private List<String> compileArtifacts;
-    private List<String> testArtifacts;
+    private Set<String> compileArtifacts;
+    private Set<String> testArtifacts;
     private File sourceDirectory;
     private File outputDirectory;
     private File testSourceDirectory;
     private File testOutputDirectory;
     private String projectName;
+    private String packagingType;
+
     private List<File> resourceDirs;
     private HashMap<File, Boolean> resourceMap;
     private boolean skipUTs;
@@ -43,6 +46,7 @@ public class ProjectModule {
     public Collection<File> recompileJavaSources;
     public Collection<File> deleteJavaSources;
     public Collection<File> failedCompilationJavaSources;
+    public boolean sourceDirRegistered;
 
     // src/test/java file changes
     public Collection<File> recompileJavaTests;
@@ -60,6 +64,7 @@ public class ProjectModule {
      * 
      * @param buildFile           pom.xml
      * @param projectName         project name (artifactId)
+     * @param packagingType       packaging type
      * @param compileArtifacts    compileArtifacts of project
      * @param testArtifacts       testArtifacts of project
      * @param sourceDirectory     src/main/java dir
@@ -72,12 +77,13 @@ public class ProjectModule {
      * @param skipITs             whether to skip integration tests for this project
      * @param compilerOptions     Java compiler options set in pom.xml
      */
-    public ProjectModule(File buildFile, String projectName, List<String> compileArtifacts,
-            List<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
+    public ProjectModule(File buildFile, String projectName, String packagingType, Set<String> compileArtifacts,
+            Set<String> testArtifacts, File sourceDirectory, File outputDirectory, File testSourceDirectory,
             File testOutputDirectory, List<File> resourceDirs, boolean skipTests, boolean skipUTs, boolean skipITs,
             JavaCompilerOptions compilerOptions, List<File> dependentModules) {
         this.buildFile = buildFile;
         this.projectName = projectName;
+        this.packagingType = packagingType;
         this.compileArtifacts = compileArtifacts;
         this.testArtifacts = testArtifacts;
         this.sourceDirectory = sourceDirectory;
@@ -96,6 +102,7 @@ public class ProjectModule {
         this.recompileJavaSources = new HashSet<File>();
         this.deleteJavaSources = new HashSet<File>();
         this.failedCompilationJavaSources = new HashSet<File>();
+        this.sourceDirRegistered = false;
 
         // init src/test/java file tracking collections
         this.recompileJavaTests = new HashSet<File>();
@@ -120,15 +127,19 @@ public class ProjectModule {
         return this.projectName;
     }
 
+    public String getPackagingType() {
+        return packagingType;
+    }
+
     public File getBuildFile() {
         return this.buildFile;
     }
 
-    public List<String> getCompileArtifacts() {
+    public Set<String> getCompileArtifacts() {
         return this.compileArtifacts;
     }
 
-    public List<String> getTestArtifacts() {
+    public Set<String> getTestArtifacts() {
         return this.testArtifacts;
     }
 
