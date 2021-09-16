@@ -378,6 +378,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected File buildFile;
     /** Map of parent build files (parent build file, list of children build files) */
     protected Map<String, List<String>> parentBuildFiles;
+    private boolean generateFeatures;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
@@ -387,7 +388,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
-            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles) {
+            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -450,6 +451,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else {
             this.parentBuildFiles = parentBuildFiles;
         }
+        this.generateFeatures = generateFeatures;
     }
 
     /**
@@ -1745,7 +1747,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // suppress install feature warning
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
-        libertyGenerateFeatures();
+        if (generateFeatures) {
+            libertyGenerateFeatures();
+        }
         // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
         if (!container) {
             libertyInstallFeature();
@@ -3340,7 +3344,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             // after compiling Java scan for Liberty features.
-            if (builtJava) {
+            if (builtJava && generateFeatures) {
                 libertyGenerateFeatures();
             }
 
@@ -3698,7 +3702,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-                libertyGenerateFeatures();
+                if (generateFeatures) {
+                    libertyGenerateFeatures();
+                }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -3710,7 +3716,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
-                libertyGenerateFeatures();
+                if (generateFeatures) {
+                    libertyGenerateFeatures();
+                }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
@@ -3731,7 +3739,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
-                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null) {
+                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                         libertyGenerateFeatures();
                     }
                     if (changeType == ChangeType.CREATE) {
@@ -3755,7 +3763,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
                     // TODO Can server.xml be removed?
-                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null) {
+                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                         libertyGenerateFeatures();
                     } else if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
