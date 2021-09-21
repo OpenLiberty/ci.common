@@ -75,8 +75,8 @@ public abstract class LooseApplication {
         config.addFile(getManifestOrDefault(manifestFile, destDir), MANIFEST_TARGET);
     } 
     
-    private File getManifestOrDefault(File manifestFile, String destiDir) throws IOException, PluginExecutionException {
-        File defaultManifestFileLocation = new File(destiDir + "/tmp" + MANIFEST_TARGET);
+    private File getManifestOrDefault(File manifestFile, String destDir) throws IOException, PluginExecutionException {
+        File defaultManifestFileLocation = new File(destDir + "/tmp" + MANIFEST_TARGET);
         defaultManifestFileLocation.getParentFile().mkdirs();
         if(manifestFile != null && manifestFile.exists() && manifestFile.isFile()) {
             // Copy the file to a good location (guaranteed inside META-INF folder)
