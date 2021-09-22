@@ -58,6 +58,12 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
+    public static final String CONFLICT = "CWWKF0033E.*", INCOMPATIBLE_SINGLETON = "CWWKF1405E.*",
+            MISSING_MULTIPLE_DEPENDENT = "CWWKF1385E.*", SAME_MODEL_CONFLICT = "CWWKF0043E.*",
+            DIFF_MODEL_CONFLICT = "CWWKF0044E.*", SAME_INDIRECT_MODEL_CONFLICT = "CWWKF0047E.*",
+            EE_CONFLICT = SAME_MODEL_CONFLICT + "|" + DIFF_MODEL_CONFLICT + "|" + SAME_INDIRECT_MODEL_CONFLICT,
+            ANY_CONFLICT = CONFLICT + "|" + MISSING_MULTIPLE_DEPENDENT + "|" + INCOMPATIBLE_SINGLETON + "|"
+                    + EE_CONFLICT;
 
     private final File installDirectory;
 
@@ -519,6 +525,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     info(exceptionMessage);
                     info("The features are already installed, so no action is needed.");
                     return;
+                } else if (exceptionMessage.matches(ANY_CONFLICT)) {
+                    throw new PluginExecutionException("A feature conflict was detected. " + exceptionMessage);
                 } else {
                     throw new PluginExecutionException(exceptionMessage);
                 }
@@ -926,6 +934,10 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             } else {
                 error("An error occurred while installing features: " + cmdResult);
             }
+        } else if (cmdResult.matches(ANY_CONFLICT)) {
+            // feature conflict
+            error("A feature conflict was detected, the features could not be installed.");
+            error(cmdResult);
         } else {
             // Log the successful output as debug
             debug(cmdResult);
