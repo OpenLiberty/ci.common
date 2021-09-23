@@ -28,6 +28,7 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -43,6 +44,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -83,6 +86,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static Boolean saveURLCacheStatus = null;
 
     private final String containerName;
+    private Path tempConfigPath;
 
     /**
      * Initialize the utility and check for unsupported scenarios.
@@ -510,6 +514,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
 
             Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
+
             if (resolvedFeatures == null) {
                 debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
@@ -525,10 +530,14 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     info(exceptionMessage);
                     info("The features are already installed, so no action is needed.");
                     return;
-                } else if (exceptionMessage.matches(ANY_CONFLICT)) {
-                    throw new PluginExecutionException("A feature conflict was detected. " + exceptionMessage);
                 } else {
-                    throw new PluginExecutionException(exceptionMessage);
+                    if (isFeatureConflict(exceptionMessage)) {
+                        throw new PluginExecutionException(
+                                "A feature conflict error occurred while installing features: " + featuresToInstall
+                                        + ": " + exceptionMessage);
+                    } else {
+                        throw new PluginExecutionException(exceptionMessage);
+                    }
                 }
             }
             Collection<File> artifacts = downloadEsas(resolvedFeatures);
@@ -932,12 +941,13 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 // The features are already installed message
                 debug(cmdResult);
             } else {
-                error("An error occurred while installing features: " + cmdResult);
+                if (isFeatureConflict(cmdResult)) {
+                    error("A feature conflict error occurred while installing features: " + features + ": "
+                            + cmdResult);
+                } else {
+                    error("An error occurred while installing features: " + cmdResult);
+                }
             }
-        } else if (cmdResult.matches(ANY_CONFLICT)) {
-            // feature conflict
-            error("A feature conflict was detected, the features could not be installed.");
-            error(cmdResult);
         } else {
             // Log the successful output as debug
             debug(cmdResult);
@@ -978,6 +988,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             jsonReader.close();
         }
         return newServerFeatures;
+    }
+
+    private boolean isFeatureConflict(String exceptionMessage) {
+        Pattern p = Pattern.compile(ANY_CONFLICT);
+        Matcher m = p.matcher(exceptionMessage);
+        if (m.find()) {
+            return true;
+        }
+        return false;
     }
 
 }
