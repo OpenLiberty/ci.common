@@ -16,9 +16,9 @@
 package io.openliberty.tools.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -28,9 +28,6 @@ import java.util.Set;
 
 import org.junit.Test;
 
-import io.openliberty.tools.common.plugins.util.InstallFeatureUtil;
-import io.openliberty.tools.common.plugins.util.PluginExecutionException;
-import io.openliberty.tools.common.plugins.util.PluginScenarioException;
 import io.openliberty.tools.common.plugins.util.InstallFeatureUtil.ProductProperties;
 
 public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
