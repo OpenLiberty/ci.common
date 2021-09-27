@@ -1158,7 +1158,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         File tempDockerfile = null;
         try {
             debug("Creating temp Dockerfile...");
-            tempDockerfile = File.createTempFile("tempDockerfile", "");
+            File devcHiddenFolder = new File(buildDirectory, DEVC_HIDDEN_FOLDER);
+            devcHiddenFolder.mkdirs();
+            tempDockerfile = File.createTempFile("tempDockerfile", "", devcHiddenFolder);
             debug("temp Dockerfile: " + tempDockerfile);
             tempDockerfilePath = tempDockerfile.toPath(); // save name to clean up later
             if (keepTempDockerfile) {

@@ -15,11 +15,11 @@
  */
 package io.openliberty.tools.common.plugins.util;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertArrayEquals;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -38,8 +38,6 @@ import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import io.openliberty.tools.common.plugins.util.DevUtil;
 
 public class DevUtilTest extends BaseDevUtilTest {
 
