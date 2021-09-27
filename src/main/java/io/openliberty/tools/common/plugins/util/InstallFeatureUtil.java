@@ -89,7 +89,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
-    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.10";
+    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.1";
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
 
@@ -608,10 +608,10 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 String ext = artifactsToExt.get(esaFile);
                 mapBasedInstallKernel.put("to.extension", TO_USER);
                 
-                if (ext!= null && ext != "" && to != null) {
+                if (ext!= null && !ext.equals("") && to != null) {
                 	warn("The product extension location \""+ext+"\" specified in the server.xml file overrides the to extension \""+to+"\" specified in the build file.");
                 }
-                if (ext != null && ext != "") {
+                if (ext != null && !ext.equals("")) {
                 	mapBasedInstallKernel.put("to.extension", ext);
                 	debug("Installing to extension from server.xml: " + ext);
                 } else if (to != null) {
