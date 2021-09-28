@@ -48,7 +48,6 @@ public abstract class XmlDocument {
     
     public void createDocument(File xmlFile) throws ParserConfigurationException, SAXException, IOException {
         DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
-        //builderFactory.setIgnoringComments(true);
         builderFactory.setCoalescing(true);
         builderFactory.setIgnoringElementContentWhitespace(true);
         builderFactory.setValidating(false);
