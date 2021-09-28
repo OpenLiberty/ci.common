@@ -29,24 +29,38 @@ import org.xml.sax.SAXException;
 import org.w3c.dom.Element;
 import org.w3c.dom.Comment;
 
-public class ServerConfigDropinXmlDocument extends XmlDocument {
+public class ServerConfigXmlDocument extends XmlDocument {
 
     private Element featureManager = null;
 
-    private ServerConfigDropinXmlDocument() {
+    private ServerConfigXmlDocument() {
     }
 
-    public static ServerConfigDropinXmlDocument newInstance() throws ParserConfigurationException {
-        ServerConfigDropinXmlDocument configDocument = new ServerConfigDropinXmlDocument();
+    /**
+     * Create a new Document Object Model for a server configuration file with a single element: server.
+     * @return A reference to the object representing a new DOM
+     * @throws ParserConfigurationException
+     */
+    public static ServerConfigXmlDocument newInstance() throws ParserConfigurationException {
+        ServerConfigXmlDocument configDocument = new ServerConfigXmlDocument();
         configDocument.createDocument("server");
         return configDocument;
     }
 
-    public static ServerConfigDropinXmlDocument newInstance(File f) throws ParserConfigurationException, SAXException, IOException {
+    /**
+     * Create a Document Object Model for a server configuration file and populate it from an existing XML file.
+     * The file should be a valid server configuration file with one top-most element called "server."
+     * @param f  An XML file to read in and store in the created DOM.
+     * @return   A reference to the object representing a new DOM
+     * @throws ParserConfigurationException
+     * @throws SAXException
+     * @throws IOException
+     */
+    public static ServerConfigXmlDocument newInstance(File f) throws ParserConfigurationException, SAXException, IOException {
         if (f == null || !f.exists()) {
             return null;
         }
-        ServerConfigDropinXmlDocument configDocument = new ServerConfigDropinXmlDocument();
+        ServerConfigXmlDocument configDocument = new ServerConfigXmlDocument();
         configDocument.createDocument(f);
         configDocument.featureManager = configDocument.findFeatureManager();
         return configDocument;
