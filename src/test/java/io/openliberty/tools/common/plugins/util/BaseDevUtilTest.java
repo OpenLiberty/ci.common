@@ -204,7 +204,12 @@ public class BaseDevUtilTest {
             // not needed for tests
             return false;
         }
-        
+
+        @Override
+        public void updateFeatureList(File serverDir) {
+            // not needed for tests
+        }
+
     }
     
     public DevUtil getNewDevUtil(File serverDirectory)  {

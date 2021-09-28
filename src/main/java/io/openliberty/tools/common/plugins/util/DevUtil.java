@@ -245,6 +245,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void checkConfigFile(File configFile, File serverDir);
 
     /**
+     * Check the server directory to ensure the feature list is up to date. Used
+     * when generateFeatures=true.
+     * 
+     * @param serverDir
+     */
+    public abstract void updateFeatureList(File serverDir);
+
+    /**
      * Compile the specified directory
      * 
      * @param dir
@@ -1748,7 +1756,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
         if (generateFeatures) {
-            libertyGenerateFeatures();
+            generateAndUpdateFeatures();
         }
         // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
         if (!container) {
@@ -3343,9 +3351,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
             }
-            // after compiling Java scan for Liberty features.
-            if (builtJava && generateFeatures) {
-                libertyGenerateFeatures();
+            // after compiling Java scan for Liberty features
+            if (builtJava && generateFeatures && !initialCompile) {
+                generateAndUpdateFeatures();
             }
 
             // additionally, process java test files if no changes detected after a
@@ -3703,7 +3711,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (generateFeatures) {
-                    libertyGenerateFeatures();
+                    generateAndUpdateFeatures();
+                    // TODO in this scenario we should not install features as part of
+                    // copyconfigfolder, but rely on generateFeatures to install features
                 }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
@@ -3717,7 +3727,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
                 if (generateFeatures) {
-                    libertyGenerateFeatures();
+                    generateAndUpdateFeatures();
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -3740,7 +3750,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
-                        libertyGenerateFeatures();
+                        generateAndUpdateFeatures();
+                        // TODO: do not install features as part of copyConfigFolder, but as part of generate features
                     }
                     if (changeType == ChangeType.CREATE) {
                         redeployApp();
@@ -3764,7 +3775,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     // TODO Can server.xml be removed?
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
-                        libertyGenerateFeatures();
+                        generateAndUpdateFeatures();
                     } else if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
@@ -5002,5 +5013,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    // generate features and update the feature list
+    private void generateAndUpdateFeatures() throws PluginExecutionException {
+        libertyGenerateFeatures();
+        updateFeatureList(serverDirectory);
     }
 }
