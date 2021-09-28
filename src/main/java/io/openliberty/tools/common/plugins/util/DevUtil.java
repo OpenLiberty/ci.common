@@ -121,6 +121,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
     private static final int DOCKER_TIMEOUT = 20; // seconds
+    public static final String GENERATE_FEATURES_FILE = "liberty-plugin-added-features.xml";
 
     /**
      * Log debug
@@ -237,7 +238,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void runIntegrationTests(File buildFile) throws PluginScenarioException, PluginExecutionException;
 
     /**
-     * Check the configuration file for new features
+     * Check the configuration file for new features. Generates features for the
+     * user if generateFeatures=true.
      * 
      * @param configFile
      * @param serverDir
@@ -245,12 +247,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void checkConfigFile(File configFile, File serverDir);
 
     /**
-     * Check the server directory to ensure the feature list is up to date. Used
-     * when generateFeatures=true.
+     * Generates missing features for the user and check the server directory to
+     * ensure the feature list is up to date.
      * 
      * @param serverDir
      */
-    public abstract void updateFeatureList(File serverDir);
+    public abstract void generateAndUpdateFeatures(File serverDir);
 
     /**
      * Compile the specified directory
@@ -1756,7 +1758,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
         if (generateFeatures) {
-            generateAndUpdateFeatures();
+            generateAndUpdateFeatures(serverDirectory);
         }
         // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
         if (!container) {
@@ -3353,7 +3355,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             // after compiling Java scan for Liberty features
             if (builtJava && generateFeatures && !initialCompile) {
-                generateAndUpdateFeatures();
+                generateAndUpdateFeatures(serverDirectory);
             }
 
             // additionally, process java test files if no changes detected after a
@@ -3710,11 +3712,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-                if (generateFeatures) {
-                    generateAndUpdateFeatures();
-                    // TODO in this scenario we should not install features as part of
-                    // copyconfigfolder, but rely on generateFeatures to install features
-                }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -3727,7 +3724,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
                 if (generateFeatures) {
-                    generateAndUpdateFeatures();
+                    generateAndUpdateFeatures(serverDirectory);
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -3739,35 +3736,36 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (directory.startsWith(configPath)
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
                                                                                             // files
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY
-                    || changeType == ChangeType.CREATE)) {
-                // suppress install feature warning - property must be set before calling copyConfigFolder
-                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                copyConfigFolder(fileChanged, configDirectory, null);
-                copyFile(fileChanged, configDirectory, serverDirectory, null);
-
-                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    untrackDockerfileDirectoriesAndRestart();
+            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                if (fileChanged.getName().equals(GENERATE_FEATURES_FILE) && generateFeatures) {
+                    // TODO deliver warning to users when they manually modified the generate features file
                 } else {
-                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
-                        generateAndUpdateFeatures();
-                        // TODO: do not install features as part of copyConfigFolder, but as part of generate features
+                    // suppress install feature warning - property must be set before calling
+                    // copyConfigFolder
+                    System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
+                    copyConfigFolder(fileChanged, configDirectory, null);
+                    copyFile(fileChanged, configDirectory, serverDirectory, null);
+
+                    if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                        untrackDockerfileDirectoriesAndRestart();
+                    } else {
+                        if (changeType == ChangeType.CREATE) {
+                            redeployApp();
+                        }
+                        if (fileChanged.getName().equals("server.env")) {
+                            // re-enable debug variables in server.env
+                            enableServerDebug(false);
+                        } else if ((fileChanged.getName().equals("bootstrap.properties")
+                                && bootstrapPropertiesFileParent == null)
+                                || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
+                            // restart server to load new properties
+                            restartServer(false);
+                        }
                     }
-                    if (changeType == ChangeType.CREATE) {
-                        redeployApp();
-                    }
-                    if (fileChanged.getName().equals("server.env")) {
-                        // re-enable debug variables in server.env
-                        enableServerDebug(false);
-                    } else if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
-                         || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
-                        // restart server to load new properties
-                        restartServer(false);
-                    }
+                    // always skip UTs
+                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
                 }
-                // always skip UTs
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-            } else if (changeType == ChangeType.DELETE) {
+            } else if (changeType == ChangeType.DELETE && !fileChanged.getName().equals(GENERATE_FEATURES_FILE)) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -3775,7 +3773,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     // TODO Can server.xml be removed?
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
-                        generateAndUpdateFeatures();
+                        generateAndUpdateFeatures(serverDirectory);
                     } else if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
@@ -5013,11 +5011,5 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } catch (IOException e) {
             return false;
         }
-    }
-
-    // generate features and update the feature list
-    private void generateAndUpdateFeatures() throws PluginExecutionException {
-        libertyGenerateFeatures();
-        updateFeatureList(serverDirectory);
     }
 }

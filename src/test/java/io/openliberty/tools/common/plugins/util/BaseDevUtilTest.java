@@ -206,7 +206,7 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void updateFeatureList(File serverDir) {
+        public void generateAndUpdateFeatures(File serverDir) {
             // not needed for tests
         }
 
