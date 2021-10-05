@@ -122,7 +122,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Indicate that the feature names should remain unmodified. The default is to make all the names lower case.
+     * Indicate whether the feature names should be converted to lower case. The default is to make all the names lower case.
      * @param val boolean false to indicate names should remain mixed case as defined in Liberty.
      *            True indicates the names will be folded to lower case.
      */
