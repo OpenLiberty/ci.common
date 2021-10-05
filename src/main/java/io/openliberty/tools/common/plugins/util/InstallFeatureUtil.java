@@ -28,7 +28,6 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -44,8 +43,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -61,12 +58,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
-    public static final String CONFLICT = "CWWKF0033E.*", INCOMPATIBLE_SINGLETON = "CWWKF1405E.*",
-            MISSING_MULTIPLE_DEPENDENT = "CWWKF1385E.*", SAME_MODEL_CONFLICT = "CWWKF0043E.*",
-            DIFF_MODEL_CONFLICT = "CWWKF0044E.*", SAME_INDIRECT_MODEL_CONFLICT = "CWWKF0047E.*",
-            EE_CONFLICT = SAME_MODEL_CONFLICT + "|" + DIFF_MODEL_CONFLICT + "|" + SAME_INDIRECT_MODEL_CONFLICT,
-            ANY_CONFLICT = CONFLICT + "|" + MISSING_MULTIPLE_DEPENDENT + "|" + INCOMPATIBLE_SINGLETON + "|"
-                    + EE_CONFLICT;
 
     private final File installDirectory;
 
@@ -86,7 +77,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static Boolean saveURLCacheStatus = null;
 
     private final String containerName;
-    private Path tempConfigPath;
 
     /**
      * Initialize the utility and check for unsupported scenarios.
@@ -514,7 +504,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
 
             Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
-
             if (resolvedFeatures == null) {
                 debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
@@ -531,13 +520,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     info("The features are already installed, so no action is needed.");
                     return;
                 } else {
-                    if (isFeatureConflict(exceptionMessage)) {
-                        throw new PluginExecutionException(
-                                "A feature conflict error occurred while installing features: " + featuresToInstall
-                                        + ": " + exceptionMessage);
-                    } else {
-                        throw new PluginExecutionException(exceptionMessage);
-                    }
+                    throw new PluginExecutionException(exceptionMessage);
                 }
             }
             Collection<File> artifacts = downloadEsas(resolvedFeatures);
@@ -941,12 +924,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 // The features are already installed message
                 debug(cmdResult);
             } else {
-                if (isFeatureConflict(cmdResult)) {
-                    error("A feature conflict error occurred while installing features: " + features + ": "
-                            + cmdResult);
-                } else {
-                    error("An error occurred while installing features: " + cmdResult);
-                }
+                error("An error occurred while installing features: " + cmdResult);
             }
         } else {
             // Log the successful output as debug
@@ -988,15 +966,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             jsonReader.close();
         }
         return newServerFeatures;
-    }
-
-    private boolean isFeatureConflict(String exceptionMessage) {
-        Pattern p = Pattern.compile(ANY_CONFLICT);
-        Matcher m = p.matcher(exceptionMessage);
-        if (m.find()) {
-            return true;
-        }
-        return false;
     }
 
 }

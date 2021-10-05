@@ -121,7 +121,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
     private static final int DOCKER_TIMEOUT = 20; // seconds
-    public static final String GENERATE_FEATURES_FILE = "liberty-plugin-added-features.xml";
 
     /**
      * Log debug
@@ -238,21 +237,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void runIntegrationTests(File buildFile) throws PluginScenarioException, PluginExecutionException;
 
     /**
-     * Check the configuration file for new features. Generates features for the
-     * user if generateFeatures=true.
+     * Check the configuration file for new features
      * 
      * @param configFile
      * @param serverDir
      */
     public abstract void checkConfigFile(File configFile, File serverDir);
-
-    /**
-     * Generates missing features for the user and check the server directory to
-     * ensure the feature list is up to date.
-     * 
-     * @param serverDir
-     */
-    public abstract void generateAndUpdateFeatures(File serverDir);
 
     /**
      * Compile the specified directory
@@ -1758,7 +1748,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
         libertyCreate();
         if (generateFeatures) {
-            generateAndUpdateFeatures(serverDirectory);
+            libertyGenerateFeatures();
         }
         // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
         if (!container) {
@@ -3353,9 +3343,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
             }
-            // after compiling Java scan for Liberty features
-            if (builtJava && generateFeatures && !initialCompile) {
-                generateAndUpdateFeatures(serverDirectory);
+            // after compiling Java scan for Liberty features.
+            if (builtJava && generateFeatures) {
+                libertyGenerateFeatures();
             }
 
             // additionally, process java test files if no changes detected after a
@@ -3712,6 +3702,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
+                if (generateFeatures) {
+                    libertyGenerateFeatures();
+                }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -3724,7 +3717,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
                 if (generateFeatures) {
-                    generateAndUpdateFeatures(serverDirectory);
+                    libertyGenerateFeatures();
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -3736,36 +3729,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (directory.startsWith(configPath)
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
                                                                                             // files
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                if (fileChanged.getName().equals(GENERATE_FEATURES_FILE) && generateFeatures) {
-                    // TODO deliver warning to users when they manually modified the generate features file
-                } else {
-                    // suppress install feature warning - property must be set before calling
-                    // copyConfigFolder
-                    System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                    copyConfigFolder(fileChanged, configDirectory, null);
-                    copyFile(fileChanged, configDirectory, serverDirectory, null);
+            if (fileChanged.exists() && (changeType == ChangeType.MODIFY
+                    || changeType == ChangeType.CREATE)) {
+                // suppress install feature warning - property must be set before calling copyConfigFolder
+                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
+                copyConfigFolder(fileChanged, configDirectory, null);
+                copyFile(fileChanged, configDirectory, serverDirectory, null);
 
-                    if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                        untrackDockerfileDirectoriesAndRestart();
-                    } else {
-                        if (changeType == ChangeType.CREATE) {
-                            redeployApp();
-                        }
-                        if (fileChanged.getName().equals("server.env")) {
-                            // re-enable debug variables in server.env
-                            enableServerDebug(false);
-                        } else if ((fileChanged.getName().equals("bootstrap.properties")
-                                && bootstrapPropertiesFileParent == null)
-                                || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
-                            // restart server to load new properties
-                            restartServer(false);
-                        }
+                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                    untrackDockerfileDirectoriesAndRestart();
+                } else {
+                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
+                        libertyGenerateFeatures();
                     }
-                    // always skip UTs
-                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+                    if (changeType == ChangeType.CREATE) {
+                        redeployApp();
+                    }
+                    if (fileChanged.getName().equals("server.env")) {
+                        // re-enable debug variables in server.env
+                        enableServerDebug(false);
+                    } else if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
+                         || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
+                        // restart server to load new properties
+                        restartServer(false);
+                    }
                 }
-            } else if (changeType == ChangeType.DELETE && !fileChanged.getName().equals(GENERATE_FEATURES_FILE)) {
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+            } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -3773,7 +3764,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     // TODO Can server.xml be removed?
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
-                        generateAndUpdateFeatures(serverDirectory);
+                        libertyGenerateFeatures();
                     } else if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
