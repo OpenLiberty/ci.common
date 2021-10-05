@@ -67,6 +67,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     public static final String SERVER_CONFIG_DIR = "server.config.dir";
 
     private Map<String,File> libertyDirectoryPropertyToFile = null;
+    private boolean lowerCaseFeatures = true;
     
     /**
      * Log debug
@@ -118,6 +119,15 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         result = getServerXmlFeatures(result, new File(serverDirectory, "server.xml"), bootstrapProperties, null);
         // add the overrides at the end since they should not be replaced by any previous content
         return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides");
+    }
+
+    /**
+     * Indicate that the feature names should remain unmodified. The default is to make all the names lower case.
+     * @param val boolean false to indicate names should remain mixed case as defined in Liberty.
+     *            True indicates the names will be folded to lower case.
+     */
+    public void setLowerCaseFeatures(boolean val) {
+        lowerCaseFeatures = val;
     }
 
     /**
@@ -314,7 +324,12 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
                     if (content.contains(":")) {
                         debug("The feature " + content + " in the server.xml file is a user feature and its installation will be skipped.");
                     } else {
-                        result.add(content.trim().toLowerCase());
+                        if (lowerCaseFeatures) {
+                            content = content.trim().toLowerCase();
+                        } else {
+                            content = content.trim();
+                        }
+                        result.add(content);
                     }
                 }
             }

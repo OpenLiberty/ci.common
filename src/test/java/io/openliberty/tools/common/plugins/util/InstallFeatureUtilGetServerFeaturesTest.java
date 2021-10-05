@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018-2021.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,13 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     private void verifyServerFeatures(Set<String> expected) throws Exception {
         Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
         assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+    }
+    
+    private void verifyServerFeaturesPreserveCase(Set<String> expected) throws Exception {
+        util.setLowerCaseFeatures(false);
+        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+        util.setLowerCaseFeatures(true); // restore default
     }
     
     /**
@@ -463,6 +470,25 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("extralowercase");
         
         verifyServerFeatures(expected);
+    }
+    
+    /**
+     * Tests server.xml with spaces and case sensitivity 
+     * when we wish to preserve the case.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testSpaceAndCaseSensitivityPreserveCase() throws Exception{
+        copyAsName("server_space_case_sensitivity.xml", "server.xml");
+        copy("extraFeaturesSpaceCaseSensitivity.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("oRiG");
+        expected.add("EXTRALOWERcase");
+        expected.add("extralowerCaSE");
+        
+        verifyServerFeaturesPreserveCase(expected);
     }
     
     /**
