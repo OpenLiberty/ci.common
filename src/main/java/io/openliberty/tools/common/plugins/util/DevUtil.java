@@ -3344,7 +3344,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             // after compiling Java scan for Liberty features.
-            if (builtJava && generateFeatures) {
+            if (builtJava && generateFeatures && !initialCompile) {
                 libertyGenerateFeatures();
             }
 
