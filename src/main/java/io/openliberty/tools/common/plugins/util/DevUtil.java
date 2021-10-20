@@ -2255,10 +2255,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (!inputUnavailable) {
             // the following will be printed on startup and every time after the tests run
             if (blockTests) {
-                String message1 = "A classpath error with Maven has been detected. Tests will not run in dev mode on this project.";
-                String message2 = "Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.";
-                info(startup ? formatAttentionMessage(message1) : message1);
-                info(startup ? formatAttentionMessage(message2) : message2);
+                printMavenClasspathErrMsg(true);
             } else {
                 if (hotTests) {
                     String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
@@ -2358,9 +2355,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             // print barrier footer
             info(formatAttentionBarrier());
-            if (blockTests && !hotTests) {
-                printMavenClasspathErrMsg();
-            }
         }
     }
 
@@ -2433,7 +2427,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else {
                         if (blockTests) {
-                            printMavenClasspathErrMsg();
+                            printMavenClasspathErrMsg(false);
                         }
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
@@ -3428,7 +3422,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 initialCompile = false;
                 if (hotTests) {
                     if (blockTests) {
-                        error("A classpath error with Maven has been detected. Tests will not run in dev mode on this project. Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.");
+                        printMavenClasspathErrMsg(false);
                     } else {
                         // if hot testing, run tests on startup
                         if (isMultiModuleProject()) {
@@ -5012,7 +5006,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     // prints error to users when Maven thread classpath error is present
-    private void printMavenClasspathErrMsg() {
-        error("A classpath error with Maven has been detected. Tests will not run in dev mode on this project. Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.");
+    private void printMavenClasspathErrMsg(boolean startup) {
+        if (startup) {
+            String message1 = "A classpath error with Maven has been detected. Tests will not run in dev mode on this project.";
+            String message2 = "Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.";
+            error(startup ? formatAttentionMessage(message1) : message1);
+            error(startup ? formatAttentionMessage(message2) : message2);
+        } else {
+            error("A classpath error with Maven has been detected. Tests will not run in dev mode on this project. Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.");
+        }
     }
 }
