@@ -5007,13 +5007,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     // prints error to users when Maven thread classpath error is present
     private void printMavenClasspathErrMsg(boolean startup) {
+        String message1 = "A classpath error with Maven has been detected. Tests will not run in dev mode on this project.";
+        String message2 = "Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.";
         if (startup) {
-            String message1 = "A classpath error with Maven has been detected. Tests will not run in dev mode on this project.";
-            String message2 = "Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.";
-            error(startup ? formatAttentionMessage(message1) : message1);
-            error(startup ? formatAttentionMessage(message2) : message2);
+            error(formatAttentionMessage(message1));
+            error(formatAttentionMessage(message2));
         } else {
-            error("A classpath error with Maven has been detected. Tests will not run in dev mode on this project. Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.");
+            error(message1 + " " + message2);
         }
     }
 }
