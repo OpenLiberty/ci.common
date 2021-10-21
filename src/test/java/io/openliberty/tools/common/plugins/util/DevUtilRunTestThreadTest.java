@@ -36,7 +36,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         public int counter = 0;
 
         public RunTestThreadUtil(boolean hotTests) throws IOException {
-            super(null, null, null, null, null, hotTests, false);
+            super(null, null, null, null, null, null, hotTests, false);
         }
 
         @Override
