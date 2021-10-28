@@ -35,10 +35,10 @@ public class BaseDevUtilTest {
     public class DevTestUtil extends DevUtil {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
-                List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(null, serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null,
+                List<File> resourceDirs, boolean hotTests, boolean skipTests) throws IOException {
+            super(temp.newFolder(), serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null,
                     resourceDirs, hotTests, skipTests, false, false, null, 30, 30, 5, 500, true, false, false, false,
-                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false);
+                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null);
         }
 
         @Override
@@ -204,10 +204,16 @@ public class BaseDevUtilTest {
             // not needed for tests
             return false;
         }
+
+        @Override
+        public boolean isClasspathResolved(File buildFile) {
+            // not needed for tests
+            return false;
+        }
         
     }
     
-    public DevUtil getNewDevUtil(File serverDirectory)  {
+    public DevUtil getNewDevUtil(File serverDirectory) throws IOException  {
         return new DevTestUtil(serverDirectory, null, null, null, null, false, false);
     }
 }

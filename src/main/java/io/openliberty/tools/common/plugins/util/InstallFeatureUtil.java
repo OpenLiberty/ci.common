@@ -926,7 +926,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             featureList.append(feature).append(" ");
         }
 
-        String featureUtilityCommand = "docker exec -e FEATURE_LOCAL_REPO=/devmode-maven-cache " + containerName + " /liberty/bin/featureUtility installFeature " + featureList;
+        String featureUtilityCommand = "docker exec -e FEATURE_LOCAL_REPO=/devmode-maven-cache " + containerName + " featureUtility installFeature " + featureList;
         if (acceptLicense) {
             featureUtilityCommand += "--acceptLicense";
         }

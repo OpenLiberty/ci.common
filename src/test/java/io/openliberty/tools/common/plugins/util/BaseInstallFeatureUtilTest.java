@@ -26,9 +26,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
-import io.openliberty.tools.common.plugins.util.InstallFeatureUtil;
-import io.openliberty.tools.common.plugins.util.PluginExecutionException;
-import io.openliberty.tools.common.plugins.util.PluginScenarioException;
 import io.openliberty.tools.common.plugins.util.InstallFeatureUtil.ProductProperties;
 
 public class BaseInstallFeatureUtilTest {

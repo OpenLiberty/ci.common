@@ -16,20 +16,12 @@
 package io.openliberty.tools.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
-
-import io.openliberty.tools.common.plugins.util.DevUtil;
-import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 
 public class DevUtilHostnamePortTest extends BaseDevUtilTest {
 
@@ -59,7 +51,7 @@ public class DevUtilHostnamePortTest extends BaseDevUtilTest {
         assertEquals(null, util.getHttpPort());
     }
 
-    private void testHostnameAndHttpPort(String message) throws PluginExecutionException {
+    private void testHostnameAndHttpPort(String message) throws PluginExecutionException, IOException {
         DevUtil util = getNewDevUtil(null);
         int portPrefixIndex = util.parseHostName(message);
         util.parseHttpPort(message, portPrefixIndex);
@@ -86,7 +78,7 @@ public class DevUtilHostnamePortTest extends BaseDevUtilTest {
     };
 
     @Test
-    public void testParseHttpsPort() throws PluginExecutionException {
+    public void testParseHttpsPort() throws PluginExecutionException, IOException {
         for (String message : tcpChannelTranslations) {
             String injectedHttp = message.replace("{0}", "defaultHttpEndpoint").replace("{1}", "localhost  (IPv4: 127.0.0.1)").replace("{2}", "9080");
             String injectedHttps = message.replace("{0}", "defaultHttpEndpoint-ssl").replace("{1}", "localhost  (IPv4: 127.0.0.1)").replace("{2}", "9443");
