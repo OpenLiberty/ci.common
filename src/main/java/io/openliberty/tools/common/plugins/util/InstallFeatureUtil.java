@@ -89,7 +89,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
-    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.1";
+    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.10";
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
 

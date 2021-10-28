@@ -72,7 +72,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 		if (version.compareTo(minVersion) < 0) {
 			throw new PluginScenarioException(
-					"Installing user features on OpenLiberty version "+version+" is not supported. The minimum required version of OpenLiberty for installing user features is "+minVersion+".");
+					"Installing user features on Liberty version "+version+" is not supported. The minimum required version of Liberty for installing user features is "+minVersion+".");
 		}
 		if (installJarFile == null) {
 			throw new PluginScenarioException("Install map jar not found.");
