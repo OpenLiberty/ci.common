@@ -2,23 +2,23 @@ package io.openliberty.tools.common.plugins.util;
 
 public class HotKey {
 
-    private String key; 
-    private String message; 
+    private String[] keywords; 
 
-    public HotKey(String key, String message){
-        this.key = key;
-        this.message = message;
+    /**
+     * @param keywords The words that triggers the hotkey. Can single letters or full words.
+     */
+    public HotKey(String... keywords){
+        this.keywords = keywords;
     }
 
-    public String printMessage(){
-        return this.message;
-    }
-
-    public boolean checkKeyPress(String line, String checkWord){
-        if (line != null && (line.trim().equalsIgnoreCase(this.key) || line.trim().equalsIgnoreCase(checkWord))) {
-            return true;
-        } else {
-            return false;
+    public boolean isPressed(String line){
+        if (line != null) {
+            for (String keyword : keywords) {
+                if (line.trim().equalsIgnoreCase(keyword)) {
+                    return true;
+                }
+            }
         }
+        return false;
     }
 }

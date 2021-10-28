@@ -2253,13 +2253,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             // the following will be printed only on startup or restart
             if (startup) {
-                if (container) {
-                    info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
-                } else {
-                    info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
-                }
-
-                info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+                printHotkeyMessages();
             }
         } else {
             debug("Cannot read user input, setting hotTests to true.");
@@ -2343,6 +2337,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    private void printHotkeyMessages() {
+        if (container) {
+            info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+        } else {
+            info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+        }
+        info(formatAttentionMessage("To see the help menu, type 'h' and press Enter."));
+        info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+    }
+
     private String formatAttentionBarrier() {
         return "************************************************************************";
     }
@@ -2380,9 +2384,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
 
         private void readInput() {
-            HotKey q = new HotKey("q", "Detected exit command");
-            HotKey h = new HotKey("h", "message");
-            HotKey r = new HotKey("r", "Detected restart command");
+            HotKey q = new HotKey("q", "quit", "exit");
+            HotKey h = new HotKey("h", "help");
+            HotKey r = new HotKey("r");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
@@ -2393,11 +2397,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         break;
                     }
                     String line = scanner.nextLine();
-                    if (q.checkKeyPress(line, "quit")){
-                        debug(q.printMessage());
+                    if (q.isPressed(line)) {
+                        debug("Detected exit command");
                         runShutdownHook(executor);
-                    } else if (r.checkKeyPress(line, "restart")){
-                        debug(r.printMessage());
+                    } else if (r.isPressed(line)) {
+                        debug("Detected restart command");
                         try {
                             restartServer(true);
                         } catch (PluginExecutionException e) {
@@ -2405,16 +2409,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not restart the server.", e);
                             runShutdownHook(executor);
                         }
-                    } else if (h.checkKeyPress(line, "help")){
+                    } else if (h.isPressed(line)) {
                         info(formatAttentionBarrier());
-                        if (container) {
-                            info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
-                        } else {
-                            info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
-                        }
-        
-                        info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
-                        info(formatAttentionMessage("To see the help menu type ‘h’ and press Enter."));
+                        printHotkeyMessages();
+                        info(formatAttentionBarrier());
                     } else {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
