@@ -22,10 +22,6 @@ jobs:
         java: [ 8, 11 ]
 
     steps:
-    - name: Setup Java ${{ matrix.java }}
-      uses: joschi/setup-jdk@v2
-      with:
-        java-version: ${{ matrix.java }}
     - name: Checkout ci.common
       uses: actions/checkout@v2
     - name: Checkout ci.ant
@@ -33,12 +29,16 @@ jobs:
       with:
         repository: OpenLiberty/ci.ant
         path: ci.ant
-    - name: Cache maven packages
-      uses: actions/cache@v2
+    - name: Set up Maven
+      uses: stCarolas/setup-maven@v4.2
       with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
+        maven-version: 3.8.1
+    - name: Setup Java ${{ matrix.java }}
+      uses: actions/setup-java@v2
+      with:
+        distribution: 'temurin'
+        java-version: ${{ matrix.java }}
+        cache: 'maven'
     - name: Install ci.ant
       run: |
         cd ./ci.ant

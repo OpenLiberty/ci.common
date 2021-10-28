@@ -20,6 +20,7 @@ import static org.junit.Assert.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -34,7 +35,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
     private class RunTestThreadUtil extends DevTestUtil {
         public int counter = 0;
 
-        public RunTestThreadUtil(boolean hotTests) {
+        public RunTestThreadUtil(boolean hotTests) throws IOException {
             super(null, null, null, null, null, hotTests, false);
         }
 
