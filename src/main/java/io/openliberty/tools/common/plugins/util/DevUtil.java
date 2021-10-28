@@ -2260,22 +2260,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
 
         if (!inputUnavailable) {
-            // the following will be printed on startup and every time after the tests run
-            if (blockTests) {
-                printMavenClasspathErrMsg(true);
-            } else {
-                if (hotTests) {
-                    String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-                    info(startup ? formatAttentionMessage(message) : message);
-                } else {
-                    String message = "To run tests on demand, press Enter.";
-                    info(startup ? formatAttentionMessage(message) : message);
-                }
-            }
-
-            // the following will be printed only on startup or restart
             if (startup) {
-                printHotkeyMessages();
+                // the following will be printed only on startup or restart
+                info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
+                info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+            } else {
+                // the following will be printed every time after the tests run
+                printTestsMessage(false);
             }
         } else {
             debug("Cannot read user input, setting hotTests to true.");
@@ -2359,13 +2350,29 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private void printHotkeyMessages() {
+    private void printTestsMessage(boolean formatForAttention) {
+        if (blockTests) {
+            printMavenClasspathErrMsg(true);
+        } else {
+            if (hotTests) {
+                String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                info(formatForAttention ? formatAttentionMessage(message) : message);
+            } else {
+                String message = "To run tests on demand, press Enter.";
+                info(formatForAttention ? formatAttentionMessage(message) : message);
+            }
+        }
+    }
+
+    private void printHelpMessages() {
+        printTestsMessage(true);
+
         if (container) {
             info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
         } else {
             info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
         }
-        info(formatAttentionMessage("To see the help menu, type 'h' and press Enter."));
+        info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
         info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
     }
 
@@ -2440,7 +2447,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else if (h.isPressed(line)) {
                         info(formatAttentionBarrier());
-                        printHotkeyMessages();
+                        printHelpMessages();
                         info(formatAttentionBarrier());
                     } else {
                         if (blockTests) {
