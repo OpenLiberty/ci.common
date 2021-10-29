@@ -2257,6 +2257,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info(formatAttentionBarrier());
 
             info(formatAttentionTitle("Liberty is running in dev mode."));
+
+            printFeatureGenerationStatus();
         }
 
         if (!inputUnavailable) {
@@ -2365,8 +2367,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printHelpMessages() {
+        printFeatureGenerationStatus();
+        printFeatureGenerationHotkeys();
         printTestsMessage(true);
-
         if (container) {
             info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
         } else {
@@ -2374,6 +2377,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
         info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+    }
+
+    private void printFeatureGenerationStatus() {
+        info(formatAttentionMessage("Automatic generation of server features: " + getFormattedBooleanString(generateFeatures)));
+    }
+
+    private void printFeatureGenerationHotkeys() {
+        info(formatAttentionMessage("To toggle the automatic generation of features, type 'g' and press Enter."));
+        if (generateFeatures) {
+            // If generateFeatures is enabled, then also describe the optimize hotkey
+            info(formatAttentionMessage("To optimize the list of generated features, type 'o' and press Enter."));
+        }
     }
 
     private String formatAttentionBarrier() {
@@ -2386,6 +2401,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private String formatAttentionMessage(String message) {
         return "*        " + message;
+    }
+
+    private String getFormattedBooleanString(boolean bool) {
+        return "[ " + (bool ? "On" : "Off") + " ]";
+    }
+
+    private void toggleFeatureGeneration() {
+        generateFeatures = !generateFeatures;
+        info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
+        if (generateFeatures) {
+            // If hotkey is toggled to “true”, generate features right away.
+            generateFeaturesWithAllClasses();
+        }
+    }
+
+    /**
+     * Pass user specified features plus all classes to generateFeatures goal.
+     */
+    private void generateFeaturesWithAllClasses() {
+        info("Generating optimized features list...");
+        // TODO
     }
 
     private class HotkeyReader implements Runnable {
@@ -2423,6 +2459,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey q = new HotKey("q", "quit", "exit");
             HotKey h = new HotKey("h", "help");
             HotKey r = new HotKey("r");
+            HotKey g = new HotKey("g");
+            HotKey o = new HotKey("o");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
@@ -2449,6 +2487,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         info(formatAttentionBarrier());
                         printHelpMessages();
                         info(formatAttentionBarrier());
+                    } else if (g.isPressed(line)) {
+                        toggleFeatureGeneration();
+                    } else if (o.isPressed(line)) {
+                        if (generateFeatures) {
+                            generateFeaturesWithAllClasses();
+                        } else {
+                            warn("Cannot optimize features because automatic generation of features is off.");
+                            warn("To toggle the automatic generation of features, type 'g' and press Enter.");
+                        }
                     } else {
                         if (blockTests) {
                             printMavenClasspathErrMsg(false);
