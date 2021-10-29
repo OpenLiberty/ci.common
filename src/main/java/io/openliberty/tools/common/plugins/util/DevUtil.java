@@ -2260,28 +2260,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
 
         if (!inputUnavailable) {
-            // the following will be printed on startup and every time after the tests run
-            if (blockTests) {
-                printMavenClasspathErrMsg(true);
-            } else {
-                if (hotTests) {
-                    String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-                    info(startup ? formatAttentionMessage(message) : message);
-                } else {
-                    String message = "To run tests on demand, press Enter.";
-                    info(startup ? formatAttentionMessage(message) : message);
-                }
-            }
-
-            // the following will be printed only on startup or restart
             if (startup) {
-                if (container) {
-                    info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
-                } else {
-                    info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
-                }
-
+                // the following will be printed only on startup or restart
+                info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
                 info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+            } else {
+                // the following will be printed every time after the tests run
+                printTestsMessage(false);
             }
         } else {
             debug("Cannot read user input, setting hotTests to true.");
@@ -2365,6 +2350,32 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    private void printTestsMessage(boolean formatForAttention) {
+        if (blockTests) {
+            printMavenClasspathErrMsg(true);
+        } else {
+            if (hotTests) {
+                String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                info(formatForAttention ? formatAttentionMessage(message) : message);
+            } else {
+                String message = "To run tests on demand, press Enter.";
+                info(formatForAttention ? formatAttentionMessage(message) : message);
+            }
+        }
+    }
+
+    private void printHelpMessages() {
+        printTestsMessage(true);
+
+        if (container) {
+            info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+        } else {
+            info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+        }
+        info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
+        info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+    }
+
     private String formatAttentionBarrier() {
         return "************************************************************************";
     }
@@ -2409,6 +2420,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
 
         private void readInput() {
+            HotKey q = new HotKey("q", "quit", "exit");
+            HotKey h = new HotKey("h", "help");
+            HotKey r = new HotKey("r");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
@@ -2419,11 +2433,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         break;
                     }
                     String line = scanner.nextLine();
-                    if (line != null && (line.trim().equalsIgnoreCase("q") || line.trim().equalsIgnoreCase("quit")
-                            || line.trim().equalsIgnoreCase("exit"))) {
+                    if (q.isPressed(line)) {
                         debug("Detected exit command");
                         runShutdownHook(executor);
-                    } else if (line != null && line.trim().equalsIgnoreCase("r")) {
+                    } else if (r.isPressed(line)) {
                         debug("Detected restart command");
                         try {
                             restartServer(true);
@@ -2432,6 +2445,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not restart the server.", e);
                             runShutdownHook(executor);
                         }
+                    } else if (h.isPressed(line)) {
+                        info(formatAttentionBarrier());
+                        printHelpMessages();
+                        info(formatAttentionBarrier());
                     } else {
                         if (blockTests) {
                             printMavenClasspathErrMsg(false);
