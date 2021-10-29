@@ -2257,6 +2257,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info(formatAttentionBarrier());
 
             info(formatAttentionTitle("Liberty is running in dev mode."));
+
+            printFeatureGenerationStatus();
         }
 
         if (!inputUnavailable) {
@@ -2365,8 +2367,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printHelpMessages() {
+        printFeatureGenerationStatus();
         printTestsMessage(true);
-
         if (container) {
             info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
         } else {
@@ -2374,6 +2376,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
         info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+    }
+
+    private void printFeatureGenerationStatus() {
+        info(formatAttentionMessage("Automatic generation of server features: [ " + (generateFeatures ? "On" : "Off") + " ]"));
     }
 
     private String formatAttentionBarrier() {
