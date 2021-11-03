@@ -18,6 +18,7 @@ package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -173,6 +174,11 @@ public class BaseDevUtilTest {
 
         @Override
         public void libertyGenerateFeatures() {
+            // not needed for tests
+        }
+
+        @Override
+        public void libertyGenerateFeatures(Collection<File> classFilesChanged) {
             // not needed for tests
         }
 
