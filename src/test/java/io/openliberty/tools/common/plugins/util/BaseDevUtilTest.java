@@ -178,7 +178,7 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void libertyGenerateFeatures(Collection<File> classFilesChanged) {
+        public void libertyGenerateFeatures(Collection<String> classes) {
             // not needed for tests
         }
 

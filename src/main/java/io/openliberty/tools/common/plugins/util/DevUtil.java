@@ -1722,12 +1722,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void libertyGenerateFeatures() throws PluginExecutionException;
 
     /**
-     * Generate features for only the class files passed in
+     * Generate features for only the classes passed in
      * 
-     * @param classFilesChanged class files that features should be generated for
+     * @param classes class file paths features should be generated for
      * @throws PluginExecutionException
      */
-    public abstract void libertyGenerateFeatures(Collection<File> classFilesChanged) throws PluginExecutionException;
+    public abstract void libertyGenerateFeatures(Collection<String> classes) throws PluginExecutionException;
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -3406,7 +3406,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             // after compiling Java scan for Liberty features.
             if (builtJava && generateFeatures && !initialCompile) {
-                libertyGenerateFeatures(javaSourceClasses);
+                Collection<String> javaSourceClassesPaths = new HashSet<String>();
+                for (File javaSourceClass : javaSourceClasses ) {
+                    javaSourceClassesPaths.add(javaSourceClass.getCanonicalPath());
+                }
+                libertyGenerateFeatures(javaSourceClassesPaths);
+                javaSourceClassesPaths.clear();
                 javaSourceClasses.clear();
             }
 
