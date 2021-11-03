@@ -2380,7 +2380,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printFeatureGenerationStatus() {
-        info(formatAttentionMessage("Automatic generation of server features: " + getFormattedBooleanString(generateFeatures)));
+        info(formatAttentionMessage("Automatic generation of features: " + getFormattedBooleanString(generateFeatures)));
     }
 
     private void printFeatureGenerationHotkeys() {
