@@ -2700,6 +2700,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             testArtifactPaths, null, false);
                 }
 
+                // when change in class files are detected scan for Liberty features.
+                if (generateFeatures && !initialCompile && !javaSourceClasses.isEmpty()) {
+                    Collection<String> javaSourceClassPaths = new HashSet<String>();
+                    for (File javaSourceClass : javaSourceClasses) {
+                        javaSourceClassPaths.add(javaSourceClass.getCanonicalPath());
+                    }
+                    libertyGenerateFeatures(javaSourceClassPaths);
+                    javaSourceClassPaths.clear();
+                    javaSourceClasses.clear();
+                }
+
                 if (shouldIncludeSources(packagingType)) {
                     // check if javaSourceDirectory has been added
                     if (!sourceDirRegistered && this.sourceDirectory.exists()
@@ -3404,15 +3415,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
             }
-            // after compiling Java scan for Liberty features.
-            if (builtJava && generateFeatures && !initialCompile) {
-                Collection<String> javaSourceClassesPaths = new HashSet<String>();
-                for (File javaSourceClass : javaSourceClasses ) {
-                    javaSourceClassesPaths.add(javaSourceClass.getCanonicalPath());
-                }
-                libertyGenerateFeatures(javaSourceClassesPaths);
-                javaSourceClassesPaths.clear();
-                javaSourceClasses.clear();
+
+            if (builtJava && initialCompile && generateFeatures && gradle) {
+                // check for initial Gradle compile and scan for Liberty features across entire
+                // project as class files may have not been modified
+                libertyGenerateFeatures();
             }
 
             // additionally, process java test files if no changes detected after a
