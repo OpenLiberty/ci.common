@@ -1722,6 +1722,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void libertyGenerateFeatures() throws PluginExecutionException;
 
     /**
+     * Generate features for only the classes passed in
+     * 
+     * @param classes class file paths features should be generated for
+     * @throws PluginExecutionException
+     */
+    public abstract void libertyGenerateFeatures(Collection<String> classes) throws PluginExecutionException;
+
+    /**
      * Install features in regular dev mode. This method should not be used in container mode.
      * @throws PluginExecutionException
      */
@@ -2524,6 +2532,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     Collection<File> deleteJavaTests;
     Collection<File> failedCompilationJavaSources;
     Collection<File> failedCompilationJavaTests;
+    Collection<File> javaSourceClasses;
     long lastJavaSourceChange;
     long lastJavaTestChange;
     Map<File, Long> lastBuildFileChange;
@@ -2592,6 +2601,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
+            Path srcOutputPath = this.outputDirectory.getCanonicalFile().toPath();
 
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
@@ -2599,6 +2609,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean serverXmlFileRegistered = false;
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
+            boolean sourceOutputDirRegistered = false;
 
             // register parent poms
             if (!parentBuildFiles.isEmpty()) {
@@ -2620,6 +2631,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (p.getSourceDirectory().exists()) {
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                             p.sourceDirRegistered = true;
+                        }
+
+                        // register source classes directory for feature generation
+                        if (p.getOutputDirectory().exists()) {
+                            registerAll(p.getOutputDirectory().getCanonicalFile().toPath(), executor);
+                            p.sourceOutputDirRegistered = true;
                         }
                     }
 
@@ -2652,6 +2669,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     registerAll(srcPath, executor);
                     sourceDirRegistered = true;
                 }
+
+                // register source classes directory for feature generation
+                if (this.outputDirectory.exists()) {
+                    registerAll(srcOutputPath, executor);
+                    sourceOutputDirRegistered = true;
+                }
+
             }
     
             if (this.testSourceDirectory.exists()) {
@@ -2740,6 +2764,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             testArtifactPaths, null, false);
                 }
 
+                // when change in class files are detected scan for Liberty features.
+                if (generateFeatures && !initialCompile && !javaSourceClasses.isEmpty()) {
+                    Collection<String> javaSourceClassPaths = new HashSet<String>();
+                    for (File javaSourceClass : javaSourceClasses) {
+                        javaSourceClassPaths.add(javaSourceClass.getCanonicalPath());
+                    }
+                    libertyGenerateFeatures(javaSourceClassPaths);
+                    javaSourceClassPaths.clear();
+                    javaSourceClasses.clear();
+                }
+
                 if (shouldIncludeSources(packagingType)) {
                     // check if javaSourceDirectory has been added
                     if (!sourceDirRegistered && this.sourceDirectory.exists()
@@ -2754,6 +2789,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
                         cleanTargetDir(outputDirectory);
                         sourceDirRegistered = false;
+                    }
+
+                    // check if javaSourceOutputDirectory has been added
+                    if (!sourceOutputDirRegistered && this.outputDirectory.exists() && this.outputDirectory.list().length > 0) {
+                        registerAll(this.outputDirectory.getCanonicalFile().toPath(), executor);
+                        debug("Registering Java source output directory: " + this.outputDirectory);
+                        sourceOutputDirRegistered = true;
                     }
                 }
 
@@ -2849,6 +2891,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 warn("The source directory " + p.getSourceDirectory()
                                         + " was deleted.  This may result in compilation errors between dependent modules.  Restart dev mode for it to take effect.");
                             }
+
+                            // TODO register adding a new output directory once adding a src/main/java dir
+                            // to an upstream project is supported
                         }
 
                         // check if test directory of an upstream project has been added/deleted
@@ -3434,8 +3479,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
             }
-            // after compiling Java scan for Liberty features.
-            if (builtJava && generateFeatures && !initialCompile) {
+
+            if (builtJava && initialCompile && generateFeatures && gradle) {
+                // check for initial Gradle compile and scan for Liberty features across entire
+                // project as class files may have not been modified
                 libertyGenerateFeatures();
             }
 
@@ -3557,6 +3604,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaTestRecompile = false;
         triggerUpstreamJavaSourceRecompile = false;
         lastBuildFileChange = new HashMap<File, Long>();
+        javaSourceClasses = new HashSet<File>();
 
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
@@ -3587,6 +3635,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
         Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
+        Path srcOutputPath = this.outputDirectory.getCanonicalFile().toPath();
 
         Path directory = fileChanged.getParentFile().toPath();
 
@@ -3690,6 +3739,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (recompileDependencies) {
                             triggerUpstreamModuleCompile(project, true);
                         }
+                    }
+                } else if (directory.startsWith(project.getOutputDirectory().getCanonicalPath())) {
+                    if (fileChanged.exists() && fileChanged.getName().endsWith(".class")
+                            && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                        debug("Java source class file modified: " + fileChanged.getName()
+                                + ". Adding to list for processing.");
+                        javaSourceClasses.add(fileChanged);
+                    } else if (changeType == ChangeType.DELETE) {
+                        debug("Java source class deleted: " + fileChanged.getName()
+                                + ". Adding to list for processing.");
+                        javaSourceClasses.remove(fileChanged); // remove if class file is already stored in list
                     }
                 } else if (fileChanged.equals(project.getBuildFile())
                         && directory.startsWith(project.getBuildFile().getParentFile().getCanonicalFile().toPath())
@@ -3948,6 +4008,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (isDockerfileDirectoryChanged(fileChanged)) {
             // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
             untrackDockerfileDirectoriesAndRestart();
+        } else if (directory.startsWith(srcOutputPath)) {
+            if (fileChanged.exists() && fileChanged.getName().endsWith(".class")
+                    && (changeType == ChangeType.MODIFY
+                            || changeType == ChangeType.CREATE)) {
+                debug("Java source class file modified: " + fileChanged.getName()
+                        + ". Adding to list for processing.");
+                javaSourceClasses.add(fileChanged);
+            } else if (changeType == ChangeType.DELETE) {
+                debug("Java source class deleted: " + fileChanged.getName() + ". Adding to list for processing.");
+                javaSourceClasses.remove(fileChanged); // remove if class file is already stored in list
+            }
         }
     }
 

@@ -59,6 +59,8 @@ public class ProjectModule {
     private List<File> dependentModules;
     public boolean disableDependencyCompile;
 
+    public boolean sourceOutputDirRegistered;
+
     /**
      * Defines a project module for supporting multi-module projects
      * 
@@ -113,6 +115,8 @@ public class ProjectModule {
 
         // resource map
         this.resourceMap = new HashMap<File, Boolean>();
+
+        this.sourceOutputDirRegistered = false;
     }
 
     public HashMap<File, Boolean> getResourceMap() {
