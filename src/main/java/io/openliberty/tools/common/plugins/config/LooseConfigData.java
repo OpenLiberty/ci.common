@@ -28,6 +28,7 @@ public class LooseConfigData extends XmlDocument {
 
     private String projectRoot = null;
     private String sourceOnDiskName = null;
+    private File xmlDoc = null;
 
     /**
      * Set both projectRoot and sourceOnDiskName to control the name used when an element is added.
@@ -110,6 +111,11 @@ public class LooseConfigData extends XmlDocument {
     
     public void toXmlFile(File xmlFile) throws Exception {        
         writeXMLDocument(xmlFile);
+        this.xmlDoc = xmlFile;
+    }
+
+    public File getXmlFile() {
+        return this.xmlDoc;
     }
     
     public Element getDocumentRoot() {
@@ -130,4 +136,10 @@ public class LooseConfigData extends XmlDocument {
         child.setAttribute("targetInArchive", target);
         parent.appendChild(child);
     }
+
+    // public void getSourceOnDiskElement() {
+    //     if (sourceOnDiskName != null) {
+
+    //     }
+    // }
 }

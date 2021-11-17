@@ -300,6 +300,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public abstract boolean isLooseApplication();
 
+    public abstract File getLooseApplicationFile();
+
     /**
      * Is the classpath properly resolved. Only relevent for Maven projects.
      * Returns false if Maven thread classpath error is detected.
@@ -2500,6 +2502,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.dockerfileUsed = null;
         this.initialCompile = true;
         this.disableDependencyCompile = false;
+        getLooseApplicationFile(); // TODO do not register directories that are in srcDir and loose app file
 
         try {
             watcher = FileSystems.getDefault().newWatchService();
