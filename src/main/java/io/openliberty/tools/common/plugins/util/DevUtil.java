@@ -2420,16 +2420,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
         if (generateFeatures) {
             // If hotkey is toggled to “true”, generate features right away.
-            generateFeaturesWithAllClasses();
+            optimizeFeatures();
         }
     }
 
     /**
-     * Pass user specified features plus all classes to generateFeatures goal.
+     * Generate features using all classes and only user specified features.
      */
-    private void generateFeaturesWithAllClasses() {
+    private void optimizeFeatures() {
         info("Generating optimized features list...");
-        // TODO
+        // TODO make this not include previously generated features
+        try {
+            libertyGenerateFeatures();
+        } catch (PluginExecutionException e) {
+            error("An error occurred while trying to optimize features: " + e.getMessage(), e);
+        }
     }
 
     private class HotkeyReader implements Runnable {
@@ -2499,7 +2504,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         toggleFeatureGeneration();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
-                            generateFeaturesWithAllClasses();
+                            optimizeFeatures();
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
