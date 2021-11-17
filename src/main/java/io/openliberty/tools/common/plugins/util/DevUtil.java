@@ -2429,7 +2429,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     private void optimizeFeatures() {
         info("Generating optimized features list...");
-        // TODO make this not include previously generated features
         try {
             libertyGenerateFeatures();
         } catch (PluginExecutionException e) {

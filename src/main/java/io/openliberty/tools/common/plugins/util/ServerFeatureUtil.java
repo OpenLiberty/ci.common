@@ -104,10 +104,11 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      * Get the set of features defined in the server.xml
      * @param serverDirectory The server directory containing the server.xml
      * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
+     * @param dropinsFilesToIgnore A set of file names under configDropins/overrides or configDropins/defaults to ignore
      * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      *         or null if there are no valid xml files or they have no featureManager section
      */
-    public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles) {
+    public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles, Set<String> dropinsFilesToIgnore) {
         if (libertyDirPropFiles != null) {
             libertyDirectoryPropertyToFile = new HashMap(libertyDirPropFiles);
         } else {
@@ -115,10 +116,21 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
             libertyDirectoryPropertyToFile = new HashMap<String,File>();
         }
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
-        Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults");
+        Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults", dropinsFilesToIgnore);
         result = getServerXmlFeatures(result, new File(serverDirectory, "server.xml"), bootstrapProperties, null);
         // add the overrides at the end since they should not be replaced by any previous content
-        return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides");
+        return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides", dropinsFilesToIgnore);
+    }
+
+    /**
+     * Get the set of features defined in the server.xml
+     * @param serverDirectory The server directory containing the server.xml
+     * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
+     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
+     *         or null if there are no valid xml files or they have no featureManager section
+     */
+    public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles) {
+        return getServerFeatures(serverDirectory, libertyDirPropFiles, null);
     }
 
     /**
@@ -177,19 +189,19 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     /**
      * Gets features from the configDropins's defaults or overrides directory
      * 
-     * @param origResult
-     *            The features that have been parsed so far.
-     * @param serverDirectory
-     *            The server directory
-     * @param folderName
-     *            The folder under configDropins: either "defaults" or
-     *            "overrides"
+     * @param origResult           The features that have been parsed so far.
+     * @param serverDirectory      The server directory
+     * @param bootstrapProperties  Bootstrap proeprties
+     * @param folderName           The folder under configDropins: either "defaults"
+     *                             or "overrides"
+     * @param dropinsFilesToIgnore A set of file names under the given folderName
+     *                             that should be ignored
      * @return The set of features to install, or empty set if the cumulatively
-     *         parsed xml files only have featureManager sections but no
-     *         features to install, or null if there are no valid xml files or
-     *         they have no featureManager section
+     *         parsed xml files only have featureManager sections but no features to
+     *         install, or null if there are no valid xml files or they have no
+     *         featureManager section
      */
-    private Set<String> getConfigDropinsFeatures(Set<String> origResult, File serverDirectory, Properties bootstrapProperties, String folderName) {
+    private Set<String> getConfigDropinsFeatures(Set<String> origResult, File serverDirectory, Properties bootstrapProperties, String folderName, final Set<String> dropinsFilesToIgnore) {
         Set<String> result = origResult;
         File configDropinsFolder;
         try {
@@ -203,7 +215,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.endsWith(".xml");
+                return name.endsWith(".xml") && (dropinsFilesToIgnore == null || !dropinsFilesToIgnore.contains(name));
             }
         });
         if (configDropinsXmls == null || configDropinsXmls.length == 0) {
