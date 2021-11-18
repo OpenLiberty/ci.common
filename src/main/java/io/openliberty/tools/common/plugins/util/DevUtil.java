@@ -2896,45 +2896,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Given the loose app file and the source directory path, return a list of
-     * files that are specified in the loose app file and are in the source
-     * directory and should be omitted from watching.
-     * 
-     * @param looseAppFile Loose Application configuration file
-     * @param srcDirectory the source directory path
-     * @return a list of files that should be omitted from watching as they are on
-     *         the source directory path and exist in the loose app config file
-     */
-    private Collection<File> getOmitFilesList(File looseAppFile, Path srcDirectory) {
-        Collection<File> omitFiles = new ArrayList<File>();
-        try {
-            if (looseAppFile != null && looseAppFile.exists()) {
-                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                DocumentBuilder db = dbf.newDocumentBuilder();
-                Document document = db.parse(looseAppFile);
-                NodeList archiveList = document.getElementsByTagName("archive");
-                for (int i = 0; i < archiveList.getLength(); i++) {
-                    NodeList ar = archiveList.item(i).getChildNodes();
-                    for (int j = 0; j < ar.getLength(); j++) {
-                        Node node = ar.item(j);
-                        if (node.getNodeName().equals("dir") || node.getNodeName().equals("file")) {
-                            Node srcOnDiskNode = node.getAttributes().getNamedItem("sourceOnDisk");
-                            File srcOnDiskFile = new File(srcOnDiskNode.getTextContent());
-                            if (srcOnDiskFile.getCanonicalPath().startsWith(srcDirectory.toString())) {
-                                omitFiles.add(srcOnDiskFile);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (ParserConfigurationException | SAXException | IOException e) {
-            debug("Unable to read loose application configuration file: " + looseAppFile.toString());
-            return null;
-        }
-        return omitFiles;
-    }
-
-    /**
      * Whether source files should be watched/included for compilation for this packaging type.
      */
     private boolean shouldIncludeSources(String packaging) {
@@ -3106,6 +3067,48 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         });
         return observer;
+    }
+
+    /**
+     * Given the loose app file and the source directory path, return a list of
+     * files that are specified in the loose app file and are in the source
+     * directory and should be omitted from watching.
+     * 
+     * @param looseAppFile Loose Application configuration file
+     * @param srcDirectory the source directory path
+     * @return a list of files that should be omitted from watching as they are on
+     *         the source directory path and exist in the loose app config file
+     */
+    protected Collection<File> getOmitFilesList(File looseAppFile, Path srcDirectory) {
+        Collection<File> omitFiles = new ArrayList<File>();
+        try {
+            if (looseAppFile != null && looseAppFile.exists()) {
+                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                DocumentBuilder db = dbf.newDocumentBuilder();
+                Document document = db.parse(looseAppFile);
+                NodeList archiveList = document.getElementsByTagName("archive");
+                for (int i = 0; i < archiveList.getLength(); i++) {
+                    NodeList ar = archiveList.item(i).getChildNodes();
+                    for (int j = 0; j < ar.getLength(); j++) {
+                        Node node = ar.item(j);
+                        if (node.getNodeName().equals("dir") || node.getNodeName().equals("file")) {
+                            String srcOnDiskNodeText = node.getAttributes().getNamedItem("sourceOnDisk").getTextContent();
+                            if (container) {
+                                srcOnDiskNodeText = srcOnDiskNodeText.replace("${"+DEVMODE_PROJECT_ROOT+"}", getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory).getCanonicalPath());
+                            }
+                            File srcOnDiskFile = new File(srcOnDiskNodeText);
+                            if (srcOnDiskFile.getCanonicalPath().startsWith(srcDirectory.toString())) {
+                                omitFiles.add(srcOnDiskFile);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            debug("Unable to read loose application configuration file: " + looseAppFile.toString());
+            return null;
+        }
+        return omitFiles;
     }
 
     private void processUpstreamJavaCompilation(List<ProjectModule> upstreamProjects, final ThreadPoolExecutor executor)
