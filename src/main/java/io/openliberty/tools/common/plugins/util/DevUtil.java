@@ -2564,7 +2564,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
                         if (p.getSourceDirectory().exists()) {
-                            omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalFile().toPath()));
+                            omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath()));
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                             p.sourceDirRegistered = true;
                         }
@@ -2596,7 +2596,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             if (shouldIncludeSources(packagingType)) {
                 if (this.sourceDirectory.exists()) {
-                    omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, srcPath));
+                    omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, this.sourceDirectory.getCanonicalPath()));
                     registerAll(srcPath, executor);
                     sourceDirRegistered = true;
                 }
@@ -3075,11 +3075,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * directory and should be omitted from watching.
      * 
      * @param looseAppFile Loose Application configuration file
-     * @param srcDirectory the source directory path
+     * @param srcDirectoryPath the source directory path
      * @return a list of files that should be omitted from watching as they are on
      *         the source directory path and exist in the loose app config file
      */
-    protected Collection<File> getOmitFilesList(File looseAppFile, Path srcDirectory) {
+    protected Collection<File> getOmitFilesList(File looseAppFile, String srcDirectoryPath) {
         Collection<File> omitFiles = new ArrayList<File>();
         try {
             if (looseAppFile != null && looseAppFile.exists()) {
@@ -3094,10 +3094,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (node.getNodeName().equals("dir") || node.getNodeName().equals("file")) {
                             String srcOnDiskNodeText = node.getAttributes().getNamedItem("sourceOnDisk").getTextContent();
                             if (container) {
-                                srcOnDiskNodeText = srcOnDiskNodeText.replace("${"+DEVMODE_PROJECT_ROOT+"}", getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory).getCanonicalPath());
+                                srcOnDiskNodeText = srcOnDiskNodeText.replace("${" + DEVMODE_PROJECT_ROOT + "}",
+                                        getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory)
+                                                .getCanonicalPath());
                             }
                             File srcOnDiskFile = new File(srcOnDiskNodeText);
-                            if (srcOnDiskFile.getCanonicalPath().startsWith(srcDirectory.toString())) {
+                            if (srcOnDiskFile.getCanonicalPath().startsWith(srcDirectoryPath)) {
                                 omitFiles.add(srcOnDiskFile);
                             }
                         }

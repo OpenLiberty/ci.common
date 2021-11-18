@@ -32,11 +32,16 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class DevUtilTest extends BaseDevUtilTest {
@@ -46,6 +51,12 @@ public class DevUtilTest extends BaseDevUtilTest {
     File srcDir;
     File targetDir;
     DevUtil util;
+    private static File src;
+
+    @BeforeClass
+    public static void setUpClass() throws Exception {
+        src = new File("src/test/resources/servers");
+    }
 
     @Before
     public void setUp() throws IOException {
@@ -502,5 +513,21 @@ public class DevUtilTest extends BaseDevUtilTest {
 
         assertEquals("Parent should be the drive root", new File("/"), DevUtil.getLongestCommonDir(new File("/a/b/c"), new File("/d/e/f")));
     }
+
+    private File copyToServerAppsDir(String origName) throws IOException {
+        File file = new File(src, origName);
+        File destFile = new File(serverDirectory, "apps/" + origName);
+        FileUtils.copyFile(file, destFile);
+        return destFile;
+    }
+
+    @Test
+    public void testOmitFilesList() throws Exception {
+        File looseAppFile = copyToServerAppsDir("looseApp.xml");
+        Collection<File> omitFiles = new ArrayList<File>();
+        omitFiles.add(new File("/src/main/webapp"));
+        assertEquals(omitFiles, util.getOmitFilesList(looseAppFile, new File("/src/main/webapp").getCanonicalPath()));
+    }
+
 
 }
