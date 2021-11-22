@@ -195,6 +195,12 @@ public class BaseDevUtilTest {
         }
 
         @Override
+        public File getLooseApplicationFile() {
+            // not needed for tests
+            return null;
+        }
+
+        @Override
         public boolean compile(File dir, ProjectModule project) {
             // not needed for tests
             return false;
