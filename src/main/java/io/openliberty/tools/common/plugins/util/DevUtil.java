@@ -3107,7 +3107,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
         } catch (ParserConfigurationException | SAXException | IOException e) {
-            debug("Unable to read loose application configuration file: " + looseAppFile.toString());
+            error("Unable to read loose application configuration file: " + looseAppFile.toString());
             return null;
         }
         return omitFiles;
@@ -4244,7 +4244,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             }
                         }
                         for (File omitFile : omitWatchingFiles) {
-                            if (dir.startsWith(omitFile.getCanonicalPath())) {
+                            if (dir.startsWith(omitFile.getCanonicalPath() + File.separator)) {
                                 debug("Skipping subdirectory " + dir.toString() + " since it is in the omit files list");
                                 return FileVisitResult.CONTINUE;
                             }
@@ -5065,7 +5065,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             if (isMultiModuleProject()) {
                 for (ProjectModule p : upstreamProjects) {
-                    if (p.getSourceDirectory().getCanonicalPath().startsWith(dirAdded.getCanonicalPath())) {
+                    if (p.getSourceDirectory().getCanonicalPath().startsWith(dirAdded.getCanonicalPath() + File.separator)) {
                         return true;
                     }
                 }
