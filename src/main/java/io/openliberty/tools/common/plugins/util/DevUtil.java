@@ -307,6 +307,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public abstract boolean isLooseApplication();
 
+    /**
+     * Get the loose application configuration file.
+     * @return File loose application configuration file
+     */
     public abstract File getLooseApplicationFile();
 
     /**
