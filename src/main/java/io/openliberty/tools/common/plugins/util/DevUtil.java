@@ -313,15 +313,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public abstract File getLooseApplicationFile();
 
-    /**
-     * Is the classpath properly resolved. Only relevent for Maven projects.
-     * Returns false if Maven thread classpath error is detected.
-     * 
-     * @param buildFile
-     * @return true if classpath is resolved, false if not
-     */
-    public abstract boolean isClasspathResolved(File buildFile);
-
     private enum FileTrackMode {
         NOT_SET, FILE_WATCHER, POLLING
     }
@@ -402,7 +393,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected Map<String, List<String>> parentBuildFiles;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
-    private boolean blockTests; // used to block tests from running when Maven classpath thread error is present
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
@@ -478,7 +468,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
-        this.blockTests = false;
     }
 
     /**
@@ -2267,16 +2256,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         if (!inputUnavailable) {
             // the following will be printed on startup and every time after the tests run
-            if (blockTests) {
-                printMavenClasspathErrMsg(true);
+
+            if (hotTests) {
+                String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                info(startup ? formatAttentionMessage(message) : message);
             } else {
-                if (hotTests) {
-                    String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-                    info(startup ? formatAttentionMessage(message) : message);
-                } else {
-                    String message = "To run tests on demand, press Enter.";
-                    info(startup ? formatAttentionMessage(message) : message);
-                }
+                String message = "To run tests on demand, press Enter.";
+                info(startup ? formatAttentionMessage(message) : message);
             }
 
             // the following will be printed only on startup or restart
@@ -2394,13 +2380,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         @Override
         public void run() {
-            if (!gradle) {
-                // check for Maven thread classpath error, block tests from running if detected
-                // see https://issues.apache.org/jira/browse/MNG-7285
-                if (buildFile != null && !isClasspathResolved(buildFile)) {
-                    blockTests = true;
-                }
-            }
             debug("Running hotkey reader thread");
             scanner = new Scanner(new CloseShieldInputStream(System.in)); // shield allows us to close the scanner without closing System.in.
             try {
@@ -2439,9 +2418,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             runShutdownHook(executor);
                         }
                     } else {
-                        if (blockTests) {
-                            printMavenClasspathErrMsg(false);
-                        }
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
@@ -3488,18 +3464,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (initialCompile) {
                 initialCompile = false;
                 if (hotTests) {
-                    if (blockTests) {
-                        printMavenClasspathErrMsg(false);
+                    // if hot testing, run tests on startup
+                    if (isMultiModuleProject()) {
+                        // force run tests across all modules in multi module scenario
+                        runTestThread(false, executor, -1, true, getAllBuildFiles());
                     } else {
-                        // if hot testing, run tests on startup
-                        if (isMultiModuleProject()) {
-                            // force run tests across all modules in multi module scenario
-                            runTestThread(false, executor, -1, true, getAllBuildFiles());
-                        } else {
-                            runTestThread(false, executor, -1, false, buildFile);
-                        }
+                        runTestThread(false, executor, -1, false, buildFile);
                     }
-
                 }
             }
         }
@@ -4621,9 +4592,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences,
             boolean manualInvocation, File... currentBuildFiles) {
-        if (blockTests) {
-            return;
-        }
         // always pass in skip unit tests value for main project
         runTestThread(waitForApplicationUpdate, executor, messageOccurrences, this.skipUTs, manualInvocation,
                 currentBuildFiles);
@@ -5077,18 +5045,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             return false;
         } catch (IOException e) {
             return false;
-        }
-    }
-
-    // prints error to users when Maven thread classpath error is present
-    private void printMavenClasspathErrMsg(boolean startup) {
-        String message1 = "A classpath error with Maven has been detected. Tests will not run in dev mode on this project.";
-        String message2 = "Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.";
-        if (startup) {
-            error(formatAttentionMessage(message1));
-            error(formatAttentionMessage(message2));
-        } else {
-            error(message1 + " " + message2);
         }
     }
 }

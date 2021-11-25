@@ -206,12 +206,6 @@ public class BaseDevUtilTest {
             return false;
         }
 
-        @Override
-        public boolean isClasspathResolved(File buildFile) {
-            // not needed for tests
-            return false;
-        }
-        
     }
     
     public DevUtil getNewDevUtil(File serverDirectory) throws IOException  {
