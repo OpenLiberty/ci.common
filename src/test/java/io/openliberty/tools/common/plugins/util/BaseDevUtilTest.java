@@ -178,7 +178,7 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void libertyGenerateFeatures(Collection<String> classes) {
+        public void libertyGenerateFeatures(Collection<String> classes, boolean scanAllClassFiles, boolean userFeaturesOnly) {
             // not needed for tests
         }
 
