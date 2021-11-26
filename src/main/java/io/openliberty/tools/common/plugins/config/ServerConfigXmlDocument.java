@@ -70,15 +70,18 @@ public class ServerConfigXmlDocument extends XmlDocument {
         createComment(doc.getDocumentElement(), comment);
     }
 
-    public void createFMComment(String comment) {
+    // Return true if the document was changed and false otherwise.
+    public boolean createFMComment(String comment) {
         if (featureManager == null) {
-            return;
+            return false;
         }
         if (!hasFMComment(comment)) {
             // First try to add some blank text to maintain the indentation level.
             createPaddingText(featureManager);
             createComment(featureManager, comment);
+            return true;
         }
+        return false;
     }
 
     public void removeFMComment(String comment) {
@@ -100,9 +103,10 @@ public class ServerConfigXmlDocument extends XmlDocument {
         // First child of <element> is four (or eight or more) blanks. Second child is the actual content.
         // This can happen when you parse an existing document into the model rather than create it from scratch.
         Node first = elem.getFirstChild();
+
         Node text = null;
         if (first != null && first instanceof Text) {
-            text = (Text) first.cloneNode(true); // try to copy blanks to maintain indentation level
+            text = first.cloneNode(true); // try to copy blanks to maintain indentation level
         }
         if (text != null) {
             insertBeforeBlanks(elem, text); // add blanks between comment and next node: </featureManager>
@@ -122,10 +126,6 @@ public class ServerConfigXmlDocument extends XmlDocument {
         } else {
             elem.appendChild(childElement);
         }
-    }
-
-    private boolean isWhitespace(Node node) {
-        return node != null && node instanceof Text && ((Text)node).getData().trim().isEmpty();
     }
 
     public void createVariableWithValue(String varName, String varValue, boolean isDefaultValue) {
