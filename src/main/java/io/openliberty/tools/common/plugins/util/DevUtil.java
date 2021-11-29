@@ -1719,15 +1719,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     public abstract void libertyDeploy() throws PluginExecutionException;
 
-    public abstract void libertyGenerateFeatures() throws PluginExecutionException;
-
     /**
-     * Generate features for only the classes passed in
+     * Generate features for the application
      * 
-     * @param classes class file paths features should be generated for
+     * @param classes class file paths features should be generated for (can be null if no modified classes)
+     * @param optimize if true, generate optimized feature list
      * @throws PluginExecutionException
      */
-    public abstract void libertyGenerateFeatures(Collection<String> classes, boolean scanAllClassFiles, boolean userFeaturesOnly) throws PluginExecutionException;
+    public abstract void libertyGenerateFeatures(Collection<String> classes, boolean optimize) throws PluginExecutionException;
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -1776,7 +1775,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (generateFeatures) {
             //TODO: decide if we should do an optimized feature generation on a server restart
             // If we do not generate here, need to revisit compileDependenciesChanged section in DevMojo
-            generateFeaturesWithAllClasses();
+            optimizeGenerateFeatures();
         }
         // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
         if (!container) {
@@ -2422,18 +2421,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
         if (generateFeatures) {
             // If hotkey is toggled to “true”, generate features right away.
-            generateFeaturesWithAllClasses();
+            optimizeGenerateFeatures();
         }
     }
 
     /**
-     * Pass user specified features plus all classes to generateFeatures goal.
+     * Pass user specified features plus all classes to binary scanner
      * @throws PluginExecutionException
      */
-    private void generateFeaturesWithAllClasses() throws PluginExecutionException {
+    private void optimizeGenerateFeatures() throws PluginExecutionException {
         info("Generating optimized features list...");
         // scan all class files and provide only user specified features
-        libertyGenerateFeatures(null, true, true);
+        libertyGenerateFeatures(null, true);
+    }
+
+     /**
+     * Pass updated classes plus all existing features to binary scanner
+     * @throws PluginExecutionException
+     * @throws IOException
+     */
+    private void incrementGenerateFeatures() throws PluginExecutionException, IOException {
+        info("Generating feature list from incremental changes...");
+        Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
+        libertyGenerateFeatures(javaSourceClassPaths, false);
+        // TODO: update clear logic to handle cases where feature generation fails
+        javaSourceClasses.clear();
     }
 
     private class HotkeyReader implements Runnable {
@@ -2508,7 +2520,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
                             try {
-                                generateFeaturesWithAllClasses();
+                                optimizeGenerateFeatures();
                             } catch (PluginExecutionException e) {
                                 error("Failed to genereate features.", e);
                             }
@@ -2778,16 +2790,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                 // when change in class files are detected scan for Liberty features.
                 if (generateFeatures && !initialCompile && !javaSourceClasses.isEmpty()) {
-                    Collection<String> javaSourceClassPaths = new HashSet<String>();
-                    for (File javaSourceClass : javaSourceClasses) {
-                        javaSourceClassPaths.add(javaSourceClass.getCanonicalPath());
-                    }
-                    
-                    // send updated class files and tell featureGeneration goal/task to provide all existing features to binary scanner
-                    libertyGenerateFeatures(javaSourceClassPaths, false, false);
-                    javaSourceClassPaths.clear(); //do we need this clear?
-                    //TODO: Update clear logic to handle cases where feature generation fails
-                    javaSourceClasses.clear();
+                    incrementGenerateFeatures();
                 }
 
                 if (shouldIncludeSources(packagingType)) {
@@ -3521,7 +3524,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (builtJava && initialCompile && generateFeatures && gradle) {
                 // check for initial Gradle compile and scan for Liberty features across entire
                 // project as class files may have not been modified
-                libertyGenerateFeatures();
+                optimizeGenerateFeatures();
             }
 
             // additionally, process java test files if no changes detected after a
@@ -3898,11 +3901,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (generateFeatures) {
                     // custom server.xml modified
-                    // send updated class files and tell featureGeneration goal/task to provide all existing features to binary scanner
-                    Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-                    libertyGenerateFeatures(javaSourceClassPaths, false, false);
-                    // TODO: update clear logic
-                    javaSourceClasses.clear();
+                    incrementGenerateFeatures();
                 }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
@@ -3918,11 +3917,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (generateFeatures) {
                     // TODO: test this scenario and decide if generating features is necessary
                     // custom server.xml is deleted
-                    // send updated class files and tell featureGeneration goal/task to provide all existing features to binary scanner
-                    Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-                    libertyGenerateFeatures(javaSourceClassPaths, false, false);
-                    // TODO: update clear logic
-                    javaSourceClasses.clear();
+                    incrementGenerateFeatures();
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -3946,11 +3941,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                         // server.xml modified
-                        // send updated class files and tell featureGeneration goal/task to provide all existing features to binary scanner
-                        Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-                        libertyGenerateFeatures(javaSourceClassPaths, false, false);
-                        // TODO: update clear logic
-                        javaSourceClasses.clear();
+                        incrementGenerateFeatures();
                     }
                     if (changeType == ChangeType.CREATE) {
                         redeployApp();
@@ -3976,11 +3967,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                         // TODO: test this scenario and decide if generating features is necessary
                         // server.xml is deleted
-                        // send updated class files and tell featureGeneration goal/task to provide all existing features (would that even be possible?) to binary scanner
-                        Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-                        libertyGenerateFeatures(javaSourceClassPaths, false, false);
-                        // TODO: update clear logic
-                        javaSourceClasses.clear();
+                        incrementGenerateFeatures();
                     } else if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
