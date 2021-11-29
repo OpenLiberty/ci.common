@@ -94,7 +94,7 @@ public class ServerConfigFileTest {
         File serverXml = new File(serversDir, "server.xml");
         ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance(serverXml);
         assertTrue(doc.findFeatureManager() != null);
-        doc.createFMComment("test comment");
+        assertTrue(doc.createFMComment("test comment"));
         assertTrue(doc.hasFMComment("test comment"));
         Node comment = doc.findFMComment("test comment");
         assertTrue(comment.getNodeType() == Node.COMMENT_NODE);
@@ -104,7 +104,7 @@ public class ServerConfigFileTest {
     public void testInvalidAddFMComment() throws Exception {
         ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance();
         assertTrue(doc.findFeatureManager() == null);
-        doc.createFMComment("test comment");
+        assertFalse(doc.createFMComment("test comment"));
         assertTrue(doc.findServerElement().getChildNodes().getLength() == 0);
     }
 
@@ -113,7 +113,7 @@ public class ServerConfigFileTest {
         File serverXml = new File(serversDir, "server.xml");
         ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance(serverXml);
         assertTrue(doc.findFeatureManager() != null);
-        doc.createFMComment("test comment");
+        assertTrue(doc.createFMComment("test comment"));
         assertTrue(doc.hasFMComment("test comment"));
         doc.removeFMComment("test comment");
         assertFalse(doc.hasFMComment("test comment"));
@@ -130,7 +130,7 @@ public class ServerConfigFileTest {
             indent = text.getTextContent().length();
         }
         assertTrue(indent == 9);
-        doc.createFMComment("test comment");
+        assertTrue(doc.createFMComment("test comment"));
         Node comment = doc.findFMComment("test comment");
         Node spacing = comment.getPreviousSibling();
         assertTrue(spacing.getNodeType() == Node.TEXT_NODE);
