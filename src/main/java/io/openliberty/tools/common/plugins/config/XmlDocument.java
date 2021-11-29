@@ -18,6 +18,8 @@ package io.openliberty.tools.common.plugins.config;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -96,5 +98,13 @@ public abstract class XmlDocument {
 
     protected boolean isWhitespace(Node node) {
         return node != null && node instanceof Text && ((Text)node).getData().trim().isEmpty();
+    }
+
+    public static void addNewlineBeforeFirstElement(File f) throws IOException {
+        // look for "<?xml version="1.0" ... ?><server .../>" and add a newline
+        byte[] contents = Files.readAllBytes(f.toPath());
+        String xmlContents = new String(contents, StandardCharsets.UTF_8);
+        xmlContents = xmlContents.replace("?><", "?>"+System.getProperty("line.separator")+"<");
+        Files.write(f.toPath(), xmlContents.getBytes());
     }
 }
