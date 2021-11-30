@@ -333,7 +333,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File projectDirectory;
     private File multiModuleProjectDirectory;
     private List<File> resourceDirs;
-    private List<Path> webResourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
     private boolean skipTests;
@@ -414,7 +413,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
             String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles,
-            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> webResourceDirs) {
+            Set<String> compileArtifactPaths, Set<String> testArtifactPaths) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -480,7 +479,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.blockTests = false;
-        this.webResourceDirs = webResourceDirs;
     }
 
     /**
@@ -1147,15 +1145,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }
     }
-    
-    /**
-     * 
-     * The intention here is to give a chance to run logic for an app update
-     * but not necessarily a full re-deploy
-     * 
-     * @throws PluginExecutionException
-     */
-    protected abstract void updateLooseApp() throws PluginExecutionException;
 
     private String formatDestMount(String destMountString, File srcMountFile) {
         // Cannot mount a file onto a directory, so must add a filename to the end of the destination argument for mounting
@@ -2658,15 +2647,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     resourceMap.put(resourceDir, true);
                 }
             }
-            
-            HashMap<Path, Boolean> webResourceMap = new HashMap<Path, Boolean>();
-            for (Path webResourceDir : webResourceDirs) {
-                webResourceMap.put(webResourceDir, false);
-                if (Files.exists(webResourceDir)) {
-                    registerAll(webResourceDir, executor);
-                    webResourceMap.put(webResourceDir, true);
-                }
-            }
 
             registerSingleFile(buildFile, executor);
 
@@ -2780,7 +2760,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // check if resourceDirectory has been added
                 for (File resourceDir : resourceDirs) {
                     if (!resourceMap.get(resourceDir) && resourceDir.exists()) {
-                    	resourceDirectoryCreated();
+                        // added resource directory
                         registerAll(resourceDir.getCanonicalFile().toPath(), executor);
                         resourceMap.put(resourceDir, true);
                     } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
@@ -2788,23 +2768,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         warn("The resource directory " + resourceDir
                                 + " was deleted.  Restart dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
-                    }
-                }
-                
-                // Check if webResourceDirectory has been added or deleted
-                for (Path webResourceDir : webResourceDirs) {
-                    if (!webResourceMap.get(webResourceDir) && Files.exists(webResourceDir)) {
-                    	updateLooseApp();
-                        registerAll(webResourceDir, executor);
-                        webResourceMap.put(webResourceDir, true);
-                    	runTestThread(false, executor, -1, false, false);
-                    } else if (webResourceMap.get(webResourceDir) && !Files.exists(webResourceDir)) {
-                        // deleted webResource directory
-                    	updateLooseApp();
-                        warn("The webResource directory " + webResourceDir
-                                + " was deleted.  Restart liberty:dev mode for it to take effect.");
-                        webResourceMap.put(webResourceDir, false);
-                    	runTestThread(false, executor, -1, false, false);
                     }
                 }
 
@@ -3618,15 +3581,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 break;
             }
         }
-        
-        // webResource file check
-        Path webResourceParent = null;
-        for (Path webResourceDir : webResourceDirs) {
-            if (directory.startsWith(webResourceDir)) {
-                webResourceParent = webResourceDir;
-                break;
-            }
-        }
 
         if (fileChanged.isDirectory()) {
             // if new directory added, watch the entire directory
@@ -3751,9 +3705,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             }
                         }
                     }
-                    // Update the loose app in case something changed 
-                    updateLooseApp();
-                    
                 } else if (upstreamResourceParent != null
                         && directory.startsWith(upstreamResourceParent.getCanonicalFile().toPath())) { // resources
                     debug("Resource dir: " + upstreamResourceParent.toString());
@@ -3797,7 +3748,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     triggerMainModuleCompile(false);
                 }
             }
-        } else if (directory.startsWith(testSrcPath)) { // src/test/java
+        } else if (directory.startsWith(testSrcPath)) { // src/main/test
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
             javaFilesChanged.add(fileChanged);
             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
@@ -3922,26 +3873,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("Resource dir: " + resourceParent.toString());
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY
                     || changeType == ChangeType.CREATE)) {
-            	resourceModifiedOrCreated(fileChanged, resourceParent, outputDirectory);
+                copyFile(fileChanged, resourceParent, outputDirectory, null);
 
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             } else if (changeType == ChangeType.DELETE) {
                 debug("Resource file deleted: " + fileChanged.getName());
-                resourceDeleted(fileChanged, resourceParent, outputDirectory);
+                deleteFile(fileChanged, resourceParent, outputDirectory, null);
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
-        } else if (webResourceParent != null && directory.startsWith(webResourceParent)) { // webResources
-                debug("webResource dir: " + webResourceParent.toString());
-                updateLooseApp();
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
             lastBuildFileChange.put(buildFile, System.currentTimeMillis());
             boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, executor);
-            
             // run all tests on build file change
             if (recompiledBuild) {
                 if (recompileDependencies) {
@@ -3956,8 +3902,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         triggerJavaTestRecompile = true;
                     }
                 }
-                // Update the loose app in case something changed 
-                updateLooseApp();
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(dockerfileUsed)
@@ -4000,12 +3944,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         return null;
     }
-    
-    protected abstract void resourceDirectoryCreated() throws IOException;
-
-    protected abstract void resourceModifiedOrCreated(File fileChanged, File resourceParent, File outputDirectory) throws IOException;
-
-    protected abstract void resourceDeleted(File fileChanged, File resourceParent, File outputDirectory) throws IOException;
 
     /**
      * Unwatches all directories that were specified in Dockerfile COPY commands, then does a container
@@ -4566,8 +4504,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // redeploy app after compilation if not loose application
                     if (!isLooseApplication()) {
                         redeployApp();
-                    } else {
-                        updateLooseApp();
                     }
                     if (projectName != null) {
                         info(projectName + " source compilation was successful.");
