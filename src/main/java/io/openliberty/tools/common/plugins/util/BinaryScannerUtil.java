@@ -56,7 +56,7 @@ public abstract class BinaryScannerUtil {
     }
 
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
-            String eeVersion, String mpVersion)
+            String eeVersion, String mpVersion, boolean optimize)
             throws PluginExecutionException, InvocationTargetException, NoRecommendationException, RecommendationSetException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
@@ -70,7 +70,7 @@ public abstract class BinaryScannerUtil {
                     return null;
                 }
 
-                String[] binaryInputs = getBinaryInputs(classFiles, allClassesDirectories);
+                String[] binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
                 List<String> currentFeatures;
                 if (currentFeatureSet == null) { // signifies we are calling the binary scanner for a sample list of features
                     currentFeatures = new ArrayList<String>();
@@ -98,7 +98,7 @@ public abstract class BinaryScannerUtil {
                         Set<String> conflicts = parseScannerMessage(problemMessage);
                         Set<String> sampleFeatureList = null;
                         try {
-                            sampleFeatureList = runBinaryScanner(null, classFiles, allClassesDirectories, eeVersion, mpVersion);
+                            sampleFeatureList = runBinaryScanner(null, classFiles, allClassesDirectories, eeVersion, mpVersion, true);
                         } catch (InvocationTargetException retryException) {
                             // binary scanner should not return a RuntimeException since there is no list of app features passed in
                             sampleFeatureList = getNoSampleFeatureList();
@@ -111,7 +111,7 @@ public abstract class BinaryScannerUtil {
                     Set<String> sampleFeatureList = null;
                     if (currentFeatureSet != null) {
                         try {
-                            sampleFeatureList = runBinaryScanner(null, classFiles, allClassesDirectories, eeVersion, mpVersion);
+                            sampleFeatureList = runBinaryScanner(null, classFiles, allClassesDirectories, eeVersion, mpVersion, true);
                         } catch (InvocationTargetException retryException) {
                             Throwable scannerSecondException = retryException.getCause();
                             if (scannerSecondException.getClass().getName().endsWith("FeatureConflictException")) {
@@ -167,17 +167,18 @@ public abstract class BinaryScannerUtil {
         return binaryScannerClassLoader;
     }
 
-    private static String[] getBinaryInputs(List<String> classFiles, Set<String> classDirectories) throws PluginExecutionException {
+    private static String[] getBinaryInputs(List<String> classFiles, Set<String> classDirectories, boolean optimize) throws PluginExecutionException {
         Collection<String> resultSet;
-        if (classFiles != null && !classFiles.isEmpty()) {
+        if (!optimize && classFiles != null && !classFiles.isEmpty()) {
             resultSet = classFiles;
-        } else {
+        } else if (optimize) {
             if (classDirectories == null || classDirectories.isEmpty()) {
                 throw new PluginExecutionException("Error collecting list of directories to send to binary scanner, list is null or empty.");
             }
             resultSet = classDirectories;
+        } else {
+            return new String[0];
         }
-
         String[] result = resultSet.toArray(new String[resultSet.size()]);
         return result;
     }
