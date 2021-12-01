@@ -1774,11 +1774,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         // suppress install feature warning
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-        libertyCreate();
         if (generateFeatures) {
             libertyGenerateFeatures();
         }
-        // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
+        libertyCreate();
+        // Skip installing features on container during restart, since the Dockerfile
+        // should have 'RUN features.sh'
         if (!container) {
             libertyInstallFeature();
         }
