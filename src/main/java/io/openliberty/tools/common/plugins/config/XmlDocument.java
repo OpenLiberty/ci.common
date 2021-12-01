@@ -18,6 +18,8 @@ package io.openliberty.tools.common.plugins.config;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -31,6 +33,8 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.Text;
 import org.xml.sax.SAXException;
 
 public abstract class XmlDocument {
@@ -54,7 +58,7 @@ public abstract class XmlDocument {
         DocumentBuilder builder = builderFactory.newDocumentBuilder();
         doc = builder.parse(xmlFile);
     }
-        
+
     public void writeXMLDocument(String fileName) throws IOException, TransformerException {
         File f = new File(fileName);
         writeXMLDocument(f);
@@ -75,10 +79,32 @@ public abstract class XmlDocument {
         transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, "yes");
         transformer.setOutputProperty(OutputKeys.VERSION, "1.0");
         transformer.setOutputProperty(OutputKeys.ENCODING,"UTF-8");
-        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+        if (isIndented()) {
+            transformer.setOutputProperty(OutputKeys.INDENT, "no");
+        } else {
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+        }
         transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
         
         transformer.transform(source, result);
         outFile.close();
+    }
+
+    protected boolean isIndented() {
+        // if the first child is just white space then the document contains indentation information
+        Node x = doc.getDocumentElement().getFirstChild();
+        return isWhitespace(x);
+    }
+
+    protected boolean isWhitespace(Node node) {
+        return node != null && node instanceof Text && ((Text)node).getData().trim().isEmpty();
+    }
+
+    public static void addNewlineBeforeFirstElement(File f) throws IOException {
+        // look for "<?xml version="1.0" ... ?><server .../>" and add a newline
+        byte[] contents = Files.readAllBytes(f.toPath());
+        String xmlContents = new String(contents, StandardCharsets.UTF_8);
+        xmlContents = xmlContents.replace("?><", "?>"+System.getProperty("line.separator")+"<");
+        Files.write(f.toPath(), xmlContents.getBytes());
     }
 }

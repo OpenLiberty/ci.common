@@ -2416,7 +2416,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return "[ " + (bool ? "On" : "Off") + " ]";
     }
 
-    private void toggleFeatureGeneration() throws PluginExecutionException {
+    private void toggleFeatureGeneration() {
         generateFeatures = !generateFeatures;
         info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
         if (generateFeatures) {
@@ -2427,12 +2427,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Pass user specified features plus all classes to binary scanner
-     * @throws PluginExecutionException
      */
-    private void optimizeGenerateFeatures() throws PluginExecutionException {
+    private void optimizeGenerateFeatures() {
         info("Generating optimized features list...");
         // scan all class files and provide only user specified features
-        libertyGenerateFeatures(null, true);
+        try {
+            libertyGenerateFeatures(null, true);
+        } catch (PluginExecutionException e) {
+            error("An error occurred while trying to optimize features: " + e.getMessage(), e);
+        }
     }
 
      /**
@@ -2440,10 +2443,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws PluginExecutionException
      * @throws IOException
      */
-    private void incrementGenerateFeatures() throws PluginExecutionException, IOException {
+    private void incrementGenerateFeatures() {
         info("Generating feature list from incremental changes...");
-        Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-        libertyGenerateFeatures(javaSourceClassPaths, false);
+        try {
+            Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
+            libertyGenerateFeatures(javaSourceClassPaths, false);
+        } catch (PluginExecutionException | IOException e) {
+            error("An error occurred while trying to generate features: " + e.getMessage(), e);
+        }
         // TODO: update clear logic to handle cases where feature generation fails
         javaSourceClasses.clear();
     }
@@ -2512,18 +2519,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         printHelpMessages();
                         info(formatAttentionBarrier());
                     } else if (g.isPressed(line)) {
-                        try {
                             toggleFeatureGeneration();
-                        } catch (PluginExecutionException e) {
-                            error("Failed to genereate features.", e);
-                        }
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
-                            try {
-                                optimizeGenerateFeatures();
-                            } catch (PluginExecutionException e) {
-                                error("Failed to genereate features.", e);
-                            }
+                            optimizeGenerateFeatures();
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
