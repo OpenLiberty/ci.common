@@ -118,6 +118,9 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         }
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
         Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults", dropinsFilesToIgnore);
+        if (serverXmlFile == null) {
+            serverXmlFile = new File(serverDirectory, "server.xml");
+        }
         result = getServerXmlFeatures(result, serverXmlFile, bootstrapProperties, null);
         // add the overrides at the end since they should not be replaced by any previous content
         return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides", dropinsFilesToIgnore);
