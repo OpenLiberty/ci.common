@@ -2426,7 +2426,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Pass user specified features plus all classes to binary scanner
+     * Generate features using all classes and only user specified features.
      */
     private void optimizeGenerateFeatures() {
         info("Generating optimized features list...");
@@ -2439,9 +2439,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
      /**
-     * Pass updated classes plus all existing features to binary scanner
-     * @throws PluginExecutionException
-     * @throws IOException
+     * Generate features using updated classes and all existing features.
      */
     private void incrementGenerateFeatures() {
         info("Generating feature list from incremental changes...");
@@ -2519,7 +2517,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         printHelpMessages();
                         info(formatAttentionBarrier());
                     } else if (g.isPressed(line)) {
-                            toggleFeatureGeneration();
+                        toggleFeatureGeneration();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
                             optimizeGenerateFeatures();
