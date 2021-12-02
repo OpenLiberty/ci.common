@@ -391,6 +391,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
     private boolean blockTests; // used to block tests from running when Maven classpath thread error is present
+    private boolean foundInitialClasses;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
@@ -468,6 +469,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.blockTests = false;
+        this.foundInitialClasses = false;
     }
 
     /**
@@ -2769,14 +2771,23 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 // when change in class files are detected scan for Liberty features.
-                if (generateFeatures && !initialCompile && !javaSourceClasses.isEmpty()) {
-                    Collection<String> javaSourceClassPaths = new HashSet<String>();
-                    for (File javaSourceClass : javaSourceClasses) {
-                        javaSourceClassPaths.add(javaSourceClass.getCanonicalPath());
+                if (generateFeatures && !javaSourceClasses.isEmpty()) {
+                    debug("Changed classes: " + javaSourceClasses);
+                    if (!gradle && !foundInitialClasses) {
+                        // For Maven, skip the first call of generate features from the initial Java compilation that happens after dev mode startup
+                        // because features were already generated during the actual dev mode startup steps.
+                        debug("Skipping generate features from first call after dev mode startup");
+                        foundInitialClasses = true;
+                        javaSourceClasses.clear();
+                    } else {
+                        Collection<String> javaSourceClassPaths = new HashSet<String>();
+                        for (File javaSourceClass : javaSourceClasses) {
+                            javaSourceClassPaths.add(javaSourceClass.getCanonicalPath());
+                        }
+                        libertyGenerateFeatures(javaSourceClassPaths);
+                        javaSourceClassPaths.clear();
+                        javaSourceClasses.clear();    
                     }
-                    libertyGenerateFeatures(javaSourceClassPaths);
-                    javaSourceClassPaths.clear();
-                    javaSourceClasses.clear();
                 }
 
                 if (shouldIncludeSources(packagingType)) {
