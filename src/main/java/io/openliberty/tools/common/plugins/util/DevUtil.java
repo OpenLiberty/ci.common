@@ -3495,12 +3495,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
 
-            if (builtJava && initialCompile && generateFeatures && gradle) {
-                // check for initial Gradle compile and scan for Liberty features across entire
-                // project as class files may have not been modified
-                libertyGenerateFeatures();
-            }
-
             // additionally, process java test files if no changes detected after a
             // different timeout
             // (but source timeout takes precedence i.e. don't recompile tests if someone
