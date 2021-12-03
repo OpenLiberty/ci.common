@@ -169,15 +169,17 @@ public abstract class BinaryScannerUtil {
 
     private static String[] getBinaryInputs(List<String> classFiles, Set<String> classDirectories, boolean optimize) throws PluginExecutionException {
         Collection<String> resultSet;
-        if (!optimize && classFiles != null && !classFiles.isEmpty()) {
-            resultSet = classFiles;
-        } else if (optimize) {
+        if (optimize) {
             if (classDirectories == null || classDirectories.isEmpty()) {
                 throw new PluginExecutionException("Error collecting list of directories to send to binary scanner, list is null or empty.");
             }
             resultSet = classDirectories;
         } else {
-            return new String[0];
+            if (classFiles != null && !classFiles.isEmpty()) {
+                resultSet = classFiles;
+            } else {
+                return new String[0];
+            }
         }
         String[] result = resultSet.toArray(new String[resultSet.size()]);
         return result;
