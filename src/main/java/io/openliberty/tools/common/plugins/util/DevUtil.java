@@ -1773,13 +1773,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         // suppress install feature warning
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-        libertyCreate();
         if (generateFeatures) {
             //TODO: decide if we should do an optimized feature generation on a server restart
             // If we do not generate here, need to revisit compileDependenciesChanged section in DevMojo
             optimizeGenerateFeatures();
         }
-        // Skip installing features on container during restart, since the Dockerfile should have 'RUN features.sh'
+        libertyCreate();
+        // Skip installing features on container during restart, since the Dockerfile
+        // should have 'RUN features.sh'
         if (!container) {
             libertyInstallFeature();
         }
@@ -3527,12 +3528,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
-            }
-
-            if (builtJava && initialCompile && generateFeatures && gradle) {
-                // check for initial Gradle compile and scan for Liberty features across entire
-                // project as class files may have not been modified
-                optimizeGenerateFeatures();
             }
 
             // additionally, process java test files if no changes detected after a
