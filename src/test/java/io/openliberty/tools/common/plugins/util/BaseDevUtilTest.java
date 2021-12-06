@@ -206,17 +206,17 @@ public class BaseDevUtilTest {
         }
 
         @Override
+        public File getLooseApplicationFile() {
+            // not needed for tests
+            return null;
+        }
+
+        @Override
         public boolean compile(File dir, ProjectModule project) {
             // not needed for tests
             return false;
         }
 
-        @Override
-        public boolean isClasspathResolved(File buildFile) {
-            // not needed for tests
-            return false;
-        }
-        
     }
     
     public DevUtil getNewDevUtil(File serverDirectory) throws IOException  {
