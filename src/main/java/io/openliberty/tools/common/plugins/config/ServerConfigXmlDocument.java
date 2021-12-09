@@ -143,15 +143,29 @@ public class ServerConfigXmlDocument extends XmlDocument {
         elem.appendChild(child);
     }
 
+    /**
+     * Add the given feature to the feature manager element. Also creates the
+     * feature manager element if it does not already exist.
+     * 
+     * @param name feature name
+     */
     public void createFeature(String name) {
-        if (featureManager == null) {
-            featureManager = doc.createElement("featureManager");
-            doc.getDocumentElement().appendChild(featureManager);
-        }
+        createFeatureManager();
         Element child = doc.createElement("feature");
         Node text = doc.createTextNode(name);
         child.appendChild(text);
         featureManager.appendChild(child);
+    }
+
+    /**
+     * Create the feature manager element if it does not already exist
+     */
+    public Element createFeatureManager() {
+        if (featureManager == null) {
+            featureManager = doc.createElement("featureManager");
+            doc.getDocumentElement().appendChild(featureManager);
+        }
+        return featureManager;
     }
 
     public Element findFeatureManager() {
