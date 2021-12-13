@@ -73,6 +73,9 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
@@ -81,6 +84,10 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.apache.maven.artifact.versioning.ComparableVersion;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import io.openliberty.tools.ant.ServerTask;
 
@@ -301,13 +308,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract boolean isLooseApplication();
 
     /**
-     * Is the classpath properly resolved. Only relevent for Maven projects.
-     * Returns false if Maven thread classpath error is detected.
-     * 
-     * @param buildFile
-     * @return true if classpath is resolved, false if not
+     * Get the loose application configuration file.
+     * @return File loose application configuration file
      */
-    public abstract boolean isClasspathResolved(File buildFile);
+    public abstract File getLooseApplicationFile();
 
     private enum FileTrackMode {
         NOT_SET, FILE_WATCHER, POLLING
@@ -320,6 +324,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File projectDirectory;
     private File multiModuleProjectDirectory;
     private List<File> resourceDirs;
+    private List<Path> webResourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
     private boolean skipTests;
@@ -390,7 +395,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean generateFeatures;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
-    private boolean blockTests; // used to block tests from running when Maven classpath thread error is present
     private boolean foundInitialClasses;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
@@ -402,7 +406,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
             String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
-            Set<String> compileArtifactPaths, Set<String> testArtifactPaths) {
+            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> webResourceDirs) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -468,8 +472,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.generateFeatures = generateFeatures;
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
-        this.blockTests = false;
         this.foundInitialClasses = false;
+        this.webResourceDirs = webResourceDirs;
     }
 
     /**
@@ -1136,6 +1140,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }
     }
+    
+    /**
+     * 
+     * The intention here is to give a chance to run logic for an app update
+     * but not necessarily a full re-deploy
+     * 
+     * @throws PluginExecutionException
+     */
+    protected abstract void updateLooseApp() throws PluginExecutionException;
 
     private String formatDestMount(String destMountString, File srcMountFile) {
         // Cannot mount a file onto a directory, so must add a filename to the end of the destination argument for mounting
@@ -2365,16 +2378,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printTestsMessage(boolean formatForAttention) {
-        if (blockTests) {
-            printMavenClasspathErrMsg(true);
+        if (hotTests) {
+            String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+            info(formatForAttention ? formatAttentionMessage(message) : message);
         } else {
-            if (hotTests) {
-                String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-                info(formatForAttention ? formatAttentionMessage(message) : message);
-            } else {
-                String message = "To run tests on demand, press Enter.";
-                info(formatForAttention ? formatAttentionMessage(message) : message);
-            }
+            String message = "To run tests on demand, press Enter.";
+            info(formatForAttention ? formatAttentionMessage(message) : message);
         }
     }
 
@@ -2467,13 +2476,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         @Override
         public void run() {
-            if (!gradle) {
-                // check for Maven thread classpath error, block tests from running if detected
-                // see https://issues.apache.org/jira/browse/MNG-7285
-                if (buildFile != null && !isClasspathResolved(buildFile)) {
-                    blockTests = true;
-                }
-            }
             debug("Running hotkey reader thread");
             scanner = new Scanner(new CloseShieldInputStream(System.in)); // shield allows us to close the scanner without closing System.in.
             try {
@@ -2529,9 +2531,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
                         }
                     } else {
-                        if (blockTests) {
-                            printMavenClasspathErrMsg(false);
-                        }
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
@@ -2557,6 +2556,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     Collection<File> failedCompilationJavaSources;
     Collection<File> failedCompilationJavaTests;
     Collection<File> javaSourceClasses;
+    Collection<File> omitWatchingFiles;
     long lastJavaSourceChange;
     long lastJavaTestChange;
     Map<File, Long> lastBuildFileChange;
@@ -2571,6 +2571,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     File jvmOptionsFile;
     File jvmOptionsFileParent;
     File dockerfileUsed;
+    File looseAppFile;
     WatchService watcher;
 
     // used for multi module projects
@@ -2604,8 +2605,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.dockerfileUsed = null;
         this.initialCompile = true;
         this.disableDependencyCompile = false;
+        this.omitWatchingFiles = new ArrayList<File>();
 
         try {
+            if (isLooseApplication()) {
+                this.looseAppFile = getLooseApplicationFile();
+                debug("Loose application configuration file set to: " + looseAppFile);
+            }
+
             watcher = FileSystems.getDefault().newWatchService();
             serverXmlFileParent = null;
             if (serverXmlFile != null && serverXmlFile.exists()) {
@@ -2653,6 +2660,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
                         if (p.getSourceDirectory().exists()) {
+                            omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath()));
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                             p.sourceDirRegistered = true;
                         }
@@ -2690,6 +2698,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             if (shouldIncludeSources(packagingType)) {
                 if (this.sourceDirectory.exists()) {
+                    omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, this.sourceDirectory.getCanonicalPath()));
                     registerAll(srcPath, executor);
                     sourceDirRegistered = true;
                 }
@@ -2741,6 +2750,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (resourceDir.exists()) {
                     registerAll(resourceDir.getCanonicalFile().toPath(), executor);
                     resourceMap.put(resourceDir, true);
+                }
+            }
+            
+            HashMap<Path, Boolean> webResourceMap = new HashMap<Path, Boolean>();
+            for (Path webResourceDir : webResourceDirs) {
+                webResourceMap.put(webResourceDir, false);
+                if (Files.exists(webResourceDir)) {
+                    registerAll(webResourceDir, executor);
+                    webResourceMap.put(webResourceDir, true);
                 }
             }
 
@@ -2877,7 +2895,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // check if resourceDirectory has been added
                 for (File resourceDir : resourceDirs) {
                     if (!resourceMap.get(resourceDir) && resourceDir.exists()) {
-                        // added resource directory
+                    	resourceDirectoryCreated();
                         registerAll(resourceDir.getCanonicalFile().toPath(), executor);
                         resourceMap.put(resourceDir, true);
                     } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
@@ -2885,6 +2903,23 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         warn("The resource directory " + resourceDir
                                 + " was deleted.  Restart dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
+                    }
+                }
+                
+                // Check if webResourceDirectory has been added or deleted
+                for (Path webResourceDir : webResourceDirs) {
+                    if (!webResourceMap.get(webResourceDir) && Files.exists(webResourceDir)) {
+                    	updateLooseApp();
+                        registerAll(webResourceDir, executor);
+                        webResourceMap.put(webResourceDir, true);
+                    	runTestThread(false, executor, -1, false, false);
+                    } else if (webResourceMap.get(webResourceDir) && !Files.exists(webResourceDir)) {
+                        // deleted webResource directory
+                    	updateLooseApp();
+                        warn("The webResource directory " + webResourceDir
+                                + " was deleted.  Restart liberty:dev mode for it to take effect.");
+                        webResourceMap.put(webResourceDir, false);
+                    	runTestThread(false, executor, -1, false, false);
                     }
                 }
 
@@ -3214,6 +3249,50 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         });
         return observer;
+    }
+
+    /**
+     * Given the loose app file and the source directory path, return a list of
+     * files that are specified in the loose app file and are in the source
+     * directory and should be omitted from watching.
+     * 
+     * @param looseAppFile Loose Application configuration file
+     * @param srcDirectoryPath the source directory path
+     * @return a list of files that should be omitted from watching as they are on
+     *         the source directory path and exist in the loose app config file
+     */
+    protected Collection<File> getOmitFilesList(File looseAppFile, String srcDirectoryPath) {
+        Collection<File> omitFiles = new ArrayList<File>();
+        try {
+            if (looseAppFile != null && looseAppFile.exists()) {
+                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                DocumentBuilder db = dbf.newDocumentBuilder();
+                Document document = db.parse(looseAppFile);
+                NodeList archiveList = document.getElementsByTagName("archive");
+                for (int i = 0; i < archiveList.getLength(); i++) {
+                    NodeList ar = archiveList.item(i).getChildNodes();
+                    for (int j = 0; j < ar.getLength(); j++) {
+                        Node node = ar.item(j);
+                        if (node.getNodeName().equals("dir") || node.getNodeName().equals("file")) {
+                            String srcOnDiskNodeText = node.getAttributes().getNamedItem("sourceOnDisk").getTextContent();
+                            if (container) {
+                                srcOnDiskNodeText = srcOnDiskNodeText.replace("${" + DEVMODE_PROJECT_ROOT + "}",
+                                        getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory)
+                                                .getCanonicalPath());
+                            }
+                            File srcOnDiskFile = new File(srcOnDiskNodeText);
+                            if (srcOnDiskFile.getCanonicalPath().startsWith(srcDirectoryPath)) {
+                                omitFiles.add(srcOnDiskFile);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            error("Unable to read loose application configuration file: " + looseAppFile.toString());
+            return null;
+        }
+        return omitFiles;
     }
 
     private boolean processUpstreamJavaCompilation(List<ProjectModule> upstreamProjects, final ThreadPoolExecutor executor)
@@ -3596,18 +3675,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (initialCompile) {
                 initialCompile = false;
                 if (hotTests) {
-                    if (blockTests) {
-                        printMavenClasspathErrMsg(false);
+                    // if hot testing, run tests on startup
+                    if (isMultiModuleProject()) {
+                        // force run tests across all modules in multi module scenario
+                        runTestThread(false, executor, -1, true, getAllBuildFiles());
                     } else {
-                        // if hot testing, run tests on startup
-                        if (isMultiModuleProject()) {
-                            // force run tests across all modules in multi module scenario
-                            runTestThread(false, executor, -1, true, getAllBuildFiles());
-                        } else {
-                            runTestThread(false, executor, -1, false, buildFile);
-                        }
+                        runTestThread(false, executor, -1, false, buildFile);
                     }
-
                 }
             }
         }
@@ -3688,6 +3762,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         for (File resourceDir : resourceDirs) {
             if (directory.startsWith(resourceDir.getCanonicalFile().toPath())) {
                 resourceParent = resourceDir;
+                break;
+            }
+        }
+        
+        // webResource file check
+        Path webResourceParent = null;
+        for (Path webResourceDir : webResourceDirs) {
+            if (directory.startsWith(webResourceDir)) {
+                webResourceParent = webResourceDir;
                 break;
             }
         }
@@ -3826,6 +3909,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             }
                         }
                     }
+                    // Update the loose app in case something changed 
+                    updateLooseApp();
+                    
                 } else if (upstreamResourceParent != null
                         && directory.startsWith(upstreamResourceParent.getCanonicalFile().toPath())) { // resources
                     debug("Resource dir: " + upstreamResourceParent.toString());
@@ -3869,7 +3955,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     triggerMainModuleCompile(false);
                 }
             }
-        } else if (directory.startsWith(testSrcPath)) { // src/main/test
+        } else if (directory.startsWith(testSrcPath)) { // src/test/java
             ArrayList<File> javaFilesChanged = new ArrayList<File>();
             javaFilesChanged.add(fileChanged);
             if (fileChanged.exists() && fileChanged.getName().endsWith(".java")
@@ -4014,21 +4100,26 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("Resource dir: " + resourceParent.toString());
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY
                     || changeType == ChangeType.CREATE)) {
-                copyFile(fileChanged, resourceParent, outputDirectory, null);
+            	resourceModifiedOrCreated(fileChanged, resourceParent, outputDirectory);
 
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             } else if (changeType == ChangeType.DELETE) {
                 debug("Resource file deleted: " + fileChanged.getName());
-                deleteFile(fileChanged, resourceParent, outputDirectory, null);
+                resourceDeleted(fileChanged, resourceParent, outputDirectory);
                 // run all tests on resource change
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
+        } else if (webResourceParent != null && directory.startsWith(webResourceParent)) { // webResources
+                debug("webResource dir: " + webResourceParent.toString());
+                updateLooseApp();
+                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
             lastBuildFileChange.put(buildFile, System.currentTimeMillis());
             boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, executor);
+            
             // run all tests on build file change
             if (recompiledBuild) {
                 if (recompileDependencies) {
@@ -4043,6 +4134,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         triggerJavaTestRecompile = true;
                     }
                 }
+                // Update the loose app in case something changed 
+                updateLooseApp();
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(dockerfileUsed)
@@ -4096,6 +4189,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         return null;
     }
+    
+    protected abstract void resourceDirectoryCreated() throws IOException;
+
+    protected abstract void resourceModifiedOrCreated(File fileChanged, File resourceParent, File outputDirectory) throws IOException;
+
+    protected abstract void resourceDeleted(File fileChanged, File resourceParent, File outputDirectory) throws IOException;
 
     /**
      * Unwatches all directories that were specified in Dockerfile COPY commands, then does a container
@@ -4375,11 +4474,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param removeOnContainerRebuild whether the files should be unwatched if the container is rebuilt
      * @throws IOException unable to walk through file tree
      */
-    protected void registerAll(final Path start, final ThreadPoolExecutor executor, final boolean removeOnContainerRebuild) throws IOException {
+    protected void registerAll(final Path start, final ThreadPoolExecutor executor,
+            final boolean removeOnContainerRebuild) throws IOException {
+
         debug("Registering all files in directory: " + start.toString());
 
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
+
             @Override
             public FileVisitResult preVisitDirectory(final Path dir, BasicFileAttributes attrs) throws IOException {
                 if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
@@ -4396,7 +4498,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 return FileVisitResult.CONTINUE;
                             }
                         }
-        
+                        for (File omitFile : omitWatchingFiles) {
+                            if (dir.startsWith(omitFile.getCanonicalPath() + File.separator)) {
+                                debug("Skipping subdirectory " + dir.toString() + " since it is in the omit files list");
+                                return FileVisitResult.CONTINUE;
+                            }
+                        }
                         FileFilter singleDirectoryFilter = new FileFilter() {
                             @Override
                             public boolean accept(File file) {
@@ -4648,6 +4755,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // redeploy app after compilation if not loose application
                     if (!isLooseApplication()) {
                         redeployApp();
+                    } else {
+                        updateLooseApp();
                     }
                     if (projectName != null) {
                         info(projectName + " source compilation was successful.");
@@ -4765,9 +4874,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public void runTestThread(boolean waitForApplicationUpdate, ThreadPoolExecutor executor, int messageOccurrences,
             boolean manualInvocation, File... currentBuildFiles) {
-        if (blockTests) {
-            return;
-        }
         // always pass in skip unit tests value for main project
         runTestThread(waitForApplicationUpdate, executor, messageOccurrences, this.skipUTs, manualInvocation,
                 currentBuildFiles);
@@ -5213,7 +5319,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             if (isMultiModuleProject()) {
                 for (ProjectModule p : upstreamProjects) {
-                    if (p.getSourceDirectory().getCanonicalPath().startsWith(dirAdded.getCanonicalPath())) {
+                    if (p.getSourceDirectory().getCanonicalPath().startsWith(dirAdded.getCanonicalPath() + File.separator)) {
                         return true;
                     }
                 }
@@ -5221,18 +5327,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             return false;
         } catch (IOException e) {
             return false;
-        }
-    }
-
-    // prints error to users when Maven thread classpath error is present
-    private void printMavenClasspathErrMsg(boolean startup) {
-        String message1 = "A classpath error with Maven has been detected. Tests will not run in dev mode on this project.";
-        String message2 = "Run tests outside of dev mode with `mvn verify` or `mvn failsafe:integration-test`.";
-        if (startup) {
-            error(formatAttentionMessage(message1));
-            error(formatAttentionMessage(message2));
-        } else {
-            error(message1 + " " + message2);
         }
     }
 }

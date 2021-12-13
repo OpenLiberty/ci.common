@@ -1,5 +1,9 @@
 /**
+<<<<<<< HEAD
  * (C) Copyright IBM Corporation 2019, 2021.
+=======
+ * (C) Copyright IBM Corporation 2019, 2021
+>>>>>>> origin/main
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -349,16 +353,22 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
             for (int j = 0; j < features.getLength(); j++) {
                 String content = features.item(j).getTextContent();
                 if (content != null) {
-                    if (content.contains(":")) {
-                        debug("The feature " + content + " in the server.xml file is a user feature and its installation will be skipped.");
-                    } else {
+                	content = content.trim();
+                	if (content.contains(":")) {
+                		String[] contentsplit = content.split(":");
+                		if (contentsplit.length > 2) {
+                			debug("The format of feature " + content + " in the server.xml is not valid and its installation will be skipped.");
+                		} else {
+                			result.add(contentsplit[0] + ":" + contentsplit[1].trim().toLowerCase());
+                		}
+                	} else {
                         if (lowerCaseFeatures) {
                             content = content.trim().toLowerCase();
                         } else {
                             content = content.trim();
                         }
                         result.add(content);
-                    }
+                	}
                 }
             }
         }
