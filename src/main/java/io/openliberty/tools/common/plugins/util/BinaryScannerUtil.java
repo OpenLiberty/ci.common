@@ -21,6 +21,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -77,6 +78,12 @@ public abstract class BinaryScannerUtil {
                 } else {
                     currentFeatures = new ArrayList<String>(currentFeatureSet);
                 }
+                debug("Calling binary scanner with the following inputs...\n" +
+                      "  binaryInputs: " + Arrays.toString(binaryInputs) + "\n" +
+                      "  eeVersion: " + eeVersion + "\n" +
+                      "  mpVersion: " + mpVersion + "\n" +
+                      "  currentFeatures: " + currentFeatures + "\n" +
+                      "  locale: " + java.util.Locale.getDefault());
                 debug("The following messages are from the application binary scanner used to generate Liberty features");
                 featureList = (Set<String>) driveScanMavenFeatureList.invoke(null, binaryInputs, eeVersion, mpVersion, currentFeatures, java.util.Locale.getDefault());
                 debug("End of messages from application binary scanner. Features recommended :");
