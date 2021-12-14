@@ -100,7 +100,7 @@ public abstract class BinaryScannerUtil {
                     String problemMessage = scannerException.getMessage();
                     if (problemMessage == null || problemMessage.isEmpty()) {
                         debug("RuntimeException from binary scanner without descriptive message", scannerException);
-                        error("Error scanning the application for Liberty features.");
+                        throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString(), scannerException);
                     } else {
                         Set<String> conflicts = parseScannerMessage(problemMessage);
                         Set<String> sampleFeatureList = null;
@@ -136,18 +136,16 @@ public abstract class BinaryScannerUtil {
                     }
                 } else {
                     //TODO handle more exceptions from binary scanner e.g. com.ibm.ws.report.exceptions.RequiredFeatureModifiedException
-                    error(scannerException.getMessage());
                     debug("Exception from binary scanner.", scannerException);
+                    throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
                 }
             } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException x){
-                // TODO Figure out what to do when there is a problem scanning the features
-                error("Exception:"+x.getClass().getName());
                 Object o = x.getCause();
                 if (o != null) {
-                    warn("Caused by exception:"+x.getCause().getClass().getName());
-                    warn("Caused by exception message:"+x.getCause().getMessage());
+                    debug("Caused by exception:"+x.getCause().getClass().getName());
+                    debug("Caused by exception message:"+x.getCause().getMessage());
                 }
-                error(x.getMessage());
+                throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + x.toString());
             }
         } else {
             if (binaryScanner == null) {
