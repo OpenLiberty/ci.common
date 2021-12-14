@@ -21,6 +21,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -78,6 +79,12 @@ public abstract class BinaryScannerUtil {
                 } else {
                     currentFeatures = new ArrayList<String>(currentFeatureSet);
                 }
+                debug("Calling binary scanner with the following inputs...\n" +
+                      "  binaryInputs: " + Arrays.toString(binaryInputs) + "\n" +
+                      "  eeVersion: " + eeVersion + "\n" +
+                      "  mpVersion: " + mpVersion + "\n" +
+                      "  currentFeatures: " + currentFeatures + "\n" +
+                      "  locale: " + java.util.Locale.getDefault());
                 debug("The following messages are from the application binary scanner used to generate Liberty features");
                 featureList = (Set<String>) driveScanMavenFeatureList.invoke(null, binaryInputs, eeVersion, mpVersion, currentFeatures, java.util.Locale.getDefault());
                 debug("End of messages from application binary scanner. Features recommended :");
@@ -95,7 +102,7 @@ public abstract class BinaryScannerUtil {
                     String problemMessage = scannerException.getMessage();
                     if (problemMessage == null || problemMessage.isEmpty()) {
                         debug("RuntimeException from binary scanner without descriptive message", scannerException);
-                        error("Error scanning the application for Liberty features.");
+                        throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString(), scannerException);
                     } else if (currentFeatureSet == null) {
                         debug("Unexpected RuntimeException from binary scanner while generating suggested features", scannerException);
                         throw ite;
@@ -134,18 +141,16 @@ public abstract class BinaryScannerUtil {
                     }
                 } else {
                     //TODO handle more exceptions from binary scanner e.g. com.ibm.ws.report.exceptions.RequiredFeatureModifiedException
-                    error(scannerException.getMessage());
                     debug("Exception from binary scanner.", scannerException);
+                    throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
                 }
             } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException x){
-                // TODO Figure out what to do when there is a problem scanning the features
-                error("Exception:"+x.getClass().getName());
                 Object o = x.getCause();
                 if (o != null) {
-                    warn("Caused by exception:"+x.getCause().getClass().getName());
-                    warn("Caused by exception message:"+x.getCause().getMessage());
+                    debug("Caused by exception:"+x.getCause().getClass().getName());
+                    debug("Caused by exception message:"+x.getCause().getMessage());
                 }
-                error(x.getMessage());
+                throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + x.toString());
             }
         } else {
             if (binaryScanner == null) {

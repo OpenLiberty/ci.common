@@ -174,8 +174,9 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void libertyGenerateFeatures(Collection<String> classes, boolean optimize) {
+        public boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize) {
             // not needed for tests
+            return true;
         }
 
         @Override
