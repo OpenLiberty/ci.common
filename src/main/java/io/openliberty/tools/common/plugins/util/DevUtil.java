@@ -2458,11 +2458,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
             libertyGenerateFeatures(javaSourceClassPaths, false);
+            javaSourceClasses.clear();
         } catch (PluginExecutionException | IOException e) {
             error("An error occurred while trying to generate features: " + e.getMessage(), e);
         }
-        // TODO: update clear logic to handle cases where feature generation fails
-        javaSourceClasses.clear();
     }
 
     private class HotkeyReader implements Runnable {
@@ -2808,7 +2807,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                 // when change in class files are detected scan for Liberty features.
                 if (generateFeatures && !javaSourceClasses.isEmpty()) {
-                    debug("Changed classes: " + javaSourceClasses);
+                    debug("Detected a change in the following classes: " + javaSourceClasses);
                     if (!gradle && !foundInitialClasses) {
                         // For Maven, skip the first call of generate features from the initial Java compilation that happens after dev mode startup
                         // because features were already generated during the actual dev mode startup steps.
