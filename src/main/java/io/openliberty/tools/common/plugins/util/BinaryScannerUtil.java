@@ -56,6 +56,7 @@ public abstract class BinaryScannerUtil {
         this.binaryScanner = binaryScanner;
     }
 
+    // The first caller to this method must set currentFeatureSet to a non-null value. Null is used to control recursion.
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String eeVersion, String mpVersion, boolean optimize)
             throws PluginExecutionException, InvocationTargetException, NoRecommendationException, RecommendationSetException {
@@ -73,7 +74,7 @@ public abstract class BinaryScannerUtil {
 
                 String[] binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
                 List<String> currentFeatures;
-                if (currentFeatureSet == null) { // signifies we are calling the binary scanner for a sample list of features
+                if (currentFeatureSet == null) { // null signifies we are calling the binary scanner for a sample list of features
                     currentFeatures = new ArrayList<String>();
                 } else {
                     currentFeatures = new ArrayList<String>(currentFeatureSet);
@@ -94,6 +95,7 @@ public abstract class BinaryScannerUtil {
                 // A RuntimeException means the currentFeatureSet contains conflicts.
                 // A FeatureConflictException means the binary files scanned conflict with each other or with
                 // the currentFeatureSet parameter.
+                // Each analysis of the exception must consider the recursion and test currentFeatureSet == null.
                 Throwable scannerException = ite.getCause();
                 if (scannerException instanceof RuntimeException) {
                     // The list of features from the app is passed in but it contains conflicts 
@@ -101,6 +103,9 @@ public abstract class BinaryScannerUtil {
                     if (problemMessage == null || problemMessage.isEmpty()) {
                         debug("RuntimeException from binary scanner without descriptive message", scannerException);
                         throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString(), scannerException);
+                    } else if (currentFeatureSet == null) {
+                        debug("Unexpected RuntimeException from binary scanner while generating suggested features", scannerException);
+                        throw ite;
                     } else {
                         Set<String> conflicts = parseScannerMessage(problemMessage);
                         Set<String> sampleFeatureList = null;
