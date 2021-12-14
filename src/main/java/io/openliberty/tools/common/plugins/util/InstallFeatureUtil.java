@@ -78,6 +78,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             EE_CONFLICT = SAME_MODEL_CONFLICT + "|" + DIFF_MODEL_CONFLICT + "|" + SAME_INDIRECT_MODEL_CONFLICT,
             ANY_CONFLICT = CONFLICT + "|" + MISSING_MULTIPLE_DEPENDENT + "|" + INCOMPATIBLE_SINGLETON + "|"
                     + EE_CONFLICT;
+    public static final Pattern conflictPattern = Pattern.compile(ANY_CONFLICT);
 
     private final File installDirectory;
 
@@ -1037,12 +1038,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     // Return true if feature conflict code is detected in the exception message
     private boolean isFeatureConflict(String exceptionMessage) {
-        Pattern p = Pattern.compile(ANY_CONFLICT);
-        Matcher m = p.matcher(exceptionMessage);
-        if (m.find()) {
-            return true;
-        }
-        return false;
+        Matcher m = conflictPattern.matcher(exceptionMessage);
+        return m.find();
     }
 
 }
