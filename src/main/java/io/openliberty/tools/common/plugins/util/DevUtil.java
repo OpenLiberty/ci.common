@@ -1739,9 +1739,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param classes class file paths features should be generated for (can be null if no modified classes)
      * @param optimize if true, generate optimized feature list
-     * @throws PluginExecutionException
+     * @return true if feature generation was successful
      */
-    public abstract void libertyGenerateFeatures(Collection<String> classes, boolean optimize) throws PluginExecutionException;
+    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize);
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -2443,23 +2443,26 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void optimizeGenerateFeatures() {
         info("Generating optimized features list...");
         // scan all class files and provide only user specified features
-        try {
-            libertyGenerateFeatures(null, true);
-        } catch (PluginExecutionException e) {
-            error("An error occurred while trying to optimize features: " + e.getMessage(), e);
-        }
+        boolean generatedFeatures = libertyGenerateFeatures(null, true);
+        if (generatedFeatures) {
+            javaSourceClasses.clear();
+        } // do not need to log an error if generatedFeatures is false because that would
+          // have already been logged by libertyGenerateFeatures
     }
 
-     /**
+    /**
      * Generate features using updated classes and all existing features.
      */
     private void incrementGenerateFeatures() {
         info("Generating feature list from incremental changes...");
         try {
-            Collection <String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-            libertyGenerateFeatures(javaSourceClassPaths, false);
-            javaSourceClasses.clear();
-        } catch (PluginExecutionException | IOException e) {
+            Collection<String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
+            boolean generatedFeatures = libertyGenerateFeatures(javaSourceClassPaths, false);
+            if (generatedFeatures) {
+                javaSourceClasses.clear();
+            } // do not need to log an error if generatedFeatures is false because that would
+              // have already been logged by libertyGenerateFeatures
+        } catch (IOException e) {
             error("An error occurred while trying to generate features: " + e.getMessage(), e);
         }
     }
