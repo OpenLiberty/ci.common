@@ -30,6 +30,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Comment;
 
 public class ServerConfigXmlDocument extends XmlDocument {
+    // Formerly called src/main/java/io/openliberty/tools/common/plugins/config/ServerConfigDropinXmlDocument.java
 
     private Element featureManager = null;
 
