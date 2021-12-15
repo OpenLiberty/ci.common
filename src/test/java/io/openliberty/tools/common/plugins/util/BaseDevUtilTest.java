@@ -17,8 +17,8 @@
 package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
-import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -40,7 +40,7 @@ public class BaseDevUtilTest {
                 List<File> resourceDirs, List<Path> webResourceDirs, boolean hotTests, boolean skipTests) throws IOException {
             super(temp.newFolder(), serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null,
                     resourceDirs, hotTests, skipTests, false, false, null, 30, 30, 5, 500, true, false, false, false,
-                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, null, null, webResourceDirs);
+                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null, webResourceDirs);
         }
 
         @Override
@@ -171,6 +171,12 @@ public class BaseDevUtilTest {
         @Override
         public void libertyInstallFeature() {
             // not needed for tests
+        }
+
+        @Override
+        public boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize) {
+            // not needed for tests
+            return true;
         }
 
         @Override

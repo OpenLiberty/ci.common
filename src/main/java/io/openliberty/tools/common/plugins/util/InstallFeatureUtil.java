@@ -47,6 +47,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -70,6 +72,13 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
     public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
+    public static final String CONFLICT = "CWWKF0033E.*", INCOMPATIBLE_SINGLETON = "CWWKF1405E.*",
+            MISSING_MULTIPLE_DEPENDENT = "CWWKF1385E.*", SAME_MODEL_CONFLICT = "CWWKF0043E.*",
+            DIFF_MODEL_CONFLICT = "CWWKF0044E.*", SAME_INDIRECT_MODEL_CONFLICT = "CWWKF0047E.*",
+            EE_CONFLICT = SAME_MODEL_CONFLICT + "|" + DIFF_MODEL_CONFLICT + "|" + SAME_INDIRECT_MODEL_CONFLICT,
+            ANY_CONFLICT = CONFLICT + "|" + MISSING_MULTIPLE_DEPENDENT + "|" + INCOMPATIBLE_SINGLETON + "|"
+                    + EE_CONFLICT;
+    public static final Pattern conflictPattern = Pattern.compile(ANY_CONFLICT);
 
     private final File installDirectory;
 
@@ -594,6 +603,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     info("The features are already installed, so no action is needed.");
                     return;
                 } else {
+                    if (isFeatureConflict(exceptionMessage)) {
+                        throw new PluginExecutionException(
+                                "A feature conflict error occurred while installing features: " + featuresToInstall
+                                        + ": " + exceptionMessage);
+                    }
                     throw new PluginExecutionException(exceptionMessage);
                 }
             }
@@ -1009,12 +1023,23 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 // The features are already installed message
                 debug(cmdResult);
             } else {
-                error("An error occurred while installing features: " + cmdResult);
+                if (isFeatureConflict(cmdResult)) {
+                    error("A feature conflict error occurred while installing features: " + features + ": "
+                            + cmdResult);
+                } else {
+                    error("An error occurred while installing features: " + cmdResult);
+                }
             }
         } else {
             // Log the successful output as debug
             debug(cmdResult);
         }
     }
-    
+
+    // Return true if feature conflict code is detected in the exception message
+    private boolean isFeatureConflict(String exceptionMessage) {
+        Matcher m = conflictPattern.matcher(exceptionMessage);
+        return m.find();
+    }
+
 }
