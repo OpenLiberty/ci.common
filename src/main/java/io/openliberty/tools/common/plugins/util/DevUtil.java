@@ -2430,11 +2430,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void toggleFeatureGeneration() {
         generateFeatures = !generateFeatures;
-        info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
+        logFeatureGenerationStatus();
         if (generateFeatures) {
             // If hotkey is toggled to “true”, generate features right away.
             optimizeGenerateFeatures();
         }
+    }
+
+    private void logFeatureGenerationStatus() {
+        info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
+    }
+
+    protected void setFeatureGeneration(boolean generateFeatures) {
+        this.generateFeatures = generateFeatures;
+        logFeatureGenerationStatus();
     }
 
     /**
