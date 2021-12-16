@@ -2465,12 +2465,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Generate features using updated classes and all existing features.
+     * Returns true if successful
      */
-    private void incrementGenerateFeatures() {
+    private boolean incrementGenerateFeatures() {
         info("Generating feature list from incremental changes...");
+        boolean generatedFeatures = false;
         try {
             Collection<String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-            boolean generatedFeatures = libertyGenerateFeatures(javaSourceClassPaths, false);
+            generatedFeatures = libertyGenerateFeatures(javaSourceClassPaths, false);
             if (generatedFeatures) {
                 javaSourceClasses.clear();
             } // do not need to log an error if generatedFeatures is false because that would
@@ -2478,6 +2480,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } catch (IOException e) {
             error("An error occurred while trying to generate features: " + e.getMessage(), e);
         }
+        
+        return generatedFeatures;
     }
 
     private class HotkeyReader implements Runnable {
@@ -4001,15 +4005,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // This is for server.xml specified by the configuration parameter
             // server will load new properties
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                boolean generateFeaturesSuccess = false;
                 if (generateFeatures) {
                     // custom server.xml modified
                     debug("1322: Calling incrementGenerateFeatures from DevUtil line 4007");
-                    incrementGenerateFeatures();
+                    generateFeaturesSuccess = incrementGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 // copyConfigFolder will install features if new ones are detected
-                copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
+                copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4041,15 +4046,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
                                                                                             // files
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                boolean generateFeaturesSuccess = false;
                 if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                     // server.xml modified
                     debug("1322: Calling incrementGenerateFeatures from DevUtil line 4050");
-                    incrementGenerateFeatures();
+                    generateFeaturesSuccess = incrementGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 // copyConfigFolder will install features if new ones are detected
-                copyConfigFolder(fileChanged, configDirectory, null);
+                copyConfigFolder(fileChanged, configDirectory, null, generateFeaturesSuccess);
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4332,7 +4338,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                       in the targetDir
      * @throws IOException creating and copying to tempConfig directory
      */
-    public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName) throws IOException {
+    public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName, boolean generateFeaturesSuccess) throws IOException {
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
         debug("Temporary configuration folder created: " + tempConfig);
@@ -4350,7 +4356,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
-        checkConfigFile(fileChanged, tempConfig);
+        // if feature generation is on, then it should succeed before installing features
+        if (!generateFeatures || generateFeaturesSuccess) {
+            checkConfigFile(fileChanged, tempConfig);
+        }
         cleanUpTempConfig();
     }
 
