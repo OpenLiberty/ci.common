@@ -1789,12 +1789,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (generateFeatures) {
             //TODO: decide if we should do an optimized feature generation on a server restart
             // If we do not generate here, need to revisit compileDependenciesChanged section in DevMojo
+            debug("1322: Calling optimizeGenerateFeatures from DevUtil line 1793");
             optimizeGenerateFeatures();
         }
         libertyCreate();
         // Skip installing features on container during restart, since the Dockerfile
         // should have 'RUN features.sh'
         if (!container) {
+            debug("1322: Calling libertyInstallFeature from DevUtil line 1800");
             libertyInstallFeature();
         }
         libertyDeploy();
@@ -2433,6 +2435,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         logFeatureGenerationStatus();
         if (generateFeatures) {
             // If hotkey is toggled to “true”, generate features right away.
+            debug("1322: Calling optimizeGenerateFeatures from DevUtil line 2439");
             optimizeGenerateFeatures();
         }
     }
@@ -2536,6 +2539,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         toggleFeatureGeneration();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
+                            debug("1322: Calling optimizeGenerateFeatures from DevUtil line 2543");
                             optimizeGenerateFeatures();
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
@@ -2827,6 +2831,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         foundInitialClasses = true;
                         javaSourceClasses.clear();
                     } else {
+                        debug("1322: Calling incrementGenerateFeatures  from DevUtil line 2835");
                         incrementGenerateFeatures();   
                     }
                 }
@@ -4001,6 +4006,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (generateFeatures) {
                     // custom server.xml modified
+                    debug("1322: Calling incrementGenerateFeatures from DevUtil line 4010");
                     incrementGenerateFeatures();
                 }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4017,6 +4023,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (generateFeatures) {
                     // TODO: test this scenario and decide if generating features is necessary
                     // custom server.xml is deleted
+                    debug("1322: Calling incrementGenerateFeatures from DevUtil line 4027");
                     incrementGenerateFeatures();
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
@@ -4041,6 +4048,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                         // server.xml modified
+                        debug("1322: Calling incrementGenerateFeatures from DevUtil line 4050");
                         incrementGenerateFeatures();
                     }
                     if (changeType == ChangeType.CREATE) {
@@ -4067,6 +4075,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                         // TODO: test this scenario and decide if generating features is necessary
                         // server.xml is deleted
+                        debug("1322: Calling incrementGenerateFeatures from DevUtil line 4079");
                         incrementGenerateFeatures();
                     } else if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
