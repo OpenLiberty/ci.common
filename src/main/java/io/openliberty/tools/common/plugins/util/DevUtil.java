@@ -4003,6 +4003,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean generateFeaturesSuccess = false;
                 if (generateFeatures) {
                     // custom server.xml modified
+                    // TODO: revisit scenarios in which we should skip install features
                     generateFeaturesSuccess = incrementGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
@@ -4042,6 +4043,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean generateFeaturesSuccess = false;
                 if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                     // server.xml modified
+                    // TODO: revisit scenarios in which we should skip install features
                     generateFeaturesSuccess = incrementGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
@@ -4330,6 +4332,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException creating and copying to tempConfig directory
      */
     public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName, boolean generateFeaturesSuccess) throws IOException {
+        // TODO: If we need to skip installing features after a feature generation failure in this code flow,
+        // we should also consider skipping the creation a temporary config folder
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
         debug("Temporary configuration folder created: " + tempConfig);
