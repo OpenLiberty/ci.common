@@ -1790,14 +1790,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             //TODO: decide if we should do an optimized feature generation on a server restart
             // If we do not generate here, need to revisit compileDependenciesChanged section in DevMojo
             // If we generate here, we need to skip install features if there is a failure
-            debug("1322: Calling optimizeGenerateFeatures from DevUtil line 1793");
             optimizeGenerateFeatures();
         }
         libertyCreate();
         // Skip installing features on container during restart, since the Dockerfile
         // should have 'RUN features.sh'
         if (!container) {
-            debug("1322: Calling libertyInstallFeature from DevUtil line 1800");
             libertyInstallFeature();
         }
         libertyDeploy();
@@ -2436,7 +2434,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         logFeatureGenerationStatus();
         if (generateFeatures) {
             // If hotkey is toggled to “true”, generate features right away.
-            debug("1322: Calling optimizeGenerateFeatures from DevUtil line 2439");
             optimizeGenerateFeatures();
         }
     }
@@ -2480,7 +2477,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } catch (IOException e) {
             error("An error occurred while trying to generate features: " + e.getMessage(), e);
         }
-        
+
         return generatedFeatures;
     }
 
@@ -2544,7 +2541,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         toggleFeatureGeneration();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
-                            debug("1322: Calling optimizeGenerateFeatures from DevUtil line 2543");
                             optimizeGenerateFeatures();
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
@@ -2836,7 +2832,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         foundInitialClasses = true;
                         javaSourceClasses.clear();
                     } else {
-                        debug("1322: Calling incrementGenerateFeatures  from DevUtil line 2835");
                         incrementGenerateFeatures();   
                     }
                 }
@@ -4008,7 +4003,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean generateFeaturesSuccess = false;
                 if (generateFeatures) {
                     // custom server.xml modified
-                    debug("1322: Calling incrementGenerateFeatures from DevUtil line 4007");
                     generateFeaturesSuccess = incrementGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
@@ -4032,7 +4026,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // custom server.xml is deleted
                     // TODO: test this scenario and decide if generating features is necessary
                     // if we generate, it may need to be optimized
-                    debug("1322: Calling incrementGenerateFeatures from DevUtil line 4027");
                     incrementGenerateFeatures();
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
@@ -4049,7 +4042,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean generateFeaturesSuccess = false;
                 if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
                     // server.xml modified
-                    debug("1322: Calling incrementGenerateFeatures from DevUtil line 4050");
                     generateFeaturesSuccess = incrementGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
@@ -4083,7 +4075,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // server.xml is deleted
                     // TODO: test this scenario and decide if generating features is necessary
                     // if we generate, it may need to be optimized
-                    debug("1322: Calling incrementGenerateFeatures from DevUtil line 4085");
                     incrementGenerateFeatures();
                 }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
