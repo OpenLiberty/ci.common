@@ -4040,8 +4040,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
                                                                                             // files
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                boolean generateFeaturesSuccess = false;
+                // default to true as generateFeatures only needs to be called if the file
+                // changed is server.xml (otherwise would have been triggered from class file
+                // change)
+                boolean generateFeaturesSuccess = true;
                 if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
+                    generateFeaturesSuccess = false;
                     // server.xml modified
                     // TODO: revisit scenarios in which we should skip install features
                     generateFeaturesSuccess = incrementGenerateFeatures();
