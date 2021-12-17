@@ -4000,8 +4000,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // This is for server.xml specified by the configuration parameter
             // server will load new properties
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                boolean generateFeaturesSuccess = false;
+                boolean generateFeaturesSuccess = true;
                 if (generateFeatures) {
+                    generateFeaturesSuccess = false;
                     // custom server.xml modified
                     // TODO: revisit scenarios in which we should skip install features
                     generateFeaturesSuccess = incrementGenerateFeatures();
