@@ -1789,6 +1789,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (generateFeatures) {
             //TODO: decide if we should do an optimized feature generation on a server restart
             // If we do not generate here, need to revisit compileDependenciesChanged section in DevMojo
+            // If we generate here, we need to skip install features if there is a failure
             optimizeGenerateFeatures();
         }
         libertyCreate();
@@ -2461,12 +2462,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Generate features using updated classes and all existing features.
+     * Returns true if successful
      */
-    private void incrementGenerateFeatures() {
+    private boolean incrementGenerateFeatures() {
         info("Generating feature list from incremental changes...");
+        boolean generatedFeatures = false;
         try {
             Collection<String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-            boolean generatedFeatures = libertyGenerateFeatures(javaSourceClassPaths, false);
+            generatedFeatures = libertyGenerateFeatures(javaSourceClassPaths, false);
             if (generatedFeatures) {
                 javaSourceClasses.clear();
             } // do not need to log an error if generatedFeatures is false because that would
@@ -2474,6 +2477,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } catch (IOException e) {
             error("An error occurred while trying to generate features: " + e.getMessage(), e);
         }
+
+        return generatedFeatures;
     }
 
     private class HotkeyReader implements Runnable {
@@ -3995,14 +4000,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // This is for server.xml specified by the configuration parameter
             // server will load new properties
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                // suppress install feature warning - property must be set before calling copyConfigFolder
-                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
-                copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
+                boolean generateFeaturesSuccess = false;
                 if (generateFeatures) {
                     // custom server.xml modified
-                    incrementGenerateFeatures();
+                    // TODO: revisit scenarios in which we should skip install features
+                    generateFeaturesSuccess = incrementGenerateFeatures();
                 }
+                // suppress install feature warning - property must be set before calling copyConfigFolder
+                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
+                // copyConfigFolder will install features if new ones are detected
+                copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
+                copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
+                
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -4015,8 +4024,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
                 if (generateFeatures) {
-                    // TODO: test this scenario and decide if generating features is necessary
                     // custom server.xml is deleted
+                    // TODO: test this scenario and decide if generating features is necessary
+                    // if we generate, it may need to be optimized
                     incrementGenerateFeatures();
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
@@ -4029,20 +4039,23 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (directory.startsWith(configPath)
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
                                                                                             // files
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY
-                    || changeType == ChangeType.CREATE)) {
+            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+                boolean generateFeaturesSuccess = false;
+                if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
+                    // server.xml modified
+                    // TODO: revisit scenarios in which we should skip install features
+                    generateFeaturesSuccess = incrementGenerateFeatures();
+                }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                copyConfigFolder(fileChanged, configDirectory, null);
+                // copyConfigFolder will install features if new ones are detected
+                copyConfigFolder(fileChanged, configDirectory, null, generateFeaturesSuccess);
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
-                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
-                        // server.xml modified
-                        incrementGenerateFeatures();
-                    }
+                    
                     if (changeType == ChangeType.CREATE) {
                         redeployApp();
                     }
@@ -4060,15 +4073,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
+                if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
+                    // server.xml is deleted
+                    // TODO: test this scenario and decide if generating features is necessary
+                    // if we generate, it may need to be optimized
+                    incrementGenerateFeatures();
+                }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
-                    // TODO Can server.xml be removed?
-                    if ((fileChanged.getName().equals("server.xml")) && serverXmlFileParent == null && generateFeatures) {
-                        // TODO: test this scenario and decide if generating features is necessary
-                        // server.xml is deleted
-                        incrementGenerateFeatures();
-                    } else if (fileChanged.getName().equals("server.env")) {
+                    if (fileChanged.getName().equals("server.env")) {
                         // re-enable debug variables in server.env
                         enableServerDebug(false);
                     }
@@ -4317,7 +4331,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                       in the targetDir
      * @throws IOException creating and copying to tempConfig directory
      */
-    public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName) throws IOException {
+    public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName, boolean generateFeaturesSuccess) throws IOException {
+        // TODO: If we need to skip installing features after a feature generation failure in this code flow,
+        // we should also consider skipping the creation a temporary config folder
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
         debug("Temporary configuration folder created: " + tempConfig);
@@ -4335,7 +4351,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
-        checkConfigFile(fileChanged, tempConfig);
+        // if feature generation is on, then it should succeed before installing features
+        if (!generateFeatures || generateFeaturesSuccess) {
+            checkConfigFile(fileChanged, tempConfig);
+        }
         cleanUpTempConfig();
     }
 
