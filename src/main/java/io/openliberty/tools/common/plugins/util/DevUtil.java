@@ -3883,7 +3883,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             triggerUpstreamModuleCompile(project, true);
                         }
                     }
-                } else if (directory.startsWith(project.getOutputDirectory().getCanonicalPath())) {
+                } else if (generateFeatures && directory.startsWith(project.getOutputDirectory().getCanonicalPath())) {
+                    // track Java source class files if generateFeatures=true
                     if (fileChanged.exists() && fileChanged.getName().endsWith(".class")
                             && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                         debug("Java source class file modified: " + fileChanged.getName()
@@ -4181,7 +4182,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (isDockerfileDirectoryChanged(fileChanged)) {
             // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
             untrackDockerfileDirectoriesAndRestart();
-        } else if (directory.startsWith(srcOutputPath)) {
+        } else if (generateFeatures && directory.startsWith(srcOutputPath)) {
+            // track Java source class files if generateFeatures=true
             if (fileChanged.exists() && fileChanged.getName().endsWith(".class")
                     && (changeType == ChangeType.MODIFY
                             || changeType == ChangeType.CREATE)) {
