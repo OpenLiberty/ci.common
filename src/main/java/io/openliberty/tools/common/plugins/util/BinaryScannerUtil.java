@@ -114,13 +114,13 @@ public abstract class BinaryScannerUtil {
                     debug("Exception from binary scanner.", scannerException);
                     throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
                 }
-            } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException loadingExceptiob){
-                Object o = loadingExceptiob.getCause();
+            } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException loadingException){
+                Object o = loadingException.getCause();
                 if (o != null) {
-                    debug("Caused by exception:"+loadingExceptiob.getCause().getClass().getName());
-                    debug("Caused by exception message:"+loadingExceptiob.getCause().getMessage());
+                    debug("Caused by exception:"+loadingException.getCause().getClass().getName());
+                    debug("Caused by exception message:"+loadingException.getCause().getMessage());
                 }
-                throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + loadingExceptiob.toString());
+                throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + loadingException.toString());
             }
         } else {
             if (binaryScanner == null) {
