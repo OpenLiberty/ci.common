@@ -171,7 +171,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 				File additionalJson = downloadArtifact(groupId, artifactId, "json", version);
 				Jsons.add(additionalJson);
 			} catch (PluginExecutionException e) {
-                warn("Unable to find the following additional features JSON in the connected repositories: " + mavenCoord);
+                warn("Unable to find the following additional features JSON in the connected repositories: " + mavenCoord + ". Please ignore this warning if this is not a user feature.");
                 debug("Unable to find additional features JSON: ", e);
             }
         }
