@@ -17,6 +17,7 @@ package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -51,34 +52,22 @@ public abstract class BinaryScannerUtil {
     // The jar file containing the binary scanner code
     private File binaryScanner;
     private URLClassLoader binaryScannerClassLoader = null;
+    private Class binaryScannerClass = null;
+    private Method binaryScannerMethod = null;
     
     public BinaryScannerUtil(File binaryScanner) {
         this.binaryScanner = binaryScanner;
     }
 
-    // The first caller to this method must set currentFeatureSet to a non-null value. Null is used to control recursion.
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String eeVersion, String mpVersion, boolean optimize)
             throws PluginExecutionException, InvocationTargetException, NoRecommendationException, RecommendationSetException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
             try {
-                ClassLoader cl = getScannerClassLoader();
-                Class driveScan = cl.loadClass("com.ibm.ws.report.binary.cmdline.DriveScan");
-                // args: String[], String, String, List, java.util.Locale
-                java.lang.reflect.Method driveScanMavenFeatureList = driveScan.getMethod("driveScanMavenFeatureList", String[].class, String.class, String.class, List.class, java.util.Locale.class);
-                if (driveScanMavenFeatureList == null) {
-                    debug("Error finding binary scanner method using reflection");
-                    return null;
-                }
-
+                Method driveScanMavenFeatureList = getScannerMethod();
                 String[] binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
-                List<String> currentFeatures;
-                if (currentFeatureSet == null) { // null signifies we are calling the binary scanner for a sample list of features
-                    currentFeatures = new ArrayList<String>();
-                } else {
-                    currentFeatures = new ArrayList<String>(currentFeatureSet);
-                }
+                List<String> currentFeatures = new ArrayList<String>(currentFeatureSet);
                 debug("Calling binary scanner with the following inputs...\n" +
                       "  binaryInputs: " + Arrays.toString(binaryInputs) + "\n" +
                       "  eeVersion: " + eeVersion + "\n" +
@@ -95,7 +84,6 @@ public abstract class BinaryScannerUtil {
                 // A RuntimeException means the currentFeatureSet contains conflicts.
                 // A FeatureConflictException means the binary files scanned conflict with each other or with
                 // the currentFeatureSet parameter.
-                // Each analysis of the exception must consider the recursion and test currentFeatureSet == null.
                 Throwable scannerException = ite.getCause();
                 if (scannerException instanceof RuntimeException) {
                     // The list of features from the app is passed in but it contains conflicts 
@@ -103,54 +91,36 @@ public abstract class BinaryScannerUtil {
                     if (problemMessage == null || problemMessage.isEmpty()) {
                         debug("RuntimeException from binary scanner without descriptive message", scannerException);
                         throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString(), scannerException);
-                    } else if (currentFeatureSet == null) {
-                        debug("Unexpected RuntimeException from binary scanner while generating suggested features", scannerException);
-                        throw ite;
                     } else {
                         Set<String> conflicts = parseScannerMessage(problemMessage);
-                        Set<String> sampleFeatureList = null;
-                        try {
-                            sampleFeatureList = runBinaryScanner(null, classFiles, allClassesDirectories, eeVersion, mpVersion, true);
-                        } catch (InvocationTargetException retryException) {
-                            // binary scanner should not return a RuntimeException since there is no list of app features passed in
-                            sampleFeatureList = getNoSampleFeatureList();
+                        Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, eeVersion, mpVersion);
+                        if (sampleFeatureList == null) {
+                            throw new NoRecommendationException(conflicts);
+                        } else {
+                            throw new RecommendationSetException(true, conflicts, sampleFeatureList);
                         }
-                        throw new RecommendationSetException(true, conflicts, sampleFeatureList);
                     }
                 } else if (scannerException.getClass().getName().endsWith("FeatureConflictException")) {
                     // The scanned files conflict with each other or with current features
                     Set<String> conflicts = getConflicts(scannerException);
-                    Set<String> sampleFeatureList = null;
-                    if (currentFeatureSet != null) {
-                        try {
-                            sampleFeatureList = runBinaryScanner(null, classFiles, allClassesDirectories, eeVersion, mpVersion, true);
-                        } catch (InvocationTargetException retryException) {
-                            Throwable scannerSecondException = retryException.getCause();
-                            if (scannerSecondException.getClass().getName().endsWith("FeatureConflictException")) {
-                                // Even after removing the server.xml feature list there are still conflicts in the binaries
-                                throw new NoRecommendationException(conflicts);
-                            } else {
-                                debug("Unexpected failure on retry call to binary scanner", scannerSecondException);
-                                debug("Passed directories to binary scanner:"+allClassesDirectories);
-                                sampleFeatureList = getNoSampleFeatureList();
-                            }
-                        }
-                        throw new RecommendationSetException(false, conflicts, sampleFeatureList);
+                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, eeVersion, mpVersion);
+                    if (sampleFeatureList == null) {
+                        throw new NoRecommendationException(conflicts);
                     } else {
-                        throw ite;
+                        throw new RecommendationSetException(false, conflicts, sampleFeatureList);
                     }
                 } else {
                     //TODO handle more exceptions from binary scanner e.g. com.ibm.ws.report.exceptions.RequiredFeatureModifiedException
                     debug("Exception from binary scanner.", scannerException);
                     throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
                 }
-            } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException x){
-                Object o = x.getCause();
+            } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException loadingExceptiob){
+                Object o = loadingExceptiob.getCause();
                 if (o != null) {
-                    debug("Caused by exception:"+x.getCause().getClass().getName());
-                    debug("Caused by exception message:"+x.getCause().getMessage());
+                    debug("Caused by exception:"+loadingExceptiob.getCause().getClass().getName());
+                    debug("Caused by exception message:"+loadingExceptiob.getCause().getMessage());
                 }
-                throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + x.toString());
+                throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + loadingExceptiob.toString());
             }
         } else {
             if (binaryScanner == null) {
@@ -158,6 +128,48 @@ public abstract class BinaryScannerUtil {
             } else {
                 throw new PluginExecutionException("Could not find the binary scanner jar at " + binaryScanner.getAbsolutePath());
             }
+        }
+        return featureList;
+    }
+
+    public Set<String> reRunBinaryScanner(Set<String> allClassesDirectories, String eeVersion, String mpVersion)
+            throws PluginExecutionException, InvocationTargetException {
+        Set<String> featureList = null;
+        try {
+            Method driveScanMavenFeatureList = getScannerMethod();
+            String[] binaryInputs = allClassesDirectories.toArray(new String[allClassesDirectories.size()]);
+            List<String> currentFeatures = new ArrayList<String>(); // when re-running always pass in no features
+            debug("Recalling binary scanner with the following inputs...\n" +
+                  "  binaryInputs: " + Arrays.toString(binaryInputs) + "\n" +
+                  "  eeVersion: " + eeVersion + "\n" +
+                  "  mpVersion: " + mpVersion + "\n" +
+                  "  currentFeatures: " + currentFeatures + "\n" +
+                  "  locale: " + java.util.Locale.getDefault());
+            debug("The following messages are from the application binary scanner used to generate Liberty features");
+            featureList = (Set<String>) driveScanMavenFeatureList.invoke(null, binaryInputs, eeVersion, mpVersion, currentFeatures, java.util.Locale.getDefault());
+            debug("End of messages from application binary scanner. Features recommended :");
+            for (String s : featureList) {debug(s);};
+        } catch (InvocationTargetException ite) {
+            Throwable scannerException = ite.getCause();
+            if (scannerException instanceof RuntimeException) {
+                // this usually happens when the list of features passed in contains conflicts, no recommendation possible
+                debug("RuntimeException from re-run of binary scanner", scannerException); // shouldn't happen
+                featureList = null;
+            } else if (scannerException.getClass().getName().endsWith("FeatureConflictException")) {
+                // The features in the scanned files conflict with each other, no recommendation possible
+                featureList = getNoSampleFeatureList();
+            } else {
+                //TODO handle more exceptions from binary scanner e.g. com.ibm.ws.report.exceptions.RequiredFeatureModifiedException
+                debug("Exception from rerunning binary scanner.", scannerException);
+                throw new PluginExecutionException("Error scanning the application for Liberty feature recommendations: " + scannerException.toString());
+            }
+        } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException loadingException){
+            Object o = loadingException.getCause();
+            if (o != null) {
+                debug("Caused by exception2:"+loadingException.getCause().getClass().getName());
+                debug("Caused by exception message2:"+loadingException.getCause().getMessage());
+            }
+            throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar for recommendations: " + loadingException.toString());
         }
         return featureList;
     }
@@ -175,6 +187,26 @@ public abstract class BinaryScannerUtil {
             binaryScannerClassLoader = new URLClassLoader(new URL[] { binaryScanner.toURI().toURL() }, cl);
         }
         return binaryScannerClassLoader;
+    }
+
+    private Class getScannerClass() throws MalformedURLException, ClassNotFoundException {
+        if (binaryScannerClass == null) {
+            ClassLoader cl = getScannerClassLoader();
+            binaryScannerClass = cl.loadClass("com.ibm.ws.report.binary.cmdline.DriveScan");
+        }
+        return binaryScannerClass;
+    }
+
+    private Method getScannerMethod() throws MalformedURLException, ClassNotFoundException, NoSuchMethodException, PluginExecutionException, SecurityException {
+        if (binaryScannerMethod == null) {
+            Class driveScan = getScannerClass();
+            // args: String[], String, String, List, java.util.Locale
+            binaryScannerMethod = driveScan.getMethod("driveScanMavenFeatureList", String[].class, String.class, String.class, List.class, java.util.Locale.class);
+            if (binaryScannerMethod == null) {
+                throw new PluginExecutionException("Error finding binary scanner method using reflection");
+            }
+        }
+        return binaryScannerMethod;
     }
 
     private static String[] getBinaryInputs(List<String> classFiles, Set<String> classDirectories, boolean optimize) throws PluginExecutionException {
