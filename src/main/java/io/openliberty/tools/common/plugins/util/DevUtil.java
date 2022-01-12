@@ -2833,7 +2833,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         javaSourceClasses.clear();
                     } else {
                         incrementGenerateFeatures();
-                        // TODO if generated file does not exist run tests
+                        File generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+                        if (!generatedFeaturesFile.exists()) {
+                            // run tests if generated-features.xml does not exist as there are no new features to install
+                            if (isMultiModuleProject()) {
+                                runTestThread(false, executor, -1, false, getAllBuildFiles());
+                            } else {
+                                runTestThread(false, executor, -1, false, false, buildFile);
+                            }
+                        }
                     }
                 }
 
@@ -4037,8 +4045,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 }
-                  // always skip UTs
-                  runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
             }
         } else if (directory.startsWith(configPath)
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
@@ -4076,11 +4084,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         restartServer(false);
                     }
                 }
-                if (fileChanged.getName().equals("generated-features.xml") && generateFeatures) {
+                if (fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME) && generateFeatures) {
                     // if generateFeatures is true, run UTs and ITs as tests would have been skipped
                     // during recompileJava()
                     if (isMultiModuleProject()) {
-                        runTestThread(false, executor, numApplicationUpdatedMessages, false, getAllBuildFiles());
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles());
                     } else {
                         runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
                     }
