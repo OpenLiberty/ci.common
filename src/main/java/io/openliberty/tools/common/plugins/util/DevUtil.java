@@ -2831,7 +2831,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Skipping generate features from first call after dev mode startup");
                         foundInitialClasses = true;
                         javaSourceClasses.clear();
-                    } else {
+                    } else if (!classesFailingToCompile()){ // do not run generate features if there are classes failing to compile
                         incrementGenerateFeatures();
                         File generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
                         if (!generatedFeaturesFile.exists()) {
@@ -5386,5 +5386,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    // returns true if there are classes in the project that are currently failing
+    // to compile
+    private boolean classesFailingToCompile() {
+        boolean failingClasses = false;
+        if (isMultiModuleProject()) {
+            for (ProjectModule p : upstreamProjects) {
+                if (!p.failedCompilationJavaSources.isEmpty()) {
+                    failingClasses = true;
+                }
+            }
+        }
+        if (!failedCompilationJavaSources.isEmpty()) {
+            failingClasses = true;
+        }
+        return failingClasses;
     }
 }
