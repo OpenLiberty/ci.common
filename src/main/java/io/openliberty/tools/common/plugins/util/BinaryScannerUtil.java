@@ -54,14 +54,35 @@ public abstract class BinaryScannerUtil {
     private URLClassLoader binaryScannerClassLoader = null;
     private Class binaryScannerClass = null;
     private Method binaryScannerMethod = null;
-    
+
     public BinaryScannerUtil(File binaryScanner) {
         this.binaryScanner = binaryScanner;
     }
 
+    /**
+     * Call the binary scanner to generate a list of Liberty features to run an application. It will scan the
+     * classFiles parameter or scan all the classes in the allClassesDirectories parameter depending on the
+     * optimize parameter. The currentFeatureSet parameter indicates the starting list of features and all the
+     * generated features will be compatible. The generated features will also be compatible with the indicated
+     * versions of Java EE or Jakarta EE and MicroProfile.
+     * 
+     * @param currentFeatureSet - the features already specified in the server configuration
+     * @param classFiles - a set of class files for the scanner to handle. Should be a subset of allClassesDirectories
+     * @param allClassesDirectories - the directories containing all the class files of the application
+     * @param eeVersion - generate features valid for the indicated version of EE
+     * @param mpVersion - generate features valid for the indicated version of MicroProfile
+     * @param optimize - true value means to scan all the classes in allClassesDirectories rather than just the
+     *                   classes in the classFiles parameter. currentFeatureSet is still used as the basis of
+     *                   the feature set.
+     * @return - a set of features that will allow the application to run in a Liberty server
+     * @throws PluginExecutionException - any exception that prevents the scanner from running
+     * @throws NoRecommendationException - indicates a problem and there are no recommended features
+     * @throws RecommendationSetException - indicates a problem but the scanner was able to generate a set of
+     *                                      features that should work to run the application
+     */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String eeVersion, String mpVersion, boolean optimize)
-            throws PluginExecutionException, InvocationTargetException, NoRecommendationException, RecommendationSetException {
+            throws PluginExecutionException, NoRecommendationException, RecommendationSetException, InvocationTargetException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
             try {
@@ -132,8 +153,21 @@ public abstract class BinaryScannerUtil {
         return featureList;
     }
 
+    /**
+     * The method is intended to call the binary scanner to generate a list of the optimal features for an
+     * application. This optimal list can be reported to the user as a suggested list of features.
+     * 
+     * In order to generate the optimal list we must scan all classes in the application and we do not consider
+     * the features already specified in the server configuration (server.xml).
+     * 
+     * @param allClassesDirectories - the scanner will find all the class files in this set of directories
+     * @param eeVersion - generate features valid for the indicated version of EE
+     * @param mpVersion - generate features valid for the indicated version of MicroProfile
+     * @return - a set of features that will allow the application to run in a Liberty server
+     * @throws PluginExecutionException - any exception that prevents the scanner from running
+     */
     public Set<String> reRunBinaryScanner(Set<String> allClassesDirectories, String eeVersion, String mpVersion)
-            throws PluginExecutionException, InvocationTargetException {
+            throws PluginExecutionException {
         Set<String> featureList = null;
         try {
             Method driveScanMavenFeatureList = getScannerMethod();
