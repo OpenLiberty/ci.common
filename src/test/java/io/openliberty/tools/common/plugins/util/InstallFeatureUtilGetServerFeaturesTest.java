@@ -66,6 +66,19 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
         assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
     }
+
+        
+    private void verifyServerFeatures(Set<String> expected, Set<String> ignoreFiles) throws Exception {
+        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null, ignoreFiles);
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+    }
+    
+    private void verifyServerFeaturesPreserveCase(Set<String> expected) throws Exception {
+        util.setLowerCaseFeatures(false);
+        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+        util.setLowerCaseFeatures(true); // restore default
+    }
     
     /**
      * Tests base server.xml without any include locations or config dropins
@@ -163,6 +176,37 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("overrides");
 
         verifyServerFeatures(expected);
+    }
+
+    /**
+     * Tests server.xml with config dropins overrides, ignoring a specific file
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testConfigOverridesIgnoreFile() throws Exception{
+        copy("server.xml");
+        copyAsName("generated-features.xml", "configDropins/overrides/generated-features.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("generated");
+
+        verifyServerFeatures(expected); // without ignore
+
+        Set<String> ignoreSet1 = new HashSet<String>();
+        ignoreSet1.add("some-other-ignored-features.xml");
+
+        verifyServerFeatures(expected, ignoreSet1); // ignoring some unrelated file
+
+        Set<String> ignoreSet2 = new HashSet<String>();
+        ignoreSet2.add("generated-features.xml");
+
+        Set<String> expected2 = new HashSet<String>();
+        expected2.add("orig");
+
+        verifyServerFeatures(expected2, ignoreSet2); // ignore specified file
+
     }
 
     /**
@@ -461,6 +505,25 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("extralowercase");
         
         verifyServerFeatures(expected);
+    }
+    
+    /**
+     * Tests server.xml with spaces and case sensitivity 
+     * when we wish to preserve the case.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testSpaceAndCaseSensitivityPreserveCase() throws Exception{
+        copyAsName("server_space_case_sensitivity.xml", "server.xml");
+        copy("extraFeaturesSpaceCaseSensitivity.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("oRiG");
+        expected.add("EXTRALOWERcase");
+        expected.add("extralowerCaSE");
+        
+        verifyServerFeaturesPreserveCase(expected);
     }
     
     /**
