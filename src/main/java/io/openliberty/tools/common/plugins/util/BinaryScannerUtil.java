@@ -30,6 +30,8 @@ import java.util.Set;
 
 public abstract class BinaryScannerUtil {
 
+    public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
+    public static final String GENERATED_FEATURES_FILE_PATH = "configDropins/overrides/" + GENERATED_FEATURES_FILE_NAME;
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
