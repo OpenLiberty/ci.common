@@ -84,7 +84,7 @@ public abstract class BinaryScannerUtil {
      */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String eeVersion, String mpVersion, boolean optimize)
-            throws PluginExecutionException, NoRecommendationException, RecommendationSetException, InvocationTargetException {
+            throws PluginExecutionException, NoRecommendationException, RecommendationSetException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
             try {
