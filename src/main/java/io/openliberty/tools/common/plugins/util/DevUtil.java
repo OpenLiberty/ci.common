@@ -2831,8 +2831,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         debug("Skipping generate features from first call after dev mode startup");
                         foundInitialClasses = true;
                         javaSourceClasses.clear();
-                    } else {
-                        incrementGenerateFeatures();   
+                    } else if (!classesFailingToCompile()){ // do not run generate features if there are classes failing to compile
+                        incrementGenerateFeatures();
+                        File generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+                        if (!generatedFeaturesFile.exists()) {
+                            // run tests if generated-features.xml does not exist as there are no new features to install
+                            if (isMultiModuleProject()) {
+                                runTestThread(false, executor, -1, false, getAllBuildFiles());
+                            } else {
+                                runTestThread(false, executor, -1, false, false, buildFile);
+                            }
+                        }
                     }
                 }
 
@@ -3436,7 +3445,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             }
                         }
                     }
-                    if (successfulCompilation) {
+                    if (successfulCompilation && !generateFeatures) {
+                        // do not run tests if generateFeatures = true, tests will run after generated-features.xml is updated
                         // run tests on current module and dependent modules
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
@@ -4019,9 +4029,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else if (changeType == ChangeType.CREATE) {
                     redeployApp();
                 }
+
                 // always skip UTs
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
@@ -4074,8 +4084,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         restartServer(false);
                     }
                 }
-                // always skip UTs
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+                if (fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME) && generateFeatures) {
+                    // if generateFeatures is true, run UTs and ITs as tests would have been skipped
+                    // during recompileJava()
+                    if (isMultiModuleProject()) {
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles());
+                    } else {
+                        runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
+                    }
+                } else {
+                    // always skip UTs
+                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+                }
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, null);
@@ -4807,7 +4827,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // if only tests were compiled, don't need to wait for
                         // app to update
                         runTestThread(false, executor, -1, skipUTs, false, projectBuildFile);
-                    } else {
+                    } else if (!generateFeatures) {
+                        // do not run tests if generateFeatures = true, tests will run after generated-features.xml is updated
                         runTestThread(true, executor, messageOccurrences, skipUTs, false, projectBuildFile);
                     }
                 }
@@ -5365,5 +5386,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    // returns true if there are classes in the project that are currently failing
+    // to compile
+    private boolean classesFailingToCompile() {
+        boolean failingClasses = false;
+        if (isMultiModuleProject()) {
+            for (ProjectModule p : upstreamProjects) {
+                if (!p.failedCompilationJavaSources.isEmpty()) {
+                    failingClasses = true;
+                }
+            }
+        }
+        if (!failedCompilationJavaSources.isEmpty()) {
+            failingClasses = true;
+        }
+        return failingClasses;
     }
 }
