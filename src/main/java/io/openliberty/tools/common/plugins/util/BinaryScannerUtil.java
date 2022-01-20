@@ -45,6 +45,18 @@ public abstract class BinaryScannerUtil {
             "from different levels of MicroProfile, Java EE, or Jakarta EE.";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE4 = "[None available]"; // format should match JVM Set.toString()
 
+    // Strings recognized by the binary scanner arguments for Java/Jakarta EE and MicroProfile
+    public static final String BINARY_SCANNER_EEV6 = "ee6";
+    public static final String BINARY_SCANNER_EEV7 = "ee7";
+    public static final String BINARY_SCANNER_EEV8 = "ee8";
+    public static final String BINARY_SCANNER_EEV9 = "ee9";
+
+    public static final String BINARY_SCANNER_MPV1 = "mp1";
+    public static final String BINARY_SCANNER_MPV2 = "mp2";
+    public static final String BINARY_SCANNER_MPV3 = "mp3";
+    public static final String BINARY_SCANNER_MPV4 = "mp4";
+    public static final String BINARY_SCANNER_MPV5 = "mp5";
+
     public abstract void debug(String message);
     public abstract void debug(String message, Throwable e);
     public abstract void error(String message);
