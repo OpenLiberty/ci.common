@@ -314,27 +314,6 @@ public abstract class BinaryScannerUtil {
         return features;
     }
 
-    public static boolean noVersionCompare(Set<String> a, Set<String> b) {
-        Set<String> aPrime = createNoVersionSet(a);
-        Set<String> bPrime = createNoVersionSet(b);
-        if (aPrime == null || bPrime == null) {
-            return false;
-        }
-        return Collections.disjoint(aPrime, bPrime);
-    }
-
-    public static Set<String> createNoVersionSet(Set<String> a) {
-        Set<String> aPrime = new HashSet<String>();
-        for (String s : a) {
-            String[] name = s.split("-", 2);
-            if (name[0] == null) {
-                return null;
-            }
-            aPrime.add(name[0]);
-        }
-        return aPrime;
-    }
-
     // A class to pass the list of conflicts back to the caller.
     public class NoRecommendationException extends Exception {
         private static final long serialVersionUID = 1L;
