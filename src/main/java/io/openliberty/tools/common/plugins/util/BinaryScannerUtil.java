@@ -24,6 +24,7 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +33,8 @@ public abstract class BinaryScannerUtil {
 
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
     public static final String GENERATED_FEATURES_FILE_PATH = "configDropins/overrides/" + GENERATED_FEATURES_FILE_NAME;
+    private static final String FEATURE_MODIFIED = "com.ibm.ws.report.exceptions.RequiredFeatureModifiedException";
+    private static final String FEATURE_CONFLICT = "com.ibm.ws.report.exceptions.FeatureConflictException";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
@@ -44,6 +47,18 @@ public abstract class BinaryScannerUtil {
             "in the application’s API usage: %s. Review and update your application to ensure it is not using conflicting APIs " +
             "from different levels of MicroProfile, Java EE, or Jakarta EE.";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE4 = "[None available]"; // format should match JVM Set.toString()
+
+    // Strings recognized by the binary scanner arguments for Java/Jakarta EE and MicroProfile
+    public static final String BINARY_SCANNER_EEV6 = "ee6";
+    public static final String BINARY_SCANNER_EEV7 = "ee7";
+    public static final String BINARY_SCANNER_EEV8 = "ee8";
+    public static final String BINARY_SCANNER_EEV9 = "ee9";
+
+    public static final String BINARY_SCANNER_MPV1 = "mp1";
+    public static final String BINARY_SCANNER_MPV2 = "mp2";
+    public static final String BINARY_SCANNER_MPV3 = "mp3";
+    public static final String BINARY_SCANNER_MPV4 = "mp4";
+    public static final String BINARY_SCANNER_MPV5 = "mp5";
 
     public abstract void debug(String message);
     public abstract void debug(String message, Throwable e);
@@ -84,7 +99,7 @@ public abstract class BinaryScannerUtil {
      */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String eeVersion, String mpVersion, boolean optimize)
-            throws PluginExecutionException, NoRecommendationException, RecommendationSetException {
+            throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
             try {
@@ -107,9 +122,12 @@ public abstract class BinaryScannerUtil {
                 // A RuntimeException means the currentFeatureSet contains conflicts.
                 // A FeatureConflictException means the binary files scanned conflict with each other or with
                 // the currentFeatureSet parameter.
+                // A RequiredFeatureModifiedException means the scanner can make a working list of features but
+                // only if certain inputs are changed.
                 Throwable scannerException = ite.getCause();
                 if (scannerException instanceof RuntimeException) {
-                    // The list of features from the app is passed in but it contains conflicts 
+                    // The list of features from the app is passed in but it contains conflicts
+                    // TODO have the scanner team change this to a defined exception like the others
                     String problemMessage = scannerException.getMessage();
                     if (problemMessage == null || problemMessage.isEmpty()) {
                         debug("RuntimeException from binary scanner without descriptive message", scannerException);
@@ -123,17 +141,22 @@ public abstract class BinaryScannerUtil {
                             throw new RecommendationSetException(true, conflicts, sampleFeatureList);
                         }
                     }
-                } else if (scannerException.getClass().getName().endsWith("FeatureConflictException")) {
+                } else if (scannerException.getClass().getName().equals(FEATURE_CONFLICT)) {
                     // The scanned files conflict with each other or with current features
-                    Set<String> conflicts = getConflicts(scannerException);
+                    Set<String> conflicts = getFeatures(scannerException);
                     Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, eeVersion, mpVersion);
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
                         throw new RecommendationSetException(false, conflicts, sampleFeatureList);
                     }
+                } else if (scannerException.getClass().getName().equals(FEATURE_MODIFIED)) {
+                    // The scanned files conflict and the scanner suggests modifying some features
+                    Set<String> modifications = getFeatures(scannerException);
+                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, eeVersion, mpVersion);
+                    throw new FeatureModifiedException(modifications, 
+                            (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList);
                 } else {
-                    //TODO handle more exceptions from binary scanner e.g. com.ibm.ws.report.exceptions.RequiredFeatureModifiedException
                     debug("Exception from binary scanner.", scannerException);
                     throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
                 }
@@ -191,11 +214,13 @@ public abstract class BinaryScannerUtil {
                 // this usually happens when the list of features passed in contains conflicts, no recommendation possible
                 debug("RuntimeException from re-run of binary scanner", scannerException); // shouldn't happen
                 featureList = null;
-            } else if (scannerException.getClass().getName().endsWith("FeatureConflictException")) {
+            } else if (scannerException.getClass().getName().equals(FEATURE_CONFLICT)) {
+                // The features in the scanned files conflict with each other, no recommendation possible
+                featureList = getNoSampleFeatureList();
+            } else if (scannerException.getClass().getName().equals(FEATURE_MODIFIED)) {
                 // The features in the scanned files conflict with each other, no recommendation possible
                 featureList = getNoSampleFeatureList();
             } else {
-                //TODO handle more exceptions from binary scanner e.g. com.ibm.ws.report.exceptions.RequiredFeatureModifiedException
                 debug("Exception from rerunning binary scanner.", scannerException);
                 throw new PluginExecutionException("Error scanning the application for Liberty feature recommendations: " + scannerException.toString());
             }
@@ -264,25 +289,23 @@ public abstract class BinaryScannerUtil {
     }
 
     @SuppressWarnings("unchecked")
-    private Set<String> getConflicts(Throwable scannerResponse) {
+    private Set<String> getFeatures(Throwable scannerResponse) {
         try {
             ClassLoader cl = getScannerClassLoader();
             @SuppressWarnings("rawtypes")
-            Class featureConflictException = cl.loadClass("com.ibm.ws.report.exceptions.FeatureConflictException");
-            java.lang.reflect.Method conflictFeatureList = featureConflictException.getMethod("getFeatures");
-            if (conflictFeatureList == null) {
-                debug("Error finding FeatureConflictException method getFeatures using reflection");
+            Class featureConflictException = cl.loadClass(scannerResponse.getClass().getName());
+            Method featureMethod = featureConflictException.getMethod("getFeatures");
+            if (featureMethod == null) {
+                debug("Error finding " + scannerResponse.getClass().getName() + " method getFeatures() using reflection");
                 return null;
             }
-            return (Set<String>) conflictFeatureList.invoke(scannerResponse);
+            return (Set<String>) featureMethod.invoke(scannerResponse);
         } catch (ClassNotFoundException | MalformedURLException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException x) {
-            //TODO maybe nothing
-            error("Exception:"+x.getClass().getName());
-            error("Message:"+x.getMessage());
-            Object o = x.getCause();
-            if (o != null) {
-                warn("Caused by exception:"+x.getCause().getClass().getName());
-                warn("Caused by exception message:"+x.getCause().getMessage());
+            debug("An error occurred when trying to call the binary scanner jar getFeatures():"+x.getClass().getName(), x);
+            Throwable cause = x.getCause();
+            if (cause != null) {
+                debug("Caused by exception:"+cause.getClass().getName());
+                debug("Caused by exception message:" + cause.getMessage());
             }
         }
         return null;
@@ -333,6 +356,23 @@ public abstract class BinaryScannerUtil {
         }
         public Set<String> getConflicts() {
             return conflicts;
+        }
+        public Set<String> getSuggestions() {
+            return suggestions;
+        }
+    }
+
+    // A class to pass the list of modified features back to the caller.
+    public class FeatureModifiedException extends Exception {
+        private static final long serialVersionUID = 1L;
+        Set<String> features;
+        Set<String> suggestions;
+        FeatureModifiedException(Set<String> featureSet, Set<String> suggestionSet) {
+            features = featureSet;
+            suggestions = suggestionSet;
+        }
+        public Set<String> getFeatures() {
+            return features;
         }
         public Set<String> getSuggestions() {
             return suggestions;
