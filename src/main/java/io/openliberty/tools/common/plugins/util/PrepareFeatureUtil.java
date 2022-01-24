@@ -58,7 +58,6 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	private File installJarFile;
 	private File jsonFile;
-	
 
 	public PrepareFeatureUtil(File installDirectory, String openLibertyVersion)
 			throws PluginScenarioException, PluginExecutionException {
@@ -121,11 +120,12 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				File generatedJson = generateJson(targetJsonFile, esaFiles);
 				if (generatedJson.exists()) {
 					jsonFile = generatedJson;
+					provideJsonFileDependency(generatedJson);
 					info("The features.json has been generated at the following location: " + generatedJson);
 				}
 			} catch (PluginExecutionException e) {
-				error(e.getMessage());
-				warn("A features-bom file must be provided at the given groupId " + groupId + ".");
+				warn(e.getMessage());
+				warn("A features-bom file must be provided at the given groupId " + groupId +  ". Please ignore this warning if this is not a user feature.");
 			}
 		}
 	}
@@ -367,6 +367,17 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		}
 		return null;
 	}
+	
+	/**
+	 * Provide the file dependency of the generated JSON file for Gradle plugin
+	 * 
+	 * @param file		 The Features JSON file
+	 * @throws PluginExecutionException If the artifact could not create dependency
+	 */
+	public void provideJsonFileDependency(File file) {
+		
+	}
+
 
 	/**
 	 * Log debug
@@ -439,5 +450,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 */
 	public abstract File downloadArtifact(String groupId, String artifactId, String type, String version)
 			throws PluginExecutionException;
+	
+
 
 }
