@@ -106,7 +106,7 @@ public abstract class BinaryScannerUtil {
                 Method driveScanMavenFeatureList = getScannerMethod();
                 String[] binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
                 List<String> currentFeatures = new ArrayList<String>(currentFeatureSet);
-                debug("Calling binary scanner with the following inputs...\n" +
+                debug("Calling " + binaryScanner.getName() + " with the following inputs...\n" +
                       "  binaryInputs: " + Arrays.toString(binaryInputs) + "\n" +
                       "  eeVersion: " + eeVersion + "\n" +
                       "  mpVersion: " + mpVersion + "\n" +
