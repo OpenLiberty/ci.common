@@ -42,11 +42,11 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
-            "Java EE, or Jakarta EE. Refer to the following set of suggested features for guidance: %s";
+            "Java EE, or Jakarta EE. Refer to the following set of suggested features for guidance: %s.";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE2 = "A working set of features could not be generated due to conflicts " +
             "between configured features: %s. Review and update your server configuration to ensure it is not using conflicting " +
             "features from different levels of MicroProfile, Java EE, or Jakarta EE. Refer to the following set of " +
-            "suggested features for guidance: %s";
+            "suggested features for guidance: %s.";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE3 = "A working set of features could not be generated due to conflicts " +
             "in the application’s API usage: %s. Review and update your application to ensure it is not using conflicting APIs " +
             "from different levels of MicroProfile, Java EE, or Jakarta EE.";
@@ -110,7 +110,7 @@ public abstract class BinaryScannerUtil {
                 Method driveScanMavenFeatureList = getScannerMethod();
                 String[] binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
                 List<String> currentFeatures = new ArrayList<String>(currentFeatureSet);
-                debug("Calling binary scanner with the following inputs...\n" +
+                debug("Calling " + binaryScanner.getName() + " with the following inputs...\n" +
                       "  binaryInputs: " + Arrays.toString(binaryInputs) + "\n" +
                       "  eeVersion: " + eeVersion + "\n" +
                       "  mpVersion: " + mpVersion + "\n" +
@@ -278,7 +278,7 @@ public abstract class BinaryScannerUtil {
         Collection<String> resultSet;
         if (optimize) {
             if (classDirectories == null || classDirectories.isEmpty()) {
-                throw new PluginExecutionException("Error collecting list of directories to send to binary scanner, list is null or empty.");
+                return new String[0];
             }
             resultSet = classDirectories;
         } else {
