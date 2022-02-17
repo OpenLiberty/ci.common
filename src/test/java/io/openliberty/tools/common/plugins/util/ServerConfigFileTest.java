@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2021.
+ * (C) Copyright IBM Corporation 2021, 2022.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.openliberty.tools.common.plugins.util;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 
@@ -95,17 +96,27 @@ public class ServerConfigFileTest {
         ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance(serverXml);
         assertTrue(doc.findFeatureManager() != null);
         assertTrue(doc.createFMComment("test comment"));
-        assertTrue(doc.hasFMComment("test comment"));
-        Node comment = doc.findFMComment("test comment");
+        assertTrue(doc.hasFirstLevelComment("test comment"));
+        Node comment = doc.findFirstLevelComment("test comment");
         assertTrue(comment.getNodeType() == Node.COMMENT_NODE);
     }
 
     @Test
-    public void testInvalidAddFMComment() throws Exception {
+    public void testAddMissingFMComment1() throws Exception {
         ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance();
         assertTrue(doc.findFeatureManager() == null);
-        assertFalse(doc.createFMComment("test comment"));
-        assertTrue(doc.findServerElement().getChildNodes().getLength() == 0);
+        assertTrue(doc.createFMComment("test comment"));
+        // when the doc has no children we add an indentation node
+        assertEquals(2, doc.findServerElement().getChildNodes().getLength());
+    }
+
+    @Test
+    public void testAddMissingFMComment2() throws Exception {
+        ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance();
+        assertTrue(doc.findFeatureManager() == null);
+        doc.createComment("test comment1");
+        assertTrue(doc.createFMComment("test comment2"));
+        assertEquals(2, doc.findServerElement().getChildNodes().getLength());
     }
 
     @Test
@@ -114,9 +125,9 @@ public class ServerConfigFileTest {
         ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance(serverXml);
         assertTrue(doc.findFeatureManager() != null);
         assertTrue(doc.createFMComment("test comment"));
-        assertTrue(doc.hasFMComment("test comment"));
+        assertTrue(doc.hasFirstLevelComment("test comment"));
         doc.removeFMComment("test comment");
-        assertFalse(doc.hasFMComment("test comment"));
+        assertFalse(doc.hasFirstLevelComment("test comment"));
     }
 
     @Test
@@ -125,18 +136,15 @@ public class ServerConfigFileTest {
         ServerConfigXmlDocument doc = ServerConfigXmlDocument.newInstance(serverXml);
         Node featureManager = doc.findFeatureManager();
         int indent = -1;
-        Node text = featureManager.getFirstChild(); // expecting children text("\n        "), element(feature), text("\n    ")
+        Node text = featureManager.getPreviousSibling(); // expecting space node text("\n    ")
         if (text.getNodeType() == Node.TEXT_NODE) {
             indent = text.getTextContent().length();
         }
-        assertTrue(indent == 9);
+        assertTrue(indent == 5);
         assertTrue(doc.createFMComment("test comment"));
-        Node comment = doc.findFMComment("test comment");
+        Node comment = doc.findFirstLevelComment("test comment");
         Node spacing = comment.getPreviousSibling();
         assertTrue(spacing.getNodeType() == Node.TEXT_NODE);
-        assertTrue(spacing.getTextContent().length() == indent); // comment indented to same level as features
-        Node closingSpace = comment.getNextSibling();
-        assertTrue(closingSpace.getNodeType() == Node.TEXT_NODE);
-        assertTrue(closingSpace.getTextContent().length() < indent); // </featureManager> indented less than features
+        assertTrue(spacing.getTextContent().length() == indent); // comment indented to same level as featureManager
     }
 }

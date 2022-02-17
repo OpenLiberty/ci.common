@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2021.
+ * (C) Copyright IBM Corporation 2019, 2022.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import org.w3c.dom.Comment;
 public class ServerConfigXmlDocument extends XmlDocument {
     // Formerly called src/main/java/io/openliberty/tools/common/plugins/config/ServerConfigDropinXmlDocument.java
 
+    public static String DEFAULT_INDENTATION = "  ";
     private Element featureManager = null;
 
     private ServerConfigXmlDocument() {
@@ -68,58 +69,16 @@ public class ServerConfigXmlDocument extends XmlDocument {
     }
 
     public void createComment(String comment) {
-        createComment(doc.getDocumentElement(), comment);
+        createComment(findServerElement(), comment);
     }
 
-    // Return true if the document was changed and false otherwise.
-    public boolean createFMComment(String comment) {
-        if (featureManager == null) {
-            return false;
-        }
-        if (!hasFMComment(comment)) {
-            // First try to add some blank text to maintain the indentation level.
-            createPaddingText(featureManager);
-            createComment(featureManager, comment);
-            return true;
-        }
-        return false;
-    }
-
-    public void removeFMComment(String comment) {
-        Node commentNode = findFMComment(comment);
-        if (commentNode != null) {
-            Node parent = commentNode.getParentNode();
-            Node sibling = commentNode.getPreviousSibling();
-            if (isWhitespace(sibling)) {
-                parent.removeChild(sibling);
-            }
-            parent.removeChild(commentNode);
-        }
-    }
-
-    private void createPaddingText(Element elem) {
-        // Assuming the model expresses the document
-        // <element>
-        // <text "    "><childE1> etc
-        // First child of <element> is four (or eight or more) blanks. Second child is the actual content.
-        // This can happen when you parse an existing document into the model rather than create it from scratch.
-        Node first = elem.getFirstChild();
-
-        Node text = null;
-        if (first != null && first instanceof Text) {
-            text = first.cloneNode(true); // try to copy blanks to maintain indentation level
-        }
-        if (text != null) {
-            insertBeforeBlanks(elem, text); // add blanks between comment and next node: </featureManager>
-        }
-    }
-
+    // add comment to the end of the children
     public void createComment(Element elem, String comment) {
         Comment commentElement = doc.createComment(comment);
-        insertBeforeBlanks(elem, commentElement);
+        appendBeforeBlanks(elem, commentElement);
     }
 
-    private void insertBeforeBlanks(Element elem, Node childElement) {
+    private void appendBeforeBlanks(Element elem, Node childElement) {
         Node lastchild = elem.getLastChild();
         if (isWhitespace(lastchild)) {
             // last child is the whitespace preceding the </element> so insert before that
@@ -127,6 +86,61 @@ public class ServerConfigXmlDocument extends XmlDocument {
         } else {
             elem.appendChild(childElement);
         }
+    }
+
+    // Return true if the document was changed and false otherwise.
+    public boolean createFMComment(String comment) {
+        if (featureManager == null) {
+            featureManager = findFeatureManager(); // may still be null
+        }
+        if (!hasFirstLevelComment(comment)) {
+            Node insertionPoint = null;
+            // Insert either before <featureManager> or as first child of <server>
+            if (featureManager == null) {
+                insertionPoint = findServerElement().getFirstChild(); // null when <server> empty
+            } else {
+                insertionPoint = featureManager;
+                if (isWhitespace(insertionPoint.getPreviousSibling())) {
+                    insertionPoint = insertionPoint.getPreviousSibling();
+                }
+            }
+            createFMComment(insertionPoint, comment);
+            return true;
+        }
+        return false;
+    }
+
+    public void createFMComment(Node insertionPoint, String comment) {
+        Comment commentElement = doc.createComment(comment);
+        if (insertionPoint == null) {
+            // special case when <server> element is empty
+            Node padding = doc.createTextNode(DEFAULT_INDENTATION);
+            findServerElement().appendChild(padding);
+            findServerElement().appendChild(commentElement);
+        } else {
+            findServerElement().insertBefore(commentElement, insertionPoint);
+            if (isWhitespace(insertionPoint)) {
+                // the model expresses the document <text "    "><element>
+                // indent the comment to the same level as the element following the insertion point
+                Node padding = insertionPoint.cloneNode(true);
+                findServerElement().insertBefore(padding, commentElement);
+            }
+        }
+    }
+
+    // Return true if the document was changed and false otherwise.
+    public boolean removeFMComment(String comment) {
+        Node commentNode = findFirstLevelComment(comment);
+        if (commentNode != null) {
+            Node parent = commentNode.getParentNode();
+            Node sibling = commentNode.getPreviousSibling();
+            if (isWhitespace(sibling)) {
+                parent.removeChild(sibling);
+            }
+            parent.removeChild(commentNode);
+            return true;
+        }
+        return false;
     }
 
     public void createVariableWithValue(String varName, String varValue, boolean isDefaultValue) {
@@ -181,31 +195,23 @@ public class ServerConfigXmlDocument extends XmlDocument {
         return null;
     }
 
-    public boolean hasFMComment(String comment) {
-        return findFMComment(comment) != null;
+    public boolean hasFirstLevelComment(String comment) {
+        return findFirstLevelComment(comment) != null;
     }
 
-    public Node findFMComment(String comment) {
-        List<Comment> l = findCommentNodes(featureManager);
-        for (Comment c : l) {
-            if (c.getData().contains(comment)) {
-                return c;
-            }
-        }
-        return null;
-    }
-
-    public List<Comment> findCommentNodes(Element e) {
-        NodeList list = e.getChildNodes();
-        List<Comment> result = new ArrayList<Comment>();
+    public Node findFirstLevelComment(String comment) {
+        // Just look at the children of <server>
+        NodeList list = findServerElement().getChildNodes();
         for (int i = 0; i < list.getLength(); i++) {
-            if (list.item(i).getNodeType() == Element.COMMENT_NODE) {
-                if (list.item(i) instanceof Comment) {
-                    result.add((Comment)list.item(i));
+            Node item = list.item(i);
+            if (item.getNodeType() == Element.COMMENT_NODE) {
+                if (item instanceof Comment &&
+                    ((Comment)item).getData().contains(comment)) {
+                    return item;
                 }
             }
         }
-        return result;
+        return null;
     }
 
     public Element findServerElement() {
