@@ -2450,7 +2450,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Generate features using all classes and only user specified features.
      */
-    private void optimizeGenerateFeatures() {
+    private boolean optimizeGenerateFeatures() {
         info("Generating optimized features list...");
         // scan all class files and provide only user specified features
         boolean generatedFeatures = libertyGenerateFeatures(null, true);
@@ -2458,6 +2458,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             javaSourceClasses.clear();
         } // do not need to log an error if generatedFeatures is false because that would
           // have already been logged by libertyGenerateFeatures
+
+        return generatedFeatures;
     }
 
     /**
@@ -4016,7 +4018,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     generateFeaturesSuccess = false;
                     // custom server.xml modified
                     // TODO: revisit scenarios in which we should skip install features
-                    generateFeaturesSuccess = incrementGenerateFeatures();
+                    generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
@@ -4039,7 +4041,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // custom server.xml is deleted
                     // TODO: test this scenario and decide if generating features is necessary
                     // if we generate, it may need to be optimized
-                    incrementGenerateFeatures();
+                    optimizeGenerateFeatures();
                 }
                 // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4060,7 +4062,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     generateFeaturesSuccess = false;
                     // server.xml modified
                     // TODO: revisit scenarios in which we should skip install features
-                    generateFeaturesSuccess = incrementGenerateFeatures();
+                    generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
                 // suppress install feature warning - property must be set before calling copyConfigFolder
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
@@ -4103,7 +4105,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // server.xml is deleted
                     // TODO: test this scenario and decide if generating features is necessary
                     // if we generate, it may need to be optimized
-                    incrementGenerateFeatures();
+                    optimizeGenerateFeatures();
                 }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
