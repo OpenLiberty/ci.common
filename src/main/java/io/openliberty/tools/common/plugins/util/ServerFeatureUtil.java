@@ -68,6 +68,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
 
     private Map<String, File> libertyDirectoryPropertyToFile = null;
     private boolean lowerCaseFeatures = true;
+    public boolean suppressLogs = false; // set to true when info and warning messages should not be displayed
     
     /**
      * Log debug
@@ -563,4 +564,5 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
         return returnValue;
     }
+
 }

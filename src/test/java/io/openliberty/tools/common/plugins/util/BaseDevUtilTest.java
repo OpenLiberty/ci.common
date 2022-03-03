@@ -137,9 +137,14 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void checkConfigFile(File configFile, File serverDir) {
+        public void installFeatures(File configFile, File serverDir) {
             // not needed for tests
-            
+        }
+
+        @Override
+        public boolean serverFeaturesModified(File configDirectory) {
+            // not needed for tests
+            return false;
         }
 
         @Override
