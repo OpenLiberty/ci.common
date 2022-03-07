@@ -68,7 +68,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
 
     private Map<String, File> libertyDirectoryPropertyToFile = null;
     private boolean lowerCaseFeatures = true;
-    public boolean suppressLogs = false; // set to true when info and warning messages should not be displayed
+    protected boolean suppressLogs = false; // set to true when info and warning messages should not be displayed
     
     /**
      * Log debug
@@ -157,6 +157,16 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      */
     public void setLowerCaseFeatures(boolean val) {
         lowerCaseFeatures = val;
+    }
+
+    /**
+     * Indicate whether the info and warning messages should not be displayed. Used
+     * as part of the dev mode flow to avoid flooding the console.
+     * 
+     * @param val boolean true to indicate that info and warning log messages should be not displayed.
+     */
+    public void setSuppressLogs(boolean val) {
+        suppressLogs = val;
     }
 
     /**
