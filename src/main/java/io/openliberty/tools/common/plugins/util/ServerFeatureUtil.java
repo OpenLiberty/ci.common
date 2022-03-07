@@ -281,7 +281,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    private Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
+    public Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
         Set<String> result = origResult;
         List<File> updatedParsedXmls = parsedXmls != null ? parsedXmls : new ArrayList<File>();
         File canonicalServerFile;
