@@ -4029,9 +4029,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // custom server.xml modified
                     generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
-                // suppress install feature warning - property must be set before calling copyConfigFolder
+                // suppress install feature warning - property must be set before calling installFeaturesToTempDir
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                // copyConfigFolder will install features if new ones are detected
                 installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 
@@ -4071,9 +4070,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     generateFeaturesSuccess = false;
                     generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
-                // suppress install feature warning - property must be set before calling copyConfigFolder
+                // suppress install feature warning - property must be set before calling installFeaturesToTempDir
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                // copyConfigFolder will install features if new ones are detected
                 installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
 
@@ -4368,7 +4366,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param targetFileName          if not null renames the fileChanged to
      *                                targetFileName in the targetDir
      * @param generateFeaturesSuccess if features were successfully generated, skip
-     *                                install features if false
+     *                                install features if false. Defaults to true if
+     *                                generateFeatures is off
      * @throws IOException creating and copying to tempConfig directory
      */
     public void installFeaturesToTempDir(File fileChanged, File srcDir, String targetFileName, boolean generateFeaturesSuccess) throws IOException {
@@ -4393,7 +4392,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         // if feature generation is on, then it should succeed before installing features
-        if (!generateFeatures || generateFeaturesSuccess) {
+        if (generateFeaturesSuccess) {
             installFeatures(fileChanged, tempConfig);
         }
         cleanUpTempConfig();

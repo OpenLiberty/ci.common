@@ -344,6 +344,40 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         }
         return result;
     }
+
+
+    /**
+     * Compares a list of current features to a list of existing features. Returns
+     * true if features have been added or removed.
+     * 
+     * @param currentFeatures
+     * @param existingFeatures
+     * @return true if features have been modified, false if not
+     */
+    public boolean featuresModified(Set<String> currentFeatures, Set<String> existingFeatures) {
+        if (currentFeatures != null) {
+            // check if features have been added
+            Set<String> featuresCopy = new HashSet<String>();
+            featuresCopy.addAll(currentFeatures);
+            if (existingFeatures != null) {
+                featuresCopy.removeAll(existingFeatures);
+            }
+            if (!featuresCopy.isEmpty()) {
+                return true; // features have been added
+            }
+
+            // check if features have been removed
+            Set<String> existingFeaturesCopy = new HashSet<String>();
+            if (existingFeatures != null) {
+                existingFeaturesCopy.addAll(existingFeatures);
+                existingFeaturesCopy.removeAll(currentFeatures);
+                if (!existingFeaturesCopy.isEmpty()) {
+                    return true; // features have been removed
+                }
+            }
+        }
+        return false;
+    }
     
     /**
      * Parse feature elements from a featureManager node, trimming whitespace
