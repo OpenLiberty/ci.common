@@ -1786,12 +1786,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         // suppress install feature warning
         System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-        if (generateFeatures) {
-            //TODO: decide if we should do an optimized feature generation on a server restart
-            // If we do not generate here, need to revisit compileDependenciesChanged section in DevMojo
-            // If we generate here, we need to skip install features if there is a failure
-            optimizeGenerateFeatures();
-        }
         libertyCreate();
         // Skip installing features on container during restart, since the Dockerfile
         // should have 'RUN features.sh'
@@ -4280,7 +4274,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         // Untrack the directories
         dockerfileDirectoriesTracked.clear();
-
         restartServer(true);
     }
 
