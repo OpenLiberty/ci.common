@@ -256,7 +256,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @return ServerFeatureUtil object
      */
-    public abstract ServerFeatureUtil getServerFeatureUtil();
+    public abstract ServerFeatureUtil getServerFeatureUtilObj();
 
     /**
      * Get the set of existing features
@@ -5422,23 +5422,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     // Returns true if features have been modified in the configuration directory
     private boolean serverFeaturesModified() {
-        ServerFeatureUtil servUtil = getServerFeatureUtil();
+        ServerFeatureUtil servUtil = getServerFeatureUtilObj();
         servUtil.setSuppressLogs(true); // suppress logs from ServerFeatureUtil, otherwise will flood dev console
-        // get server features from the config directory, exclude generated-features.xml
+
+        // check if a generated feature has been manually added to other config files
+        Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null,
+                new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH), null, null);
         Set<String> generatedFiles = new HashSet<String>();
         generatedFiles.add(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME);
         // if serverXmlFile is null, getServerFeatures will use the default server.xml
         // in the configDirectory
-        Set<String> features = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+        Set<String> featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
                 new HashMap<String, File>(), generatedFiles);
-
-        // exclude generated features from the features list
-        Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null,
-                new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH), null, null);
-        servUtil.setSuppressLogs(false); // re-enable logs from ServerFeatureUtil
-        if (features != null && generatedFeatures != null) {
-            features.removeAll(generatedFeatures);
+        // compare generatedFeatures and featuresExcludingGenerated for overlap
+        if (featuresExcludingGenerated != null && generatedFeatures != null) {
+            if (!Collections.disjoint(featuresExcludingGenerated, generatedFeatures)) {
+                // indicates a generated feature has been manually added to other config files
+                return true;
+            }
         }
+
+        // if serverXmlFile is null, getServerFeatures will use the default server.xml
+        // in the configDirectory
+        Set<String> features = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+                new HashMap<String, File>(), null);
+        servUtil.setSuppressLogs(false); // re-enable logs from ServerFeatureUtil
         return servUtil.featuresModified(features, getExistingFeatures());
     }
 }

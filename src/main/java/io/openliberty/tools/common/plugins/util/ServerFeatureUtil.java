@@ -357,19 +357,17 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     public boolean featuresModified(Set<String> currentFeatures, Set<String> existingFeatures) {
         if (currentFeatures != null) {
             // check if features have been added
-            Set<String> featuresCopy = new HashSet<String>();
-            featuresCopy.addAll(currentFeatures);
+            Set<String> currentFeaturesCopy = new HashSet<String>(currentFeatures);
             if (existingFeatures != null) {
-                featuresCopy.removeAll(existingFeatures);
+                currentFeaturesCopy.removeAll(existingFeatures);
             }
-            if (!featuresCopy.isEmpty()) {
+            if (!currentFeaturesCopy.isEmpty()) {
                 return true; // features have been added
             }
 
             // check if features have been removed
-            Set<String> existingFeaturesCopy = new HashSet<String>();
             if (existingFeatures != null) {
-                existingFeaturesCopy.addAll(existingFeatures);
+                Set<String> existingFeaturesCopy = new HashSet<String>(existingFeatures);
                 existingFeaturesCopy.removeAll(currentFeatures);
                 if (!existingFeaturesCopy.isEmpty()) {
                     return true; // features have been removed

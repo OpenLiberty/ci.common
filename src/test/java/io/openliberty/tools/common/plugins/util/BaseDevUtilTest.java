@@ -142,9 +142,15 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public boolean serverFeaturesModified(File configDirectory) {
+        public ServerFeatureUtil getServerFeatureUtilObj() {
             // not needed for tests
-            return false;
+            return null;
+        }
+
+        @Override
+        public Set<String> getExistingFeatures() {
+            // not needed for tests
+            return null;
         }
 
         @Override
