@@ -252,13 +252,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void installFeatures(File configFile, File serverDir);
 
     /**
-     * Check the configuration directory in the source directory for new features.
-     * Used in the generate features scenario.
+     * Get the ServerFeatureUtil object
      * 
-     * @param configDirectory configuration directory in source
-     * @return true if new features are detected
+     * @return ServerFeatureUtil object
      */
-    public abstract boolean serverFeaturesModified(File configDirectory);
+    public abstract ServerFeatureUtil getServerFeatureUtil();
+
+    /**
+     * Get the set of existing features
+     * 
+     * @return existing features set
+     */
+    public abstract Set<String> getExistingFeatures();
 
     /**
      * Compile the specified directory
@@ -4024,7 +4029,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 boolean generateFeaturesSuccess = true;
                 // generate features whenever features have changed
-                if (generateFeatures && serverFeaturesModified(configDirectory)) {
+                if (generateFeatures && serverFeaturesModified()) {
                     generateFeaturesSuccess = false;
                     // custom server.xml modified
                     generateFeaturesSuccess = optimizeGenerateFeatures();
@@ -4046,7 +4051,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
                 // generate features whenever features have changed
-                if (generateFeatures && serverFeaturesModified(configDirectory)) {
+                if (generateFeatures && serverFeaturesModified()) {
                     // custom server.xml is deleted
                     optimizeGenerateFeatures();
                 }
@@ -4066,7 +4071,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // excluding the generated-features.xml file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                         && !fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME))
-                        && serverFeaturesModified(configDirectory)) {
+                        && serverFeaturesModified()) {
                     generateFeaturesSuccess = false;
                     generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
@@ -4110,7 +4115,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // excluding the generated-features.xml file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                         && !fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME))
-                        && serverFeaturesModified(configDirectory)) {
+                        && serverFeaturesModified()) {
                     optimizeGenerateFeatures();
                 }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4391,10 +4396,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
-        // if feature generation is on, then it should succeed before installing features
-        if (generateFeaturesSuccess) {
-            installFeatures(fileChanged, tempConfig);
-        }
+        installFeatures(fileChanged, tempConfig);
         cleanUpTempConfig();
     }
 
@@ -5416,5 +5418,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             failingClasses = true;
         }
         return failingClasses;
+    }
+
+    // Returns true if features have been modified in the configuration directory
+    private boolean serverFeaturesModified() {
+        ServerFeatureUtil servUtil = getServerFeatureUtil();
+        servUtil.setSuppressLogs(true); // suppress logs from ServerFeatureUtil, otherwise will flood dev console
+        // get server features from the config directory, exclude generated-features.xml
+        Set<String> generatedFiles = new HashSet<String>();
+        generatedFiles.add(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME);
+        // if serverXmlFile is null, getServerFeatures will use the default server.xml
+        // in the configDirectory
+        Set<String> features = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+                new HashMap<String, File>(), generatedFiles);
+
+        // exclude generated features from the features list
+        Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null,
+                new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH), null, null);
+        servUtil.setSuppressLogs(false); // re-enable logs from ServerFeatureUtil
+        if (features != null && generatedFeatures != null) {
+            features.removeAll(generatedFeatures);
+        }
+        return servUtil.featuresModified(features, getExistingFeatures());
     }
 }
