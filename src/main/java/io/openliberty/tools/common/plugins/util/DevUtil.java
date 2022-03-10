@@ -5434,19 +5434,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // in the configDirectory
         Set<String> featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
                 new HashMap<String, File>(), generatedFiles);
-        // compare generatedFeatures and featuresExcludingGenerated for overlap
-        if (featuresExcludingGenerated != null && generatedFeatures != null) {
-            if (!Collections.disjoint(featuresExcludingGenerated, generatedFeatures)) {
-                // indicates a generated feature has been manually added to other config files
-                return true;
-            }
+        servUtil.setSuppressLogs(false); // re-enable logs from ServerFeatureUtil
+        if (featuresExcludingGenerated != null && generatedFeatures != null
+                && !Collections.disjoint(featuresExcludingGenerated, generatedFeatures)) {
+            // indicates a generated feature has been manually added to other config files
+            return true;
         }
 
-        // if serverXmlFile is null, getServerFeatures will use the default server.xml
-        // in the configDirectory
-        Set<String> features = servUtil.getServerFeatures(configDirectory, serverXmlFile,
-                new HashMap<String, File>(), null);
-        servUtil.setSuppressLogs(false); // re-enable logs from ServerFeatureUtil
-        return servUtil.featuresModified(features, getExistingFeatures());
+        Set<String> features = featuresExcludingGenerated != null ? new HashSet<String>(featuresExcludingGenerated)
+                : new HashSet<String>();
+        if (generatedFeatures != null) {
+            features.addAll(generatedFeatures);
+        }
+        return !features.equals(getExistingFeatures());
     }
 }
