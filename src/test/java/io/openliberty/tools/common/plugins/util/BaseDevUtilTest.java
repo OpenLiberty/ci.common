@@ -137,9 +137,20 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void checkConfigFile(File configFile, File serverDir) {
+        public void installFeatures(File configFile, File serverDir) {
             // not needed for tests
-            
+        }
+
+        @Override
+        public ServerFeatureUtil getServerFeatureUtilObj() {
+            // not needed for tests
+            return null;
+        }
+
+        @Override
+        public Set<String> getExistingFeatures() {
+            // not needed for tests
+            return null;
         }
 
         @Override

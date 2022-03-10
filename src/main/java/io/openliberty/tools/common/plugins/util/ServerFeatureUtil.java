@@ -68,6 +68,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
 
     private Map<String, File> libertyDirectoryPropertyToFile = null;
     private boolean lowerCaseFeatures = true;
+    protected boolean suppressLogs = false; // set to true when info and warning messages should not be displayed
     
     /**
      * Log debug
@@ -156,6 +157,16 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      */
     public void setLowerCaseFeatures(boolean val) {
         lowerCaseFeatures = val;
+    }
+
+    /**
+     * Indicate whether the info and warning messages should not be displayed. Used
+     * as part of the dev mode flow to avoid flooding the console.
+     * 
+     * @param val boolean true to indicate that info and warning log messages should be not displayed.
+     */
+    public void setSuppressLogs(boolean val) {
+        suppressLogs = val;
     }
 
     /**
@@ -270,7 +281,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    private Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
+    public Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
         Set<String> result = origResult;
         List<File> updatedParsedXmls = parsedXmls != null ? parsedXmls : new ArrayList<File>();
         File canonicalServerFile;
@@ -333,7 +344,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         }
         return result;
     }
-    
+
     /**
      * Parse feature elements from a featureManager node, trimming whitespace
      * and treating everything as lowercase.
@@ -563,4 +574,5 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
         return returnValue;
     }
+
 }
