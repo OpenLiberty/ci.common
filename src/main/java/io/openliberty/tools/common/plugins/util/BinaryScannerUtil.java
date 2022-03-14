@@ -70,6 +70,7 @@ public abstract class BinaryScannerUtil {
     public abstract void error(String message);
     public abstract void warn(String message);
     public abstract void info(String message);
+    public abstract boolean isDebugEnabled();
 
     // The jar file containing the binary scanner code
     private File binaryScanner;
@@ -112,7 +113,10 @@ public abstract class BinaryScannerUtil {
                 Method generateFeatureSetMethod = getScannerMethod();
                 // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
                 Set<String> binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
-                String logLevel = "*=FINE"; // generate messages for debugging by support team
+                String logLevel = null;
+                if (isDebugEnabled()) {
+                    logLevel = "*=FINE";  // generate messages for debugging by support team
+                }
                 debug("Calling " + binaryScanner.getName() + " with the following inputs...\n" +
                         "  binaryInputs: " + binaryInputs + "\n" +
                         "  eeVersion: " + eeVersion + "\n" +
