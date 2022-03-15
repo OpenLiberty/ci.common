@@ -209,9 +209,12 @@ public abstract class BinaryScannerUtil {
             Method generateFeatureSetMethod = getScannerMethod();
             Set<String> binaryInputs = allClassesDirectories;
             Set<String> currentFeaturesSet = new HashSet<String>(); // when re-running always pass in no features
-            String logLevel = null;
+            String logLevel;
             if (isDebugEnabled()) {
                 logLevel = "*=FINE";  // generate messages for debugging by support team
+            } else {
+                logLevel = null;
+                logLocation = null;
             }
             debug("Recalling binary scanner with the following inputs...\n" +
                   "  binaryInputs: " + binaryInputs + "\n" +
