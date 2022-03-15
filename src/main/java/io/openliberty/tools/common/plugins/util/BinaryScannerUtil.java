@@ -113,9 +113,12 @@ public abstract class BinaryScannerUtil {
                 Method generateFeatureSetMethod = getScannerMethod();
                 // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
                 Set<String> binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
-                String logLevel = null;
+                String logLevel;
                 if (isDebugEnabled()) {
                     logLevel = "*=FINE";  // generate messages for debugging by support team
+                } else {
+                    logLevel = null;
+                    logLocation = null;
                 }
                 debug("Calling " + binaryScanner.getName() + " with the following inputs...\n" +
                         "  binaryInputs: " + binaryInputs + "\n" +
