@@ -93,8 +93,8 @@ public abstract class BinaryScannerUtil {
      * @param classFiles - a set of class files for the scanner to handle. Should be a subset of allClassesDirectories
      * @param allClassesDirectories - the directories containing all the class files of the application
      * @param logLocation - directory name relative to project or absolute path passed to binary scanner
-     * @param eeVersion - generate features valid for the indicated version of EE
-     * @param mpVersion - generate features valid for the indicated version of MicroProfile
+     * @param targetJavaEE - generate features valid for the indicated version of EE
+     * @param targetMicroProfile - generate features valid for the indicated version of MicroProfile
      * @param optimize - true value means to scan all the classes in allClassesDirectories rather than just the
      *                   classes in the classFiles parameter. currentFeatureSet is still used as the basis of
      *                   the feature set.
@@ -105,7 +105,7 @@ public abstract class BinaryScannerUtil {
      *                                      features that should work to run the application
      */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
-            String logLocation, String eeVersion, String mpVersion, boolean optimize)
+            String logLocation, String targetJavaEE, String targetMicroProfile, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
@@ -122,16 +122,14 @@ public abstract class BinaryScannerUtil {
                 }
                 debug("Calling " + binaryScanner.getName() + " with the following inputs...\n" +
                         "  binaryInputs: " + binaryInputs + "\n" +
-                        "  eeVersion: " + eeVersion + "\n" +
-                        "  mpVersion: " + mpVersion + "\n" +
+                        "  targetJavaEE: " + targetJavaEE + "\n" +
+                        "  targetMicroP: " + targetMicroProfile + "\n" +
                         "  currentFeatures: " + currentFeatureSet + "\n" +
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
-                debug("The following messages are from the application binary scanner used to generate Liberty features");
-                featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, eeVersion, mpVersion,
+                featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                         currentFeatureSet, logLocation, logLevel, java.util.Locale.getDefault());
-                debug("End of messages from application binary scanner. Features recommended :");
                 for (String s : featureList) {debug(s);};
             } catch (InvocationTargetException ite) {
                 // This is the exception from the JVM that indicates there was an exception in the method we
@@ -145,7 +143,7 @@ public abstract class BinaryScannerUtil {
                 if (scannerException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                     // The list of features from the app is passed in but it contains conflicts
                     Set<String> conflicts = getFeatures(scannerException);
-                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, eeVersion, mpVersion);
+                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -154,7 +152,7 @@ public abstract class BinaryScannerUtil {
                 } else if (scannerException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
                     // The scanned files conflict with each other or with current features
                     Set<String> conflicts = getFeatures(scannerException);
-                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, eeVersion, mpVersion);
+                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -163,7 +161,7 @@ public abstract class BinaryScannerUtil {
                 } else if (scannerException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
                     // The scanned files conflict and the scanner suggests modifying some features
                     Set<String> modifications = getFeatures(scannerException);
-                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, eeVersion, mpVersion);
+                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
                     throw new FeatureModifiedException(modifications, 
                             (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList);
                 } else {
@@ -197,12 +195,12 @@ public abstract class BinaryScannerUtil {
      * 
      * @param allClassesDirectories - the scanner will find all the class files in this set of directories
      * @param logLocation - directory name relative to project or absolute path passed to binary scanner
-     * @param eeVersion - generate features valid for the indicated version of EE
-     * @param mpVersion - generate features valid for the indicated version of MicroProfile
+     * @param targetJavaEE - generate features valid for the indicated version of EE
+     * @param targetMicroProfile - generate features valid for the indicated version of MicroProfile
      * @return - a set of features that will allow the application to run in a Liberty server
      * @throws PluginExecutionException - any exception that prevents the scanner from running
      */
-    public Set<String> reRunBinaryScanner(Set<String> allClassesDirectories, String logLocation, String eeVersion, String mpVersion)
+    public Set<String> reRunBinaryScanner(Set<String> allClassesDirectories, String logLocation, String targetJavaEE, String targetMicroProfile)
             throws PluginExecutionException {
         Set<String> featureList = null;
         try {
@@ -218,16 +216,14 @@ public abstract class BinaryScannerUtil {
             }
             debug("Recalling binary scanner with the following inputs...\n" +
                   "  binaryInputs: " + binaryInputs + "\n" +
-                  "  eeVersion: " + eeVersion + "\n" +
-                  "  mpVersion: " + mpVersion + "\n" +
+                  "  targetJavaEE: " + targetJavaEE + "\n" +
+                  "  targetMicroP: " + targetMicroProfile + "\n" +
                   "  currentFeatures: " + currentFeaturesSet + "\n" +
                   "  logLocation: " + logLocation + "\n" +
                   "  logLevel: " + logLevel + "\n" +
                   "  locale: " + java.util.Locale.getDefault());
-            debug("The following messages are from the application binary scanner used to generate Liberty features");
-            featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, eeVersion, mpVersion,
+            featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                     currentFeaturesSet, logLocation, logLevel, java.util.Locale.getDefault());
-            debug("End of messages from application binary scanner. Features recommended :");
             for (String s : featureList) {debug(s);};
         } catch (InvocationTargetException ite) {
             Throwable scannerException = ite.getCause();
