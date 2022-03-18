@@ -193,28 +193,33 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param buildFile
      * @param compileArtifactPaths
      * @param testArtifactPaths
+     * @param generateFeatures     boolean, true if auto generation of features is
+     *                             on
      * @param executor             The thread pool executor
      * @throws PluginExecutionException if there was an error when restarting the
      *                                  server
      * @return true if the build file was recompiled with changes
      */
     public abstract boolean recompileBuildFile(File buildFile, Set<String> compileArtifactPaths,
-            Set<String> testArtifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
+            Set<String> testArtifactPaths, boolean generateFeatures, ThreadPoolExecutor executor)
+            throws PluginExecutionException;
 
     /**
      * Updates the compile artifact paths of the given project module. Only used in
      * multi module scenario.
      * 
-     * @param projectModule The corresponding project module to update artifact
-     *                      paths for
-     * @param redeployCheck Whether to redeploy the application if changes in the
-     *                      dependencies are detected
-     * @param executor      The thread pool executor
+     * @param projectModule    The corresponding project module to update artifact
+     *                         paths for
+     * @param redeployCheck    Whether to redeploy the application if changes in the
+     *                         dependencies are detected
+     * @param generateFeatures boolean, true if auto generation of features is on
+     * @param executor         The thread pool executor
      * @return true if the compile artifact paths are updated
-     * @throws PluginExecutionException
+     * @throws PluginExecutionException if there was an error when restarting the
+     *                                  server
      */
     public abstract boolean updateArtifactPaths(ProjectModule projectModule, boolean redeployCheck,
-            ThreadPoolExecutor executor) throws PluginExecutionException;
+            boolean generateFeatures, ThreadPoolExecutor executor) throws PluginExecutionException;
 
     /**
      * Update the compile artifact paths of any child modules of the given build
@@ -2681,7 +2686,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // check for upstream projects
             if (isMultiModuleProject()) {
                 for (ProjectModule p : upstreamProjects) {
-                    updateArtifactPaths(p, false, executor);
+                    updateArtifactPaths(p, false, generateFeatures, executor);
 
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
@@ -3921,7 +3926,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     debug("Change detected in: " + project.getBuildFile() + ". Updating compile artifact paths.");
                     lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                     // when an upstream project build file changes, get the updated artifact paths
-                    boolean updatedArtifactPaths = updateArtifactPaths(project, true, executor);
+                    boolean updatedArtifactPaths = updateArtifactPaths(project, true, generateFeatures, executor);
                     if (updatedArtifactPaths) {
                         if (recompileDependencies) {
                             // recompile the entire module
@@ -4176,7 +4181,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
             lastBuildFileChange.put(buildFile, System.currentTimeMillis());
-            boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, executor);
+            boolean recompiledBuild = recompileBuildFile(buildFile, compileArtifactPaths, testArtifactPaths, generateFeatures, executor);
             
             // run all tests on build file change
             if (recompiledBuild) {
