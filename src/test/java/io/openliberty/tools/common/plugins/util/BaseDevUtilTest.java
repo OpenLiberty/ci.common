@@ -105,14 +105,14 @@ public class BaseDevUtilTest {
 
         @Override
         public boolean recompileBuildFile(File buildFile, Set<String> compileArtifactPaths,
-                Set<String> testArtifactPaths, ThreadPoolExecutor executor) {
+                Set<String> testArtifactPaths, boolean generateFeatures, ThreadPoolExecutor executor) {
             // not needed for tests
             return false;
         }
 
         @Override
         public boolean updateArtifactPaths(ProjectModule projectModule, boolean redeployCheck,
-                ThreadPoolExecutor executor) throws PluginExecutionException {
+                boolean generateFeatures, ThreadPoolExecutor executor) throws PluginExecutionException {
             // not needed for tests
             return false;
         }
