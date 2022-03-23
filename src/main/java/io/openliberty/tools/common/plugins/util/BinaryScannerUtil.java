@@ -21,11 +21,10 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public abstract class BinaryScannerUtil {
@@ -59,11 +58,27 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_EEV8 = "ee8";
     public static final String BINARY_SCANNER_EEV9 = "ee9";
 
+    public static final String BINARY_SCANNER_PREFIX = "mp";
     public static final String BINARY_SCANNER_MPV1 = "mp1";
     public static final String BINARY_SCANNER_MPV2 = "mp2";
     public static final String BINARY_SCANNER_MPV3 = "mp3";
     public static final String BINARY_SCANNER_MPV4 = "mp4";
     public static final String BINARY_SCANNER_MPV5 = "mp5";
+
+    public static final Map<String, String> BINARY_SCANNER_MP = new HashMap<String, String>();
+    static {
+        BINARY_SCANNER_MP.put("1.2", "mp1.2");
+        BINARY_SCANNER_MP.put("1.3", "mp1.3");
+        BINARY_SCANNER_MP.put("1.4", "mp1.4");
+        BINARY_SCANNER_MP.put("2.0", "mp2.0");
+        BINARY_SCANNER_MP.put("2.1", "mp2.1");
+        BINARY_SCANNER_MP.put("2.2", "mp2.2");
+        BINARY_SCANNER_MP.put("3.0", "mp3.0");
+        BINARY_SCANNER_MP.put("3.2", "mp3.2");
+        BINARY_SCANNER_MP.put("3.3", "mp3.3");
+        BINARY_SCANNER_MP.put("4.0", "mp4.0");
+        BINARY_SCANNER_MP.put("4.1", "mp4.1");
+    }
 
     public abstract void debug(String message);
     public abstract void debug(String message, Throwable e);
