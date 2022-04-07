@@ -4374,8 +4374,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException creating and copying to tempConfig directory
      */
     public void installFeaturesToTempDir(File fileChanged, File srcDir, String targetFileName, boolean generateFeaturesSuccess) throws IOException {
-        if (generateFeatures && !generateFeaturesSuccess) {
-            return; // skip creating temp dir and installing features if feature generation failed
+        if ((generateFeatures && !generateFeaturesSuccess) || !serverFeaturesModified()) {
+            return; // skip creating temp dir and installing features if feature generation failed or server features have not changed
         }
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
@@ -5419,9 +5419,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     // Returns true if features have been modified in the configuration directory
+    // (excluding generated-features.xml file). Called only if generate-features=true
     private boolean serverFeaturesModified() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
-        servUtil.setSuppressLogs(true); // suppress logs from ServerFeatureUtil, otherwise will flood dev console
 
         // check if a generated feature has been manually added to other config files
         Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null,
@@ -5432,7 +5432,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // in the configDirectory
         Set<String> featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
                 new HashMap<String, File>(), generatedFiles);
-        servUtil.setSuppressLogs(false); // re-enable logs from ServerFeatureUtil
         if (featuresExcludingGenerated != null && generatedFeatures != null
                 && !Collections.disjoint(featuresExcludingGenerated, generatedFeatures)) {
             // indicates a generated feature has been manually added to other config files
