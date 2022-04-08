@@ -2464,7 +2464,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Generate features using all classes and only user specified features.
      */
     private boolean optimizeGenerateFeatures() {
-        info("Generating optimized features list...");
+        debug("Generating optimized features list...");
         // scan all class files and provide only user specified features
         boolean generatedFeatures = libertyGenerateFeatures(null, true);
         if (generatedFeatures) {
@@ -2480,7 +2480,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Returns true if successful
      */
     private boolean incrementGenerateFeatures() {
-        info("Generating feature list from incremental changes...");
+        debug("Generating feature list from incremental changes...");
         boolean generatedFeatures = false;
         try {
             Collection<String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
@@ -5426,11 +5426,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     // Returns true if features have been modified in the configuration directory
-    // (excluding generated-features.xml file). Called only if generate-features=true
     private boolean serverFeaturesModified() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
 
-        // check if a generated feature has been manually added to other config files
+        // generateFeatures scenario: check if a generated feature has been manually added to other config files
         Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null,
                 new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH), null, null);
         Set<String> generatedFiles = new HashSet<String>();
@@ -5445,6 +5444,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             return true;
         }
 
+        // compare current feature list to existing feature list
         Set<String> features = featuresExcludingGenerated != null ? new HashSet<String>(featuresExcludingGenerated)
                 : new HashSet<String>();
         if (generatedFeatures != null) {
