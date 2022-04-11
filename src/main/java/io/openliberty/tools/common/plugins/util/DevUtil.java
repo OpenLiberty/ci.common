@@ -2464,7 +2464,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Generate features using all classes and only user specified features.
      */
     private boolean optimizeGenerateFeatures() {
-        info("Generating optimized features list...");
+        debug("Generating optimized features list...");
         // scan all class files and provide only user specified features
         boolean generatedFeatures = libertyGenerateFeatures(null, true);
         if (generatedFeatures) {
@@ -2480,7 +2480,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Returns true if successful
      */
     private boolean incrementGenerateFeatures() {
-        info("Generating feature list from incremental changes...");
+        debug("Generating feature list from incremental changes...");
         boolean generatedFeatures = false;
         try {
             Collection<String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
@@ -4027,17 +4027,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // server will load new properties
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 boolean generateFeaturesSuccess = true;
+                boolean serverFeaturesModified = serverFeaturesModified();
                 // generate features whenever features have changed
-                if (generateFeatures && serverFeaturesModified()) {
+                if (generateFeatures && serverFeaturesModified) {
                     generateFeaturesSuccess = false;
                     // custom server.xml modified
                     generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
-                // suppress install feature warning - property must be set before calling installFeaturesToTempDir
-                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
+                if (serverFeaturesModified) {
+                    // suppress install feature warning - property must be set before calling
+                    // installFeaturesToTempDir
+                    System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
+                    installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
+                }
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-                
+
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -4066,23 +4070,26 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                                                                             // files
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 boolean generateFeaturesSuccess = true; // default to true to cover cases where feature generation is disabled
+                boolean serverFeaturesModified = serverFeaturesModified();
                 // generate features whenever features have changed and an XML file is modified,
                 // excluding the generated-features.xml file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                         && !fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME))
-                        && serverFeaturesModified()) {
+                        && serverFeaturesModified) {
                     generateFeaturesSuccess = false;
                     generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
-                // suppress install feature warning - property must be set before calling installFeaturesToTempDir
-                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
+                if (serverFeaturesModified) {
+                    // suppress install feature warning - property must be set before calling
+                    // installFeaturesToTempDir
+                    System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
+                    installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
+                }
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else {
-                    
                     if (changeType == ChangeType.CREATE) {
                         redeployApp();
                     }
@@ -5421,9 +5428,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     // Returns true if features have been modified in the configuration directory
     private boolean serverFeaturesModified() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
-        servUtil.setSuppressLogs(true); // suppress logs from ServerFeatureUtil, otherwise will flood dev console
 
-        // check if a generated feature has been manually added to other config files
+        // generateFeatures scenario: check if a generated feature has been manually added to other config files
         Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null,
                 new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH), null, null);
         Set<String> generatedFiles = new HashSet<String>();
@@ -5432,13 +5438,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // in the configDirectory
         Set<String> featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
                 new HashMap<String, File>(), generatedFiles);
-        servUtil.setSuppressLogs(false); // re-enable logs from ServerFeatureUtil
         if (featuresExcludingGenerated != null && generatedFeatures != null
                 && !Collections.disjoint(featuresExcludingGenerated, generatedFeatures)) {
             // indicates a generated feature has been manually added to other config files
             return true;
         }
 
+        // compare current feature list to existing feature list
         Set<String> features = featuresExcludingGenerated != null ? new HashSet<String>(featuresExcludingGenerated)
                 : new HashSet<String>();
         if (generatedFeatures != null) {
