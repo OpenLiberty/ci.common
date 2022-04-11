@@ -5430,7 +5430,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
 
         // generateFeatures scenario: check if a generated feature has been manually added to other config files
-        Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null,
+        Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null, serverDirectory,
                 new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH), null, null);
         Set<String> generatedFiles = new HashSet<String>();
         generatedFiles.add(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME);
