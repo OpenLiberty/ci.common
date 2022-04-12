@@ -415,6 +415,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
     private boolean foundInitialClasses;
+    private final File generatedFeaturesFile;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
@@ -493,6 +494,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.testArtifactPaths = testArtifactPaths;
         this.foundInitialClasses = false;
         this.webResourceDirs = webResourceDirs;
+        this.generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
     }
 
     /**
@@ -2848,7 +2850,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         javaSourceClasses.clear();
                     } else if (!classesFailingToCompile()){ // do not run generate features if there are classes failing to compile
                         incrementGenerateFeatures();
-                        File generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
                         if (!generatedFeaturesFile.exists()) {
                             // run tests if generated-features.xml does not exist as there are no new features to install
                             if (isMultiModuleProject()) {
@@ -4074,7 +4075,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // generate features whenever features have changed and an XML file is modified,
                 // excluding the generated-features.xml file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
-                        && !fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME))
+                        && !fileChanged.equals(generatedFeaturesFile))
                         && serverFeaturesModified) {
                     generateFeaturesSuccess = false;
                     generateFeaturesSuccess = optimizeGenerateFeatures();
@@ -4102,7 +4103,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         restartServer(false);
                     }
                 }
-                if (fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME) && generateFeatures) {
+                if (fileChanged.equals(generatedFeaturesFile) && generateFeatures) {
                     // if generateFeatures is true, run UTs and ITs as tests would have been skipped
                     // during recompileJava()
                     if (isMultiModuleProject()) {
@@ -4120,7 +4121,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // generate features whenever features have changed and an XML file is deleted,
                 // excluding the generated-features.xml file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
-                        && !fileChanged.getName().equals(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME))
+                        && !fileChanged.equals(generatedFeaturesFile))
                         && serverFeaturesModified()) {
                     optimizeGenerateFeatures();
                 }
@@ -4401,6 +4402,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
+        if (generateFeatures && generateFeaturesSuccess) {
+            // copy generated-features.xml file
+            copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
+        }
         installFeatures(fileChanged, tempConfig);
         cleanUpTempConfig();
     }
