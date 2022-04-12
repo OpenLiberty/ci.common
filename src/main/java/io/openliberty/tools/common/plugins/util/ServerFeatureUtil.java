@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -123,7 +124,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         if (serverXmlFile == null) {
             serverXmlFile = new File(serverDirectory, "server.xml");
         }
-        result = getServerXmlFeatures(result, serverXmlFile, bootstrapProperties, null);
+        result = getServerXmlFeatures(result, serverDirectory, serverXmlFile, bootstrapProperties, null);
         // add the overrides at the end since they should not be replaced by any previous content
         return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides", dropinsFilesToIgnore);
     }
@@ -259,7 +260,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         Collections.sort(Arrays.asList(configDropinsXmls), comparator);
 
         for (File xml : configDropinsXmls) {
-            Set<String> features = getServerXmlFeatures(result, xml, bootstrapProperties,null);
+            Set<String> features = getServerXmlFeatures(result, serverDirectory, xml, bootstrapProperties,null);
             if (features != null) {
                 result = features;
             }
@@ -273,8 +274,12 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      * 
      * @param origResult
      *            The features that have been parsed so far.
+     * @param serverDirectory 
+     *            The server directory containing the server.xml.
      * @param serverFile
      *            The server XML file.
+     * @param bootstrapProperties
+     *            The properties defined in bootstrap.properties.
      * @param parsedXmls
      *            The list of XML files that have been parsed so far.
      * @return The set of features to install, or empty set if the cumulatively
@@ -282,7 +287,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    public Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
+    public Set<String> getServerXmlFeatures(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
         Set<String> result = origResult;
         List<File> updatedParsedXmls = parsedXmls != null ? parsedXmls : new ArrayList<File>();
         File canonicalServerFile;
@@ -294,7 +299,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
             debug("Exception received: "+e.getMessage(), e);
             return result;
         }
-        info("Parsing the server file " + canonicalServerFile + " for features and includes.");
+        
+        info("Parsing the server file for features and includes: " + getRelativeServerFilePath(serverDirectory, serverFile));
         updatedParsedXmls.add(canonicalServerFile);
         if (!canonicalServerFile.exists()) {
             warn("The server file " + canonicalServerFile + " does not exist. Skipping its features.");
@@ -332,7 +338,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
                             }
                             result.addAll(parseFeatureManagerNode(child));
                         } else if ("include".equals(child.getNodeName())){
-                            result = parseIncludeNode(result, canonicalServerFile, bootstrapProperties, child, updatedParsedXmls);
+                            result = parseIncludeNode(result, serverDirectory, canonicalServerFile, bootstrapProperties, child, updatedParsedXmls);
                         }
                     }
                 }
@@ -388,6 +394,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      * 
      * @param origResult
      *            The features that have been parsed so far.
+     * @param serverDirectory
+     *            The server directory containing the server.xml.
      * @param serverFile
      *            The parent server XML file containing the include node.
      * @param node
@@ -399,7 +407,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    private Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Properties bootstrapProperties, Element node,
+    private Set<String> parseIncludeNode(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
         String includeFileName = evaluateExpression(bootstrapProperties, node.getAttribute("location"));
@@ -439,7 +447,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         }
         if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
-            Set<String> features = getServerXmlFeatures(null, includeFile, bootstrapProperties, updatedParsedXmls);
+            Set<String> features = getServerXmlFeatures(null, serverDirectory, includeFile, bootstrapProperties, updatedParsedXmls);
             if (features != null && !features.isEmpty()) {
                 info("Features were included for file "+ includeFileName);
             }
@@ -574,6 +582,20 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         returnValue = returnValue.replace("\\","/");
         debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
         return returnValue;
+    }
+
+    // return the server file path relative to the server directory
+    private String getRelativeServerFilePath(File serverDirectory, File serverFile) {
+        try {
+            File canonicalServerDirectory = serverDirectory.getCanonicalFile();
+            URI serverDirectoryUri = canonicalServerDirectory.toURI();
+            URI serverFileUri = serverFile.toURI();
+            return serverDirectory.getName() + File.separator + serverDirectoryUri.relativize(serverFileUri).getPath();
+        } catch (IOException e1) {
+            debug("Unable to determine the file path of " + serverFile + " relative to the server directory "
+                    + serverDirectory);
+           return serverFile.toString();
+        }
     }
 
 }
