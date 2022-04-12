@@ -412,6 +412,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /** Map of parent build files (parent build file, list of children build files) */
     protected Map<String, List<String>> parentBuildFiles;
     private boolean generateFeatures;
+    private Set<String> generatedFeaturesSet; // set of features in generated-features.xml file
+    private boolean generatedFeaturesModified;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
     private boolean foundInitialClasses;
@@ -495,6 +497,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.foundInitialClasses = false;
         this.webResourceDirs = webResourceDirs;
         this.generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+        this.generatedFeaturesModified = false;
+        if (this.generateFeatures) {
+            this.generatedFeaturesSet = getGeneratedFeatures();
+        } else {
+            this.generatedFeaturesSet = new HashSet<String>();
+        }
     }
 
     /**
@@ -2471,9 +2479,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean generatedFeatures = libertyGenerateFeatures(null, true);
         if (generatedFeatures) {
             javaSourceClasses.clear();
+            generatedFeaturesModified = generatedFeaturesModified();
         } // do not need to log an error if generatedFeatures is false because that would
           // have already been logged by libertyGenerateFeatures
-
         return generatedFeatures;
     }
 
@@ -2489,6 +2497,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             generatedFeatures = libertyGenerateFeatures(javaSourceClassPaths, false);
             if (generatedFeatures) {
                 javaSourceClasses.clear();
+                generatedFeaturesModified = generatedFeaturesModified();
             } // do not need to log an error if generatedFeatures is false because that would
               // have already been logged by libertyGenerateFeatures
         } catch (IOException e) {
@@ -4072,10 +4081,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                 boolean generateFeaturesSuccess = true; // default to true to cover cases where feature generation is disabled
                 boolean serverFeaturesModified = serverFeaturesModified();
+                boolean isGeneratedFeaturesFile = fileChanged.equals(generatedFeaturesFile);
                 // generate features whenever features have changed and an XML file is modified,
                 // excluding the generated-features.xml file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
-                        && !fileChanged.equals(generatedFeaturesFile))
+                        && !isGeneratedFeaturesFile)
                         && serverFeaturesModified) {
                     generateFeaturesSuccess = false;
                     generateFeaturesSuccess = optimizeGenerateFeatures();
@@ -4086,7 +4096,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                     installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
                 }
-                copyFile(fileChanged, configDirectory, serverDirectory, null);
+                if (isGeneratedFeaturesFile && !generatedFeaturesModified) {
+                    // features in the generated-features.xml file did not change, do not copy this file
+                    // to the server directory
+                    debug("The features in " + generatedFeaturesFile + " have not been modified.");
+                } else {
+                    copyFile(fileChanged, configDirectory, serverDirectory, null);
+                    generatedFeaturesModified = false;
+                }
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
@@ -4103,7 +4120,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         restartServer(false);
                     }
                 }
-                if (fileChanged.equals(generatedFeaturesFile) && generateFeatures) {
+                if (isGeneratedFeaturesFile && generateFeatures) {
                     // if generateFeatures is true, run UTs and ITs as tests would have been skipped
                     // during recompileJava()
                     if (isMultiModuleProject()) {
@@ -5436,9 +5453,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         // generateFeatures scenario: check if a generated feature has been manually added to other config files
         Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null, serverDirectory,
-                new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH), null, null);
+                generatedFeaturesFile, null, null);
         Set<String> generatedFiles = new HashSet<String>();
-        generatedFiles.add(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME);
+        generatedFiles.add(generatedFeaturesFile.getName());
         // if serverXmlFile is null, getServerFeatures will use the default server.xml
         // in the configDirectory
         Set<String> featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
@@ -5456,5 +5473,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             features.addAll(generatedFeatures);
         }
         return !features.equals(getExistingFeatures());
+    }
+
+    // returns true and updates the generatedFeaturesSet if the feature set in the
+    // generated-features.xml file has changed
+    private boolean generatedFeaturesModified() {
+        Set<String> updatedGeneratedFeatures = getGeneratedFeatures();
+        if (!updatedGeneratedFeatures.equals(generatedFeaturesSet)) {
+            generatedFeaturesSet = updatedGeneratedFeatures; // update generated features set list
+            return true;
+        }
+        return false;
+    }
+
+    // returns the features specified in the generated-features.xml file
+    private Set<String> getGeneratedFeatures() {
+        ServerFeatureUtil servUtil = getServerFeatureUtilObj();
+        Set<String> genFeatSet = new HashSet<String>();
+        servUtil.getServerXmlFeatures(genFeatSet, configDirectory,
+                generatedFeaturesFile, null, null);
+        return genFeatSet;
     }
 }
