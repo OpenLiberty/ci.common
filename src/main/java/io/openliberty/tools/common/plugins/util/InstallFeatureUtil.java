@@ -79,6 +79,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             ANY_CONFLICT = CONFLICT + "|" + MISSING_MULTIPLE_DEPENDENT + "|" + INCOMPATIBLE_SINGLETON + "|"
                     + EE_CONFLICT;
     public static final Pattern conflictPattern = Pattern.compile(ANY_CONFLICT);
+    public static final String CONFLICT_MESSAGE = "A feature conflict error occurred while installing features: ";
 
     private final File installDirectory;
 
@@ -605,7 +606,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 } else {
                     if (isFeatureConflict(exceptionMessage)) {
                         throw new PluginExecutionException(
-                                "A feature conflict error occurred while installing features: " + featuresToInstall
+                               CONFLICT_MESSAGE + featuresToInstall
                                         + ": " + exceptionMessage);
                     }
                     throw new PluginExecutionException(exceptionMessage);
