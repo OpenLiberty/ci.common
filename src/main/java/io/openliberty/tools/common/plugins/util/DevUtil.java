@@ -253,8 +253,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param configFile
      * @param serverDir
+     * @param generateFeatures
      */
-    public abstract void installFeatures(File configFile, File serverDir);
+    public abstract void installFeatures(File configFile, File serverDir, boolean generateFeatures);
 
     /**
      * Get the ServerFeatureUtil object
@@ -4406,7 +4407,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // copy generated-features.xml file
             copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
         }
-        installFeatures(fileChanged, tempConfig);
+        installFeatures(fileChanged, tempConfig, generateFeatures);
         cleanUpTempConfig();
     }
 

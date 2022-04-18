@@ -137,7 +137,7 @@ public class BaseDevUtilTest {
         }
 
         @Override
-        public void installFeatures(File configFile, File serverDir) {
+        public void installFeatures(File configFile, File serverDir, boolean generateFeatures) {
             // not needed for tests
         }
 
