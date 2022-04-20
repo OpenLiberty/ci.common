@@ -39,6 +39,7 @@ public abstract class BinaryScannerUtil {
     private static final String FEATURE_MODIFIED_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException";
     private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
     private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
+    private static final String FEATURE_NOT_AVAILABLE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureNotAvailableAtRequestedLevelException";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
@@ -51,6 +52,9 @@ public abstract class BinaryScannerUtil {
             "in the application’s API usage: %s. Review and update your application to ensure it is not using conflicting APIs " +
             "from different levels of MicroProfile, Java EE, or Jakarta EE.";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE4 = "[None available]"; // format should match JVM Set.toString()
+    public static final String BINARY_SCANNER_CONFLICT_MESSAGE5 = "A working set of features could not be generated due to conflicts " + 
+            "in the required features: %s and required levels of MicroProfile: %s, Java EE or Jakarta EE: %s. Review and update your application to ensure it " + 
+            "is using the correct levels of MicroProfile, Java EE, or Jakarta EE, or consider removing the following set of features: %s.";
 
     // Strings recognized by the binary scanner arguments for Java/Jakarta EE and MicroProfile
     public static final String BINARY_SCANNER_EEV6 = "ee6";
@@ -118,10 +122,14 @@ public abstract class BinaryScannerUtil {
      * @throws NoRecommendationException - indicates a problem and there are no recommended features
      * @throws RecommendationSetException - indicates a problem but the scanner was able to generate a set of
      *                                      features that should work to run the application
+     * @throws FeatureModifiedException - indicates a problem but the scanner was able to generate a set of features 
+     *                                      that should work if certain features are modified
+     * @throws FeatureUnavailableException - incidates a problem between required features and required MP/EE levels but 
+     *                                      the scanner was able to generate a set of features that should be removed
      */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String logLocation, String targetJavaEE, String targetMicroProfile, boolean optimize)
-            throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException {
+            throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException, FeatureUnavailableException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
             try {
@@ -154,6 +162,8 @@ public abstract class BinaryScannerUtil {
                 // the currentFeatureSet parameter.
                 // 3. RequiredFeatureModifiedException means the scanner can make a working list of features but
                 // only if certain inputs are changed.
+                // 4. FeatureNotAvailableAtRequestedLevelException means the features passed or binary files
+                // scanned require features that do not exist at the requested EE or MP levels.
                 Throwable scannerException = ite.getCause();
                 if (scannerException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                     // The list of features from the app is passed in but it contains conflicts
@@ -179,6 +189,14 @@ public abstract class BinaryScannerUtil {
                     Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
                     throw new FeatureModifiedException(modifications, 
                             (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList);
+                } else if (scannerException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
+                    // The list of features required by app or passed to binary scanner do not exist
+                    // at the required EE or MP level
+                    Set<String> conflicts = getFeatures(scannerException);
+                    Set<String> unavailableFeatures = getUnavailableEEFeatures(scannerException);
+                    unavailableFeatures.addAll(getUnavailableMPFeatures(scannerException));
+                    throw new FeatureUnavailableException(conflicts, unavailableFeatures, targetMicroProfile,
+                            targetJavaEE);
                 } else {
                     debug("Exception from binary scanner.", scannerException);
                     throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
@@ -321,20 +339,31 @@ public abstract class BinaryScannerUtil {
         return resultSet;
     }
 
-    @SuppressWarnings("unchecked")
     private Set<String> getFeatures(Throwable scannerResponse) {
+        return getFeatures(scannerResponse, "getFeatures");
+    }
+
+    private Set<String> getUnavailableMPFeatures(Throwable scannerResponse) {
+        return getFeatures(scannerResponse, "getUnavailableMPFeatures");
+    }
+    private Set<String> getUnavailableEEFeatures(Throwable scannerResponse) {
+        return getFeatures(scannerResponse, "getUnavailableEEFeatures");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> getFeatures(Throwable scannerResponse, String method) {
         try {
             ClassLoader cl = getScannerClassLoader();
             @SuppressWarnings("rawtypes")
             Class featureConflictException = cl.loadClass(scannerResponse.getClass().getName());
-            Method featureMethod = featureConflictException.getMethod("getFeatures");
+            Method featureMethod = featureConflictException.getMethod(method);
             if (featureMethod == null) {
-                debug("Error finding " + scannerResponse.getClass().getName() + " method getFeatures() using reflection");
+                debug("Error finding " + scannerResponse.getClass().getName() + " method " + method + " using reflection");
                 return null;
             }
             return (Set<String>) featureMethod.invoke(scannerResponse);
         } catch (ClassNotFoundException | MalformedURLException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException x) {
-            debug("An error occurred when trying to call the binary scanner jar getFeatures():"+x.getClass().getName(), x);
+            debug("An error occurred when trying to call the binary scanner jar " + method + ":"+x.getClass().getName(), x);
             Throwable cause = x.getCause();
             if (cause != null) {
                 debug("Caused by exception:"+cause.getClass().getName());
@@ -394,6 +423,33 @@ public abstract class BinaryScannerUtil {
         }
         public Set<String> getSuggestions() {
             return suggestions;
+        }
+    }
+
+    // A class to pass the list of unavailable features back to the caller.
+    public class FeatureUnavailableException extends Exception {
+        private static final long serialVersionUID = 1L;
+        Set<String> conflicts;
+        Set<String> unavailableFeatures;
+        String mpLevel;
+        String eeLevel;
+        FeatureUnavailableException(Set<String> conflictsSet, Set<String> unavailableFeaturesSet, String mpLevel, String eeLevel) {
+            conflicts = conflictsSet;
+            unavailableFeatures = unavailableFeaturesSet;
+            this.mpLevel = mpLevel;
+            this.eeLevel = eeLevel;
+        }
+        public Set<String> getConflicts() {
+            return conflicts;
+        }
+        public Set<String> getUnavailableFeatures() {
+            return unavailableFeatures;
+        }
+        public String getEELevel() {
+            return eeLevel;
+        }
+        public String getMPLevel() {
+            return mpLevel;
         }
     }
 }
