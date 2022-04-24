@@ -2618,6 +2618,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     File dockerfileUsed;
     File looseAppFile;
     WatchService watcher;
+    boolean compileComplete;
 
     // used for multi module projects
     boolean triggerUpstreamJavaSourceRecompile;
@@ -2649,6 +2650,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.jvmOptionsFile = jvmOptionsFile;
         this.dockerfileUsed = null;
         this.initialCompile = true;
+        this.compileComplete = false;
         this.disableDependencyCompile = false;
         this.omitWatchingFiles = new ArrayList<File>();
 
@@ -2686,6 +2688,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
             boolean sourceOutputDirRegistered = false;
+            boolean registerClassDirAttempted = false;
+            int loopCount = 0;
 
             // register parent poms
             if (!parentBuildFiles.isEmpty()) {
@@ -2705,6 +2709,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
+                        debug("OLD Register source directory for module: " + p.getProjectName());
                         if (p.getSourceDirectory().exists()) {
                             omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath()));
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
@@ -2720,6 +2725,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
 
                     // watch src/test/java dir
+                    debug("OLD Register test source directory for module: " + p.getProjectName());
                     if (p.getTestSourceDirectory().exists()) {
                         registerAll(p.getTestSourceDirectory().getCanonicalFile().toPath(), executor);
                         p.testSourceDirRegistered = true;
@@ -2729,6 +2735,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     HashMap<File, Boolean> upstreamResourceMap = new HashMap<File, Boolean>();
                     for (File upstreamResourceDir : p.getResourceDirs()) {
                         upstreamResourceMap.put(upstreamResourceDir, false);
+                        debug("OLD Register resource directory for module: " + p.getProjectName());
                         if (upstreamResourceDir.exists()) {
                             registerAll(upstreamResourceDir.getCanonicalFile().toPath(), executor);
                             upstreamResourceMap.put(upstreamResourceDir, true);
@@ -2738,12 +2745,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
                     // watch pom.xml
                     if (p.getBuildFile().exists()) {
+                        debug("OLD Register build file for module: " + p.getProjectName());
                         registerSingleFile(p.getBuildFile(), executor);
                     }
                 }
             }
 
             if (shouldIncludeSources(packagingType)) {
+                debug("OLD Register source directory for main module");
                 if (this.sourceDirectory.exists()) {
                     omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, this.sourceDirectory.getCanonicalPath()));
                     registerAll(srcPath, executor);
@@ -2759,16 +2768,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             }
     
+            debug("OLD Register test source directory for main module");
             if (this.testSourceDirectory.exists()) {
                 registerAll(testSrcPath, executor);
                 testSourceDirRegistered = true;
             }
 
+            debug("OLD Register config directory for main module");
             if (this.configDirectory.exists()) {
                 registerAll(configPath, executor);
                 configDirRegistered = true;
             }
 
+            debug("OLD Register serverXML for main module");
             if (serverXmlFile != null && serverXmlFile.exists() && serverXmlFileParent.exists()) {
                 Path serverXmlFilePath = serverXmlFileParent.getCanonicalFile().toPath();
                 registerAll(serverXmlFilePath, executor);
@@ -2792,6 +2804,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 registerSingleFile(dockerfileUsed, executor);
             }
 
+            debug("OLD Register resource directories for main module");
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
             for (File resourceDir : resourceDirs) {
                 resourceMap.put(resourceDir, false);
@@ -2801,6 +2814,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             
+            debug("OLD Register web resource directories for main module");
             HashMap<Path, Boolean> webResourceMap = new HashMap<Path, Boolean>();
             for (Path webResourceDir : webResourceDirs) {
                 webResourceMap.put(webResourceDir, false);
@@ -2850,42 +2864,60 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             testArtifactPaths, applicationId, change);
                 } else {
                     // process java compilation for main project
+                    debug("Initiate processJavaCompilation");
                     processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
                             testArtifactPaths, null, false);
                 }
 
-                if (initialCompile) {
-                    initialCompile = false;
-                    // register class file directories
-                    if (!recompileDependencies) {
+                debug("--- BEFORE REGISTRATION ---");
+                debug("recompileDependencies: " + recompileDependencies);
+                debug("registerClassDirAttempted: " + registerClassDirAttempted);
+                debug("initialCompile: " + initialCompile);
+                if (!recompileDependencies && !registerClassDirAttempted && !initialCompile) {
+                    //loopCount++;
+                    //if (loopCount == 20) {
+                        debug("Attempt to register class file directories");
+                        // set to true regardless of success
+                        // this may need to be updated, but currently do not want to come into this section again
+                        registerClassDirAttempted = true;
+                        // register class file directories
                         if (isMultiModuleProject()) {
                             for (ProjectModule p : upstreamProjects) {
                                 if (shouldIncludeSources(p.getPackagingType())) {
                                     // register source classes directory for feature generation
                                     if (p.getOutputDirectory().exists()) {
+                                        debug("NEW Register class directory for module: " + p.getProjectName());
                                         registerAll(p.getOutputDirectory().getCanonicalFile().toPath(), executor);
                                         p.sourceOutputDirRegistered = true;
                                     }
                                 }
                             }
-                        } else {
-                            if (shouldIncludeSources(packagingType)) {
-                                // register source classes directory for feature generation
-                                if (this.outputDirectory.exists()) {
-                                    registerAll(srcOutputPath, executor);
-                                    sourceOutputDirRegistered = true;
-                                }
-                
+                        }
+                        if (shouldIncludeSources(packagingType)) {
+                            // register source classes directory for feature generation
+                            if (this.outputDirectory.exists()) { //check if registered already in this if to account for below?
+                                debug("NEW Register class directory for main module");
+                                registerAll(srcOutputPath, executor);
+                                sourceOutputDirRegistered = true;
                             }
                         }
-                    }
+                    //}
                 }
 
                 // Generate features from source file changes
-                if (generateFeatures && !classesFailingToCompile()) {
+                // compilation might not be processed at this point
+                debug("--- BEFORE GENERATE FEATURES ---");
+                if (generateFeatures && !classesFailingToCompile()) { //do not run generate features if there are classes failing to compile
                     boolean attemptedFeatureGeneration = false;
                     // no class file tracking
-                    if (recompileDependencies && modifiedSrcBuildFile != null) {
+                    debug("Inside generate features process...");
+                    debug("compileComplete: " + compileComplete);
+                    debug("modifiedSrcBuildFile: " + modifiedSrcBuildFile);
+                    debug("javaSourceClasses size: " + javaSourceClasses.size());
+                    debug("javaSourceClasses: " + javaSourceClasses.toString());
+                    if (recompileDependencies && compileComplete && modifiedSrcBuildFile != null) {
+                         //this doesn't work because it can't just stay true if no buildFile found
+                        debug("Inside recompileDependencies section...");
                         // main module modified
                         if (modifiedSrcBuildFile.equals(buildFile)) {
                             debug("Main module modified!");
@@ -2914,6 +2946,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             runTestThread(false, executor, -1, false, false, buildFile);
                         }
                     }
+                    compileComplete = false;
                 }
 
                 //TODOG - remove when done
@@ -2956,8 +2989,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
 
                     //TODOGR
+                    // should this be removed or combined with the added code???
+                    // don't want a situation where initialCompile is changed after above...
+                    //... and this one runs first - then you hit a double register
                     // check if javaSourceOutputDirectory has been added
-                    if (!recompileDependencies && !sourceOutputDirRegistered && this.outputDirectory.exists() && this.outputDirectory.list().length > 0) {
+                    // check for classfilesRegistered here?? - that attempt should be made first...
+                    if (!recompileDependencies && registerClassDirAttempted && !sourceOutputDirRegistered && this.outputDirectory.exists() && this.outputDirectory.list().length > 0) {
+                        debug("NEW OTHER Register new class directory for main module");
                         registerAll(this.outputDirectory.getCanonicalFile().toPath(), executor);
                         debug("Registering Java source output directory: " + this.outputDirectory);
                         sourceOutputDirRegistered = true;
@@ -3466,7 +3504,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             successfulCompilation = false;
                         }
                     }
-                    debug("Recompiling Java source files: " + project.recompileJavaSources);
+                    debug("Recompiling Java source files 1: " + project.recompileJavaSources);
 
                     // always skip running tests through recompileJavaSource on upstream projects
                     // since tests need to run on all dependent projects, runTestThread is called
@@ -3687,11 +3725,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
             Set<String> compileArtifactPaths, Set<String> testArtifactPaths, String projectName, boolean upstreamBuilt) throws IOException, PluginExecutionException {
+        debug("processJavaCompilation: START");
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
         boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
         if (processSources && pastBuildFileWaitPeriod) {
+            debug("processJavaCompilation: Inside first IF");
             // delete before recompiling, so if a file is in both lists, its class will be
             // deleted then recompiled
             if (!deleteJavaSources.isEmpty()) {
@@ -3701,12 +3741,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+                debug("processJavaCompilation: Inside java source recompile IF");
                 // try to recompile java files that previously did not compile successfully
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
                 boolean skipRunningTests = false;
                 if (initialCompile || disableDependencyCompile) {
+                    debug("processJavaCompilation: Inside disable dependency IF");
                     // skip running tests when disableDependencyCompile is set as tests will be run
                     // through upstream project logic
                     skipRunningTests = true;
@@ -3717,11 +3759,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         skipRunningTests = true;
                     }
                 }
-                debug("Recompiling Java source files: " + recompileJavaSources);
+                debug("Recompiling Java source files 2: " + recompileJavaSources);
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
                         testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
+                    debug("Setting compileComplete to TRUE");
+                    compileComplete = true;
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
@@ -3791,6 +3835,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 disableDependencyCompile = false;
             }
             if (initialCompile) {
+                debug("CHANGING initialCompile TO FALSE");
+                initialCompile = false;
                 if (hotTests) {
                     // if hot testing, run tests on startup
                     if (isMultiModuleProject()) {
@@ -3956,6 +4002,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         if (recompileDependencies) {
                             // set to know what module to generate features for
                             modifiedSrcBuildFile = project.getBuildFile();
+                            debug("Multi-module: Setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
                             triggerUpstreamModuleCompile(project, false);
                         } else {
                             project.recompileJavaSources.add(fileChanged);
@@ -4065,6 +4112,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (recompileDependencies) {
                     // set to know what module to generate features for
                     modifiedSrcBuildFile = buildFile;
+                    debug("Single module: Setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
                     triggerMainModuleCompile(false);
                 } else {
                     recompileJavaSources.add(fileChanged);
@@ -5452,7 +5500,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (sourceDir.exists()) {
                 Collection<File> allJavaSources = FileUtils.listFiles(sourceDir.getCanonicalFile(),
                         new String[] { "java" }, true);
-                debug("Recompiling Java source files: " + allJavaSources);
+                debug("Recompiling Java source files 3: " + allJavaSources);
                 if (recompileJavaSource(allJavaSources, compileArtifactPaths, executor, outputDir, testOutputDir,
                         projectName, buildFile, compilerOptions, skipUTs, true)) {
                     // successful compilation so we can clear failedCompilation list
