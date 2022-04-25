@@ -2308,7 +2308,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             info(formatAttentionTitle("Liberty is running in dev mode."));
 
-            printFeatureGenerationStatus();
+            // TODO enable when feature generation is re-enabled
+            // printFeatureGenerationStatus();
         }
 
         if (!inputUnavailable) {
@@ -2413,8 +2414,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printHelpMessages() {
-        printFeatureGenerationStatus();
-        printFeatureGenerationHotkeys();
+        // TODO enable when feature generation is re-enabled
+        // printFeatureGenerationStatus();
+        // printFeatureGenerationHotkeys();
         printTestsMessage(true);
         if (container) {
             info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
@@ -2564,15 +2566,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         info(formatAttentionBarrier());
                         printHelpMessages();
                         info(formatAttentionBarrier());
-                    } else if (g.isPressed(line)) {
-                        toggleFeatureGeneration();
-                    } else if (o.isPressed(line)) {
-                        if (generateFeatures) {
-                            optimizeGenerateFeatures();
-                        } else {
-                            warn("Cannot optimize features because automatic generation of features is off.");
-                            warn("To toggle the automatic generation of features, type 'g' and press Enter.");
-                        }
+                    // TODO enable when feature generation is re-enabled
+                    // } else if (g.isPressed(line)) {
+                    //     toggleFeatureGeneration();
+                    // } else if (o.isPressed(line)) {
+                    //     if (generateFeatures) {
+                    //         optimizeGenerateFeatures();
+                    //     } else {
+                    //         warn("Cannot optimize features because automatic generation of features is off.");
+                    //         warn("To toggle the automatic generation of features, type 'g' and press Enter.");
+                    //     }
                     } else {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
