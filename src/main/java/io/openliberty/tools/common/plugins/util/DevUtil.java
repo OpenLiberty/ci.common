@@ -5451,27 +5451,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     // Returns true if features have been modified in the configuration directory
     private boolean serverFeaturesModified() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
+        Set<String> generatedFeatureSet = null;
+        Set<String> featuresExcludingGenerated = null;
 
-        // generateFeatures scenario: check if a generated feature has been manually added to other config files
-        Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null, serverDirectory,
-                generatedFeaturesFile, null, null);
-        Set<String> generatedFiles = new HashSet<String>();
-        generatedFiles.add(generatedFeaturesFile.getName());
-        // if serverXmlFile is null, getServerFeatures will use the default server.xml
-        // in the configDirectory
-        Set<String> featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
-                new HashMap<String, File>(), generatedFiles);
-        if (featuresExcludingGenerated != null && generatedFeatures != null
-                && !Collections.disjoint(featuresExcludingGenerated, generatedFeatures)) {
-            // indicates a generated feature has been manually added to other config files
-            return true;
+        if (generateFeatures) {
+            // generateFeatures scenario: check if a generated feature has been manually added to other config files
+            generatedFeatureSet = servUtil.getServerXmlFeatures(null, serverDirectory,
+            generatedFeaturesFile, null, null);
+            Set<String> generatedFiles = new HashSet<String>();
+            generatedFiles.add(generatedFeaturesFile.getName());
+            // if serverXmlFile is null, getServerFeatures will use the default server.xml
+            // in the configDirectory
+            featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+                    new HashMap<String, File>(), generatedFiles);
+            if (featuresExcludingGenerated != null && generatedFeatureSet != null
+                    && !Collections.disjoint(featuresExcludingGenerated, generatedFeatureSet)) {
+                // indicates a generated feature has been manually added to other config files
+                return true;
+            }
+        } else {
+            featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+                    new HashMap<String, File>(), null);
         }
-
+        
         // compare current feature list to existing feature list
         Set<String> features = featuresExcludingGenerated != null ? new HashSet<String>(featuresExcludingGenerated)
                 : new HashSet<String>();
-        if (generatedFeatures != null) {
-            features.addAll(generatedFeatures);
+        if (generatedFeatureSet != null) {
+            features.addAll(generatedFeatureSet);
         }
         return !features.equals(getExistingFeatures());
     }
