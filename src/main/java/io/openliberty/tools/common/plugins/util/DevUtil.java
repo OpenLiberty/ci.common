@@ -4001,9 +4001,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             debug("Multi-module: Setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
                             ProjectModule modifiedModule = getProjectModule(modifiedSrcBuildFile);
                             File outputDir = modifiedModule.getOutputDirectory();
-                            if (!javaSourceClasses.contains(outputDir)) {
-                                javaSourceClasses.add(outputDir);
-                            }
+                            javaSourceClasses.add(outputDir);
                             lastChangeCompiled = false;
                             triggerUpstreamModuleCompile(project, false);
                         } else {
@@ -4115,9 +4113,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // set to know what module to generate features for
                     modifiedSrcBuildFile = buildFile;
                     debug("Single module: Setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
-                    if (!javaSourceClasses.contains(outputDirectory)) {
-                        javaSourceClasses.add(outputDirectory);
-                    }
+                    javaSourceClasses.add(outputDirectory);
                     lastChangeCompiled = false;
                     triggerMainModuleCompile(false);
                 } else {
