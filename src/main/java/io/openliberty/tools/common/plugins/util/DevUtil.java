@@ -2910,7 +2910,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 debug("--- BEFORE GENERATE FEATURES ---");
                 if (generateFeatures && !classesFailingToCompile()) { //do not run generate features if there are classes failing to compile
                     boolean tryFeatureGeneration = false;
-                    // no class file tracking
+                    
                     debug("Inside generate features process...");
                     //debug("mainModuleCompiled: " + mainModuleCompiled);
                     //debug("upstreamModuleCompiled: " + upstreamModuleCompiled);
@@ -2918,16 +2918,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     debug("modifiedSrcBuildFile: " + modifiedSrcBuildFile);
                     debug("javaSourceClasses size: " + javaSourceClasses.size());
                     debug("javaSourceClasses: " + javaSourceClasses.toString());
-                    if (recompileDependencies && lastChangeCompiled) {
+                    if (recompileDependencies && lastChangeCompiled) { // no class file tracking
                         // redo this method
                         debug("Inside recompileDependencies section...");
                         lastChangeCompiled = false;
                         modifiedSrcBuildFile = null;
                         tryFeatureGeneration = true;
                         incrementGenerateFeatures();
-                    }
-                    // class file tracking
-                    else if (!recompileDependencies && !javaSourceClasses.isEmpty()) {
+                    } else if (!recompileDependencies && !javaSourceClasses.isEmpty()) { // class file tracking
                         debug("Detected a change in the following classes: " + javaSourceClasses);
                         tryFeatureGeneration = true;
                         incrementGenerateFeatures();
@@ -3509,7 +3507,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
                         change = true;
-                        // TODOG
                         if (modifiedSrcBuildFile != null && 
                                 project.getBuildFile().equals(modifiedSrcBuildFile)) {
                             lastChangeCompiled = true;
@@ -3763,7 +3760,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
-                    //TODOG - maybe need to change to mainModuleComplete
                     if (modifiedSrcBuildFile != null && modifiedSrcBuildFile.equals(buildFile)) {
                         lastChangeCompiled = true;
                     }
@@ -4001,11 +3997,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 + ". Adding to list for processing.");
                         lastJavaSourceChange = System.currentTimeMillis();
                         if (recompileDependencies) {
-                            // set to know what module to generate features for
                             modifiedSrcBuildFile = project.getBuildFile();
                             debug("Multi-module: Setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
                             ProjectModule modifiedModule = getProjectModule(modifiedSrcBuildFile);
-                            javaSourceClasses.add(modifiedModule.getOutputDirectory());
+                            File outputDir = modifiedModule.getOutputDirectory();
+                            if (!javaSourceClasses.contains(outputDir)) {
+                                javaSourceClasses.add(outputDir);
+                            }
                             lastChangeCompiled = false;
                             triggerUpstreamModuleCompile(project, false);
                         } else {
@@ -4117,7 +4115,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // set to know what module to generate features for
                     modifiedSrcBuildFile = buildFile;
                     debug("Single module: Setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
-                    javaSourceClasses.add(outputDirectory);
+                    if (!javaSourceClasses.contains(outputDirectory)) {
+                        javaSourceClasses.add(outputDirectory);
+                    }
                     lastChangeCompiled = false;
                     triggerMainModuleCompile(false);
                 } else {
