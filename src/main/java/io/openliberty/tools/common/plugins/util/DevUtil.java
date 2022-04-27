@@ -2838,7 +2838,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             testArtifactPaths, applicationId, change);
                 } else {
                     // process java compilation for main project
-                    debug("Initiate processJavaCompilation");
                     processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths,
                             testArtifactPaths, null, false);
                 }
@@ -2872,8 +2871,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // Generate features from source file changes
                 if (generateFeatures && !classesFailingToCompile()) { //do not run generate features if there are classes failing to compile
                     boolean tryFeatureGeneration = false;
-                    if (recompileDependencies && lastChangeCompiled) { // no class file tracking
-                        debug("Last java source change is compiled");
+                    if (recompileDependencies && lastChangeCompiled && !javaSourceClasses.isEmpty()) { // no class file tracking
+                        debug("Detected a change in the following class directories: " + javaSourceClasses);
                         lastChangeCompiled = false;
                         modifiedSrcBuildFile = null;
                         tryFeatureGeneration = true;
@@ -3420,7 +3419,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             successfulCompilation = false;
                         }
                     }
-                    debug("Recompiling Java source files 1: " + project.recompileJavaSources);
+                    debug("Recompiling Java source files: " + project.recompileJavaSources);
 
                     // always skip running tests through recompileJavaSource on upstream projects
                     // since tests need to run on all dependent projects, runTestThread is called
@@ -3646,13 +3645,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
             Set<String> compileArtifactPaths, Set<String> testArtifactPaths, String projectName, boolean upstreamBuilt) throws IOException, PluginExecutionException {
-        debug("processJavaCompilation: START");
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
         boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
         if (processSources && pastBuildFileWaitPeriod) {
-            debug("processJavaCompilation: Inside first IF");
             // delete before recompiling, so if a file is in both lists, its class will be
             // deleted then recompiled
             if (!deleteJavaSources.isEmpty()) {
@@ -3662,14 +3659,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
-                debug("processJavaCompilation: Inside java source recompile IF");
                 // try to recompile java files that previously did not compile successfully
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
                 boolean skipRunningTests = false;
                 if (initialCompile || disableDependencyCompile) {
-                    debug("processJavaCompilation: Inside disable dependency IF");
                     // skip running tests when disableDependencyCompile is set as tests will be run
                     // through upstream project logic
                     skipRunningTests = true;
@@ -3680,7 +3675,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         skipRunningTests = true;
                     }
                 }
-                debug("Recompiling Java source files 2: " + recompileJavaSources);
+                debug("Recompiling Java source files: " + recompileJavaSources);
                 if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
                         testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
@@ -3758,7 +3753,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 disableDependencyCompile = false;
             }
             if (initialCompile) {
-                debug("CHANGING initialCompile TO FALSE");
+                debug("Setting initialCompile to false");
                 initialCompile = false;
                 if (hotTests) {
                     // if hot testing, run tests on startup
@@ -3927,7 +3922,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             debug("Multi-module - setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
                             ProjectModule modifiedModule = getProjectModule(modifiedSrcBuildFile);
                             File outputDir = modifiedModule.getOutputDirectory();
-                            javaSourceClasses.add(outputDir);
+                            if (outputDir != null) {
+                                javaSourceClasses.add(outputDir);
+                            }
                             lastChangeCompiled = false;
                             triggerUpstreamModuleCompile(project, false);
                         } else {
@@ -4038,7 +4035,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // set to know what module to generate features for
                     modifiedSrcBuildFile = buildFile;
                     debug("Single module - setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
-                    javaSourceClasses.add(outputDirectory);
+                    if (outputDirectory != null) {
+                        javaSourceClasses.add(outputDirectory);
+                    }
                     lastChangeCompiled = false;
                     triggerMainModuleCompile(false);
                 } else {
@@ -5427,7 +5426,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (sourceDir.exists()) {
                 Collection<File> allJavaSources = FileUtils.listFiles(sourceDir.getCanonicalFile(),
                         new String[] { "java" }, true);
-                debug("Recompiling Java source files 3: " + allJavaSources);
+                debug("Recompiling Java source files: " + allJavaSources);
                 if (recompileJavaSource(allJavaSources, compileArtifactPaths, executor, outputDir, testOutputDir,
                         projectName, buildFile, compilerOptions, skipUTs, true)) {
                     // successful compilation so we can clear failedCompilation list
