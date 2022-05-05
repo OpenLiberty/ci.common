@@ -2843,7 +2843,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // Assumption is that initialCompile will only be set to false after ALL modules are complete
                 // Will need to update logic once multiple attempts are enabled for upstream projects
                 if (!recompileDependencies && !initialCompile && !sourceOutputDirRegistered) {
-                    debug("Attempt to register class file directories for feature generation");
                     // Allow more than one register attempt for adding a new output directory once adding a src/main/java dir
                     // to an upstream project is supported - https://github.com/OpenLiberty/ci.maven/issues/1202
                     if (isMultiModuleProject() && !mmOutputDirRegAttempted) {
