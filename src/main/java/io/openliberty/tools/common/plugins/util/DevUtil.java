@@ -3659,16 +3659,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
         if (processSources && pastBuildFileWaitPeriod) {
             // Count the messages before the compile.
-            int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
+            int numApplicationUpdatedMessages = 0;
             // delete before recompiling, so if a file is in both lists, its class will be
             // deleted then recompiled
             if (!deleteJavaSources.isEmpty()) {
                 debug("Deleting Java source files: " + deleteJavaSources);
+                numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 for (File file : deleteJavaSources) {
                     deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                 }
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+                numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 // try to recompile java files that previously did not compile successfully
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
