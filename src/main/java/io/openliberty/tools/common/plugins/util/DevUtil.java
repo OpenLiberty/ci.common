@@ -99,6 +99,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
     private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I:";
     private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I:";
+    private static final String STOPPED_APP_MESSAGE_REGEXP = "CWWKZ0009I:";
     private static final String PORT_IN_USE_MESSAGE_PREFIX = "CWWKO0221E:";
     private static final String WEB_APP_AVAILABLE_MESSAGE_PREFIX = "CWWKT0016I:";
     private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
@@ -537,8 +538,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             File logFile = getMessagesLogFile(serverTask);
 
-            String regexp = UPDATED_APP_MESSAGE_REGEXP;
-
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
@@ -601,6 +600,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             if (!forceSkipITs) {
                 if (!detectedAppStarted.get()) {
+                    // very first time app is started wait for START_APP or UPDATED_APP message
                     if (appStartupTimeout < 0) {
                         warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
                         appStartupTimeout = 30;
@@ -621,11 +621,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 } else if (waitForApplicationUpdate) {
                     // wait until application has been updated
-                    if (appUpdateTimeout < 0) {
-                        appUpdateTimeout = 5;
+                    int timesStopped = serverTask.countStringOccurrencesInFile(STOPPED_APP_MESSAGE_REGEXP, logFile);
+                    int timesUpdated = serverTask.countStringOccurrencesInFile(UPDATED_APP_MESSAGE_REGEXP, logFile);
+                    debug("timesStopped=" + timesStopped + " timesUpdated=" + timesUpdated);
+                    if (timesStopped > timesUpdated) {
+                        // timesStopped == timesUpdated indicates the app is already updated and no wait for update required
+                        if (appUpdateTimeout < 0) {
+                            appUpdateTimeout = 5;
+                        }
+                        long timeout = appUpdateTimeout * 1000;
+                        serverTask.waitForUpdatedStringInLog(UPDATED_APP_MESSAGE_REGEXP, timeout, logFile, messageOccurrences);
                     }
-                    long timeout = appUpdateTimeout * 1000;
-                    serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
                 }
 
                 if (gradle) {
@@ -2878,14 +2884,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // reset lastChangeCompiled and modifiedSrcBuildFile
                         lastChangeCompiled = false; // only needed when recompileDependencies is true
                         modifiedSrcBuildFile = null; // only needed when recompileDependencies is true
+                        long generatedTime = generatedFeaturesFile.lastModified();
+                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         incrementGenerateFeatures();
-                        // run tests if generated-features.xml does not exist as there are no new features to install 
-                        // (typically tests run after generate features & install when hotTests=true)
                         if (!generatedFeaturesFile.exists()) {
+                            // run tests if generated-features.xml does not exist as there are no new features to install
+                            // (typically tests run after generate features & install when hotTests=true)
                             if (isMultiModuleProject()) {
                                 runTestThread(false, executor, -1, false, getAllBuildFiles());
                             } else {
                                 runTestThread(false, executor, -1, false, false, buildFile);
+                            }
+                        } else if (generatedFeaturesFile.lastModified() == generatedTime) {
+                            // The generated-features.xml file was not modified by adding or removing features as a
+                            // result of the compilation so call tests now. If it had been changed tests would be called
+                            // after processing the config file change.
+                            if (isMultiModuleProject()) {
+                                runTestThread(false, executor, numApplicationUpdatedMessages, false, getAllBuildFiles());
+                            } else {
+                                runTestThread(false, executor, numApplicationUpdatedMessages, false, false, buildFile);
                             }
                         }
                     }
@@ -2895,11 +2912,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // check if javaSourceDirectory has been added
                     if (!sourceDirRegistered && this.sourceDirectory.exists()
                             && this.sourceDirectory.listFiles().length > 0) {
+                        // Count the messages before the compile.
+                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         compile(this.sourceDirectory);
                         registerAll(srcPath, executor);
                         debug("Registering Java source directory: " + this.sourceDirectory);
                         // run tests after waiting for app update since app changed
-                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
                         sourceDirRegistered = true;
                     } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
@@ -3473,6 +3491,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 if (compileDownstreamSrc) { // compile downstream modules' source and test classes
+                    // Count the messages before the compile.
+                    int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                     for (File dependentModule : project.getDependentModules()) {
                         if (!recompileDependencies) {
                             // recompileDependencies = false, only compile failing classes from dependent
@@ -3490,7 +3510,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (successfulCompilation && !generateFeatures) {
                         // do not run tests if generateFeatures = true, tests will run after generated-features.xml is updated
                         // run tests on current module and dependent modules
-                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                     }
                 } else if (compileDownstreamTest) { // compile downstream modules' test classes
@@ -3639,6 +3658,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
         boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
         if (processSources && pastBuildFileWaitPeriod) {
+            // Count the messages before the compile.
+            int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
             // delete before recompiling, so if a file is in both lists, its class will be
             // deleted then recompiled
             if (!deleteJavaSources.isEmpty()) {
@@ -3723,7 +3744,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // recompileJavaSource won't run (which normally handles tests)
             if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
                 // run tests after waiting for app update since app changed
-                int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
             } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
                 // run all tests without waiting for app update since only tests changed
@@ -4840,7 +4860,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
-            
+
             if (useBuildRecompile) {
                 compileResult = compile(tests ? testSourceDirectory : sourceDirectory);
             } else {
