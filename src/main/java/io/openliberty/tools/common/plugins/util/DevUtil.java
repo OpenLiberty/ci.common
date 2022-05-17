@@ -623,7 +623,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // wait until application has been updated
                     int timesStopped = serverTask.countStringOccurrencesInFile(STOPPED_APP_MESSAGE_REGEXP, logFile);
                     int timesUpdated = serverTask.countStringOccurrencesInFile(UPDATED_APP_MESSAGE_REGEXP, logFile);
-                    debug("timesStopped=" + timesStopped + " timesUpdateded=" + timesUpdated);
+                    debug("timesStopped=" + timesStopped + " timesUpdated=" + timesUpdated);
                     if (timesStopped > timesUpdated) {
                         // timesStopped == timesUpdated indicates the app is already updated and no wait for update required
                         if (appUpdateTimeout < 0) {
