@@ -273,6 +273,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract Set<String> getExistingFeatures();
 
     /**
+     * Update existing features set
+     */
+    public abstract void updateExistingFeatures();
+
+    /**
      * Compile the specified directory
      * 
      * @param dir
@@ -4145,6 +4150,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
                     generatedFeaturesModified = false;
                 }
+                if (serverFeaturesModified) {
+                    updateExistingFeatures();
+                }
+
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -4197,6 +4206,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // copy generated features file to server dir
                     copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
                     generatedFeaturesModified = false;
+                }
+                if (serverFeaturesModified) {
+                    updateExistingFeatures();
                 }
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
