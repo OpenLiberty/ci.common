@@ -4177,7 +4177,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     debug("The features in " + generatedFeaturesFile + " have not been modified.");
                 } else {
                     copyFile(fileChanged, configDirectory, serverDirectory, null);
-                    if (generateFeaturesSuccess && generatedFeaturesModified) {
+                    // if the generated features file changed, copy it over to target along with the changed config file so the server picks up the changes together
+                    if (generateFeaturesSuccess && generatedFeaturesModified) { 
                         // copy generated-features.xml file to server dir
                         copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
                         generatedFeaturesModified = false;
