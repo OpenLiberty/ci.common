@@ -4121,7 +4121,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
                 }
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-
+                if (generateFeaturesSuccess && generatedFeaturesModified) {
+                    // copy generated-features.xml file to server dir
+                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                    generatedFeaturesModified = false;
+                }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -4172,7 +4176,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     debug("The features in " + generatedFeaturesFile + " have not been modified.");
                 } else {
                     copyFile(fileChanged, configDirectory, serverDirectory, null);
-                    generatedFeaturesModified = false;
+                    if (generateFeaturesSuccess && generatedFeaturesModified) {
+                        // copy generated-features.xml file to server dir
+                        copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                        generatedFeaturesModified = false;
+                    }
                 }
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
