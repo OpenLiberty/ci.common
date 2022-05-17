@@ -4121,6 +4121,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
                 }
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
+                // if the generated features file changed, copy it over to target along with the changed server.xml file so the server picks up the changes together
                 if (generateFeaturesSuccess && generatedFeaturesModified) {
                     // copy generated-features.xml file to server dir
                     copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
