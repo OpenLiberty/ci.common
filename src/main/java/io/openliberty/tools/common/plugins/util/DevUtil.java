@@ -2486,6 +2486,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean generatedFeatures = libertyGenerateFeatures(null, true);
         if (generatedFeatures) {
             modifiedClasses.clear();
+            failedToGenerateClasses.clear();
             generatedFeaturesModified = generatedFeaturesModified();
         } // do not need to log an error if generatedFeatures is false because that would
           // have already been logged by libertyGenerateFeatures
@@ -2504,9 +2505,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             generatedFeatures = libertyGenerateFeatures(classPaths, false);
             if (generatedFeatures) {
                 modifiedClasses.clear();
+                failedToGenerateClasses.clear();
                 generatedFeaturesModified = generatedFeaturesModified();
-            } // do not need to log an error if generatedFeatures is false because that would
-              // have already been logged by libertyGenerateFeatures
+            } else {
+                // do not need to log an error if generatedFeatures is false because that would
+                // have already been logged by libertyGenerateFeatures
+                failedToGenerateClasses.addAll(modifiedClasses);
+                modifiedClasses.clear();
+            }
         } catch (IOException e) {
             error("An error occurred while trying to generate features: " + e.getMessage(), e);
         }
@@ -2605,6 +2611,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     Collection<File> failedCompilationJavaSources;
     Collection<File> failedCompilationJavaTests;
     Collection<File> modifiedClasses; // can contain class files or output class dirs
+    Collection<File> failedToGenerateClasses; // classes that we failed to generate features for
     Collection<File> omitWatchingFiles;
     long lastJavaSourceChange;
     long lastJavaTestChange;
@@ -2880,6 +2887,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // recompileDependencies = no class file tracking, so we wait for compilation to be complete
                     // !recompileDepenencies = class file tracking, so waiting on class file changes
                     if ((recompileDependencies && lastChangeCompiled) || !recompileDependencies) {
+                        if (!failedToGenerateClasses.isEmpty()) {
+                            modifiedClasses.addAll(failedToGenerateClasses);
+                        }
                         debug("Detected a change in the following classes/directories: " + modifiedClasses);
                         // reset lastChangeCompiled and modifiedSrcBuildFile
                         lastChangeCompiled = false; // only needed when recompileDependencies is true
@@ -3814,6 +3824,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerUpstreamJavaSourceRecompile = false;
         lastBuildFileChange = new HashMap<File, Long>();
         modifiedClasses = new HashSet<File>();
+        failedToGenerateClasses = new HashSet<File>();
 
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
