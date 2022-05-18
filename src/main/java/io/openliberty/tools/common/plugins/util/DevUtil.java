@@ -4134,7 +4134,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
                 }
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-
+                // if the generated features file was modified as a result of the server.xml
+                // file modification, copy it over to target so the server picks up the changes
+                // together
+                if (generateFeaturesSuccess && generatedFeaturesModified) {
+                    // copy generated features file to server dir
+                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                    generatedFeaturesModified = false;
+                }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -4166,7 +4173,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean serverFeaturesModified = serverFeaturesModified();
                 boolean isGeneratedFeaturesFile = fileChanged.equals(generatedFeaturesFile);
                 // generate features whenever features have changed and an XML file is modified,
-                // excluding the generated-features.xml file
+                // excluding the generated features file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                         && !isGeneratedFeaturesFile)
                         && serverFeaturesModified) {
@@ -4180,12 +4187,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
                 }
                 if (isGeneratedFeaturesFile && !generatedFeaturesModified) {
-                    // features in the generated-features.xml file did not change, do not copy this file
+                    // features in the generated features file did not change, do not copy this file
                     // to the server directory
                     debug("The features in " + generatedFeaturesFile + " have not been modified.");
                 } else {
                     copyFile(fileChanged, configDirectory, serverDirectory, null);
-                    generatedFeaturesModified = false;
+                    // if the generated features file was modified as a result of another config
+                    // file modification, copy it over to target so the server picks up the changes
+                    // together
+                    if (generateFeaturesSuccess && generatedFeaturesModified) {
+                        // this logic is not entered if the fileChanged is the generated features file
+                        // copy generated features file to server dir
+                        copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                        generatedFeaturesModified = false;
+                    }
                 }
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
