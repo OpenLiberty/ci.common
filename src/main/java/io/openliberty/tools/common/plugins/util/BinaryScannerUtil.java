@@ -68,6 +68,8 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_MPV3 = "mp3";
     public static final String BINARY_SCANNER_MPV4 = "mp4";
     public static final String BINARY_SCANNER_MPV5 = "mp5";
+    // represents an EE or MP version higher than any of our stored versions
+    public static final String BINARY_SCANNER_UMBRELLA_DEP_MAXV = "zz10";
 
     public static final Map<String, String> BINARY_SCANNER_MP = new HashMap<String, String>();
     static {
