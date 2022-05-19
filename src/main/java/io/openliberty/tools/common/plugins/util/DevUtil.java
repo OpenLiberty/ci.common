@@ -2314,7 +2314,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             info(formatAttentionTitle("Liberty is running in dev mode."));
 
-            printFeatureGenerationStatus();
+            // TODO enable when feature generation is re-enabled
+            // printFeatureGenerationStatus();
         }
 
         if (!inputUnavailable) {
@@ -2419,8 +2420,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printHelpMessages() {
-        printFeatureGenerationStatus();
-        printFeatureGenerationHotkeys();
+        // TODO enable when feature generation is re-enabled
+        // printFeatureGenerationStatus();
+        // printFeatureGenerationHotkeys();
         printTestsMessage(true);
         if (container) {
             info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
@@ -2576,15 +2578,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         info(formatAttentionBarrier());
                         printHelpMessages();
                         info(formatAttentionBarrier());
-                    } else if (g.isPressed(line)) {
-                        toggleFeatureGeneration();
-                    } else if (o.isPressed(line)) {
-                        if (generateFeatures) {
-                            optimizeGenerateFeatures();
-                        } else {
-                            warn("Cannot optimize features because automatic generation of features is off.");
-                            warn("To toggle the automatic generation of features, type 'g' and press Enter.");
-                        }
+                    // TODO enable when feature generation is re-enabled
+                    // } else if (g.isPressed(line)) {
+                    //     toggleFeatureGeneration();
+                    // } else if (o.isPressed(line)) {
+                    //     if (generateFeatures) {
+                    //         optimizeGenerateFeatures();
+                    //     } else {
+                    //         warn("Cannot optimize features because automatic generation of features is off.");
+                    //         warn("To toggle the automatic generation of features, type 'g' and press Enter.");
+                    //     }
                     } else {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
@@ -5550,27 +5553,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     // Returns true if features have been modified in the configuration directory
     private boolean serverFeaturesModified() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
+        Set<String> generatedFeatureSet = null;
+        Set<String> featuresExcludingGenerated = null;
 
-        // generateFeatures scenario: check if a generated feature has been manually added to other config files
-        Set<String> generatedFeatures = servUtil.getServerXmlFeatures(null, serverDirectory,
-                generatedFeaturesFile, null, null);
-        Set<String> generatedFiles = new HashSet<String>();
-        generatedFiles.add(generatedFeaturesFile.getName());
-        // if serverXmlFile is null, getServerFeatures will use the default server.xml
-        // in the configDirectory
-        Set<String> featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
-                new HashMap<String, File>(), generatedFiles);
-        if (featuresExcludingGenerated != null && generatedFeatures != null
-                && !Collections.disjoint(featuresExcludingGenerated, generatedFeatures)) {
-            // indicates a generated feature has been manually added to other config files
-            return true;
+        if (generateFeatures) {
+            // generateFeatures scenario: check if a generated feature has been manually added to other config files
+            generatedFeatureSet = servUtil.getServerXmlFeatures(null, serverDirectory,
+            generatedFeaturesFile, null, null);
+            Set<String> generatedFiles = new HashSet<String>();
+            generatedFiles.add(generatedFeaturesFile.getName());
+            // if serverXmlFile is null, getServerFeatures will use the default server.xml
+            // in the configDirectory
+            featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+                    new HashMap<String, File>(), generatedFiles);
+            if (featuresExcludingGenerated != null && generatedFeatureSet != null
+                    && !Collections.disjoint(featuresExcludingGenerated, generatedFeatureSet)) {
+                // indicates a generated feature has been manually added to other config files
+                return true;
+            }
+        } else {
+            featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+                    new HashMap<String, File>(), null);
         }
-
+        
         // compare current feature list to existing feature list
         Set<String> features = featuresExcludingGenerated != null ? new HashSet<String>(featuresExcludingGenerated)
                 : new HashSet<String>();
-        if (generatedFeatures != null) {
-            features.addAll(generatedFeatures);
+        if (generatedFeatureSet != null) {
+            features.addAll(generatedFeatureSet);
         }
         return !features.equals(getExistingFeatures());
     }
