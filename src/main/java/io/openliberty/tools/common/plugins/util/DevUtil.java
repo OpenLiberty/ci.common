@@ -99,6 +99,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String START_SERVER_MESSAGE_PREFIX = "CWWKF0011I:";
     private static final String START_APP_MESSAGE_REGEXP = "CWWKZ0001I:";
     private static final String UPDATED_APP_MESSAGE_REGEXP = "CWWKZ0003I:";
+    private static final String STOPPED_APP_MESSAGE_REGEXP = "CWWKZ0009I:";
     private static final String PORT_IN_USE_MESSAGE_PREFIX = "CWWKO0221E:";
     private static final String WEB_APP_AVAILABLE_MESSAGE_PREFIX = "CWWKT0016I:";
     private static final String LISTENING_ON_PORT_MESSAGE_PREFIX = "CWWKO0219I:";
@@ -417,8 +418,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean generatedFeaturesModified;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
-    private boolean foundInitialClasses;
     private final File generatedFeaturesFile;
+    private File modifiedSrcBuildFile;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
@@ -495,7 +496,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.generateFeatures = generateFeatures;
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
-        this.foundInitialClasses = false;
         this.webResourceDirs = webResourceDirs;
         this.generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
         this.generatedFeaturesModified = false;
@@ -504,6 +504,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else {
             this.generatedFeaturesSet = new HashSet<String>();
         }
+        this.modifiedSrcBuildFile = null;
     }
 
     /**
@@ -536,8 +537,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
 
             File logFile = getMessagesLogFile(serverTask);
-
-            String regexp = UPDATED_APP_MESSAGE_REGEXP;
 
             try {
                 Thread.sleep(500);
@@ -601,6 +600,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             if (!forceSkipITs) {
                 if (!detectedAppStarted.get()) {
+                    // very first time app is started wait for START_APP or UPDATED_APP message
                     if (appStartupTimeout < 0) {
                         warn("The verifyTimeout (verifyAppStartTimeout) value needs to be an integer greater than or equal to 0.  The default value of 30 seconds will be used.");
                         appStartupTimeout = 30;
@@ -621,11 +621,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 } else if (waitForApplicationUpdate) {
                     // wait until application has been updated
-                    if (appUpdateTimeout < 0) {
-                        appUpdateTimeout = 5;
+                    int timesStopped = serverTask.countStringOccurrencesInFile(STOPPED_APP_MESSAGE_REGEXP, logFile);
+                    int timesUpdated = serverTask.countStringOccurrencesInFile(UPDATED_APP_MESSAGE_REGEXP, logFile);
+                    debug("timesStopped=" + timesStopped + " timesUpdated=" + timesUpdated);
+                    if (timesStopped > timesUpdated) {
+                        // timesStopped == timesUpdated indicates the app is already updated and no wait for update required
+                        if (appUpdateTimeout < 0) {
+                            appUpdateTimeout = 5;
+                        }
+                        long timeout = appUpdateTimeout * 1000;
+                        serverTask.waitForUpdatedStringInLog(UPDATED_APP_MESSAGE_REGEXP, timeout, logFile, messageOccurrences);
                     }
-                    long timeout = appUpdateTimeout * 1000;
-                    serverTask.waitForUpdatedStringInLog(regexp, timeout, logFile, messageOccurrences);
                 }
 
                 if (gradle) {
@@ -2308,8 +2314,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             info(formatAttentionTitle("Liberty is running in dev mode."));
 
-            // TODO enable when feature generation is re-enabled
-            // printFeatureGenerationStatus();
+            printFeatureGenerationStatus();
         }
 
         if (!inputUnavailable) {
@@ -2414,9 +2419,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printHelpMessages() {
-        // TODO enable when feature generation is re-enabled
-        // printFeatureGenerationStatus();
-        // printFeatureGenerationHotkeys();
+        printFeatureGenerationStatus();
+        printFeatureGenerationHotkeys();
         printTestsMessage(true);
         if (container) {
             info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
@@ -2481,7 +2485,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // scan all class files and provide only user specified features
         boolean generatedFeatures = libertyGenerateFeatures(null, true);
         if (generatedFeatures) {
-            javaSourceClasses.clear();
+            modifiedClasses.clear();
+            failedToGenerateClasses.clear();
             generatedFeaturesModified = generatedFeaturesModified();
         } // do not need to log an error if generatedFeatures is false because that would
           // have already been logged by libertyGenerateFeatures
@@ -2496,13 +2501,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         debug("Generating feature list from incremental changes...");
         boolean generatedFeatures = false;
         try {
-            Collection<String> javaSourceClassPaths = getClassPaths(javaSourceClasses);
-            generatedFeatures = libertyGenerateFeatures(javaSourceClassPaths, false);
+            Collection<String> classPaths = getClassPaths(modifiedClasses);
+            generatedFeatures = libertyGenerateFeatures(classPaths, false);
             if (generatedFeatures) {
-                javaSourceClasses.clear();
+                modifiedClasses.clear();
+                failedToGenerateClasses.clear();
                 generatedFeaturesModified = generatedFeaturesModified();
-            } // do not need to log an error if generatedFeatures is false because that would
-              // have already been logged by libertyGenerateFeatures
+            } else {
+                // do not need to log an error if generatedFeatures is false because that would
+                // have already been logged by libertyGenerateFeatures
+                failedToGenerateClasses.addAll(modifiedClasses);
+                modifiedClasses.clear();
+            }
         } catch (IOException e) {
             error("An error occurred while trying to generate features: " + e.getMessage(), e);
         }
@@ -2566,16 +2576,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         info(formatAttentionBarrier());
                         printHelpMessages();
                         info(formatAttentionBarrier());
-                    // TODO enable when feature generation is re-enabled
-                    // } else if (g.isPressed(line)) {
-                    //     toggleFeatureGeneration();
-                    // } else if (o.isPressed(line)) {
-                    //     if (generateFeatures) {
-                    //         optimizeGenerateFeatures();
-                    //     } else {
-                    //         warn("Cannot optimize features because automatic generation of features is off.");
-                    //         warn("To toggle the automatic generation of features, type 'g' and press Enter.");
-                    //     }
+                    } else if (g.isPressed(line)) {
+                        toggleFeatureGeneration();
+                    } else if (o.isPressed(line)) {
+                        if (generateFeatures) {
+                            optimizeGenerateFeatures();
+                        } else {
+                            warn("Cannot optimize features because automatic generation of features is off.");
+                            warn("To toggle the automatic generation of features, type 'g' and press Enter.");
+                        }
                     } else {
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
@@ -2601,7 +2610,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     Collection<File> deleteJavaTests;
     Collection<File> failedCompilationJavaSources;
     Collection<File> failedCompilationJavaTests;
-    Collection<File> javaSourceClasses;
+    Collection<File> modifiedClasses; // can contain class files or output class dirs
+    Collection<File> failedToGenerateClasses; // classes that we failed to generate features for
     Collection<File> omitWatchingFiles;
     long lastJavaSourceChange;
     long lastJavaTestChange;
@@ -2619,6 +2629,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     File dockerfileUsed;
     File looseAppFile;
     WatchService watcher;
+    boolean lastChangeCompiled; // tracks when the module containing the latest src file change is compiled successfully
 
     // used for multi module projects
     boolean triggerUpstreamJavaSourceRecompile;
@@ -2650,6 +2661,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.jvmOptionsFile = jvmOptionsFile;
         this.dockerfileUsed = null;
         this.initialCompile = true;
+        this.lastChangeCompiled = false;
         this.disableDependencyCompile = false;
         this.omitWatchingFiles = new ArrayList<File>();
 
@@ -2678,7 +2690,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
             Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
             Path configPath = this.configDirectory.getCanonicalFile().toPath();
-            Path srcOutputPath = this.outputDirectory.getCanonicalFile().toPath();
+            Path outputPath = this.outputDirectory.getCanonicalFile().toPath();
 
             boolean sourceDirRegistered = false;
             boolean testSourceDirRegistered = false;
@@ -2687,6 +2699,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean bootstrapPropertiesFileRegistered = false;
             boolean jvmOptionsFileRegistered = false;
             boolean sourceOutputDirRegistered = false;
+            boolean mmOutputDirRegAttempted = false; //multi module output directories registration attempted
 
             // register parent poms
             if (!parentBuildFiles.isEmpty()) {
@@ -2701,6 +2714,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // check for upstream projects
             if (isMultiModuleProject()) {
                 for (ProjectModule p : upstreamProjects) {
+                    // TODO: Consider whether or not we should generate features at this point
                     updateArtifactPaths(p, false, generateFeatures, executor);
 
                     if (shouldIncludeSources(p.getPackagingType())) {
@@ -2709,12 +2723,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath()));
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                             p.sourceDirRegistered = true;
-                        }
-
-                        // register source classes directory for feature generation
-                        if (p.getOutputDirectory().exists()) {
-                            registerAll(p.getOutputDirectory().getCanonicalFile().toPath(), executor);
-                            p.sourceOutputDirRegistered = true;
                         }
                     }
 
@@ -2748,15 +2756,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     registerAll(srcPath, executor);
                     sourceDirRegistered = true;
                 }
-
-                // register source classes directory for feature generation
-                if (this.outputDirectory.exists()) {
-                    registerAll(srcOutputPath, executor);
-                    sourceOutputDirRegistered = true;
-                }
-
             }
-    
+
             if (this.testSourceDirectory.exists()) {
                 registerAll(testSrcPath, executor);
                 testSourceDirRegistered = true;
@@ -2852,23 +2853,66 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             testArtifactPaths, null, false);
                 }
 
-                // when change in class files are detected scan for Liberty features.
-                if (generateFeatures && !javaSourceClasses.isEmpty()) {
-                    debug("Detected a change in the following classes: " + javaSourceClasses);
-                    if (!gradle && !foundInitialClasses) {
-                        // For Maven, skip the first call of generate features from the initial Java compilation that happens after dev mode startup
-                        // because features were already generated during the actual dev mode startup steps.
-                        debug("Skipping generate features from first call after dev mode startup");
-                        foundInitialClasses = true;
-                        javaSourceClasses.clear();
-                    } else if (!classesFailingToCompile()){ // do not run generate features if there are classes failing to compile
+                // Assumption is that initialCompile will only be set to false after ALL modules are complete
+                // Will need to update logic once multiple attempts are enabled for upstream projects
+                if (!recompileDependencies && !initialCompile && !sourceOutputDirRegistered) {
+                    // Allow more than one register attempt for adding a new output directory once adding a src/main/java dir
+                    // to an upstream project is supported - https://github.com/OpenLiberty/ci.maven/issues/1202
+                    if (isMultiModuleProject() && !mmOutputDirRegAttempted) {
+                        debug("Attempt to register upstream class file directories");
+                        mmOutputDirRegAttempted = true;
+                        for (ProjectModule p : upstreamProjects) {
+                            if (shouldIncludeSources(p.getPackagingType())) {
+                                // register source classes directory for upstream modules
+                                if (p.getOutputDirectory().exists()) {
+                                    registerAll(p.getOutputDirectory().getCanonicalFile().toPath(), executor);
+                                    p.sourceOutputDirRegistered = true;
+                                }
+                            }
+                        }
+                    }
+                    if (shouldIncludeSources(packagingType)) {
+                        // register class output directory for main module
+                        if (this.outputDirectory.exists() && this.outputDirectory.list().length > 0) {
+                            debug("Registering class output directory: " + this.outputDirectory);
+                            registerAll(outputPath, executor);
+                            sourceOutputDirRegistered = true;
+                        }
+                    }
+                }
+
+                // Generate features from source or class file changes
+                // do not run generate features if there are classes failing to compile
+                if (generateFeatures && !classesFailingToCompile() && !modifiedClasses.isEmpty()) {
+                    // recompileDependencies = no class file tracking, so we wait for compilation to be complete
+                    // !recompileDepenencies = class file tracking, so waiting on class file changes
+                    if ((recompileDependencies && lastChangeCompiled) || !recompileDependencies) {
+                        if (!failedToGenerateClasses.isEmpty()) {
+                            modifiedClasses.addAll(failedToGenerateClasses);
+                        }
+                        debug("Detected a change in the following classes/directories: " + modifiedClasses);
+                        // reset lastChangeCompiled and modifiedSrcBuildFile
+                        lastChangeCompiled = false; // only needed when recompileDependencies is true
+                        modifiedSrcBuildFile = null; // only needed when recompileDependencies is true
+                        long generatedTime = generatedFeaturesFile.lastModified();
+                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         incrementGenerateFeatures();
                         if (!generatedFeaturesFile.exists()) {
                             // run tests if generated-features.xml does not exist as there are no new features to install
+                            // (typically tests run after generate features & install when hotTests=true)
                             if (isMultiModuleProject()) {
                                 runTestThread(false, executor, -1, false, getAllBuildFiles());
                             } else {
                                 runTestThread(false, executor, -1, false, false, buildFile);
+                            }
+                        } else if (generatedFeaturesFile.lastModified() == generatedTime) {
+                            // The generated-features.xml file was not modified by adding or removing features as a
+                            // result of the compilation so call tests now. If it had been changed tests would be called
+                            // after processing the config file change.
+                            if (isMultiModuleProject()) {
+                                runTestThread(false, executor, numApplicationUpdatedMessages, false, getAllBuildFiles());
+                            } else {
+                                runTestThread(false, executor, numApplicationUpdatedMessages, false, false, buildFile);
                             }
                         }
                     }
@@ -2878,23 +2922,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // check if javaSourceDirectory has been added
                     if (!sourceDirRegistered && this.sourceDirectory.exists()
                             && this.sourceDirectory.listFiles().length > 0) {
+                        // Count the messages before the compile.
+                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         compile(this.sourceDirectory);
                         registerAll(srcPath, executor);
                         debug("Registering Java source directory: " + this.sourceDirectory);
                         // run tests after waiting for app update since app changed
-                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
                         sourceDirRegistered = true;
                     } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
                         cleanTargetDir(outputDirectory);
                         sourceDirRegistered = false;
-                    }
-
-                    // check if javaSourceOutputDirectory has been added
-                    if (!sourceOutputDirRegistered && this.outputDirectory.exists() && this.outputDirectory.list().length > 0) {
-                        registerAll(this.outputDirectory.getCanonicalFile().toPath(), executor);
-                        debug("Registering Java source output directory: " + this.outputDirectory);
-                        sourceOutputDirRegistered = true;
                     }
                 }
 
@@ -3007,9 +3045,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 warn("The source directory " + p.getSourceDirectory()
                                         + " was deleted.  This may result in compilation errors between dependent modules.  Restart dev mode for it to take effect.");
                             }
-
-                            // TODO register adding a new output directory once adding a src/main/java dir
-                            // to an upstream project is supported
                         }
 
                         // check if test directory of an upstream project has been added/deleted
@@ -3114,7 +3149,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException
      */
     public Collection<String> getJavaSourceClassPaths() throws IOException {
-        return getClassPaths(javaSourceClasses);
+        return getClassPaths(modifiedClasses);
     }
 
     /**
@@ -3411,6 +3446,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // successful compilation so we can clear failedCompilation list
                         project.failedCompilationJavaSources.clear();
                         change = true;
+                        if (modifiedSrcBuildFile != null && 
+                                project.getBuildFile().equals(modifiedSrcBuildFile)) {
+                            // The module with the latest src file change has compiled successfully
+                            debug("Setting lastChangeCompiled to true");
+                            lastChangeCompiled = true;
+                        }
                     } else {
                         successfulCompilation = false;
                         project.failedCompilationJavaSources.addAll(project.recompileJavaSources);
@@ -3460,6 +3501,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 if (compileDownstreamSrc) { // compile downstream modules' source and test classes
+                    // Count the messages before the compile.
+                    int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                     for (File dependentModule : project.getDependentModules()) {
                         if (!recompileDependencies) {
                             // recompileDependencies = false, only compile failing classes from dependent
@@ -3477,7 +3520,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (successfulCompilation && !generateFeatures) {
                         // do not run tests if generateFeatures = true, tests will run after generated-features.xml is updated
                         // run tests on current module and dependent modules
-                        int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                         runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles(project));
                     }
                 } else if (compileDownstreamTest) { // compile downstream modules' test classes
@@ -3625,18 +3667,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
         boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
-        boolean builtJava = upstreamBuilt;
         if (processSources && pastBuildFileWaitPeriod) {
+            // Count the messages before the compile.
+            int numApplicationUpdatedMessages = 0;
             // delete before recompiling, so if a file is in both lists, its class will be
             // deleted then recompiled
             if (!deleteJavaSources.isEmpty()) {
                 debug("Deleting Java source files: " + deleteJavaSources);
+                numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 for (File file : deleteJavaSources) {
                     deleteJavaFile(file, outputDirectory, this.sourceDirectory);
                 }
-                builtJava = true;
             }
             if (!recompileJavaSources.isEmpty() || triggerJavaSourceRecompile) {
+                numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 // try to recompile java files that previously did not compile successfully
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
@@ -3658,7 +3702,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         testOutputDirectory, projectName, buildFile, compilerOptions, skipUTs, skipRunningTests)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
-                    builtJava = true;
+                    if (modifiedSrcBuildFile != null && modifiedSrcBuildFile.equals(buildFile)) {
+                        // The module with the latest src file change has compiled successfully
+                        debug("Setting lastChangeCompiled to true");
+                        lastChangeCompiled = true;
+                    }
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
                 }
@@ -3708,7 +3756,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // recompileJavaSource won't run (which normally handles tests)
             if (!deleteJavaSources.isEmpty() && recompileJavaSources.isEmpty()) {
                 // run tests after waiting for app update since app changed
-                int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, buildFile);
             } else if (processTests && !deleteJavaTests.isEmpty() && recompileJavaTests.isEmpty()) {
                 // run all tests without waiting for app update since only tests changed
@@ -3728,6 +3775,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 disableDependencyCompile = false;
             }
             if (initialCompile) {
+                debug("Setting initialCompile to false");
                 initialCompile = false;
                 if (hotTests) {
                     // if hot testing, run tests on startup
@@ -3777,7 +3825,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerJavaTestRecompile = false;
         triggerUpstreamJavaSourceRecompile = false;
         lastBuildFileChange = new HashMap<File, Long>();
-        javaSourceClasses = new HashSet<File>();
+        modifiedClasses = new HashSet<File>();
+        failedToGenerateClasses = new HashSet<File>();
 
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
@@ -3808,7 +3857,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Path srcPath = this.sourceDirectory.getCanonicalFile().toPath();
         Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
-        Path srcOutputPath = this.outputDirectory.getCanonicalFile().toPath();
+        Path outputPath = this.outputDirectory.getCanonicalFile().toPath();
 
         Path directory = fileChanged.getParentFile().toPath();
 
@@ -3892,6 +3941,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                 + ". Adding to list for processing.");
                         lastJavaSourceChange = System.currentTimeMillis();
                         if (recompileDependencies) {
+                            if (generateFeatures) {
+                                // When recompileDependencies=true, we now check for source code changes and not class file changes
+                                // We track what module each change occurred in and generate features for that entire module once compilation for that module is complete
+                                // set modifiedSrcBuildFile to know what module to generate features for
+                                modifiedSrcBuildFile = project.getBuildFile();
+                                debug("Multi-module - setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
+                                ProjectModule modifiedModule = getProjectModule(modifiedSrcBuildFile);
+                                File outputDir = modifiedModule.getOutputDirectory();
+                                // Add output dir for processing generate features
+                                if (outputDir != null) {
+                                    modifiedClasses.add(outputDir);
+                                }
+                                // New src file change, reset lastChangeCompiled
+                                lastChangeCompiled = false;
+                            }
                             triggerUpstreamModuleCompile(project, false);
                         } else {
                             project.recompileJavaSources.add(fileChanged);
@@ -3922,17 +3986,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             triggerUpstreamModuleCompile(project, true);
                         }
                     }
-                } else if (generateFeatures && directory.startsWith(project.getOutputDirectory().getCanonicalPath())) {
-                    // track Java source class files if generateFeatures=true
+                } else if (!recompileDependencies && generateFeatures && directory.startsWith(project.getOutputDirectory().getCanonicalPath())) {
+                    // track Java source class files if generateFeatures=true && recompileDependencies=false
+                    // When recompileDependencies=true and class files are tracked, there are too many recompiled class files and feature generation runs too often
+                    // Therefore, we only track class files if recompileDependencies=false
                     if (fileChanged.exists() && fileChanged.getName().endsWith(".class")
                             && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
                         debug("Java source class file modified: " + fileChanged.getName()
                                 + ". Adding to list for processing.");
-                        javaSourceClasses.add(fileChanged);
+                        modifiedClasses.add(fileChanged);
                     } else if (changeType == ChangeType.DELETE) {
                         debug("Java source class deleted: " + fileChanged.getName()
                                 + ". Adding to list for processing.");
-                        javaSourceClasses.remove(fileChanged); // remove if class file is already stored in list
+                        modifiedClasses.remove(fileChanged); // remove if class file is already stored in list
                     }
                 } else if (fileChanged.equals(project.getBuildFile())
                         && directory.startsWith(project.getBuildFile().getParentFile().getCanonicalFile().toPath())
@@ -3998,6 +4064,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         + ". Adding to list for processing.");
                 lastJavaSourceChange = System.currentTimeMillis();
                 if (recompileDependencies) {
+                    if (generateFeatures) {
+                        // When recompileDependencies=true, we now check for source code changes and not class file changes
+                        // We track what module each change occurred in and generate features for that entire module once compilation for that module is complete
+                        // set modifiedSrcBuildFile to know what module to generate features for
+                        modifiedSrcBuildFile = buildFile;
+                        debug("Single module - setting modifiedSrcBuildFile to: " + modifiedSrcBuildFile);
+                        // Add output dir for processing generate features
+                        if (outputDirectory != null) {
+                            modifiedClasses.add(outputDirectory);
+                        }
+                        // New src file change, reset lastChangeCompiled
+                        lastChangeCompiled = false;
+                    }
                     triggerMainModuleCompile(false);
                 } else {
                     recompileJavaSources.add(fileChanged);
@@ -4055,7 +4134,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
                 }
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-
+                // if the generated features file was modified as a result of the server.xml
+                // file modification, copy it over to target so the server picks up the changes
+                // together
+                if (generateFeaturesSuccess && generatedFeaturesModified) {
+                    // copy generated features file to server dir
+                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                    generatedFeaturesModified = false;
+                }
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
                     untrackDockerfileDirectoriesAndRestart();
                 } else if (changeType == ChangeType.CREATE) {
@@ -4087,7 +4173,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean serverFeaturesModified = serverFeaturesModified();
                 boolean isGeneratedFeaturesFile = fileChanged.equals(generatedFeaturesFile);
                 // generate features whenever features have changed and an XML file is modified,
-                // excluding the generated-features.xml file
+                // excluding the generated features file
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                         && !isGeneratedFeaturesFile)
                         && serverFeaturesModified) {
@@ -4101,12 +4187,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
                 }
                 if (isGeneratedFeaturesFile && !generatedFeaturesModified) {
-                    // features in the generated-features.xml file did not change, do not copy this file
+                    // features in the generated features file did not change, do not copy this file
                     // to the server directory
                     debug("The features in " + generatedFeaturesFile + " have not been modified.");
                 } else {
                     copyFile(fileChanged, configDirectory, serverDirectory, null);
-                    generatedFeaturesModified = false;
+                    // if the generated features file was modified as a result of another config
+                    // file modification, copy it over to target so the server picks up the changes
+                    // together
+                    if (generateFeaturesSuccess && generatedFeaturesModified) {
+                        // this logic is not entered if the fileChanged is the generated features file
+                        // copy generated features file to server dir
+                        copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                        generatedFeaturesModified = false;
+                    }
                 }
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4243,17 +4337,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if (isDockerfileDirectoryChanged(fileChanged)) {
             // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
             untrackDockerfileDirectoriesAndRestart();
-        } else if (generateFeatures && directory.startsWith(srcOutputPath)) {
-            // track Java source class files if generateFeatures=true
+        } else if (!recompileDependencies && generateFeatures && directory.startsWith(outputPath)) {
+            // track Java source class files if generateFeatures=true && recompileDependencies=false
+            // When recompileDependencies=true and class files are tracked, there are too many recompiled class files and feature generation runs too often
+            // Therefore, we only track class files if recompileDependencies=false
             if (fileChanged.exists() && fileChanged.getName().endsWith(".class")
                     && (changeType == ChangeType.MODIFY
                             || changeType == ChangeType.CREATE)) {
                 debug("Java source class file modified: " + fileChanged.getName()
                         + ". Adding to list for processing.");
-                javaSourceClasses.add(fileChanged);
+                modifiedClasses.add(fileChanged);
             } else if (changeType == ChangeType.DELETE) {
                 debug("Java source class deleted: " + fileChanged.getName() + ". Adding to list for processing.");
-                javaSourceClasses.remove(fileChanged); // remove if class file is already stored in list
+                modifiedClasses.remove(fileChanged); // remove if class file is already stored in list
             }
         }
     }
@@ -4792,7 +4888,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
-            
+
             if (useBuildRecompile) {
                 compileResult = compile(tests ? testSourceDirectory : sourceDirectory);
             } else {

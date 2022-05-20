@@ -68,6 +68,8 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_MPV3 = "mp3";
     public static final String BINARY_SCANNER_MPV4 = "mp4";
     public static final String BINARY_SCANNER_MPV5 = "mp5";
+    // represents an EE or MP version higher than any of our stored versions
+    public static final String BINARY_SCANNER_UMBRELLA_DEP_MAXV = "zz10";
 
     public static final Map<String, String> BINARY_SCANNER_MP = new HashMap<String, String>();
     static {
@@ -132,6 +134,10 @@ public abstract class BinaryScannerUtil {
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException, FeatureUnavailableException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
+            // if we are already generating features for all class files (optimize=true) and
+            // we are not passing any user specified features (currentFeatureSet is empty)
+            // we do not need to rerun the binary scanner if it fails
+            boolean reRunIfFailed = !currentFeatureSet.isEmpty() || !optimize;
             try {
                 Method generateFeatureSetMethod = getScannerMethod();
                 // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
@@ -168,6 +174,7 @@ public abstract class BinaryScannerUtil {
                 if (scannerException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                     // The list of features from the app is passed in but it contains conflicts
                     Set<String> conflicts = getFeatures(scannerException);
+                    // always rerun binary scanner in this scenario, this exception only occurs if a current feature list is passed to binary scanner
                     Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
@@ -177,7 +184,8 @@ public abstract class BinaryScannerUtil {
                 } else if (scannerException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
                     // The scanned files conflict with each other or with current features
                     Set<String> conflicts = getFeatures(scannerException);
-                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
+                    //  rerun binary scanner with all class files and without the current feature set to get feature recommendations
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile): null;
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -186,9 +194,10 @@ public abstract class BinaryScannerUtil {
                 } else if (scannerException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
                     // The scanned files conflict and the scanner suggests modifying some features
                     Set<String> modifications = getFeatures(scannerException);
-                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
+                    //  rerun binary scanner with all class files and without the current feature set
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile) : null;
                     throw new FeatureModifiedException(modifications, 
-                            (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList);
+                            (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, scannerException.getLocalizedMessage());
                 } else if (scannerException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
                     // The list of features required by app or passed to binary scanner do not exist
                     // at the required EE or MP level
@@ -414,15 +423,20 @@ public abstract class BinaryScannerUtil {
         private static final long serialVersionUID = 1L;
         Set<String> features;
         Set<String> suggestions;
-        FeatureModifiedException(Set<String> featureSet, Set<String> suggestionSet) {
+        String message;
+        FeatureModifiedException(Set<String> featureSet, Set<String> suggestionSet, String message) {
             features = featureSet;
             suggestions = suggestionSet;
+            this.message = message;
         }
         public Set<String> getFeatures() {
             return features;
         }
         public Set<String> getSuggestions() {
             return suggestions;
+        }
+        public String getMessage() {
+            return message;
         }
     }
 
