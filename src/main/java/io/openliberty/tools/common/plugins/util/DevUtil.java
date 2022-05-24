@@ -418,7 +418,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean generatedFeaturesModified;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
-    private final File generatedFeaturesFile;
+    protected final File generatedFeaturesFile;
     private File modifiedSrcBuildFile;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
@@ -4177,7 +4177,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                         && !isGeneratedFeaturesFile)
                         && serverFeaturesModified) {
-                    generateFeaturesSuccess = false;
                     generateFeaturesSuccess = optimizeGenerateFeatures();
                 }
                 if (serverFeaturesModified) {
@@ -4186,21 +4185,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                     installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
                 }
-                if (isGeneratedFeaturesFile && !generatedFeaturesModified) {
-                    // features in the generated features file did not change, do not copy this file
-                    // to the server directory
-                    debug("The features in " + generatedFeaturesFile + " have not been modified.");
-                } else {
-                    copyFile(fileChanged, configDirectory, serverDirectory, null);
-                    // if the generated features file was modified as a result of another config
-                    // file modification, copy it over to target so the server picks up the changes
-                    // together
-                    if (generateFeaturesSuccess && generatedFeaturesModified) {
-                        // this logic is not entered if the fileChanged is the generated features file
-                        // copy generated features file to server dir
-                        copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
-                        generatedFeaturesModified = false;
-                    }
+                copyFile(fileChanged, configDirectory, serverDirectory, null);
+                // if the generated features file was modified as a result of another config
+                // file modification, copy it over to target so the server picks up the changes
+                // together
+                if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
+                    // this logic is not entered if the fileChanged is the generated features file
+                    // copy generated features file to server dir
+                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                    generatedFeaturesModified = false;
                 }
 
                 if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4519,7 +4512,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }, true);
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
-        if (generateFeatures && generateFeaturesSuccess) {
+        if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generatedFeaturesFile)) {
             // copy generated-features.xml file
             copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
         }
