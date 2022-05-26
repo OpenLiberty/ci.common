@@ -10,7 +10,7 @@
 
 	<groupId>io.openliberty.tools</groupId>
 	<artifactId>ci.common</artifactId>
-	<version>1.8.20-SNAPSHOT</version>
+	<version>1.8.20</version>
 	<packaging>jar</packaging>
 
 	<name>ci.common</name>
@@ -27,7 +27,7 @@
 		<connection>scm:git:git@github.com:openliberty/ci.maven.git</connection>
 		<developerConnection>scm:git:git@github.com:openliberty/ci.common.git</developerConnection>
 		<url>git@github.com:openliberty/ci.common.git</url>
-		<tag>HEAD</tag>
+		<tag>ci.common-1.8.20</tag>
 	</scm>
 
 	<properties>
