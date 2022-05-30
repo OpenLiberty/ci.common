@@ -2320,8 +2320,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (!inputUnavailable) {
             if (startup) {
                 // the following will be printed only on startup or restart
-                info(formatAttentionMessage("h - To see the help menu for available actions, type 'h' and press Enter."));
-                info(formatAttentionMessage("q - To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+                info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+                info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
             } else {
                 // the following will be printed every time after the tests run
                 printTestsMessage(false);
@@ -2413,8 +2413,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
             info(formatForAttention ? formatAttentionMessage("Enter - " + message) : message);
         } else {
-            String message = "To run tests on demand, press Enter.";
-            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : message);
+            String message = "run tests on demand, press Enter.";
+            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : "To " + message);
         }
     }
 
@@ -2423,12 +2423,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         printFeatureGenerationHotkeys();
         printTestsMessage(true);
         if (container) {
-            info(formatAttentionMessage("r - To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+            info(formatAttentionMessage("r - rebuild the Docker image and restart the container, type 'r' and press Enter."));
         } else {
-            info(formatAttentionMessage("r - To restart the server, type 'r' and press Enter."));
+            info(formatAttentionMessage("r - restart the server, type 'r' and press Enter."));
         }
-        info(formatAttentionMessage("h - To see the help menu for available actions, type 'h' and press Enter."));
-        info(formatAttentionMessage("q - To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+        info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+        info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
     }
 
     private void printFeatureGenerationStatus() {
@@ -2436,10 +2436,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printFeatureGenerationHotkeys() {
-        info(formatAttentionMessage("g - To toggle the automatic generation of features, type 'g' and press Enter."));
+        info(formatAttentionMessage("g - toggle the automatic generation of features, type 'g' and press Enter."));
         if (generateFeatures) {
             // If generateFeatures is enabled, then also describe the optimize hotkey
-            info(formatAttentionMessage("o - To optimize the list of generated features, type 'o' and press Enter."));
+            info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter."));
         }
     }
 
