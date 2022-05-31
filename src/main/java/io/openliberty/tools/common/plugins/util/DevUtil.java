@@ -2320,8 +2320,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (!inputUnavailable) {
             if (startup) {
                 // the following will be printed only on startup or restart
-                info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
-                info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+                info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+                info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
             } else {
                 // the following will be printed every time after the tests run
                 printTestsMessage(false);
@@ -2329,7 +2329,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else {
             debug("Cannot read user input, setting hotTests to true.");
             String message = "Tests will run automatically when changes are detected.";
-            info(startup ? formatAttentionMessage(message) : message);
+            info(startup ? formatAttentionMessage("Enter - " + message) : message);
             hotTests = true;
         }
         if (startup) {
@@ -2411,10 +2411,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void printTestsMessage(boolean formatForAttention) {
         if (hotTests) {
             String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-            info(formatForAttention ? formatAttentionMessage(message) : message);
+            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : message);
         } else {
-            String message = "To run tests on demand, press Enter.";
-            info(formatForAttention ? formatAttentionMessage(message) : message);
+            String message = "run tests on demand, press Enter.";
+            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : "To " + message);
         }
     }
 
@@ -2423,12 +2423,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         printFeatureGenerationHotkeys();
         printTestsMessage(true);
         if (container) {
-            info(formatAttentionMessage("To rebuild the Docker image and restart the container, type 'r' and press Enter."));
+            info(formatAttentionMessage("r - rebuild the Docker image and restart the container, type 'r' and press Enter."));
         } else {
-            info(formatAttentionMessage("To restart the server, type 'r' and press Enter."));
+            info(formatAttentionMessage("r - restart the server, type 'r' and press Enter."));
         }
-        info(formatAttentionMessage("To see the help menu for available actions, type 'h' and press Enter."));
-        info(formatAttentionMessage("To stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+        info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+        info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
     }
 
     private void printFeatureGenerationStatus() {
@@ -2436,10 +2436,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printFeatureGenerationHotkeys() {
-        info(formatAttentionMessage("To toggle the automatic generation of features, type 'g' and press Enter."));
+        info(formatAttentionMessage("g - toggle the automatic generation of features, type 'g' and press Enter."));
         if (generateFeatures) {
             // If generateFeatures is enabled, then also describe the optimize hotkey
-            info(formatAttentionMessage("To optimize the list of generated features, type 'o' and press Enter."));
+            info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter."));
         }
     }
 
@@ -2550,6 +2550,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey r = new HotKey("r");
             HotKey g = new HotKey("g");
             HotKey o = new HotKey("o");
+            HotKey enter = new HotKey("");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
@@ -2585,7 +2586,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
                         }
-                    } else {
+                    } else if (enter.isPressed(line)){
                         debug("Detected Enter key. Running tests... ");
                         if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
@@ -2593,6 +2594,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         } else {
                             runTestThread(false, executor, -1, true, buildFile);
                         }
+                    } else {
+                        warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
                     }
                 }
             } else {
