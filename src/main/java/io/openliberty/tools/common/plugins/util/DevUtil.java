@@ -4126,149 +4126,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 && fileChanged.getCanonicalPath().endsWith(serverXmlFile.getName())) {
             // This is for server.xml specified by the configuration parameter
             // server will load new properties
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                boolean generateFeaturesSuccess = true;
-                boolean serverFeaturesModified = serverFeaturesModified();
-                // generate features whenever features have changed
-                if (generateFeatures && serverFeaturesModified) {
-                    generateFeaturesSuccess = false;
-                    // custom server.xml modified
-                    generateFeaturesSuccess = optimizeGenerateFeatures();
-                }
-                if (serverFeaturesModified) {
-                    // suppress install feature warning - property must be set before calling
-                    // installFeaturesToTempDir
-                    System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                    installFeaturesToTempDir(fileChanged, serverXmlFileParent, "server.xml", generateFeaturesSuccess);
-                }
-                copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
-                // if the generated features file was modified as a result of the server.xml
-                // file modification, copy it over to target so the server picks up the changes
-                // together
-                if (generateFeaturesSuccess && generatedFeaturesModified) {
-                    // copy generated features file to server dir
-                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
-                    generatedFeaturesModified = false;
-                }
-                if (serverFeaturesModified) {
-                    updateExistingFeatures();
-                }
-
-                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    untrackDockerfileDirectoriesAndRestart();
-                } else if (changeType == ChangeType.CREATE) {
-                    redeployApp();
-                }
-
-                // always skip UTs
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-            } else if (changeType == ChangeType.DELETE) {
-                info("Config file deleted: " + fileChanged.getName());
-                deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
-                // generate features whenever features have changed
-                if (generateFeatures && serverFeaturesModified()) {
-                    // custom server.xml is deleted
-                    optimizeGenerateFeatures();
-                }
-                // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
-                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    untrackDockerfileDirectoriesAndRestart();
-                }
-                // always skip UTs
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-            }
+            processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, true);
         } else if (directory.startsWith(configPath)
-                && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) { // config
-                                                                                            // files
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-                boolean generateFeaturesSuccess = true; // default to true to cover cases where feature generation is disabled
-                boolean serverFeaturesModified = serverFeaturesModified();
-                boolean isGeneratedFeaturesFile = fileChanged.equals(generatedFeaturesFile);
-                // generate features whenever features have changed and an XML file is modified,
-                // excluding the generated features file
-                if (generateFeatures && (fileChanged.getName().endsWith(".xml")
-                        && !isGeneratedFeaturesFile)
-                        && serverFeaturesModified) {
-                    generateFeaturesSuccess = optimizeGenerateFeatures();
-                }
-                if (serverFeaturesModified) {
-                    // suppress install feature warning - property must be set before calling
-                    // installFeaturesToTempDir
-                    System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
-                    installFeaturesToTempDir(fileChanged, configDirectory, null, generateFeaturesSuccess);
-                }
-                copyFile(fileChanged, configDirectory, serverDirectory, null);
-                // if the generated features file was modified as a result of another config
-                // file modification, copy it over to target so the server picks up the changes
-                // together
-                if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
-                    // this logic is not entered if the fileChanged is the generated features file
-                    // copy generated features file to server dir
-                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
-                    generatedFeaturesModified = false;
-                }
-                if (serverFeaturesModified) {
-                    updateExistingFeatures();
-                }
-
-                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    untrackDockerfileDirectoriesAndRestart();
-                } else {
-                    if (changeType == ChangeType.CREATE) {
-                        redeployApp();
-                    }
-                    if (fileChanged.getName().equals("server.env")) {
-                        // re-enable debug variables in server.env
-                        enableServerDebug(false);
-                    } else if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
-                         || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
-                        // restart server to load new properties
-                        restartServer(false);
-                    }
-                }
-                if (isGeneratedFeaturesFile && generateFeatures) {
-                    // if generateFeatures is true, run UTs and ITs as tests would have been skipped
-                    // during recompileJava()
-                    if (isMultiModuleProject()) {
-                        runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles());
-                    } else {
-                        runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
-                    }
-                } else {
-                    // always skip UTs
-                    runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-                }
-            } else if (changeType == ChangeType.DELETE) {
-                info("Config file deleted: " + fileChanged.getName());
-                deleteFile(fileChanged, configDirectory, serverDirectory, null);
-                // generate features whenever features have changed and an XML file is deleted,
-                // excluding the generated-features.xml file
-                if (generateFeatures && (fileChanged.getName().endsWith(".xml")
-                        && !fileChanged.equals(generatedFeaturesFile))
-                        && serverFeaturesModified()) {
-                    optimizeGenerateFeatures();
-                }
-                if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
-                    untrackDockerfileDirectoriesAndRestart();
-                } else {
-                    if (fileChanged.getName().equals("server.env")) {
-                        // re-enable debug variables in server.env
-                        enableServerDebug(false);
-                    }
-                    if (container && OSUtil.isLinux()) {
-                        info("Restarting the container for this change to take effect.");
-                        // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            debug("Unexpected InterruptedException handling config file deletion.", e);
-                        }
-                        restartServer(false);
-                    }    
-                }
-                // always skip UTs
-                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
-            }
+                && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) {
+            // configuration file
+            processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, false);
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
                    && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
@@ -4359,6 +4221,135 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 debug("Java source class deleted: " + fileChanged.getName() + ". Adding to list for processing.");
                 modifiedClasses.remove(fileChanged); // remove if class file is already stored in list
             }
+        }
+    }
+
+    /**
+     * Process a configuration file change.
+     * 
+     * Typical sequence of events when config file is created/modfiied:
+     * 1. Generate features
+     * 2. Install features if features were modified
+     * 3. Copy fileChanged (and generated features file if modified in step 1) to
+     * server directory
+     * 4. Update existing features list if features were modified
+     * 5. Redeploy or restart server if needed (devc or server properties modified)
+     * 
+     * Typical sequence of events when config file is deleted:
+     * 1. Delete corresponding configuration file from server directory
+     * 2. Generate features
+     * 3. Restart server if needed (devc or Linux)
+     * 
+     * @param fileChanged                   modified file
+     * @param changeType                    file change event CREATE, MODIFY or
+     *                                      DELETE
+     * @param executor                      ThreadPoolExecutor for running tests
+     * @param numApplicationUpdatedMessages number of application updated
+     *                                      messages, used when running tests
+     * @param configuredServerXml           true if fileChanged is serverXmlFile
+     *                                      specified by the configuration parameter
+     * @throws IOException
+     * @throws PluginExecutionException
+     */
+    private void processConfigFileChange(File fileChanged, ChangeType changeType, ThreadPoolExecutor executor,
+            int numApplicationUpdatedMessages, boolean configuredServerXml)
+            throws IOException, PluginExecutionException {
+        boolean isGeneratedFeaturesFile = configuredServerXml ? false : fileChanged.equals(generatedFeaturesFile);
+        String targetFileName = configuredServerXml ? "server.xml" : null; // if null file will retain the same name when copied
+        File fileChangedParentDir = configuredServerXml ? serverXmlFileParent : configDirectory;
+
+        if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
+            debug("Config file modified: " + fileChanged);
+            boolean generateFeaturesSuccess = true; // default to true in case feature generation is disabled
+            boolean serverFeaturesModified = serverFeaturesModified();
+
+            // generate features whenever features have changed and an XML file is modified,
+            // excluding the generated features file
+            if (generateFeatures && (fileChanged.getName().endsWith(".xml")
+                    && !isGeneratedFeaturesFile)
+                    && serverFeaturesModified) {
+                generateFeaturesSuccess = optimizeGenerateFeatures();
+            }
+            if (serverFeaturesModified) {
+                // suppress install feature warning - property must be set before calling
+                // installFeaturesToTempDir
+                System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
+                installFeaturesToTempDir(fileChanged, fileChangedParentDir, targetFileName, generateFeaturesSuccess);
+            }
+            copyFile(fileChanged, fileChangedParentDir, serverDirectory, targetFileName);
+
+            // if the generated features file was modified as a result of another config
+            // file modification, copy it over to target so the server picks up the changes
+            // together
+            if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
+                // this logic is not entered if the fileChanged is the generated features file
+                // copy generated features file to server dir
+                copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                generatedFeaturesModified = false;
+            }
+            if (serverFeaturesModified) {
+                updateExistingFeatures();
+            }
+
+            if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                untrackDockerfileDirectoriesAndRestart();
+            } else {
+                if (changeType == ChangeType.CREATE) {
+                    redeployApp();
+                }
+                if (fileChanged.getName().equals("server.env")) {
+                    // re-enable debug variables in server.env
+                    enableServerDebug(false);
+                } else if ((fileChanged.getName().equals("bootstrap.properties")
+                        && bootstrapPropertiesFileParent == null)
+                        || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
+                    // restart server to load new properties
+                    restartServer(false);
+                }
+            }
+            if (isGeneratedFeaturesFile && generateFeatures) {
+                // if generateFeatures is true, run UTs and ITs as tests would have been skipped
+                // during recompileJava()
+                if (isMultiModuleProject()) {
+                    runTestThread(true, executor, numApplicationUpdatedMessages, false, getAllBuildFiles());
+                } else {
+                    runTestThread(true, executor, numApplicationUpdatedMessages, false, false, buildFile);
+                }
+            } else {
+                // always skip UTs
+                runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
+            }
+        } else if (changeType == ChangeType.DELETE) {
+            info("Config file deleted: " + fileChanged.getName());
+            deleteFile(fileChanged, fileChangedParentDir, serverDirectory, targetFileName);
+            // generate features whenever features have changed and an XML file is deleted,
+            // excluding the generated-features.xml file
+            if (generateFeatures && (fileChanged.getName().endsWith(".xml")
+                    && !fileChanged.equals(generatedFeaturesFile))
+                    && serverFeaturesModified()) {
+                optimizeGenerateFeatures();
+            }
+            // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
+            if (isDockerfileDirectoryChanged(serverDirectory, fileChanged)) {
+                untrackDockerfileDirectoriesAndRestart();
+            } else {
+                if (fileChanged.getName().equals("server.env")) {
+                    // re-enable debug variables in server.env
+                    enableServerDebug(false);
+                }
+                if (container && OSUtil.isLinux()) {
+                    info("Restarting the container for this change to take effect.");
+                    // Allow a 1 second grace period to replace the file in case the user changes the file with a script or a tool like vim.
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        debug("Unexpected InterruptedException handling config file deletion.", e);
+                    }
+                    restartServer(false);
+                }    
+            }
+            // always skip UTs
+            runTestThread(true, executor, numApplicationUpdatedMessages, true, false, buildFile);
         }
     }
 
