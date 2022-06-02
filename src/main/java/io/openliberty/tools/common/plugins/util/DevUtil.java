@@ -4227,7 +4227,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Process a configuration file change.
      * 
-     * Typical sequence of events when config file is created/modfiied:
+     * Typical sequence of events when config file is created/modified:
      * 1. Generate features
      * 2. Install features if features were modified
      * 3. Copy fileChanged (and generated features file if modified in step 1) to
