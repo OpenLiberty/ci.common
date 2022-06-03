@@ -44,7 +44,6 @@ import org.w3c.dom.NodeList;
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.commons.io.FileUtils;
 
-
 public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	private final File installDirectory;
@@ -79,14 +78,29 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	}
 
 	public void prepareFeatures(List<String> featureBOMs) throws PluginExecutionException {
+		Map<File, String> esaMap = new HashMap<File, String>();
 		for (String BOMCoordinate : featureBOMs) {
 			String[] coord = BOMCoordinate.split(":");
 			String groupId = coord[0];
 			String artifactId = coord[1];
 			String version = coord[2];
-			prepareFeature(groupId, artifactId, version);
+			File additionalBOM = downloadArtifact(groupId, artifactId, "pom", version);
+			esaMap.putAll(populateESAMap(additionalBOM));
+			prepareFeature(groupId, artifactId, version, additionalBOM, esaMap);
 		}
 
+	}
+	
+	private Map<File, String> populateESAMap(File additionalBOM) {
+		Map<File, String> result = new HashMap<File, String>();
+		try {	
+			result = downloadArtifactsFromBOM(additionalBOM);
+		} catch (PluginExecutionException e) {
+			warn(e.getMessage());
+			warn("A features-bom file must be provided at " + additionalBOM.getAbsolutePath() +  ". Please ignore this warning if this is not a user feature.");
+		}
+		
+		return result;
 	}
 
 	/**
@@ -97,38 +111,23 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @param version
 	 * @throws PluginExecutionException
 	 */
-	private void prepareFeature(String groupId, String artifactId, String version) throws PluginExecutionException {
+	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) throws PluginExecutionException {
 		File json = null;
-		try {
-			json = downloadArtifact(groupId, FEATURES_JSON_ARTIFACT_ID, "json", version);
-		} catch (PluginExecutionException e) {
-			debug(e);
-			info(String.format("The features.json file was not found at the expected coordinate %s:"+FEATURES_JSON_ARTIFACT_ID+":%s in connected repositories.", groupId,
-					artifactId, version));
-		}
-		if (json != null) {
-			info("The features.json already exists at the following location: " + json);
-			jsonFile = json;
-		} else {
 			try {
-				File additionalBOM = downloadArtifact(groupId, artifactId, "pom", version);
 				String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
 				String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
 						version);
-				
-				Map<File, String> esaFiles = downloadArtifactsFromBOM(additionalBOM);
-				File generatedJson = generateJson(targetJsonFile, esaFiles);
+				File generatedJson = generateJson(targetJsonFile, esaMap);
 				if (generatedJson.exists()) {
 					jsonFile = generatedJson;
-					provideJsonFileDependency(generatedJson);
+					provideJsonFileDependency(generatedJson, groupId, version);
 					info("The features.json has been generated at the following location: " + generatedJson);
 				}
 			} catch (PluginExecutionException e) {
 				warn(e.getMessage());
-				warn("A features-bom file must be provided at the given groupId " + groupId +  ". Please ignore this warning if this is not a user feature.");
 			}
 		}
-	}
+
 
 	/**
 	 * Download the Artifacts mentioned within the additionalBOM pom file
@@ -372,9 +371,11 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * Provide the file dependency of the generated JSON file for Gradle plugin
 	 * 
 	 * @param file		 The Features JSON file
+	 * @param groupId	 The groupId 
+	 * @param version    The version
 	 * @throws PluginExecutionException If the artifact could not create dependency
 	 */
-	public void provideJsonFileDependency(File file) {
+	public void provideJsonFileDependency(File file, String groupId, String version) {
 		
 	}
 
