@@ -273,7 +273,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract Set<String> getExistingFeatures();
 
     /**
-     * Update existing features set
+     * Update the existing features list using the files in the server directory.
+     * Called on configuration file change to ensure we have the most current
+     * feature list.
      */
     public abstract void updateExistingFeatures();
 
