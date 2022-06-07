@@ -154,6 +154,11 @@ public class BaseDevUtilTest {
         }
 
         @Override
+        public void updateExistingFeatures() {
+            // not needed for tests
+        }
+
+        @Override
         public boolean compile(File dir) {
             // not needed for tests
             return false;
