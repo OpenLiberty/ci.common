@@ -2443,10 +2443,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printFeatureGenerationHotkeys() {
-        info(formatAttentionMessage("g - toggle the automatic generation of features, type 'g' and press Enter."));
+        info(formatAttentionMessage(
+                "g - toggle the automatic generation of features, type 'g' and press Enter. A new server configuration file will be generated in the SOURCE configuration directory."));
         if (generateFeatures) {
             // If generateFeatures is enabled, then also describe the optimize hotkey
-            info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter."));
+            info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter. A new server configuration file will be generated in the SOURCE configuration directory."));
         }
     }
 
@@ -2470,6 +2471,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         generateFeatures = !generateFeatures;
         logFeatureGenerationStatus();
         if (generateFeatures) {
+            String generatedFileCanonicalPath;
+            try {
+                generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).getCanonicalPath();
+            } catch (IOException e) {
+                generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).toString();
+            }
+            warn("The source configuration directory will be modified. Features will automatically be generated in a new file: " + generatedFileCanonicalPath);
             // If hotkey is toggled to “true”, generate features right away.
             optimizeGenerateFeatures();
         }
