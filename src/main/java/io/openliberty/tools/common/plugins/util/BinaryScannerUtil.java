@@ -21,10 +21,8 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public abstract class BinaryScannerUtil {
@@ -57,34 +55,12 @@ public abstract class BinaryScannerUtil {
             "is using the correct levels of MicroProfile, Java EE, or Jakarta EE, or consider removing the following set of features: %s.";
 
     // Strings recognized by the binary scanner arguments for Java/Jakarta EE and MicroProfile
-    public static final String BINARY_SCANNER_EEV6 = "ee6";
-    public static final String BINARY_SCANNER_EEV7 = "ee7";
-    public static final String BINARY_SCANNER_EEV8 = "ee8";
-    public static final String BINARY_SCANNER_EEV9 = "ee9";
-
-    public static final String BINARY_SCANNER_PREFIX = "mp";
-    public static final String BINARY_SCANNER_MPV1 = "mp1";
-    public static final String BINARY_SCANNER_MPV2 = "mp2";
-    public static final String BINARY_SCANNER_MPV3 = "mp3";
-    public static final String BINARY_SCANNER_MPV4 = "mp4";
-    public static final String BINARY_SCANNER_MPV5 = "mp5";
+    // Valid ee6, ee7, ee8, ee9 and so on
+    public static final String BINARY_SCANNER_EE_PREFIX = "ee";
+    // Valid mp1, mp1.2, mp1.3 and so on
+    public static final String BINARY_SCANNER_MP_PREFIX = "mp";
     // represents an EE or MP version higher than any of our stored versions
     public static final String BINARY_SCANNER_UMBRELLA_DEP_MAXV = "zz10";
-
-    public static final Map<String, String> BINARY_SCANNER_MP = new HashMap<String, String>();
-    static {
-        BINARY_SCANNER_MP.put("1.2", "mp1.2");
-        BINARY_SCANNER_MP.put("1.3", "mp1.3");
-        BINARY_SCANNER_MP.put("1.4", "mp1.4");
-        BINARY_SCANNER_MP.put("2.0", "mp2.0");
-        BINARY_SCANNER_MP.put("2.1", "mp2.1");
-        BINARY_SCANNER_MP.put("2.2", "mp2.2");
-        BINARY_SCANNER_MP.put("3.0", "mp3.0");
-        BINARY_SCANNER_MP.put("3.2", "mp3.2");
-        BINARY_SCANNER_MP.put("3.3", "mp3.3");
-        BINARY_SCANNER_MP.put("4.0", "mp4.0");
-        BINARY_SCANNER_MP.put("4.1", "mp4.1");
-    }
 
     public abstract void debug(String message);
     public abstract void debug(String message, Throwable e);
@@ -206,10 +182,21 @@ public abstract class BinaryScannerUtil {
                     unavailableFeatures.addAll(getUnavailableMPFeatures(scannerException));
                     throw new FeatureUnavailableException(conflicts, unavailableFeatures, targetMicroProfile,
                             targetJavaEE);
-                } else {
-                    debug("Exception from binary scanner.", scannerException);
-                    throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
+                } else if (scannerException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
+                    String msg = scannerException.getMessage();
+                    if (msg.contains("CWMIG12056E")) {
+                        if (msg.contains("targetJavaEE")) {
+                            throw new PluginExecutionException("The Java EE or Jakarta EE version number specified in the build file " +
+                                    "is not supported for feature generation.");
+                        } else if (msg.contains("targetMicroProfile")) {
+                            throw new PluginExecutionException("The MicroProfile version number specified in the build file " +
+                                    "is not supported for feature generation.");
+                        }
+                    }
+                    // otherwise execute default behaviour.
                 }
+                debug("Exception from binary scanner.", scannerException);
+                throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
             } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException loadingException){
                 Object o = loadingException.getCause();
                 if (o != null) {
@@ -380,6 +367,40 @@ public abstract class BinaryScannerUtil {
             }
         }
         return null;
+    }
+
+    /**
+     * Create the string required by the binary scanner parameter targetJavaEE
+     * E.g. ee7, ee8 etc
+     * @param ver the String value version number read from the build file (pom.xml, build.gradle)
+     *           E.g. 8, 8.0, 8.0.0 etc. This is verified by the parser and cannot be blank.
+     * @return String parameter passed to binary scanner
+     */
+    public static String composeEEVersion(String ver) {
+        String majorVersion;
+        int offset = ver.indexOf(".");
+        majorVersion = (offset == -1) ? ver : ver.substring(0, offset);
+        return BINARY_SCANNER_EE_PREFIX + majorVersion;
+    }
+
+    /**
+     * Create the string required by the binary scanner parameter targetMicroProfile
+     * E.g. mp1.3, mp4.1 etc
+     * @param ver the String value version number read from the build file (pom.xml, build.gradle)
+     *           E.g. 1, 2.1 etc. This is verified by the parser and cannot be blank.
+     * @return String parameter passed to binary scanner or empty string in case of error
+     */
+    public static String composeMPVersion(String ver) {
+        int offset = ver.indexOf("-RC"); // clean up input data
+        if (offset > 0) {
+            ver = ver.substring(0, offset);
+        }
+        String[] parts = ver.split("\\.", 3); // binary scanner only recognises the first two values. Regex for "." char
+        if (parts.length > 1 &&
+                parts[0] != null && !parts[0].isEmpty() && parts[1] != null && !parts[1].isEmpty()) {
+            return BINARY_SCANNER_MP_PREFIX + parts[0] + "." + parts[1];
+        }
+        return "";
     }
 
     // A class to pass the list of conflicts back to the caller.
