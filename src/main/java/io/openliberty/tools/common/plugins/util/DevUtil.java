@@ -53,6 +53,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -80,6 +81,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.NameFileFilter;
+import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
@@ -3906,7 +3909,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (changeType == ChangeType.CREATE) {
                 if (!isUpstreamSourceDir(fileChanged)) { // adding a src/main/java dir to an upstream project is not currently supported
                     registerAll(fileChanged.toPath(), executor);
+                    // TODO process ALL files in newly registered directory, not just the generated features file https://github.com/OpenLiberty/ci.maven/issues/1548
+                    // check if the generated features file exists in any of the newly registered directories
+                    Iterator<File> it = FileUtils.iterateFiles(fileChanged,
+                            new NameFileFilter(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME),
+                            TrueFileFilter.INSTANCE);
+                    if (it.hasNext()) {
+                        File newlyRegisteredFile = it.next();
+                        // confirm that the newly registered file is in configDropins/overrides
+                        if (newlyRegisteredFile.getCanonicalPath()
+                                .endsWith(BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH)) {
+                            // process file changes for the generated features file so that newly generated features are installed
+                            debug("Registered configDropins/overrides directory, processing file changes for generated features file: "
+                                    + newlyRegisteredFile);
+                            processFileChanges(executor, newlyRegisteredFile, outputDirectory, false,
+                                    ChangeType.CREATE);
+                        }
+                    }
                 }
+                
             }
             // otherwise if a directory was modified, just continue to the next entry
             // (if delete, can't tell if it was a directory since it doesn't exist anymore)
