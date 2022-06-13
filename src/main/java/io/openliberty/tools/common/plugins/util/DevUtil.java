@@ -2444,10 +2444,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void printFeatureGenerationHotkeys() {
         info(formatAttentionMessage(
-                "g - toggle the automatic generation of features, type 'g' and press Enter. A new server configuration file will be generated in the SOURCE configuration directory."));
+                "g - toggle the automatic generation of features, type 'g' and press Enter."));
+        info(formatAttentionMessage(
+                "    A new server configuration file will be generated in the SOURCE configDropins/overrides configuration directory."));
         if (generateFeatures) {
             // If generateFeatures is enabled, then also describe the optimize hotkey
-            info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter. A new server configuration file will be generated in the SOURCE configuration directory."));
+            info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter."));
+            info(formatAttentionMessage(
+                    "    A new server configuration file will be generated in the SOURCE configDropins/overrides configuration directory."));
         }
     }
 
