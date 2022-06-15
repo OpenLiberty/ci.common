@@ -3916,9 +3916,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             TrueFileFilter.INSTANCE);
                     if (it.hasNext()) {
                         File newlyRegisteredFile = it.next();
-                        // confirm that the newly registered file is in configDropins/overrides
-                        if (newlyRegisteredFile.getCanonicalPath()
-                                .endsWith(BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH)) {
+                        // confirm that the newly registered file is generated features file in configDropins/overrides
+                        if (newlyRegisteredFile.equals(generatedFeaturesFile)) {
                             // process file changes for the generated features file so that newly generated features are installed
                             debug("Registered configDropins/overrides directory, processing file changes for generated features file: "
                                     + newlyRegisteredFile);
