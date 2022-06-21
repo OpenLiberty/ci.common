@@ -391,7 +391,7 @@ public abstract class BinaryScannerUtil {
      * @return String parameter passed to binary scanner or empty string in case of error
      */
     public static String composeMPVersion(String ver) {
-        int offset = ver.indexOf("-RC"); // clean up input data
+        int offset = ver.indexOf("-RC"); // clean up 4.1-RC to 4.1
         if (offset > 0) {
             ver = ver.substring(0, offset);
         }
