@@ -388,7 +388,7 @@ public abstract class BinaryScannerUtil {
      * E.g. mp1.3, mp4.1 etc
      * @param ver the String value version number read from the build file (pom.xml, build.gradle)
      *           E.g. 1, 2.1 etc. This is verified by the parser and cannot be blank.
-     * @return String parameter passed to binary scanner or empty string in case of error
+     * @return String parameter passed to binary scanner or null in case of error
      */
     public static String composeMPVersion(String ver) {
         int offset = ver.indexOf("-RC"); // clean up 4.1-RC to 4.1
@@ -396,11 +396,15 @@ public abstract class BinaryScannerUtil {
             ver = ver.substring(0, offset);
         }
         String[] parts = ver.split("\\.", 3); // binary scanner only recognises the first two values. Regex for "." char
+        // TODO: remove extra handling for v5 once issue 1551 is fixed
+        if ("5".equals(parts[0])) {
+            return BINARY_SCANNER_MP_PREFIX + parts[0];
+        }
         if (parts.length > 1 &&
                 parts[0] != null && !parts[0].isEmpty() && parts[1] != null && !parts[1].isEmpty()) {
             return BINARY_SCANNER_MP_PREFIX + parts[0] + "." + parts[1];
         }
-        return "";
+        return null;
     }
 
     // A class to pass the list of conflicts back to the caller.
