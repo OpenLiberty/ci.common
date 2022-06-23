@@ -396,10 +396,6 @@ public abstract class BinaryScannerUtil {
             ver = ver.substring(0, offset);
         }
         String[] parts = ver.split("\\.", 3); // binary scanner only recognises the first two values. Regex for "." char
-        // TODO: remove extra handling for v5 once issue 1551 is fixed
-        if ("5".equals(parts[0])) {
-            return BINARY_SCANNER_MP_PREFIX + parts[0];
-        }
         if (parts.length > 1 &&
                 parts[0] != null && !parts[0].isEmpty() && parts[1] != null && !parts[1].isEmpty()) {
             return BINARY_SCANNER_MP_PREFIX + parts[0] + "." + parts[1];
