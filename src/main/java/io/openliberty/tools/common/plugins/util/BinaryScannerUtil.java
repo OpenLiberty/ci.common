@@ -53,6 +53,10 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE5 = "A working set of features could not be generated due to conflicts " + 
             "in the required features: %s and required levels of MicroProfile: %s, Java EE or Jakarta EE: %s. Review and update your application to ensure it " + 
             "is using the correct levels of MicroProfile, Java EE, or Jakarta EE, or consider removing the following set of features: %s.";
+    public static final String BINARY_SCANNER_INVALID_MP_MESSAGE = "The MicroProfile version number specified in the build file " +
+            "is not supported for feature generation.";
+    public static final String BINARY_SCANNER_INVALID_EE_MESSAGE = "The Java EE or Jakarta EE version number specified in the build file " +
+            "is not supported for feature generation.";
 
     // Strings recognized by the binary scanner arguments for Java/Jakarta EE and MicroProfile
     // Valid ee6, ee7, ee8, ee9 and so on
@@ -183,14 +187,13 @@ public abstract class BinaryScannerUtil {
                     throw new FeatureUnavailableException(conflicts, unavailableFeatures, targetMicroProfile,
                             targetJavaEE);
                 } else if (scannerException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
+                    // TODO: Affected by issue #1558
                     String msg = scannerException.getMessage();
                     if (msg.contains("CWMIG12056E")) {
                         if (msg.contains("targetJavaEE")) {
-                            throw new PluginExecutionException("The Java EE or Jakarta EE version number specified in the build file " +
-                                    "is not supported for feature generation.");
+                            throw new PluginExecutionException(BINARY_SCANNER_INVALID_EE_MESSAGE);
                         } else if (msg.contains("targetMicroProfile")) {
-                            throw new PluginExecutionException("The MicroProfile version number specified in the build file " +
-                                    "is not supported for feature generation.");
+                            throw new PluginExecutionException(BINARY_SCANNER_INVALID_MP_MESSAGE);
                         }
                     }
                     // otherwise execute default behaviour.
