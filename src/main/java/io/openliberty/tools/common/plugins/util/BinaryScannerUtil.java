@@ -63,8 +63,6 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_EE_PREFIX = "ee";
     // Valid mp1, mp1.2, mp1.3 and so on
     public static final String BINARY_SCANNER_MP_PREFIX = "mp";
-    // represents an EE or MP version higher than any of our stored versions
-    public static final String BINARY_SCANNER_UMBRELLA_DEP_MAXV = "zz10";
 
     public abstract void debug(String message);
     public abstract void debug(String message, Throwable e);
