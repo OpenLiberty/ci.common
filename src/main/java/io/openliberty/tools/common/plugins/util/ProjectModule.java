@@ -194,4 +194,14 @@ public class ProjectModule {
     public void setDependentModules(List<File> dependentModules) {
         this.dependentModules = dependentModules;
     }
+    
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder( 48 );
+        sb.append( "ProjectModule: " );
+        sb.append( projectName );
+
+        return sb.toString();
+    }
 }
