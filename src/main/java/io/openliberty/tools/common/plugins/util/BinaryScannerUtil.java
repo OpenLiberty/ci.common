@@ -38,6 +38,8 @@ public abstract class BinaryScannerUtil {
     private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
     private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
     private static final String FEATURE_NOT_AVAILABLE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureNotAvailableAtRequestedLevelException";
+    private static final String ILLEGAL_TARGET_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetException";
+    private static final String ILLEGAL_TARGET_COMBINATION_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetCombinationException";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
@@ -53,9 +55,14 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE5 = "A working set of features could not be generated due to conflicts " + 
             "in the required features: %s and required levels of MicroProfile: %s, Java EE or Jakarta EE: %s. Review and update your application to ensure it " + 
             "is using the correct levels of MicroProfile, Java EE, or Jakarta EE, or consider removing the following set of features: %s.";
-    public static final String BINARY_SCANNER_INVALID_MP_MESSAGE = "The MicroProfile version number specified in the build file " +
+    public static final String BINARY_SCANNER_INVALID_MP_MESSAGE = "The MicroProfile version number %s specified in the build file " +
             "is not supported for feature generation.";
-    public static final String BINARY_SCANNER_INVALID_EE_MESSAGE = "The Java EE or Jakarta EE version number specified in the build file " +
+    public static final String BINARY_SCANNER_INVALID_EE_MESSAGE = "The Java EE or Jakarta EE version number %s specified in the build file " +
+            "is not supported for feature generation.";
+    public static final String BINARY_SCANNER_INVALID_EEMPARG_MESSAGE = "Either the Java EE or Jakarta EE version number or the MicroProfile version number specified in the build file " +
+            "is not supported for feature generation."; // We need to be prepared for this situation from the binary scanner.
+    public static final String BINARY_SCANNER_INVALID_COMBO_MESSAGE = "The Java EE or Jakarta EE version number %s specified in the build file " +
+            "in combination with the MicroProfile version number %s specified in the build file " +
             "is not supported for feature generation.";
 
     // Strings recognized by the binary scanner arguments for Java/Jakarta EE and MicroProfile
@@ -104,12 +111,16 @@ public abstract class BinaryScannerUtil {
      *                                      features that should work to run the application
      * @throws FeatureModifiedException - indicates a problem but the scanner was able to generate a set of features 
      *                                      that should work if certain features are modified
-     * @throws FeatureUnavailableException - incidates a problem between required features and required MP/EE levels but 
+     * @throws FeatureUnavailableException - indicates a problem between required features and required MP/EE levels but
      *                                      the scanner was able to generate a set of features that should be removed
+     * @throws IllegalTargetException - indicates one or both of the MP or EE versions is not supported by the binary scanner
+     * @throws IllegalTargetComboException - indicates the MP or EE version parameters are not supported by the binary
+     *                                       scanner when used in combination with each other. E.g. EE 7 and MP 2.1
      */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String logLocation, String targetJavaEE, String targetMicroProfile, boolean optimize)
-            throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException, FeatureUnavailableException {
+            throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
+            FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException {
         Set<String> featureList = null;
         if (binaryScanner != null && binaryScanner.exists()) {
             // if we are already generating features for all class files (optimize=true) and
@@ -148,6 +159,10 @@ public abstract class BinaryScannerUtil {
                 // only if certain inputs are changed.
                 // 4. FeatureNotAvailableAtRequestedLevelException means the features passed or binary files
                 // scanned require features that do not exist at the requested EE or MP levels.
+                // 5. IllegalTargetException means that the Java or Jakarta EE version or the MicroProfile version
+                // we read from the build file is out of range for the binary scanner. For EE we only use the first
+                // digit: ee6 to ee9. For MP we use the first two digits mp1.2 to mp5.0.
+                // 6. IllegalTargetCombinationException means that the EE level and the MP level are not compatible.
                 Throwable scannerException = ite.getCause();
                 if (scannerException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                     // The list of features from the app is passed in but it contains conflicts
@@ -184,7 +199,14 @@ public abstract class BinaryScannerUtil {
                     unavailableFeatures.addAll(getUnavailableMPFeatures(scannerException));
                     throw new FeatureUnavailableException(conflicts, unavailableFeatures, targetMicroProfile,
                             targetJavaEE);
+                } else if (scannerException.getClass().getName().equals(ILLEGAL_TARGET_EXCEPTION)) {
+                    // The EE and/or the MP version number is out of range
+                    throw new IllegalTargetException(getInvalidEETarget(scannerException), getInvalidMPTarget(scannerException));
+                } else if (scannerException.getClass().getName().equals(ILLEGAL_TARGET_COMBINATION_EXCEPTION)) {
+                    // The EE and MP version numbers are in range but they are not compatible with each other based on the standards.
+                    throw new IllegalTargetComboException(getInvalidEETarget(scannerException), getInvalidMPTarget(scannerException));
                 } else if (scannerException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
+                    // Used by binary scanner 22.0.0.3, remove after 22.0.0.4 is in sonatype
                     // TODO: Affected by issue #1558
                     String msg = scannerException.getMessage();
                     if (msg.contains("CWMIG12056E")) {
@@ -194,7 +216,7 @@ public abstract class BinaryScannerUtil {
                             throw new PluginExecutionException(BINARY_SCANNER_INVALID_MP_MESSAGE);
                         }
                     }
-                    // otherwise execute default behaviour.
+                    // otherwise exit this if statement and execute default behaviour.
                 }
                 debug("Exception from binary scanner.", scannerException);
                 throw new PluginExecutionException("Error scanning the application for Liberty features: " + scannerException.toString());
@@ -336,19 +358,31 @@ public abstract class BinaryScannerUtil {
         return resultSet;
     }
 
+    @SuppressWarnings("unchecked")
     private Set<String> getFeatures(Throwable scannerResponse) {
-        return getFeatures(scannerResponse, "getFeatures");
-    }
-
-    private Set<String> getUnavailableMPFeatures(Throwable scannerResponse) {
-        return getFeatures(scannerResponse, "getUnavailableMPFeatures");
-    }
-    private Set<String> getUnavailableEEFeatures(Throwable scannerResponse) {
-        return getFeatures(scannerResponse, "getUnavailableEEFeatures");
+        return (Set<String>) getMethodResult(scannerResponse, "getFeatures");
     }
 
     @SuppressWarnings("unchecked")
-    private Set<String> getFeatures(Throwable scannerResponse, String method) {
+    private Set<String> getUnavailableMPFeatures(Throwable scannerResponse) {
+        return (Set<String>) getMethodResult(scannerResponse, "getUnavailableMPFeatures");
+    }
+    @SuppressWarnings("unchecked")
+    private Set<String> getUnavailableEEFeatures(Throwable scannerResponse) {
+        return (Set<String>) getMethodResult(scannerResponse, "getUnavailableEEFeatures");
+    }
+
+    @SuppressWarnings("unchecked")
+    private String getInvalidMPTarget(Throwable scannerResponse) {
+        return (String) getMethodResult(scannerResponse, "getIllegalMPTarget");
+    }
+    @SuppressWarnings("unchecked")
+    private String getInvalidEETarget(Throwable scannerResponse) {
+        return (String) getMethodResult(scannerResponse, "getIllegalEETarget");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object getMethodResult(Throwable scannerResponse, String method) {
         try {
             ClassLoader cl = getScannerClassLoader();
             @SuppressWarnings("rawtypes")
@@ -358,7 +392,7 @@ public abstract class BinaryScannerUtil {
                 debug("Error finding " + scannerResponse.getClass().getName() + " method " + method + " using reflection");
                 return null;
             }
-            return (Set<String>) featureMethod.invoke(scannerResponse);
+            return featureMethod.invoke(scannerResponse);
         } catch (ClassNotFoundException | MalformedURLException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException x) {
             debug("An error occurred when trying to call the binary scanner jar " + method + ":"+x.getClass().getName(), x);
             Throwable cause = x.getCause();
@@ -480,6 +514,40 @@ public abstract class BinaryScannerUtil {
         }
         public Set<String> getUnavailableFeatures() {
             return unavailableFeatures;
+        }
+        public String getEELevel() {
+            return eeLevel;
+        }
+        public String getMPLevel() {
+            return mpLevel;
+        }
+    }
+
+    // A class to pass the invalid EE and MP parameters back to the caller.
+    public class IllegalTargetException extends Exception {
+        private static final long serialVersionUID = 1L;
+        String eeLevel;
+        String mpLevel;
+        IllegalTargetException(String eeLevel, String mpLevel) {
+            this.eeLevel = eeLevel;
+            this.mpLevel = mpLevel;
+        }
+        public String getEELevel() {
+            return eeLevel;
+        }
+        public String getMPLevel() {
+            return mpLevel;
+        }
+    }
+
+    // A class to pass the EE and MP parameters which do not work together back to the caller.
+    public class IllegalTargetComboException extends Exception {
+        private static final long serialVersionUID = 1L;
+        String eeLevel;
+        String mpLevel;
+        IllegalTargetComboException(String eeLevel, String mpLevel) {
+            this.eeLevel = eeLevel;
+            this.mpLevel = mpLevel;
         }
         public String getEELevel() {
             return eeLevel;
