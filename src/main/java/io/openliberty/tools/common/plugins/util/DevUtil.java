@@ -1354,12 +1354,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Process getRunProcess(String command) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
         processBuilder.command(getCommandTokens(command));
+        Map<String, String> env = processBuilder.environment();
         if (!OSUtil.isLinux()){
-            Map<String, String> env = processBuilder.environment();
             if (!env.keySet().contains("DOCKER_BUILDKIT")) { // don't touch if already set
                 env.put("DOCKER_BUILDKIT", "0"); // must set 0 on Windows VMs
                 debug("Generating environment for docker build & run: DOCKER_BUILDKIT=0");
             }
+        }
+        if (!env.keySet().contains("DOCKER_SCAN_SUGGEST")) { // don't touch if already set
+            env.put("DOCKER_SCAN_SUGGEST", "false"); // Disable stderr contents from showing as error message
+            debug("Generating environment for docker build & run: DOCKER_SCAN_SUGGEST=false");
         }
         return processBuilder.start();
     }
