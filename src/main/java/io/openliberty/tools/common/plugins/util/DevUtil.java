@@ -45,6 +45,8 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,6 +81,11 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
+
+import javax.xml.stream.FactoryConfigurationError;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.NameFileFilter;
@@ -394,6 +401,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private final boolean container;
     private String imageName;
     private String containerName;
+    private Timestamp containerStartTimestamp;
+    private Timestamp containerStopTimestamp;
     private File dockerfile;
     private File dockerBuildContext;
     private Path tempDockerfilePath = null;
@@ -1386,6 +1395,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         });
         logCopyErrorThread.start();
 
+        containerStartTimestamp = Timestamp.from(Instant.now());
+        writeDevcMetadata();
         if (timeout == 0) {
             startingProcess.waitFor();
         } else {
@@ -1400,6 +1411,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("Unexpected exit running docker command, return value=" + startingProcess.exitValue());
             // show first message from standard err
             String errorMessage = new String(firstErrorLine).trim() + " RC=" + startingProcess.exitValue();
+            containerStopTimestamp = Timestamp.from(Instant.now());
+            writeDevcMetadata();
             throw new RuntimeException(errorMessage);
         }
     }
@@ -1503,6 +1516,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 String dockerStopCmd = "docker stop " + containerName;
                 debug("Stopping container " + containerName);
                 execDockerCmd(dockerStopCmd, DOCKER_TIMEOUT + 20); // allow extra time for server shutdown
+                containerStopTimestamp = Timestamp.from(Instant.now());
+                writeDevcMetadata();
             }
         } catch (RuntimeException r) {
             error("Error stopping container: " + r.getMessage());
@@ -5637,5 +5652,38 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         servUtil.getServerXmlFeatures(genFeatSet, configDirectory,
                 generatedFeaturesFile, null, null);
         return genFeatSet;
+    }
+
+    /**
+     * Create metadata when running devc mode and containers
+     * Language server then uses metadata file to connect
+     * 
+     * @throws XMLStreamException
+     * @throws IOException
+     * @throws FactoryConfigurationError
+     */
+    public void writeDevcMetadata() {
+        File metaFile = new File(serverDirectory, "liberty-dev-metadata.xml");
+        try {
+            XMLStreamWriter metadataWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(new FileWriter(metaFile)) ;
+            metadataWriter.writeStartDocument();
+            metadataWriter.writeStartElement("devModeMetaData");
+            writeElement(metadataWriter, "containerName", containerName != null ? containerName : DEVMODE_CONTAINER_BASE_NAME);
+            if (containerStartTimestamp != null) writeElement(metadataWriter, "startTime", containerStartTimestamp.toString());
+            if (containerStopTimestamp != null) writeElement(metadataWriter, "stopTime", containerStopTimestamp.toString());
+            metadataWriter.writeEndElement();
+            metadataWriter.writeEndDocument();
+    
+            metadataWriter.flush();
+            metadataWriter.close();
+        } catch (Exception e) {
+            warn("Failed to write metadata.");
+        }
+    }
+
+    private void writeElement(XMLStreamWriter writer, String element, String optional) throws XMLStreamException {
+        writer.writeStartElement(element);
+        if (optional != null) writer.writeCharacters(optional);
+        writer.writeEndElement();
     }
 }
