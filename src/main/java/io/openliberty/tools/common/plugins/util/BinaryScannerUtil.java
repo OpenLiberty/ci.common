@@ -412,6 +412,9 @@ public abstract class BinaryScannerUtil {
      * @return String parameter passed to binary scanner
      */
     public static String composeEEVersion(String ver) {
+        if (ver == null) {
+            return null;
+        }
         String majorVersion;
         int offset = ver.indexOf(".");
         majorVersion = (offset == -1) ? ver : ver.substring(0, offset);
@@ -426,6 +429,9 @@ public abstract class BinaryScannerUtil {
      * @return String parameter passed to binary scanner or null in case of error
      */
     public static String composeMPVersion(String ver) {
+        if (ver == null) {
+            return null;
+        }
         int offset = ver.indexOf("-RC"); // clean up 4.1-RC to 4.1
         if (offset > 0) {
             ver = ver.substring(0, offset);
