@@ -401,8 +401,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private final boolean container;
     private String imageName;
     private String containerName;
-    private Timestamp containerStartTimestamp;
-    private Timestamp containerStopTimestamp;
+    protected String containerStartTimestamp;
+    protected String containerStopTimestamp;
     private File dockerfile;
     private File dockerBuildContext;
     private Path tempDockerfilePath = null;
@@ -1395,7 +1395,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         });
         logCopyErrorThread.start();
 
-        containerStartTimestamp = Timestamp.from(Instant.now());
+        containerStartTimestamp = Timestamp.from(Instant.now()).toString();
         writeDevcMetadata();
         if (timeout == 0) {
             startingProcess.waitFor();
@@ -1411,7 +1411,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("Unexpected exit running docker command, return value=" + startingProcess.exitValue());
             // show first message from standard err
             String errorMessage = new String(firstErrorLine).trim() + " RC=" + startingProcess.exitValue();
-            containerStopTimestamp = Timestamp.from(Instant.now());
+            containerStopTimestamp = Timestamp.from(Instant.now()).toString();
             writeDevcMetadata();
             throw new RuntimeException(errorMessage);
         }
@@ -1516,7 +1516,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 String dockerStopCmd = "docker stop " + containerName;
                 debug("Stopping container " + containerName);
                 execDockerCmd(dockerStopCmd, DOCKER_TIMEOUT + 20); // allow extra time for server shutdown
-                containerStopTimestamp = Timestamp.from(Instant.now());
+                containerStopTimestamp = Timestamp.from(Instant.now()).toString();
                 writeDevcMetadata();
             }
         } catch (RuntimeException r) {
@@ -5658,12 +5658,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Create metadata when running devc mode and containers
      * Language server then uses metadata file to connect
      * 
-     * @throws XMLStreamException
-     * @throws IOException
-     * @throws FactoryConfigurationError
      */
     public void writeDevcMetadata() {
-        File metaFile = new File(serverDirectory, "liberty-dev-metadata.xml");
+        File metaFile = new File(buildDirectory, serverDirectory.getName() + "-liberty-devc-metadata.xml");
         try {
             XMLStreamWriter metadataWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(new FileWriter(metaFile)) ;
             metadataWriter.writeStartDocument();

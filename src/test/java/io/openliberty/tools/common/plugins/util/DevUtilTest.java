@@ -532,12 +532,13 @@ public class DevUtilTest extends BaseDevUtilTest {
 
     @Test
     public void testWriteDevcMetadataSimple() throws XMLStreamException, FactoryConfigurationError, IOException {
+        util = getNewDevUtil(serverDirectory, targetDir);
         util.writeDevcMetadata();
-        File metaDataXml = new File(serverDirectory, "liberty-dev-metadata.xml");
+        File metaDataXml = new File(targetDir, serverDirectory.getName() + "-liberty-devc-metadata.xml");
         assertTrue(metaDataXml.exists());
         String content = FileUtils.readFileToString(metaDataXml, "UTF-8");
-        // assertTrue(content.contains("<startTime>"));
         assertTrue(content.contains("<containerName>liberty-dev</containerName"));
-        assertFalse(content.contains("<stopTime>") || content.contains("</stopTime>"));
+        assertTrue(content.contains("<startTime>start</startTime>"));
+        assertTrue(content.contains("<stopTime>stop</stopTime>"));
     }
 }
