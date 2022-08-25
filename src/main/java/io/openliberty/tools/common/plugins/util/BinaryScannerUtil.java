@@ -529,12 +529,11 @@ public abstract class BinaryScannerUtil {
         }
     }
 
-    // A class to pass the invalid EE and MP parameters back to the caller.
-    public class IllegalTargetException extends Exception {
+    public abstract class AbstractIllegalTargetException extends Exception {
         private static final long serialVersionUID = 1L;
         String eeLevel;
         String mpLevel;
-        IllegalTargetException(String eeLevel, String mpLevel) {
+        AbstractIllegalTargetException(String eeLevel, String mpLevel) {
             this.eeLevel = eeLevel;
             this.mpLevel = mpLevel;
         }
@@ -546,20 +545,19 @@ public abstract class BinaryScannerUtil {
         }
     }
 
-    // A class to pass the EE and MP parameters which do not work together back to the caller.
-    public class IllegalTargetComboException extends Exception {
+    // A class to pass the invalid EE and MP parameters back to the caller.
+    public class IllegalTargetException extends AbstractIllegalTargetException {
         private static final long serialVersionUID = 1L;
-        String eeLevel;
-        String mpLevel;
+        IllegalTargetException(String eeLevel, String mpLevel) {
+            super(eeLevel, mpLevel);
+        }
+    }
+
+    // A class to pass the EE and MP parameters which do not work together back to the caller.
+    public class IllegalTargetComboException extends AbstractIllegalTargetException {
+        private static final long serialVersionUID = 1L;
         IllegalTargetComboException(String eeLevel, String mpLevel) {
-            this.eeLevel = eeLevel;
-            this.mpLevel = mpLevel;
-        }
-        public String getEELevel() {
-            return eeLevel;
-        }
-        public String getMPLevel() {
-            return mpLevel;
+            super(eeLevel, mpLevel);
         }
     }
 }
