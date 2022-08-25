@@ -444,6 +444,39 @@ public abstract class BinaryScannerUtil {
         return null;
     }
 
+    /**
+     * Convenience method to build the string reported to the user when the exception is detected.
+     * 
+     * This is used after the caller has analyzed the Java or Jakarta EE version number and the MicroProfile
+     * version number and generated argument values to pass to the binary scanner. If the binary scanner
+     * detects a problem and throws an exception it reports the invalid arguments. We must map the invalid
+     * arguments back to the user specified version number in order to fix the problem.
+     * 
+     * @param invalidEEArg - the argument passed to the binary scanner which may be returned as invalid.
+     * @param invalidMPArg - the argument passed to the binary scanner which may be returned as invalid.
+     * @param eeVersion - the user specified version string from the build file used to generate the arg.
+     * @param mpVersion - the user specified version string from the build file used to generate the arg.
+     * @return a string we can report to the user to report an error or errors and guide the effort to fix it.
+     */
+    public static String buildInvalidArgExceptionMessage(String invalidEEArg, String invalidMPArg, String eeVersion, String mpVersion) {
+        String messages = null;
+        if (invalidEEArg != null) {
+            messages = String.format(BINARY_SCANNER_INVALID_EE_MESSAGE, eeVersion);
+        }
+        if (invalidMPArg != null) {
+            if (messages != null) {
+                messages += "\n" ;
+                messages += String.format(BINARY_SCANNER_INVALID_MP_MESSAGE, mpVersion);
+            } else {
+                messages = String.format(BINARY_SCANNER_INVALID_MP_MESSAGE, mpVersion);
+            }
+        }
+        if (messages == null) { // We need to be prepared for this situation from the binary scanner.
+            messages = BINARY_SCANNER_INVALID_EEMPARG_MESSAGE;
+        }
+        return messages;
+    }
+
     // A class to pass the list of conflicts back to the caller.
     public class NoRecommendationException extends Exception {
         private static final long serialVersionUID = 1L;
