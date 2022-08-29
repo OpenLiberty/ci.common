@@ -36,6 +36,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 
+import javax.xml.stream.FactoryConfigurationError;
+import javax.xml.stream.XMLStreamException;
+
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -527,5 +530,19 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertEquals(omitFiles, util.getOmitFilesList(looseAppFile, new File("/src/main/webapp").getCanonicalPath()));
     }
 
+    @Test
+    public void testWriteDevcMetadataSimple() throws XMLStreamException, FactoryConfigurationError, IOException {
+        util = getNewDevUtil(serverDirectory, targetDir);
+        util.writeDevcMetadata(true);
+        File metaDataXml = new File(targetDir, serverDirectory.getName() + "-liberty-devc-metadata.xml");
+        assertTrue(metaDataXml.exists());
+        String content = FileUtils.readFileToString(metaDataXml, "UTF-8");
+        assertTrue(content.contains("<containerName>liberty-dev</containerName"));
+        assertTrue(content.contains("<containerAlive>true</containerAlive>"));
 
+        util.writeDevcMetadata(false);
+        content = FileUtils.readFileToString(metaDataXml, "UTF-8");
+        assertTrue(content.contains("<containerName>liberty-dev</containerName"));
+        assertTrue(content.contains("<containerAlive>false</containerAlive>"));
+    }
 }

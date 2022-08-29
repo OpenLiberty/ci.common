@@ -43,6 +43,12 @@ public class BaseDevUtilTest {
                     false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null, webResourceDirs);
         }
 
+        public DevTestUtil(File serverDirectory, File buildDir) {
+            super(buildDir, serverDirectory, null, null, null, null, null,
+                    null, false, false, false, false, null, 30, 30, 5, 500, true, false, false, false,
+                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null, null);
+        }
+
         @Override
         public void debug(String msg) {
             // not needed for tests
@@ -254,5 +260,9 @@ public class BaseDevUtilTest {
     
     public DevUtil getNewDevUtil(File serverDirectory) throws IOException  {
         return new DevTestUtil(serverDirectory, null, null, null, null, null, false, false);
+    }
+
+    public DevUtil getNewDevUtil(File serverDirectory, File buildDir) {
+        return new DevTestUtil(serverDirectory, buildDir);
     }
 }
