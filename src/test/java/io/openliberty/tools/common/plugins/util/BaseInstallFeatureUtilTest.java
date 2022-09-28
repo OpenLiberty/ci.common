@@ -36,6 +36,7 @@ public class BaseInstallFeatureUtilTest {
     private static final String RESOURCES_INSTALL_DIR = RESOURCES_DIR + "/installdir";
     
     public File installDir;
+    public File buildDir;
     
     @Rule
     public TemporaryFolder temp = new TemporaryFolder();
@@ -45,11 +46,13 @@ public class BaseInstallFeatureUtilTest {
         installDir = temp.newFolder();
         File src = new File(RESOURCES_INSTALL_DIR);
         FileUtils.copyDirectory(src, installDir);
+
+        buildDir = temp.newFolder();
     }
     
     public class InstallFeatureTestUtil extends InstallFeatureUtil {
-        public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, List<String> additionalJsons)  throws PluginScenarioException, PluginExecutionException {
-            super(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, null, additionalJsons);
+        public InstallFeatureTestUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, List<String> additionalJsons)  throws PluginScenarioException, PluginExecutionException {
+            super(installDirectory, buildDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, null, additionalJsons);
         }
 
         @Override
@@ -99,15 +102,15 @@ public class BaseInstallFeatureUtilTest {
     }
     
     public InstallFeatureUtil getNewInstallFeatureUtil() throws PluginExecutionException, PluginScenarioException {
-        return getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
+        return getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
     }
 
-    public InstallFeatureUtil getNewInstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginExecutionException, PluginScenarioException {
+    public InstallFeatureUtil getNewInstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginExecutionException, PluginScenarioException {
         List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDirectory);
         String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
         List<String> additionalJsons = new ArrayList<String>();
 
-        return new InstallFeatureTestUtil(installDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, additionalJsons);
+        return new InstallFeatureTestUtil(installDirectory, buildDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, additionalJsons);
     }
     
 }

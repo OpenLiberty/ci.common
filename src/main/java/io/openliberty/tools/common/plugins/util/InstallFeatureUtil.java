@@ -61,7 +61,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-
+import org.apache.commons.io.FileUtils;
 
 
 /**
@@ -82,6 +82,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     public static final String CONFLICT_MESSAGE = "A feature conflict error occurred while installing features: ";
 
     private final File installDirectory;
+
+    private final File buildDirectory;
 
     private File installJarFile;
 
@@ -126,8 +128,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @throws PluginExecutionException If properties files cannot be found in the
      *                                  installDirectory/lib/versions
      */
-    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, String containerName, List<String> additionalJsons) throws PluginScenarioException, PluginExecutionException {
+    public InstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, String containerName, List<String> additionalJsons) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
+        this.buildDirectory = buildDirectory;
         this.to = to;
         this.propertiesList = propertiesList;
         this.openLibertyVersion = openLibertyVersion;
@@ -651,6 +654,17 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
             productInfoValidate();
             info("The following features have been installed: " + installedFeaturesBuilder.toString());
+
+            // Look for and remove .libertyls folder (Liberty Tools) to cause regeneration of the schema
+            File schemaGenDir = new File(buildDirectory, ".libertyls");
+            if (schemaGenDir.exists() && schemaGenDir.isDirectory()) {
+                try {
+                    FileUtils.deleteDirectory(schemaGenDir);
+                    debug("Deleted .libertyls directory after installing features.");
+                } catch (IOException e) {
+                    debug("Could not delete .libertyls directory after installing features.");
+                }
+            }
         } catch (PrivilegedActionException e) {
             throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
         } catch (IOException e) {
