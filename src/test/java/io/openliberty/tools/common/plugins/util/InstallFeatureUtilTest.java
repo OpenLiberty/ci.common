@@ -47,7 +47,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         File wlProps = new File(installDir, "lib/versions/WebSphereApplicationServer.properties");
         assertTrue(olProps.delete());
         assertTrue(wlProps.delete());
-        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
     }
     
     /**
@@ -57,7 +57,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorNoInstallMap() throws Exception {
         File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
         assertTrue(installMap.delete());
-        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
     }
     
     /**
@@ -67,7 +67,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorNoOpenLibertyProperties() throws Exception {
         File olProps = new File(installDir, "lib/versions/openliberty.properties");
         assertTrue(olProps.delete());
-        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
     }
     
     /**
@@ -79,12 +79,12 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         assertTrue(olProps.delete());
         File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
         assertTrue(installMap.delete());
-        getNewInstallFeatureUtil(installDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
     }
         
     @Test
     public void testConstructorTo() throws Exception {
-        InstallFeatureUtil util = getNewInstallFeatureUtil(installDir, null, "myextension", new HashSet<String>());
+        InstallFeatureUtil util = getNewInstallFeatureUtil(installDir, buildDir, null, "myextension", new HashSet<String>());
         assertNotNull(util);
     }
     
@@ -93,7 +93,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
      */
     @Test(expected = PluginScenarioException.class)
     public void testConstructorFrom() throws Exception {
-        getNewInstallFeatureUtil(installDir, installDir.getAbsolutePath(), null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, installDir.getAbsolutePath(), null, new HashSet<String>());
     }
     
     /**
@@ -103,7 +103,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorEsas() throws Exception {
         Set<String> esas = new HashSet<String>();
         esas.add("abc.esa");
-        getNewInstallFeatureUtil(installDir, null, null, esas);
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, esas);
     }
     
     /**
@@ -193,7 +193,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir);
         String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
         List<String> additionalJsons = new ArrayList<String>();
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion, additionalJsons) {
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, buildDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion, additionalJsons) {
             @Override
             public File downloadArtifact(String groupId, String artifactId, String type, String version)
                     throws PluginExecutionException {
