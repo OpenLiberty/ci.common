@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -420,7 +421,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         File includeFile = null;
         if (isURL(includeFileName)) {
             try {
-                File tempFile = File.createTempFile("serverFromURL", ".xml");
+                File tempFile = Files.createTempFile("serverFromURL", ".xml").toFile();
                 FileUtils.copyURLToFile(new URL(includeFileName), tempFile, COPY_FILE_TIMEOUT_MILLIS, COPY_FILE_TIMEOUT_MILLIS);
                 includeFile = tempFile;
             } catch (IOException e) {
