@@ -42,6 +42,11 @@ public class JavaCompilerOptions {
     private boolean showWarnings = false;
 
     /**
+     * Source file encoding
+     */
+    private String encoding;
+
+    /**
      * Get list of options that can be passed to the compiler.
      * Options with values are represented as multiple strings in the list
      *  e.g. "-source" and "1.8"
@@ -56,6 +61,7 @@ public class JavaCompilerOptions {
         addStringOption(options, "-source", source);
         addStringOption(options, "-target", target);
         addStringOption(options, "--release", release);
+        addStringOption(options, "-encoding", encoding);
         return options;
     }
 
@@ -96,6 +102,14 @@ public class JavaCompilerOptions {
 
     public void setRelease(String release) {
         this.release = release;
+    }
+
+    public String getEncoding() {
+        return encoding;
+    }
+
+    public void setEncoding(String encoding) {
+        this.encoding = encoding;
     }
 
 }
