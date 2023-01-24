@@ -29,10 +29,6 @@ jobs:
       with:
         repository: OpenLiberty/ci.ant
         path: ci.ant
-    - name: Set up Maven
-      uses: stCarolas/setup-maven@v4.2
-      with:
-        maven-version: 3.8.1
     - name: Setup Java ${{ matrix.java }}
       uses: actions/setup-java@v2
       with:
@@ -45,4 +41,4 @@ jobs:
         mvn clean install
         cd ..
     - name: Build and run tests
-      run: mvn clean install
+      run: ./mvnw clean install
