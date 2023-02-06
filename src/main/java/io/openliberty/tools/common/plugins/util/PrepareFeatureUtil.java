@@ -251,8 +251,10 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				json = (File) mapBasedInstallKernel.get("generate.json");
 				
 				if (mapBasedInstallKernel.get("action.error.message") != null) {
+					debug("generateJson action.error.message: "
+							+ mapBasedInstallKernel.get("action.error.message"));
 					debug("generateJson action.exception.stacktrace: "
-							+ mapBasedInstallKernel.get("action.error.stacktrace"));
+							+ mapBasedInstallKernel.get("action.exception.stacktrace"));
 				}	
 
 			} catch (PrivilegedActionException e) {
