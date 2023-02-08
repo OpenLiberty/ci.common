@@ -31,6 +31,7 @@ public class JavaCompilerOptionsTest {
         jco.setSource("9");
         jco.setTarget("1.8");
         jco.setRelease("10");
+        jco.setEncoding("UTF-8");
         
         List<String> result = jco.getOptions();
         int i = 0;
@@ -40,6 +41,8 @@ public class JavaCompilerOptionsTest {
         assertTrue(result.get(i++).equals("1.8"));
         assertTrue(result.get(i++).equals("--release"));
         assertTrue(result.get(i++).equals("10"));
+        assertTrue(result.get(i++).equals("-encoding"));
+        assertTrue(result.get(i++).equals("UTF-8"));
         assertEquals(i, result.size());
     }
     
@@ -86,6 +89,18 @@ public class JavaCompilerOptionsTest {
         assertTrue(result.get(0).equals("-nowarn"));
         assertTrue(result.get(1).equals("--release"));
         assertTrue(result.get(2).equals("10"));
+    }
+
+    @Test
+    public void testEncoding() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setEncoding("UTF-8");
+
+        List<String> result = jco.getOptions();
+        assertEquals(3, result.size());
+        assertTrue(result.get(0).equals("-nowarn"));
+        assertTrue(result.get(1).equals("-encoding"));
+        assertTrue(result.get(2).equals("UTF-8"));
     }
 
 }
