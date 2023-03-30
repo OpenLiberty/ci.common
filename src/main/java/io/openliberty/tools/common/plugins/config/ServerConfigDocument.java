@@ -534,6 +534,10 @@ public class ServerConfigDocument {
             }
         }
 
+        // For Windows, avoid escaping the backslashes by changing to forward slashes
+        resolved = resolved.replace("\\","/");
+        log.debug("Expression "+ nodeValue +" evaluated and replaced with "+resolved);
+
         return resolved;
     }
 
