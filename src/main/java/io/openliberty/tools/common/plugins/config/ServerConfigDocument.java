@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2019.
+ * (C) Copyright IBM Corporation 2017, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,12 +41,14 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
 import org.w3c.dom.NamedNodeMap;
 import org.xml.sax.SAXException;
 
 import io.openliberty.tools.common.CommonLoggerI;
+import io.openliberty.tools.common.plugins.util.PropertyUtil;
 
 // Moved from ci.maven/liberty-maven-plugin/src/main/java/net/wasdev/wlp/maven/plugins/ServerConfigDocument.java
 public class ServerConfigDocument {
@@ -66,6 +68,7 @@ public class ServerConfigDocument {
     private static HashMap<String, String> locationsAndNames;
     private static Properties props;
     private static Properties defaultProps;
+    private static Map<String, File> libertyDirectoryPropertyToFile = null;
 
     private static final String VARIABLE_NAME_PATTERN = "\\$\\{(.*?)\\}";
     private static final Pattern varNamePattern = Pattern.compile(VARIABLE_NAME_PATTERN);
@@ -108,6 +111,10 @@ public class ServerConfigDocument {
         return props;
     }
 
+    public static Map<String, File> getLibertyDirPropertyFiles() {
+        return libertyDirectoryPropertyToFile;
+    }
+
     public static Properties getDefaultProperties() {
         return defaultProps;
     }
@@ -118,12 +125,17 @@ public class ServerConfigDocument {
 
     public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile) {
-        this(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true);
+        this(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true, null);
     }
 
     public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) {
-        initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence);
+        this(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, null);
+    }
+
+    public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
+            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
+        initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
     }
 
     private static DocumentBuilder getDocumentBuilder() {
@@ -153,26 +165,37 @@ public class ServerConfigDocument {
     
     public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile) throws IOException {
-        return getInstance(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true);
+        return getInstance(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true, null);
     }
 
     public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) throws IOException {
+        return getInstance(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, null);
+    }
+
+    public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
+            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) throws IOException {
         // Initialize if instance is not created yet, or source server xml file
         // location has been changed.
         if (instance == null || !serverXML.getCanonicalPath().equals(getServerXML().getCanonicalPath())) {
-            instance = new ServerConfigDocument(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence);
+            instance = new ServerConfigDocument(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
         }
         return instance;
     }
 
     private static void initializeAppsLocation(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) {
+            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
         try {
             ServerConfigDocument.log = log;
             serverXMLFile = serverXML;
             configDirectory = configDir;
-
+            if (libertyDirPropertyFiles != null) {
+                libertyDirectoryPropertyToFile = new HashMap(libertyDirPropertyFiles);
+            } else {
+                log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
+                libertyDirectoryPropertyToFile = new HashMap<String,File>();
+            }
+    
             locations = new HashSet<String>();
             names = new HashSet<String>();
             namelessLocations = new HashSet<String>();
@@ -310,6 +333,7 @@ public class ServerConfigDocument {
                         locations.add(nodeValue);
                     }
                 } else if (!locations.contains(resolved)) {
+                    log.debug("Adding resolved app location: "+resolved+" for specified location: "+nodeValue);
                     locations.add(resolved);
                 }
             }
@@ -514,20 +538,26 @@ public class ServerConfigDocument {
     }
 
     private static String getPropertyValue(String propertyName) {
-        String value = getProperties().getProperty(propertyName);
-        if (value == null) {
-            // Check for default value since no other value found.
-            value = getDefaultProperties().getProperty(propertyName);
-        }
-        if (value == null && propertyName.startsWith("env.") && propertyName.length() > 4) {
-            // Look for property without the 'env.' prefix
-            String newPropName = propertyName.substring(4);
-            value = getProperties().getProperty(newPropName);
+        String value = null;
+        if(!getLibertyDirPropertyFiles().containsKey(propertyName)) {
+            value = getProperties().getProperty(propertyName);
             if (value == null) {
                 // Check for default value since no other value found.
-                value = getDefaultProperties().getProperty(newPropName);
+                value = getDefaultProperties().getProperty(propertyName);
             }
-        }
+            if (value == null && propertyName.startsWith("env.") && propertyName.length() > 4) {
+                // Look for property without the 'env.' prefix
+                String newPropName = propertyName.substring(4);
+                value = getProperties().getProperty(newPropName);
+                if (value == null) {
+                    // Check for default value since no other value found.
+                    value = getDefaultProperties().getProperty(newPropName);
+                }
+            }
+        } else {
+            File envDirectory = getLibertyDirPropertyFiles().get(propertyName);
+            value = envDirectory.toString();
+        }            
         return value;
     }
 
@@ -569,15 +599,23 @@ public class ServerConfigDocument {
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
-            String nodeValue = nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue();
+            if (nodeList.item(i) instanceof Element) {
+                Element child = (Element) nodeList.item(i);
+                String includeFileName = PropertyUtil.evaluateExpression(log, props, child.getAttribute("location"), libertyDirectoryPropertyToFile);
 
-            if (!nodeValue.isEmpty()) {
-                Document docIncl = getIncludeDoc(nodeValue);
+                if (includeFileName == null || includeFileName.trim().isEmpty()) {
+                    log.warn("Unable to resolve include file location "+child.getAttribute("location")+". Skipping the included file during application location processing.");
+                    return;
+                }
+                    
+                Document docIncl = getIncludeDoc(includeFileName);
 
                 if (docIncl != null) {
                     parseVariables(docIncl);
                     // handle nested include elements
                     parseIncludeVariables(docIncl);
+                } else {
+                    log.warn("Unable to parse include file "+includeFileName+". Skipping the included file during application location processing.");
                 }
             }
         }
