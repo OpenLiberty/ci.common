@@ -491,7 +491,8 @@ public class ServerConfigDocument {
      */
     private static String resolveVariables(String nodeValue, Collection<String> variableChain) {
 
-        String resolved = nodeValue;
+        // For Windows, avoid escaping the backslashes in the resolvedValue by changing to forward slashes
+        String resolved = nodeValue.replace("\\","/");
         Matcher varNameMatcher = varNamePattern.matcher(nodeValue);
 
         Collection<String> variablesToResolve = new HashSet<String> ();
@@ -522,8 +523,9 @@ public class ServerConfigDocument {
 
                 if (resolvedValue != null) {
                     String escapedVariable = Matcher.quoteReplacement(nextVariable);
-                    String escapedValue = Matcher.quoteReplacement(resolvedValue);
-                    resolved = resolved.replaceAll("\\$\\{" + escapedVariable + "\\}", escapedValue);
+                    // For Windows, avoid escaping the backslashes in the resolvedValue by changing to forward slashes
+                    resolvedValue = resolvedValue.replace("\\","/");
+                    resolved = resolved.replaceAll("\\$\\{" + escapedVariable + "\\}", resolvedValue);
                 } else {
                     // Variable value could not be resolved. Log message and return null.
                     log.debug("Could not resolve the value " + value + " for variable ${" + nextVariable + "}");
@@ -536,8 +538,6 @@ public class ServerConfigDocument {
             }
         }
 
-        // For Windows, avoid escaping the backslashes by changing to forward slashes
-        // resolved = resolved.replace("\\","/");
         log.debug("Expression "+ nodeValue +" evaluated and replaced with "+resolved);
 
         return resolved;
