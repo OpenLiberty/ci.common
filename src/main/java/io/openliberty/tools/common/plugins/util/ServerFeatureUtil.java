@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2021.
+ * (C) Copyright IBM Corporation 2019, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,6 +104,26 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      * @param msg
      */
     public abstract void info(String msg);
+
+    /**
+     * Log error
+     * @param msg
+     */
+    public abstract void error(String msg);
+
+    /**
+     * Log error
+     * @param msg
+     * @param e
+     */
+    public abstract void error(String msg, Throwable e);
+
+    /**
+     * Returns whether debug is enabled by the current logger
+     * 
+     * @return whether debug is enabled
+     */
+    public abstract boolean isDebugEnabled();
 
     /**
      * Get the set of features defined in the server.xml
