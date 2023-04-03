@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2021.
+ * (C) Copyright IBM Corporation 2019, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,10 +48,12 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
+import io.openliberty.tools.common.CommonLoggerI;
+
 /**
  * Utility class to determine server features
  */
-public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
+public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil implements CommonLoggerI {
     
     public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
     public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
@@ -102,6 +104,26 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
      * @param msg
      */
     public abstract void info(String msg);
+
+    /**
+     * Log error
+     * @param msg
+     */
+    public abstract void error(String msg);
+
+    /**
+     * Log error
+     * @param msg
+     * @param e
+     */
+    public abstract void error(String msg, Throwable e);
+
+    /**
+     * Returns whether debug is enabled by the current logger
+     * 
+     * @return whether debug is enabled
+     */
+    public abstract boolean isDebugEnabled();
 
     /**
      * Get the set of features defined in the server.xml
@@ -410,7 +432,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
     private Set<String> parseIncludeNode(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
-        String includeFileName = evaluateExpression(bootstrapProperties, node.getAttribute("location"));
+        String includeFileName = PropertyUtil.evaluateExpression(this, bootstrapProperties, node.getAttribute("location"), libertyDirectoryPropertyToFile);
 
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
             warn("Unable to parse include file "+node.getAttribute("location")+". Skipping the included features.");
@@ -514,75 +536,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil {
         return prop;
     }
 
-    private String evaluateExpression(Properties properties, String expression) {
-        String value = expression;
-        if (expression != null) {
-            Pattern p = Pattern.compile("\\$\\{(.*?)\\}");
-            Matcher m = p.matcher(expression);
-            StringBuffer sb = new StringBuffer();
-            while (m.find()) {
-                String variable = m.group(1);
-                
-                String propertyValue = properties.getProperty(variable, "${" + variable + "}");
-                
-                // Remove encapsulating ${} characters and validate that a valid liberty directory property was configured
-                propertyValue = removeEncapsulatingEnvVarSyntax(propertyValue, properties); 
-                
-                if (propertyValue == null) {
-                    return null;
-                }
 
-                m.appendReplacement(sb, propertyValue);
-            }
-            m.appendTail(sb);
-            value = sb.toString();
-        }
-        // For Windows, avoid escaping the backslashes by changing to forward slashes
-        value = value.replace("\\","/");
-        debug("Include location attribute "+ expression +" evaluated and replaced with "+value);
-        return value;
-    }
-
-    private String removeEncapsulatingEnvVarSyntax(String propertyValue, Properties properties){
-        Pattern p = Pattern.compile("\\$\\{(.*?)\\}");
-        Matcher m = p.matcher(propertyValue);
-        StringBuffer sb = new StringBuffer();
-        while (m.find()) {
-            String envDirectoryProperty = m.group(1);
-            if(!libertyDirectoryPropertyToFile.containsKey(envDirectoryProperty)) {
-                // Check if property is a reference to a configured bootstrap property
-                String bootStrapValue = properties.getProperty(envDirectoryProperty);
-                if(bootStrapValue != null) {
-                    // For Windows, avoid escaping the backslashes by changing to forward slashes
-                    bootStrapValue = bootStrapValue.replace("\\","/");
-                    m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(bootStrapValue, properties));
-                } else {
-                    warn("The referenced property " + envDirectoryProperty + " is not a predefined Liberty directory property or a configured bootstrap property.");
-                    return null;
-                }
-            } else {
-                File envDirectory = libertyDirectoryPropertyToFile.get(envDirectoryProperty);
-                String path = envDirectory.toString();
-                // For Windows, avoid escaping the backslashes by changing to forward slashes
-                path = path.replace("\\","/");
-                m.appendReplacement(sb, path);
-            }
-        }
-        m.appendTail(sb);
-        String returnValue = sb.toString();
-        if (sb.charAt(0) == '"' && sb.charAt(sb.length()-1) == '"') {
-            if (sb.length() > 2) {
-                returnValue = sb.substring(1,sb.length()-1);
-            } else {
-                // The sb variable just contains a beginning and ending quote. Return an empty String.
-                returnValue = "";
-            }
-        }
-        // For Windows, avoid escaping the backslashes by changing to forward slashes
-        returnValue = returnValue.replace("\\","/");
-        debug("Include location attribute property value "+ propertyValue +" replaced with "+ returnValue);
-        return returnValue;
-    }
 
     // return the server file path relative to the server directory
     private String getRelativeServerFilePath(File serverDirectory, File serverFile) {
