@@ -25,7 +25,11 @@ import io.openliberty.tools.common.CommonLoggerI;
 
 public class PropertyUtil {
     public static String evaluateExpression(CommonLoggerI log, Properties properties, String expression,  Map<String, File> libertyDirectoryPropertyToFile) {
-        String value = expression;
+        return evaluateExpression(log, properties, new Properties(), expression, libertyDirectoryPropertyToFile);
+    }
+
+    public static String evaluateExpression(CommonLoggerI log, Properties properties, Properties defaultProps, String expression,  Map<String, File> libertyDirectoryPropertyToFile) {
+            String value = expression;
         if (expression != null) {
             Pattern p = Pattern.compile("\\$\\{(.*?)\\}");
             Matcher m = p.matcher(expression);
@@ -36,7 +40,7 @@ public class PropertyUtil {
                 String propertyValue = properties.getProperty(variable, "${" + variable + "}");
                 
                 // Remove encapsulating ${} characters and validate that a valid liberty directory property was configured
-                propertyValue = removeEncapsulatingEnvVarSyntax(log, propertyValue, properties, libertyDirectoryPropertyToFile); 
+                propertyValue = removeEncapsulatingEnvVarSyntax(log, propertyValue, properties, defaultProps, libertyDirectoryPropertyToFile); 
                 
                 if (propertyValue == null) {
                     return null;
@@ -53,19 +57,33 @@ public class PropertyUtil {
         return value;
     }
 
-    public static String removeEncapsulatingEnvVarSyntax(CommonLoggerI log, String propertyValue, Properties properties, Map<String, File> libertyDirectoryPropertyToFile){
+    public static String removeEncapsulatingEnvVarSyntax(CommonLoggerI log, String propertyValue, Properties properties, Properties defaultProps, Map<String, File> libertyDirectoryPropertyToFile){
         Pattern p = Pattern.compile("\\$\\{(.*?)\\}");
         Matcher m = p.matcher(propertyValue);
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
             String envDirectoryProperty = m.group(1);
             if(!libertyDirectoryPropertyToFile.containsKey(envDirectoryProperty)) {
-                // Check if property is a reference to a configured bootstrap property
-                String bootStrapValue = properties.getProperty(envDirectoryProperty);
-                if(bootStrapValue != null) {
+                // Check if property is a reference to a configured property
+                String value = properties.getProperty(envDirectoryProperty);
+                if (value == null) {
+                    // Check for default value since no other value found.
+                    value = defaultProps.getProperty(envDirectoryProperty);
+                }
+                if (value == null && envDirectoryProperty.startsWith("env.") && envDirectoryProperty.length() > 4) {
+                    // Look for property without the 'env.' prefix
+                    String newPropName = envDirectoryProperty.substring(4);
+                    value = properties.getProperty(newPropName);
+                    if (value == null) {
+                        // Check for default value since no other value found.
+                        value = defaultProps.getProperty(newPropName);
+                    }
+                }
+
+                if(value != null) {
                     // For Windows, avoid escaping the backslashes by changing to forward slashes
-                    bootStrapValue = bootStrapValue.replace("\\","/");
-                    m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(log, bootStrapValue, properties, libertyDirectoryPropertyToFile));
+                    value = value.replace("\\","/");
+                    m.appendReplacement(sb, removeEncapsulatingEnvVarSyntax(log, value, properties, defaultProps, libertyDirectoryPropertyToFile));
                 } else {
                     log.warn("The referenced property " + envDirectoryProperty + " is not a predefined Liberty directory property or a configured bootstrap property.");
                     return null;

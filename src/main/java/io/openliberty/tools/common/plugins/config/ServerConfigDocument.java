@@ -218,13 +218,18 @@ public class ServerConfigDocument {
             // e.g. <variable name="myVarName" value="myVarValue" />
             // 7. variables from configDropins/overrides/<file_name>
 
-            // get variables from server.env
+            // 1. Need to parse variables in the server.xml for default values before trying to find the include files in case one of the variables is used
+            // in the location.
+            parseVariablesForDefaultValues(doc);
+
+            // 2. get variables from server.env
             File cfgFile = findConfigFile("server.env", serverEnvFile, giveConfigDirPrecedence);
 
             if (cfgFile != null) {
                 parseProperties(new FileInputStream(cfgFile));
             }
 
+            // 3. get variables from bootstrap.properties
             File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
 
             if (giveConfigDirPrecedence && cfgDirFile != null) {
@@ -241,9 +246,16 @@ public class ServerConfigDocument {
                 parseProperties(new FileInputStream(cfgDirFile));
             }
 
+            // 4. parse variables from include files (both default and non-default values - which we store separately)
             parseIncludeVariables(doc);
+
+            // 5. variables from configDropins/defaults/<file_name>
             parseConfigDropinsDirVariables("defaults");
-            parseVariables(doc);
+
+            // 6. variables defined in server.xml - non-default values
+            parseVariablesForValues(doc);
+
+            // 7. variables from configDropins/overrides/<file_name>
             parseConfigDropinsDirVariables("overrides");
 
             parseApplication(doc, XPATH_SERVER_APPLICATION);
@@ -345,10 +357,18 @@ public class ServerConfigDocument {
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
-            String nodeValue = nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue();
+            if (nodeList.item(i) instanceof Element) {
+                Element child = (Element) nodeList.item(i);
 
-            if (!nodeValue.isEmpty()) {
-                Document docIncl = getIncludeDoc(nodeValue);
+                // Need to handle more variable substitution for include location.
+                String includeFileName = PropertyUtil.evaluateExpression(log, props, defaultProps, child.getAttribute("location"), libertyDirectoryPropertyToFile);
+
+                if (includeFileName == null || includeFileName.trim().isEmpty()) {
+                    log.warn("Unable to resolve include file location "+child.getAttribute("location")+". Skipping the included file during application location processing.");
+                    return;
+                }
+
+                Document docIncl = getIncludeDoc(includeFileName);
 
                 if (docIncl != null) {
                     parseApplication(docIncl, XPATH_SERVER_APPLICATION);
@@ -567,8 +587,20 @@ public class ServerConfigDocument {
         return value;
     }
 
-    private static void parseVariables(Document doc) throws XPathExpressionException {
-        // parse input document
+    private static void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
+        parseVariables(doc, true, false, false);
+    }
+
+    private static void parseVariablesForValues(Document doc) throws XPathExpressionException {
+        parseVariables(doc, false, true, false);
+    }
+
+    private static void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
+        parseVariables(doc, false, false, true);
+    }
+
+    private static void parseVariables(Document doc, boolean defaultValues, boolean values, boolean both) throws XPathExpressionException {
+            // parse input document
         NodeList nodeList = (NodeList) XPATH_SERVER_VARIABLE.evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
@@ -579,13 +611,14 @@ public class ServerConfigDocument {
             if (!varName.isEmpty()) {
                 // A variable can have either a value attribute OR a defaultValue attribute.
                 String varValue = getValue(attr, "value");
-                if (varValue != null && !varValue.isEmpty()) {
+                String varDefaultValue = getValue(attr, "defaultValue");
+
+                if ((values || both) && (varValue != null && !varValue.isEmpty())) {
                     props.setProperty(varName, varValue);
-                } else {
-                    String varDefaultValue = getValue(attr, "defaultValue");
-                    if (varDefaultValue != null && ! varDefaultValue.isEmpty()) {
+                }
+
+                if ((defaultValues || both) && (varDefaultValue != null && ! varDefaultValue.isEmpty())) {
                         defaultProps.setProperty(varName, varDefaultValue);
-                    }
                 }
             }
         }
@@ -607,7 +640,8 @@ public class ServerConfigDocument {
         for (int i = 0; i < nodeList.getLength(); i++) {
             if (nodeList.item(i) instanceof Element) {
                 Element child = (Element) nodeList.item(i);
-                String includeFileName = PropertyUtil.evaluateExpression(log, props, child.getAttribute("location"), libertyDirectoryPropertyToFile);
+                // Need to handle more variable substitution for include location.
+                String includeFileName = PropertyUtil.evaluateExpression(log, props, defaultProps, child.getAttribute("location"), libertyDirectoryPropertyToFile);
 
                 if (includeFileName == null || includeFileName.trim().isEmpty()) {
                     log.warn("Unable to resolve include file location "+child.getAttribute("location")+". Skipping the included file during application location processing.");
@@ -617,7 +651,7 @@ public class ServerConfigDocument {
                 Document docIncl = getIncludeDoc(includeFileName);
 
                 if (docIncl != null) {
-                    parseVariables(docIncl);
+                    parseVariablesForBothValues(docIncl);
                     // handle nested include elements
                     parseIncludeVariables(docIncl);
                 } else {
@@ -666,7 +700,7 @@ public class ServerConfigDocument {
         // get input XML Document
         Document doc = parseDropinsXMLFile(file);
         if (doc != null) {
-            parseVariables(doc);
+            parseVariablesForBothValues(doc);
             parseIncludeVariables(doc);
         }
     }
