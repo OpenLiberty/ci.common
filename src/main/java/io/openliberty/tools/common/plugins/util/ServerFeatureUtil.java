@@ -33,8 +33,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -125,6 +123,19 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      */
     public abstract boolean isDebugEnabled();
 
+    public void setLibertyDirectoryPropertyFiles(Map<String,File> libertyDirPropFiles) {
+        if (libertyDirPropFiles != null) {
+            libertyDirectoryPropertyToFile = new HashMap<String, File> (libertyDirPropFiles);
+        }
+    }
+
+    public Map<String, File> getLibertyDirectoryPropertyFiles() {
+        if (libertyDirectoryPropertyToFile == null) {
+            return new HashMap<String,File>();
+        }
+        return libertyDirectoryPropertyToFile;
+    }
+
     /**
      * Get the set of features defined in the server.xml
      * @param serverDirectory The server directory containing the server.xml
@@ -136,10 +147,9 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      */
      public Set<String> getServerFeatures(File serverDirectory, File serverXmlFile, Map<String,File> libertyDirPropFiles, Set<String> dropinsFilesToIgnore) {
         if (libertyDirPropFiles != null) {
-            libertyDirectoryPropertyToFile = new HashMap(libertyDirPropFiles);
-        } else {
+            setLibertyDirectoryPropertyFiles(libertyDirPropFiles);
+        } else if (libertyDirectoryPropertyToFile == null) {
             warn("The properties for directories are null and could lead to server include files not being processed for server features.");
-            libertyDirectoryPropertyToFile = new HashMap<String,File>();
         }
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
         Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults", dropinsFilesToIgnore);
@@ -390,11 +400,12 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     private Set<String> parseIncludeNode(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
-        // CLK999 Need to handle more variable substitution for include location.
-        String includeFileName = PropertyUtil.evaluateExpression(this, bootstrapProperties, node.getAttribute("location"), libertyDirectoryPropertyToFile);
+        // Need to handle more variable substitution for include location.
+        String nodeValue = node.getAttribute("location");
+        String includeFileName = VariableUtility.resolveVariables(this, nodeValue, null, bootstrapProperties, new Properties(), getLibertyDirectoryPropertyFiles());
 
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
-            warn("Unable to parse include file "+node.getAttribute("location")+". Skipping the included features.");
+            warn("Unable to parse include file "+nodeValue+". Skipping the included features.");
             return result;
         }
 
