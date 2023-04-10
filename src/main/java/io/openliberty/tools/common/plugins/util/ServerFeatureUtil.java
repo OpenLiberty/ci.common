@@ -33,8 +33,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -125,6 +123,19 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      */
     public abstract boolean isDebugEnabled();
 
+    public void setLibertyDirectoryPropertyFiles(Map<String,File> libertyDirPropFiles) {
+        if (libertyDirPropFiles != null) {
+            libertyDirectoryPropertyToFile = new HashMap<String, File> (libertyDirPropFiles);
+        }
+    }
+
+    public Map<String, File> getLibertyDirectoryPropertyFiles() {
+        if (libertyDirectoryPropertyToFile == null) {
+            return new HashMap<String,File>();
+        }
+        return libertyDirectoryPropertyToFile;
+    }
+
     /**
      * Get the set of features defined in the server.xml
      * @param serverDirectory The server directory containing the server.xml
@@ -136,16 +147,17 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      */
      public Set<String> getServerFeatures(File serverDirectory, File serverXmlFile, Map<String,File> libertyDirPropFiles, Set<String> dropinsFilesToIgnore) {
         if (libertyDirPropFiles != null) {
-            libertyDirectoryPropertyToFile = new HashMap(libertyDirPropFiles);
-        } else {
+            setLibertyDirectoryPropertyFiles(libertyDirPropFiles);
+        } else if (libertyDirectoryPropertyToFile == null) {
             warn("The properties for directories are null and could lead to server include files not being processed for server features.");
-            libertyDirectoryPropertyToFile = new HashMap<String,File>();
         }
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
         Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults", dropinsFilesToIgnore);
         if (serverXmlFile == null) {
             serverXmlFile = new File(serverDirectory, "server.xml");
         }
+
+        // CLK999 Need to also handle server.env and variables in server.xml with default values in addition to bootstrap.properties.
         result = getServerXmlFeatures(result, serverDirectory, serverXmlFile, bootstrapProperties, null);
         // add the overrides at the end since they should not be replaced by any previous content
         return getConfigDropinsFeatures(result, serverDirectory, bootstrapProperties, "overrides", dropinsFilesToIgnore);
@@ -191,50 +203,6 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      */
     public void setSuppressLogs(boolean val) {
         suppressLogs = val;
-    }
-
-    /**
-     * Initializes the pre-defined Liberty directory properties which will be used when resolving variable references in 
-     * the include element location attribute, such as <include location="${server.config.dir}/xyz.xml"/>. 
-     * Note that we are intentionally not including the wlp.output.dir property, as that location can be specified by the
-     * user outside of the Liberty installation and does not make much sense as a location for server include files.
-     * All other Liberty directory properties can be determined relative to the passed in serverDirectory, which is the 
-     * server.config.dir.
-     *
-     * @param serverDirectory The server directory containing the server.xml
-     */
-    private void initializeLibertyDirectoryPropertyFiles(File serverDirectory) {
-        libertyDirectoryPropertyToFile = new HashMap<String,File>();
-        if (serverDirectory.exists()) {
-            try {
-                libertyDirectoryPropertyToFile.put(SERVER_CONFIG_DIR, serverDirectory.getCanonicalFile());
-
-                File wlpUserDir = serverDirectory.getParentFile().getParentFile();
-                libertyDirectoryPropertyToFile.put(WLP_USER_DIR, wlpUserDir.getCanonicalFile());
-
-                File wlpInstallDir = wlpUserDir.getParentFile();
-                libertyDirectoryPropertyToFile.put(WLP_INSTALL_DIR, wlpInstallDir.getCanonicalFile());
- 
-                File userExtDir = new File(wlpUserDir, "extension");
-                libertyDirectoryPropertyToFile.put(USR_EXTENSION_DIR, userExtDir.getCanonicalFile());
-
-                File userSharedDir = new File(wlpUserDir, "shared");
-                File userSharedAppDir = new File(userSharedDir, "app");
-                File userSharedConfigDir = new File(userSharedDir, "config");
-                File userSharedResourcesDir = new File(userSharedDir, "resources");
-                File userSharedStackGroupsDir = new File(userSharedDir, "stackGroups");
-
-                libertyDirectoryPropertyToFile.put(SHARED_APP_DIR, userSharedAppDir.getCanonicalFile());
-                libertyDirectoryPropertyToFile.put(SHARED_CONFIG_DIR, userSharedConfigDir.getCanonicalFile());
-                libertyDirectoryPropertyToFile.put(SHARED_RESOURCES_DIR, userSharedResourcesDir.getCanonicalFile());
-                libertyDirectoryPropertyToFile.put(SHARED_STACKGROUP_DIR, userSharedStackGroupsDir.getCanonicalFile());
-            } catch (Exception e) {
-                warn("The properties for directories could not be initialized because an error occurred when accessing them.");
-                debug("Exception received: "+e.getMessage(), e);
-            }
-        } else {
-            warn("The " + serverDirectory + " directory cannot be accessed. Skipping its server features.");
-        }
     }
     
     /**
@@ -432,10 +400,12 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     private Set<String> parseIncludeNode(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
-        String includeFileName = PropertyUtil.evaluateExpression(this, bootstrapProperties, node.getAttribute("location"), libertyDirectoryPropertyToFile);
+        // Need to handle more variable substitution for include location.
+        String nodeValue = node.getAttribute("location");
+        String includeFileName = VariableUtility.resolveVariables(this, nodeValue, null, bootstrapProperties, new Properties(), getLibertyDirectoryPropertyFiles());
 
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
-            warn("Unable to parse include file "+node.getAttribute("location")+". Skipping the included features.");
+            warn("Unable to parse include file "+nodeValue+". Skipping the included features.");
             return result;
         }
 

@@ -27,9 +27,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Collection;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -48,7 +45,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.xml.sax.SAXException;
 
 import io.openliberty.tools.common.CommonLoggerI;
-import io.openliberty.tools.common.plugins.util.PropertyUtil;
+import io.openliberty.tools.common.plugins.util.VariableUtility;
 
 // Moved from ci.maven/liberty-maven-plugin/src/main/java/net/wasdev/wlp/maven/plugins/ServerConfigDocument.java
 public class ServerConfigDocument {
@@ -69,9 +66,6 @@ public class ServerConfigDocument {
     private static Properties props;
     private static Properties defaultProps;
     private static Map<String, File> libertyDirectoryPropertyToFile = null;
-
-    private static final String VARIABLE_NAME_PATTERN = "\\$\\{(.*?)\\}";
-    private static final Pattern varNamePattern = Pattern.compile(VARIABLE_NAME_PATTERN);
 
     private static final XPathExpression XPATH_SERVER_APPLICATION;
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
@@ -218,13 +212,18 @@ public class ServerConfigDocument {
             // e.g. <variable name="myVarName" value="myVarValue" />
             // 7. variables from configDropins/overrides/<file_name>
 
-            // get variables from server.env
+            // 1. Need to parse variables in the server.xml for default values before trying to find the include files in case one of the variables is used
+            // in the location.
+            parseVariablesForDefaultValues(doc);
+
+            // 2. get variables from server.env
             File cfgFile = findConfigFile("server.env", serverEnvFile, giveConfigDirPrecedence);
 
             if (cfgFile != null) {
                 parseProperties(new FileInputStream(cfgFile));
             }
 
+            // 3. get variables from bootstrap.properties
             File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
 
             if (giveConfigDirPrecedence && cfgDirFile != null) {
@@ -241,9 +240,16 @@ public class ServerConfigDocument {
                 parseProperties(new FileInputStream(cfgDirFile));
             }
 
+            // 4. parse variables from include files (both default and non-default values - which we store separately)
             parseIncludeVariables(doc);
+
+            // 5. variables from configDropins/defaults/<file_name>
             parseConfigDropinsDirVariables("defaults");
-            parseVariables(doc);
+
+            // 6. variables defined in server.xml - non-default values
+            parseVariablesForValues(doc);
+
+            // 7. variables from configDropins/overrides/<file_name>
             parseConfigDropinsDirVariables("overrides");
 
             parseApplication(doc, XPATH_SERVER_APPLICATION);
@@ -271,8 +277,8 @@ public class ServerConfigDocument {
 
                 // add unique values only
                 if (!nameValue.isEmpty()) {
-                    String resolvedName = resolveVariables(nameValue, null);
-                    String resolvedLocation = resolveVariables(locationValue, null);
+                    String resolvedName = VariableUtility.resolveVariables(log, nameValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
+                    String resolvedLocation = VariableUtility.resolveVariables(log, locationValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
                     if (resolvedName == null) {
                         if (!names.contains(nameValue)) {
                             names.add(nameValue);
@@ -293,7 +299,7 @@ public class ServerConfigDocument {
 
                 // add unique values only
                 if (!nodeValue.isEmpty()) {
-                    String resolved = resolveVariables(nodeValue, null);
+                    String resolved = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
                     if (resolved == null) {
                         if (! namelessLocations.contains(nodeValue)) {
                             namelessLocations.add(nodeValue);
@@ -325,7 +331,7 @@ public class ServerConfigDocument {
 
             // add unique values only
             if (!nodeValue.isEmpty()) {
-                String resolved = resolveVariables(nodeValue, null);
+                String resolved = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
                 if (resolved == null) {
                     // location could not be resolved, log message and add location as is
                     log.info("The variables referenced by location " + nodeValue + " cannot be resolved.");
@@ -345,10 +351,19 @@ public class ServerConfigDocument {
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
-            String nodeValue = nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue();
+            if (nodeList.item(i) instanceof Element) {
+                Element child = (Element) nodeList.item(i);
 
-            if (!nodeValue.isEmpty()) {
-                Document docIncl = getIncludeDoc(nodeValue);
+                // Need to handle more variable substitution for include location.
+                String nodeValue = child.getAttribute("location");
+                String includeFileName = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
+
+                if (includeFileName == null || includeFileName.trim().isEmpty()) {
+                    log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
+                    return;
+                }
+
+                Document docIncl = getIncludeDoc(includeFileName);
 
                 if (docIncl != null) {
                     parseApplication(docIncl, XPATH_SERVER_APPLICATION);
@@ -484,91 +499,21 @@ public class ServerConfigDocument {
         }
     }
 
-    /*
-     * Attempts to resolve all variables in the passed in nodeValue. Variable value/defaultValue can reference other variables.
-     * This method is called recursively to resolve the variables. The variableChain collection keeps track of the variable references
-     * in a resolution chain in order to prevent an infinite loop. The variableChain collection should be passed as null on the initial call.
-     */
-    private static String resolveVariables(String nodeValue, Collection<String> variableChain) {
 
-        // For Windows, avoid escaping the backslashes in the resolvedValue by changing to forward slashes
-        String resolved = nodeValue.replace("\\","/");
-        Matcher varNameMatcher = varNamePattern.matcher(nodeValue);
-
-        Collection<String> variablesToResolve = new HashSet<String> ();
-
-        while (varNameMatcher.find()) {
-            String varName = varNameMatcher.group(1);
-            if (variableChain != null && variableChain.contains(varName)) {
-                // Found recursive reference when resolving variables. Log message and return null.
-                log.debug("Found a recursive variable reference when resolving ${" + varName + "}");
-                return null;
-            } else {
-                variablesToResolve.add(varName);
-            }
-        }
-
-        for (String nextVariable : variablesToResolve) {
-            String value = getPropertyValue(nextVariable);
-
-            if (value != null && !value.isEmpty()) {
-                Collection<String> thisVariableChain = new HashSet<String> ();
-                thisVariableChain.add(nextVariable);
-
-                if (variableChain != null && !variableChain.isEmpty()) {
-                    thisVariableChain.addAll(variableChain);
-                }
-
-                String resolvedValue = resolveVariables(value, thisVariableChain);
-
-                if (resolvedValue != null) {
-                    String escapedVariable = Matcher.quoteReplacement(nextVariable);
-                    // For Windows, avoid escaping the backslashes in the resolvedValue by changing to forward slashes
-                    resolvedValue = resolvedValue.replace("\\","/");
-                    resolved = resolved.replaceAll("\\$\\{" + escapedVariable + "\\}", resolvedValue);
-                } else {
-                    // Variable value could not be resolved. Log message and return null.
-                    log.debug("Could not resolve the value " + value + " for variable ${" + nextVariable + "}");
-                    return null;
-                }
-            } else {
-                // Variable could not be resolved. Log message and return null.
-                log.debug("Variable " + nextVariable + " cannot be resolved.");
-                return null;
-            }
-        }
-
-        log.debug("Expression "+ nodeValue +" evaluated and replaced with "+resolved);
-
-        return resolved;
+    private static void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
+        parseVariables(doc, true, false, false);
     }
 
-    private static String getPropertyValue(String propertyName) {
-        String value = null;
-        if(!getLibertyDirPropertyFiles().containsKey(propertyName)) {
-            value = getProperties().getProperty(propertyName);
-            if (value == null) {
-                // Check for default value since no other value found.
-                value = getDefaultProperties().getProperty(propertyName);
-            }
-            if (value == null && propertyName.startsWith("env.") && propertyName.length() > 4) {
-                // Look for property without the 'env.' prefix
-                String newPropName = propertyName.substring(4);
-                value = getProperties().getProperty(newPropName);
-                if (value == null) {
-                    // Check for default value since no other value found.
-                    value = getDefaultProperties().getProperty(newPropName);
-                }
-            }
-        } else {
-            File envDirectory = getLibertyDirPropertyFiles().get(propertyName);
-            value = envDirectory.toString();
-        }            
-        return value;
+    private static void parseVariablesForValues(Document doc) throws XPathExpressionException {
+        parseVariables(doc, false, true, false);
     }
 
-    private static void parseVariables(Document doc) throws XPathExpressionException {
-        // parse input document
+    private static void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
+        parseVariables(doc, false, false, true);
+    }
+
+    private static void parseVariables(Document doc, boolean defaultValues, boolean values, boolean both) throws XPathExpressionException {
+            // parse input document
         NodeList nodeList = (NodeList) XPATH_SERVER_VARIABLE.evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
@@ -579,13 +524,14 @@ public class ServerConfigDocument {
             if (!varName.isEmpty()) {
                 // A variable can have either a value attribute OR a defaultValue attribute.
                 String varValue = getValue(attr, "value");
-                if (varValue != null && !varValue.isEmpty()) {
+                String varDefaultValue = getValue(attr, "defaultValue");
+
+                if ((values || both) && (varValue != null && !varValue.isEmpty())) {
                     props.setProperty(varName, varValue);
-                } else {
-                    String varDefaultValue = getValue(attr, "defaultValue");
-                    if (varDefaultValue != null && ! varDefaultValue.isEmpty()) {
+                }
+
+                if ((defaultValues || both) && (varDefaultValue != null && ! varDefaultValue.isEmpty())) {
                         defaultProps.setProperty(varName, varDefaultValue);
-                    }
                 }
             }
         }
@@ -607,17 +553,19 @@ public class ServerConfigDocument {
         for (int i = 0; i < nodeList.getLength(); i++) {
             if (nodeList.item(i) instanceof Element) {
                 Element child = (Element) nodeList.item(i);
-                String includeFileName = PropertyUtil.evaluateExpression(log, props, child.getAttribute("location"), libertyDirectoryPropertyToFile);
+                // Need to handle more variable substitution for include location.
+                String nodeValue = child.getAttribute("location");
+                String includeFileName = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
 
                 if (includeFileName == null || includeFileName.trim().isEmpty()) {
-                    log.warn("Unable to resolve include file location "+child.getAttribute("location")+". Skipping the included file during application location processing.");
+                    log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
                     return;
                 }
                     
                 Document docIncl = getIncludeDoc(includeFileName);
 
                 if (docIncl != null) {
-                    parseVariables(docIncl);
+                    parseVariablesForBothValues(docIncl);
                     // handle nested include elements
                     parseIncludeVariables(docIncl);
                 } else {
@@ -666,7 +614,7 @@ public class ServerConfigDocument {
         // get input XML Document
         Document doc = parseDropinsXMLFile(file);
         if (doc != null) {
-            parseVariables(doc);
+            parseVariablesForBothValues(doc);
             parseIncludeVariables(doc);
         }
     }
