@@ -96,16 +96,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         getNewInstallFeatureUtil(installDir, buildDir, installDir.getAbsolutePath(), null, new HashSet<String>());
     }
     
-    /**
-     * TODO remove the expected exception when installing from ESAs is supported
-     */
-    @Test(expected = PluginScenarioException.class)
-    public void testConstructorEsas() throws Exception {
-        Set<String> esas = new HashSet<String>();
-        esas.add("abc.esa");
-        getNewInstallFeatureUtil(installDir, buildDir, null, null, esas);
-    }
-    
+
     /**
      * The installFeatures method should be tested from the actual project that
      * uses it. It will throw an exception here because the test install map jar
@@ -268,5 +259,4 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         target.add("other");
         assertFalse("Collection " + reference + " should not contain all of the elements from " + target + " ignoring case", InstallFeatureUtil.containsIgnoreCase(reference, target));
     }
-
 }

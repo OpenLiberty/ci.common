@@ -521,5 +521,13 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
            return serverFile.toString();
         }
     }
+    
+    //return user directory
+    protected File getUserExtensionPath() {
+    	if(libertyDirectoryPropertyToFile == null || libertyDirectoryPropertyToFile.get(USR_EXTENSION_DIR) == null ) {
+    		return null;
+    	}
+    	return libertyDirectoryPropertyToFile.get(USR_EXTENSION_DIR);
+    }
 
 }
