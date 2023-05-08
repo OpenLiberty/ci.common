@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018, 2021.
+ * (C) Copyright IBM Corporation 2018, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,7 +106,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     
     private final Set<String> pluginListedEsas;
     
-    private Map<String, String> shortNameMap;
+    //Map (symbolic name, short name) of the manually installed user feature. 
+    private Map<String, String> manuallyInstalledUsrFeatureMap;
 
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
@@ -152,7 +153,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         this.containerName = containerName;
         this.additionalJsons = additionalJsons;
         this.pluginListedEsas = pluginListedEsas;
-        this.shortNameMap = new HashMap<String, String>();
+        this.manuallyInstalledUsrFeatureMap = new HashMap<String, String>();
         
         if (containerName == null) {
             installJarFile = loadInstallJarFile(installDirectory);
@@ -582,9 +583,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 		            	String shortName = m.getMainAttributes().getValue("IBM-ShortName");
 		            	
 		            	if(shortName != null) {
-		            		shortNameMap.put(symbolicName.toLowerCase(), shortName.toLowerCase());
+		            		manuallyInstalledUsrFeatureMap.put(symbolicName.toLowerCase(), shortName.toLowerCase());
 		            	} else {
-		            		shortNameMap.put(symbolicName.toLowerCase(), "");
+		            		manuallyInstalledUsrFeatureMap.put(symbolicName.toLowerCase(), "");
 		            	}
 		            	File targetFile = new File(featuresDirectory, symbolicName + ".mf");
 		            	if(targetFile.exists()) {
@@ -593,7 +594,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 		            	}
 		            	copyZipEntry(zip, entry, targetFile);
 		            	
-		            }else if(fileName.toLowerCase().endsWith("jar")){
+		            }else if(fileName.toLowerCase().endsWith(".jar")){
 		            	File targetFile = new File(libDirectory, fileName);
 		            	copyZipEntry(zip, entry, targetFile);	
 		            }
@@ -636,7 +637,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     			info("Neither InstallUtility nor FeatureUtility is available to install user feature esa.");
     			info("Attempting to manually install the user feature esa without resolving its dependencies.");
     			info("Recommended user action: upgrade to OpenLiberty version " + MIN_USER_FEATURE_VERSION + " or higher and provide features-bom file for the user feature esa.");
-    			info(" To directly install the esa file without providing features-bom file, upgrade to OpenLiberty version 23.0.0.2.");
+    			info("To directly install the esa file without providing features-bom file, upgrade to OpenLiberty version 23.0.0.2 or later.");
     			
     			copyUserFeature(pluginListedEsas, installDirectory);
     		}
@@ -647,8 +648,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     			String[] userFeatureSplit = feature.split(":");
     			String userFeatureName = userFeatureSplit[1].toLowerCase();
     			featureToExtMap.put(userFeatureName, userFeatureSplit[0]);
-    			//check if user feature esa was installed manually
-    			if(!shortNameMap.containsValue(userFeatureName) && !shortNameMap.containsKey(userFeatureName)) {
+    			//check if user feature esa was installed manually. userFeatureName could be either symbolic name or short name of the user feature. 
+    			if(!manuallyInstalledUsrFeatureMap.containsValue(userFeatureName) && !manuallyInstalledUsrFeatureMap.containsKey(userFeatureName)) {
     				featuresToInstall.add(userFeatureName);
     			}
     		} else {
