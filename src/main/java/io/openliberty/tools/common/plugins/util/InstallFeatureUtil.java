@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018, 2021.
+ * (C) Copyright IBM Corporation 2018, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,13 +29,17 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,9 +49,14 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.regex.Matcher;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -94,17 +103,24 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private Set<File> downloadedJsons;
     
     private final List<String> additionalJsons;
+    
+    private final Set<String> pluginListedEsas;
+    
+    //Map (symbolic name, short name) of the manually installed user feature. 
+    private Map<String, String> manuallyInstalledUsrFeatureMap;
 
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String INSTALL_MAP_SUFFIX = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
+    private static final String CLOSED_LIBERTY_PRODUCT_ID = "com.ibm.websphere.appserver";
     private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
     private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
+    private static final DefaultArtifactVersion MIN_VERSION = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
-
+    
     private final String containerName;
 
     /**
@@ -136,18 +152,24 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         this.openLibertyVersion = openLibertyVersion;
         this.containerName = containerName;
         this.additionalJsons = additionalJsons;
+        this.pluginListedEsas = pluginListedEsas;
+        this.manuallyInstalledUsrFeatureMap = new HashMap<String, String>();
+        
         if (containerName == null) {
             installJarFile = loadInstallJarFile(installDirectory);
             if (installJarFile == null) {
                 throw new PluginScenarioException("Install map jar not found.");
             }
             downloadedJsons = downloadProductJsons();
-            if (additionalJsons != null && !additionalJsons.isEmpty()) {
-            	//check if the openliberty kernel meets min required version 21.0.0.11
-            	DefaultArtifactVersion minVersion = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
-            	DefaultArtifactVersion version = new DefaultArtifactVersion(openLibertyVersion);
-            	
-            	if (version.compareTo(minVersion) >= 0) {
+            
+            //check if the openliberty kernel meets min required version 21.0.0.11      	
+        	DefaultArtifactVersion version = null;      	
+        	if(openLibertyVersion != null) {
+        		version = new DefaultArtifactVersion(openLibertyVersion);	
+        	}
+        		
+            if (additionalJsons != null && !additionalJsons.isEmpty() && version != null) {     	
+            	if (version.compareTo(MIN_VERSION) >= 0) {
             		Set<File> groupIDJsons = getAdditionalJsons();
                     if (groupIDJsons != null) {
                         downloadedJsons.addAll(groupIDJsons);
@@ -159,13 +181,29 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 throw new PluginScenarioException(
                         "Cannot find JSONs for to the installed runtime from the Maven repository.");
             }
-            if (hasUnsupportedParameters(from, pluginListedEsas)) {
+            if (from != null) {
+            	debug("has from: " + from);
                 throw new PluginScenarioException(
-                        "Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
+                        "Cannot install features from a Maven repository when using 'from' parameter.");
 
             }
         }
     }
+
+
+
+	private void copyZipEntry(ZipFile zip, ZipEntry entry, File targetFile) throws IOException, FileNotFoundException {
+		try(InputStream is = zip.getInputStream(entry)){	
+			// write file content
+		    try(FileOutputStream fos = new FileOutputStream(targetFile)){
+		    	int len;
+		    	byte[] buffer = new byte[1024];
+		        while ((len = is.read(buffer)) > 0) {
+		            fos.write(buffer, 0, len);
+		        }
+		    }
+		}
+	}
     
 
     /**
@@ -399,6 +437,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         return null;
     }
+    
+    public static boolean isClosedLiberty(List<ProductProperties> propList) {
+    	for (ProductProperties properties : propList) {
+            if (properties.getId().equals(CLOSED_LIBERTY_PRODUCT_ID)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public static boolean isOpenLibertyBetaVersion(String olVersion) {
         if (olVersion != null && olVersion.endsWith("-beta")) {
@@ -423,24 +470,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         public String getVersion() {
             return version;
         }
-    }
-
-    /**
-     * Returns true if this scenario is not supported for installing from Maven
-     * repository, which is one of the following conditions: "from" parameter is
-     * specified (don't need Maven repositories), or esa files are specified in the
-     * configuration (not supported with Maven for now)
-     * 
-     * @param from             the "from" parameter specified in the plugin
-     * @param pluginListedEsas the ESA files specified in the plugin configuration
-     * @return true if the fallback scenario occurred, false otherwise
-     */
-    private boolean hasUnsupportedParameters(String from, Set<String> pluginListedEsas) {
-        boolean hasFrom = from != null;
-        boolean hasPluginListedEsas = !pluginListedEsas.isEmpty();
-        debug("hasFrom: " + hasFrom);
-        debug("hasPluginListedEsas: " + hasPluginListedEsas);
-        return hasFrom || hasPluginListedEsas;
     }
 
     private File downloadEsaArtifact(String mavenCoordinates) throws PluginExecutionException {
@@ -527,11 +556,64 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
         return result;
     }
+    
+    /*
+     * @param pluginListedEsas plugin listed esa file paths for feature install
+     * 	manifest files will be copied to  ${wlp.user.dir}/extension/lib/features
+     * 	OSGi bundles will be copied to ${wlp.user.dir}/extension/lib
+     */
+	public void copyUserFeature(Set<String> pluginListedEsas, File installDirectory ) throws PluginExecutionException {
+		File userExtDirectory = getUserExtensionPath() != null ? getUserExtensionPath() : new File(installDirectory, "usr/extension");
+		File libDirectory = new File (userExtDirectory, "lib");
+		File featuresDirectory = new File(libDirectory, "features");
+		libDirectory.mkdirs();
+		featuresDirectory.mkdirs();		  
+		
+		for(String esa : pluginListedEsas) {
+			debug("Copying " + esa + " to Liberty image.");
+			try (ZipFile zip = new ZipFile(esa)){	
+				Enumeration<? extends ZipEntry> zipEntries = zip.entries();
+				
+				while (zipEntries.hasMoreElements()) {
+					ZipEntry entry = zipEntries.nextElement();	   
+		            String fileName = entry.getName();
+		            if (fileName.toLowerCase().endsWith("subsystem.mf")) {
+		            	Manifest m = new Manifest(zip.getInputStream(entry));
+		            	String symbolicName = m.getMainAttributes().getValue("Subsystem-SymbolicName").split(";")[0];	            	
+		            	String shortName = m.getMainAttributes().getValue("IBM-ShortName");
+		            	
+		            	if(shortName != null) {
+		            		manuallyInstalledUsrFeatureMap.put(symbolicName.toLowerCase(), shortName.toLowerCase());
+		            	} else {
+		            		manuallyInstalledUsrFeatureMap.put(symbolicName.toLowerCase(), "");
+		            	}
+		            	File targetFile = new File(featuresDirectory, symbolicName + ".mf");
+		            	if(targetFile.exists()) {
+		            		info("The feature " + esa + " is already installed.");
+		            		break;
+		            	}
+		            	copyZipEntry(zip, entry, targetFile);
+		            	
+		            }else if(fileName.toLowerCase().endsWith(".jar")){
+		            	File targetFile = new File(libDirectory, fileName);
+		            	copyZipEntry(zip, entry, targetFile);	
+		            }
+		        }
+				
+
+			} catch (IOException e) {
+				throw new PluginExecutionException(e);
+			}		
+		}	
+	}
 
     /**
      * Resolve, download, and install features from a Maven repository. This method
      * calls the resolver with the given JSONs and feature list, downloads the ESAs
      * corresponding to the resolved features, then installs those features.
+     * 
+     * If user listed feature esa and installUtility/featureUtility is not available 
+     * to install user feature esa, then copy esa feature manually to Liberty install. 
      * 
      * @param jsonRepos         JSON files, each containing an array of metadata for
      *                          all features in a Liberty release.
@@ -545,17 +627,41 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     	
     	Map<String, String> featureToExtMap = new HashMap<String, String>();
     	List<String> featuresToInstall = new ArrayList<String>();
+    	
+    	DefaultArtifactVersion version;
+    	if(openLibertyVersion != null) {
+    		version = new DefaultArtifactVersion(openLibertyVersion);	
+    		info("plugin listed esa: " + pluginListedEsas.toString());
+    		if (version.compareTo(MIN_VERSION) < 0 && !pluginListedEsas.isEmpty()) {
+    			//manually install user feature esas
+    			info("Neither InstallUtility nor FeatureUtility is available to install user feature esa.");
+    			info("Attempting to manually install the user feature esa without resolving its dependencies.");
+    			info("Recommended user action: upgrade to OpenLiberty version " + MIN_USER_FEATURE_VERSION + " or higher and provide features-bom file for the user feature esa.");
+    			info("To directly install the esa file without providing features-bom file, upgrade to OpenLiberty version 23.0.0.2 or later.");
+    			
+    			copyUserFeature(pluginListedEsas, installDirectory);
+    		}
+    	}
+    		   	
     	for (String feature: featuresList) {
     		if (feature.contains(":")) {
     			String[] userFeatureSplit = feature.split(":");
-    			featureToExtMap.put(userFeatureSplit[1], userFeatureSplit[0]);
-    			featuresToInstall.add(userFeatureSplit[1]);
+    			String userFeatureName = userFeatureSplit[1].toLowerCase();
+    			featureToExtMap.put(userFeatureName, userFeatureSplit[0]);
+    			//check if user feature esa was installed manually. userFeatureName could be either symbolic name or short name of the user feature. 
+    			if(!manuallyInstalledUsrFeatureMap.containsValue(userFeatureName) && !manuallyInstalledUsrFeatureMap.containsKey(userFeatureName)) {
+    				featuresToInstall.add(userFeatureName);
+    			}
     		} else {
     			featureToExtMap.put(feature, "");
     			featuresToInstall.add(feature);
     		}
     	}
-
+    	    		
+    	if(featuresToInstall.isEmpty()) {
+    		return;
+    	}
+    	
         if (containerName != null) {
             installFeaturesOnContainer(featuresToInstall, isAcceptLicense);
             return;

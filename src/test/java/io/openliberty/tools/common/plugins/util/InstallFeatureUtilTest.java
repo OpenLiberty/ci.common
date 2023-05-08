@@ -1,18 +1,3 @@
-/**
- * (C) Copyright IBM Corporation 2018, 2021.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.openliberty.tools.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
@@ -96,16 +81,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         getNewInstallFeatureUtil(installDir, buildDir, installDir.getAbsolutePath(), null, new HashSet<String>());
     }
     
-    /**
-     * TODO remove the expected exception when installing from ESAs is supported
-     */
-    @Test(expected = PluginScenarioException.class)
-    public void testConstructorEsas() throws Exception {
-        Set<String> esas = new HashSet<String>();
-        esas.add("abc.esa");
-        getNewInstallFeatureUtil(installDir, buildDir, null, null, esas);
-    }
-    
+
     /**
      * The installFeatures method should be tested from the actual project that
      * uses it. It will throw an exception here because the test install map jar
@@ -268,5 +244,4 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         target.add("other");
         assertFalse("Collection " + reference + " should not contain all of the elements from " + target + " ignoring case", InstallFeatureUtil.containsIgnoreCase(reference, target));
     }
-
 }
