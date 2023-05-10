@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2021.
+ * (C) Copyright IBM Corporation 2019, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,7 +82,6 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -437,10 +436,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> testArtifactPaths;
     protected final File generatedFeaturesFile;
     private File modifiedSrcBuildFile;
+    private boolean skipInstallFeature;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
-            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, String applicationId,
+            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
             long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
             boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
             File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
@@ -460,6 +460,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.skipTests = skipTests;
         this.skipUTs = skipUTs;
         this.skipITs = skipITs;
+        this.skipInstallFeature = skipInstallFeature;
         this.applicationId = applicationId;
         this.serverStartTimeout = serverStartTimeout;
         this.appStartupTimeout = appStartupTimeout;
@@ -1849,8 +1850,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         libertyCreate();
         // Skip installing features on container during restart, since the Dockerfile
         // should have 'RUN features.sh'
-        if (!container) {
+        // Also skip install feature on restart if config parameter specified.
+        if (!container && !skipInstallFeature) {
             libertyInstallFeature();
+        } else {
+            info("Skipping liberty:install-feature");
         }
         libertyDeploy();
         startServer(buildContainer, false);
