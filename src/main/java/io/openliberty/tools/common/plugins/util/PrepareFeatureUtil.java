@@ -375,7 +375,6 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @param file		 The Features JSON file
 	 * @param groupId	 The groupId 
 	 * @param version    The version
-	 * @throws PluginExecutionException If the artifact could not create dependency
 	 */
 	public void provideJsonFileDependency(File file, String groupId, String version) {
 		

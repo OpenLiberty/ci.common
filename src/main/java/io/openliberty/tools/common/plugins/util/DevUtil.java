@@ -1725,8 +1725,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
      /**
      * Parses Docker network names from a "docker inspect" command result on a container.
-     * @param dockerResult the result from the command "docker inspect -f '{{.NetworkSettings.Networks}}' containerName"
-     * -> dockerResult must not contain surrounding quotes or leading/trailing whitespace
+     * @param dockerResult the result from the command "docker inspect -f '{{.NetworkSettings.Networks}}' containerName".
+     * The dockerResult must not contain surrounding quotes or leading/trailing whitespace.
      * @return a String array containing the names of the networks contained in the dockerResult parameter
      */
     protected static String[] parseNetworks(String dockerResult) {
@@ -2121,7 +2121,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Gets a map of the environment variables to set for debug mode.
      * 
-     * @param libertyDebugPort the debug port to use
+     * @return a Map of debug environment variables with name as key
      */
     public Map<String, String> getDebugEnvironmentVariables() throws IOException {
         Map<String, String> map = new HashMap<String, String>();
@@ -2206,8 +2206,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * available, return a random available port and cache the result which will
      * override the preferredPort if this method is called again.
      * 
-     * @param  The number of the port to start the search for an available port.
-     * @param  Whether to choose an ephemeral port. True to choose an ephemeral port,
+     * @param  preferredPort The number of the port to start the search for an available port.
+     * @param  isDebugPort Whether to choose an ephemeral port. True to choose an ephemeral port,
      *         false to search sequentially.
      * @return An available port.
      * @throws IOException if it could not find any available port, or there was an
@@ -2681,10 +2681,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param outputDirectory
      * @param testOutputDirectory
      * @param executor
-     * @param compileArtifactPaths    Compile classpath elements, or null if this
-     *                                DevUtil instance has useBuildRecompile=true
-     * @param testArtifactPaths       Test classpath elements, or null if this
-     *                                DevUtil instance has useBuildRecompile=true
      * @param serverXmlFile           Can be null when using the server.xml from the
      *                                configDirectory, which has a default value.
      * @param bootstrapPropertiesFile
@@ -3184,7 +3180,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * 
-     * @return Collection<String> of class paths
+     * @return {@code Collection<String>} of class paths
      * @throws IOException
      */
     public Collection<String> getJavaSourceClassPaths() throws IOException {
