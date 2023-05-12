@@ -615,8 +615,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * If user listed feature esa and installUtility/featureUtility is not available 
      * to install user feature esa, then copy esa feature manually to Liberty install. 
      * 
-     * @param jsonRepos         JSON files, each containing an array of metadata for
-     *                          all features in a Liberty release.
+     * @param isAcceptLicense  flag for accepting the license terms
      * @param featuresList The list of features to install.
      * @throws PluginExecutionException if any of the features could not be
      *                                  installed

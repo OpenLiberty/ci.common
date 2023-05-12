@@ -31,10 +31,11 @@ public class LibertyProperty {
     }
 
     /**
-     * Converts Map<String, String> to Map<LibertyPropertyI, String>. Validates
+     * Converts {@code Map<String, String>}  to {@code Map<LibertyPropertyI, String>}. Validates
      * each key property name.
      * 
      * @param arquillianProperties
+     * @param cls
      * @return a map of converted arquillianProperties
      * @throws ArquillianConfigurationException
      *             if a property name is invalid.
@@ -59,8 +60,9 @@ public class LibertyProperty {
      * Check that the given key exists in ArquillianProperties
      * 
      * @param key
+     * @param cls
      * @return true if so, fail the build otherwise
-     * @throws MojoFailureException
+     * @throws ArquillianConfigurationException
      */
     private static LibertyPropertyI getArquillianProperty(String key, Class<?> cls)
             throws ArquillianConfigurationException {
