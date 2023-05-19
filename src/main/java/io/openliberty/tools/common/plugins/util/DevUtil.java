@@ -436,7 +436,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> testArtifactPaths;
     protected final File generatedFeaturesFile;
     private File modifiedSrcBuildFile;
-    private boolean skipInstallFeature;
+    protected boolean skipInstallFeature;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
