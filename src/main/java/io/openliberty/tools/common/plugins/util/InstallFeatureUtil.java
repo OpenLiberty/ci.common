@@ -329,7 +329,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                     if (!lowercaseSet.contains(value.toLowerCase())) {
                         lowercaseSet.add(value.toLowerCase());
                         // if the value is empty or blank, issue a warning and do not add it to the list of features to install
-                        if (value.isEmpty() || value.isBlank()) {
+                        if (value.isEmpty() || value.trim().isEmpty()) {
                             warn("An empty feature was specified in a server configuration file. Ensure that the features are valid.");
                         } else {
                             result.add(value);
