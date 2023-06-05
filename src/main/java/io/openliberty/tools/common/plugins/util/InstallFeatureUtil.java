@@ -320,8 +320,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @param collections a collection of strings
      * @return the combined set of strings, ignoring case
      */
-    @SafeVarargs
-    public static Set<String> combineToSet(Collection<String>... collections) {
+    public Set<String> combineToSet(Collection<String>... collections) {
         Set<String> result = new HashSet<String>();
         Set<String> lowercaseSet = new HashSet<String>();
         for (Collection<String> collection : collections) {
@@ -329,7 +328,12 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 for (String value : collection) {
                     if (!lowercaseSet.contains(value.toLowerCase())) {
                         lowercaseSet.add(value.toLowerCase());
-                        result.add(value);
+                        // if the value is empty or blank, issue a warning and do not add it to the list of features to install
+                        if (value.isEmpty() || value.isBlank()) {
+                            warn("An empty feature was specified in a server configuration file. Ensure that the features are valid.");
+                        } else {
+                            result.add(value);
+                        }
                     }
                 }
             }

@@ -97,6 +97,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     
     @Test
     public void testCombineToSet() throws Exception {
+        InstallFeatureUtil util = getNewInstallFeatureUtil();
         Set<String> a = new HashSet<String>();
         a.add("1");
         a.add("2");
@@ -106,12 +107,13 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         List<String> c = new ArrayList<String>();
         c.add("4");
         c.add("5");
-        Set<String> result = InstallFeatureUtil.combineToSet(a, b, c);
+        Set<String> result = util.combineToSet(a, b, c);
         assertEquals(5, result.size());
     }
 
     @Test
     public void testCombineToSetCaseInsensitive() throws Exception {
+        InstallFeatureUtil util = getNewInstallFeatureUtil();
         Set<String> a = new HashSet<String>();
         a.add("mpconfig-1.3");
         a.add("mpOpenAPI-1.0");
@@ -125,7 +127,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         c.add("mpHealth-1.0");
         c.add("ejblite-3.2");
         c.add("EJBLITE-3.2");
-        Set<String> result = InstallFeatureUtil.combineToSet(a, b, c);
+        Set<String> result = util.combineToSet(a, b, c);
         assertEquals(5, result.size());
         assertTrue(result.contains("mpconfig-1.3"));
         assertTrue(result.contains("mpOpenAPI-1.0"));
