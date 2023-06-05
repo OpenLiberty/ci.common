@@ -371,7 +371,12 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                         } else {
                             content = content.trim();
                         }
-                        result.add(content);
+                        // Check for empty feature element, skip it and log warning.
+                        if (content.isEmpty()) {
+                            warn("An empty feature was specified in a server configuration file. Ensure that the features are valid.");
+                        } else {
+                            result.add(content);
+                        }
                 	}
                 }
             }
