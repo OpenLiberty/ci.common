@@ -4556,12 +4556,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         FileUtils.copyDirectory(serverDirectory, tempConfig, new FileFilter() {
             public boolean accept(File pathname) {
                 String name = pathname.getName();
+                String parent = pathname.getParentFile().getName();
+                String serverDirName = serverDirectory.getName();
                 // skip:
                 // - ignore list
-                // - workarea and logs dirs from the server directory, since those can be
+                // - workarea, messaging and logs dirs from the server directory, since those can be
                 // changing
                 boolean skip = ignoreFileOrDir(pathname) || (pathname.isDirectory() && 
-                (name.equals("workarea") || name.equals("logs") || name.equals("messageStore") || name.equals("Log")));
+                (name.equals("workarea") || name.equals("logs") || (name.equals("messaging") && parent.equals(serverDirName))));
                 return !skip;
             }
         }, true);
