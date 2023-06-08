@@ -2024,7 +2024,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // Delete server.env file
                 serverEnvFile.delete();
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             error("Could not retrieve server.env: " + e.getMessage());
         }
     }
@@ -2036,7 +2036,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 try {
                     FileUtils.deleteDirectory(tempConfig);
                     debug("Successfully deleted liberty:dev temporary configuration folder");
-                } catch (IOException e) {
+                } catch (Exception e) {
                     warn("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
                 }
             }
@@ -2050,7 +2050,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 try {
                     Files.delete(tempDockerfilePath);
                     debug("Successfully deleted dev mode temporary Dockerfile");
-                } catch (IOException e) {
+                } catch (Exception e) {
                     warn("Could not delete dev mode temporary Dockerfile: " + e.getMessage());
                 }
             }
@@ -2078,30 +2078,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void runShutdownHook(final ThreadPoolExecutor executor) {
-        if (!calledShutdownHook.getAndSet(true)) {
+        try {
+            if (!calledShutdownHook.getAndSet(true)) {
 
-            if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
-                disablePolling();
+                if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
+                    disablePolling();
+                }
+    
+                setDevStop(true);
+                cleanUpTempConfig();
+                cleanUpServerEnv();
+    
+                if (hotkeyReader != null) {
+                    hotkeyReader.shutdown();
+                }
+    
+                // shutdown tests
+                executor.shutdown();
+    
+                // stopping server
+                if (container) {
+                    cleanUpTempDockerfile();
+                    stopContainer();
+                } else {
+                    stopServer();
+                }
             }
-
-            setDevStop(true);
-            cleanUpTempConfig();
-            cleanUpServerEnv();
-
-            if (hotkeyReader != null) {
-                hotkeyReader.shutdown();
-            }
-
-            // shutdown tests
-            executor.shutdown();
-
-            // stopping server
-            if (container) {
-                cleanUpTempDockerfile();
-                stopContainer();
-            } else {
-                stopServer();
-            }
+        } catch (Exception e) {
+            warn("Received exception during server shutdown and cleanup: " + e.getMessage());
         }
     }
 
@@ -4556,8 +4560,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // - ignore list
                 // - workarea and logs dirs from the server directory, since those can be
                 // changing
-                boolean skip = ignoreFileOrDir(pathname)
-                        || (pathname.isDirectory() && (name.equals("workarea") || name.equals("logs")));
+                boolean skip = ignoreFileOrDir(pathname) || (pathname.isDirectory() && 
+                (name.equals("workarea") || name.equals("logs") || name.equals("messageStore") || name.equals("Log")));
                 return !skip;
             }
         }, true);
