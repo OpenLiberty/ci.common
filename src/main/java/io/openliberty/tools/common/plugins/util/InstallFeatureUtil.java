@@ -29,16 +29,12 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,25 +49,11 @@ import java.util.jar.Manifest;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.regex.Matcher;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
-
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.commons.io.FileUtils;
-
 
 /**
  * Utility class to install features from Maven repositories.
@@ -117,7 +99,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
     private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
-    private static final DefaultArtifactVersion MIN_VERSION = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
+
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
     
@@ -162,14 +144,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
             downloadedJsons = downloadProductJsons();
             
-            //check if the openliberty kernel meets min required version 21.0.0.11      	
-        	DefaultArtifactVersion version = null;      	
-        	if(openLibertyVersion != null) {
-        		version = new DefaultArtifactVersion(openLibertyVersion);	
-        	}
-        		
-            if (additionalJsons != null && !additionalJsons.isEmpty() && version != null) {     	
-            	if (version.compareTo(MIN_VERSION) >= 0) {
+            //check if the openliberty kernel meets min required version 21.0.0.11      	        		
+            if (additionalJsons != null && !additionalJsons.isEmpty() && openLibertyVersion != null) {     	
+		        if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) >= 0) {
             		Set<File> groupIDJsons = getAdditionalJsons();
                     if (groupIDJsons != null) {
                         downloadedJsons.addAll(groupIDJsons);
@@ -631,11 +608,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     	Map<String, String> featureToExtMap = new HashMap<String, String>();
     	List<String> featuresToInstall = new ArrayList<String>();
     	
-    	DefaultArtifactVersion version;
     	if(openLibertyVersion != null) {
-    		version = new DefaultArtifactVersion(openLibertyVersion);	
     		info("plugin listed esa: " + pluginListedEsas.toString());
-    		if (version.compareTo(MIN_VERSION) < 0 && !pluginListedEsas.isEmpty()) {
+		    if ((VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) < 0) && !pluginListedEsas.isEmpty()) {
     			//manually install user feature esas
     			info("Neither InstallUtility nor FeatureUtility is available to install user feature esa.");
     			info("Attempting to manually install the user feature esa without resolving its dependencies.");
