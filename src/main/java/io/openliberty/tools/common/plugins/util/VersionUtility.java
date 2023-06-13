@@ -44,11 +44,15 @@ public class VersionUtility {
      */
     public static int compareArtifactVersion(String currentVersion, String compareVersion, boolean isLibertyVersion) {
 		String[] compareVersionArray = compareVersion.split("\\.");
-		int majorVersion = Integer.parseInt(compareVersionArray[0]);		
+		int majorVersion = Integer.parseInt(compareVersionArray[0]);
         int minorVersion = isLibertyVersion ? 0 : Integer.parseInt(compareVersionArray[1]);
 		int patchLevel = isLibertyVersion ? Integer.parseInt(compareVersionArray[3]) : Integer.parseInt(compareVersionArray[2]);
 		Version minVersion = new Version(majorVersion, minorVersion, patchLevel, null, null, null);
 
+        // check for and strip off any classifier
+        if (currentVersion.contains("-")) {
+            currentVersion = currentVersion.substring(0, currentVersion.indexOf("-"));
+        }
 		String[] currentVersionArray = currentVersion.split("\\.");
 		majorVersion = Integer.parseInt(currentVersionArray[0]);
         minorVersion = isLibertyVersion ? 0 : Integer.parseInt(currentVersionArray[1]);
