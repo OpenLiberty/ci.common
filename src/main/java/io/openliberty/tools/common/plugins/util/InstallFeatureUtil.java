@@ -145,8 +145,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             downloadedJsons = downloadProductJsons();
             
             //check if the openliberty kernel meets min required version 21.0.0.11      	        		
-            if (additionalJsons != null && !additionalJsons.isEmpty() && openLibertyVersion != null) {     	
-		        if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) >= 0) {
+            if (additionalJsons != null && !additionalJsons.isEmpty() && openLibertyVersion != null) {
+                if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) >= 0) {
             		Set<File> groupIDJsons = getAdditionalJsons();
                     if (groupIDJsons != null) {
                         downloadedJsons.addAll(groupIDJsons);
@@ -610,7 +610,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     	
     	if(openLibertyVersion != null) {
     		info("plugin listed esa: " + pluginListedEsas.toString());
-		    if ((VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) < 0) && !pluginListedEsas.isEmpty()) {
+            if ((VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) < 0) && !pluginListedEsas.isEmpty()) {
     			//manually install user feature esas
     			info("Neither InstallUtility nor FeatureUtility is available to install user feature esa.");
     			info("Attempting to manually install the user feature esa without resolving its dependencies.");

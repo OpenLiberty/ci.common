@@ -936,8 +936,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             return; // can't tell if the version is valid.
         }
         debug("Detected Docker version >" + dockerVersion);
-
-		if (VersionUtility.compareArtifactVersion(dockerVersion, MIN_DOCKER_VERSION, false) < 0) {
+        
+        if (VersionUtility.compareArtifactVersion(dockerVersion, MIN_DOCKER_VERSION, false) < 0) {
             throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.0 or higher.");
         }
     }
