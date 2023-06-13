@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2021.
+ * (C) Copyright IBM Corporation 2019, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,8 +45,6 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -82,7 +80,6 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -93,7 +90,6 @@ import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
-import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -940,9 +936,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             return; // can't tell if the version is valid.
         }
         debug("Detected Docker version >" + dockerVersion);
-        ComparableVersion minVer = new ComparableVersion(MIN_DOCKER_VERSION);
-        ComparableVersion curVer = new ComparableVersion(dockerVersion);
-        if (curVer.compareTo(minVer) < 0) {
+        
+        if (VersionUtility.compareArtifactVersion(dockerVersion, MIN_DOCKER_VERSION, false) < 0) {
             throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be 18.03.0 or higher.");
         }
     }
