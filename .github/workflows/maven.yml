@@ -37,8 +37,6 @@ jobs:
         cache: 'maven'
     - name: Install ci.ant
       run: |
-        cd ./ci.ant
-        mvn clean install
-        cd ..
+        ./mvnw -V clean install -f ci.ant
     - name: Build and run tests
-      run: ./mvnw clean install
+      run: ./mvnw -V clean install
