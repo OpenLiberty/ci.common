@@ -68,26 +68,6 @@ public class ServerConfigXmlDocument extends XmlDocument {
         return configDocument;
     }
 
-    public void createComment(String comment) {
-        createComment(findServerElement(), comment);
-    }
-
-    // add comment to the end of the children
-    public void createComment(Element elem, String comment) {
-        Comment commentElement = doc.createComment(comment);
-        appendBeforeBlanks(elem, commentElement);
-    }
-
-    private void appendBeforeBlanks(Element elem, Node childElement) {
-        Node lastchild = elem.getLastChild();
-        if (isWhitespace(lastchild)) {
-            // last child is the whitespace preceding the </element> so insert before that
-            elem.insertBefore(childElement, lastchild);
-        } else {
-            elem.appendChild(childElement);
-        }
-    }
-
     // Return true if the document was changed and false otherwise.
     public boolean createFMComment(String comment) {
         if (featureManager == null) {
@@ -214,7 +194,4 @@ public class ServerConfigXmlDocument extends XmlDocument {
         return null;
     }
 
-    public Element findServerElement() {
-        return doc.getDocumentElement(); // defined for this type of file
-    }
 }

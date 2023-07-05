@@ -31,6 +31,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.w3c.dom.Comment;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -57,6 +58,30 @@ public abstract class XmlDocument {
         builderFactory.setValidating(false);
         DocumentBuilder builder = builderFactory.newDocumentBuilder();
         doc = builder.parse(xmlFile);
+    }
+
+    public void createComment(String comment) {
+        createComment(findServerElement(), comment);
+    }
+    
+    // add comment to the end of the children
+    public void createComment(Element elem, String comment) {
+        Comment commentElement = doc.createComment(comment);
+        appendBeforeBlanks(elem, commentElement);
+    }
+
+    private void appendBeforeBlanks(Element elem, Node childElement) {
+        Node lastchild = elem.getLastChild();
+        if (isWhitespace(lastchild)) {
+            // last child is the whitespace preceding the </element> so insert before that
+            elem.insertBefore(childElement, lastchild);
+        } else {
+            elem.appendChild(childElement);
+        }
+    }
+
+    public Element findServerElement() {
+        return doc.getDocumentElement(); // defined for this type of file
     }
 
     public void writeXMLDocument(String fileName) throws IOException, TransformerException {
