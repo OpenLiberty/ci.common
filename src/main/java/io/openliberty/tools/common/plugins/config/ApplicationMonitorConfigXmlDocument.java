@@ -40,8 +40,8 @@ public class ApplicationMonitorConfigXmlDocument extends XmlDocument {
         }
 
         ServerConfigXmlDocument configDocument = ServerConfigXmlDocument.newInstance();
-        configDocument.createGeneratedComment(tool);
-        configDocument.createServerElement("applicationMonitor", attributes);;
+        configDocument.createGeneratedByComment(tool);
+        configDocument.createServerElementWithAttributes("applicationMonitor", attributes);
         configDocument.writeXMLDocument(appMonXml);
     }
     
