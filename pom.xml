@@ -10,7 +10,7 @@
 
     <groupId>io.openliberty.tools</groupId>
     <artifactId>ci.common</artifactId>
-    <version>1.8.27-SNAPSHOT</version>
+    <version>1.8.27-appMon-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>ci.common</name>
