@@ -37,11 +37,6 @@ public class ApplicationMonitorConfigXmlDocument extends XmlDocument {
     }
 
     public void createAppMonitorElement() {
-        Element varElement = doc.createElement("variable");
-        varElement.setAttribute("name", "io.openliberty.tools.update.trigger");
-        varElement.setAttribute("defaultValue", "polled");
-        doc.getDocumentElement().appendChild(varElement);
-
         Element appMonitor = doc.createElement("applicationMonitor");
         appMonitor.setAttribute("updateTrigger", "${io.openliberty.tools.update.trigger}");
         doc.getDocumentElement().appendChild(appMonitor);
@@ -56,7 +51,7 @@ public class ApplicationMonitorConfigXmlDocument extends XmlDocument {
     }
     
     public static File getAppMonitorConfigXmlFile(File serverDirectory) {
-        File f = new File(serverDirectory, "configDropins/defaults/" + APPLICATION_CONFIG_XML_FILENAME); 
+        File f = new File(serverDirectory, "configDropins/overrides/" + APPLICATION_CONFIG_XML_FILENAME); 
         return f;
     }
 }
