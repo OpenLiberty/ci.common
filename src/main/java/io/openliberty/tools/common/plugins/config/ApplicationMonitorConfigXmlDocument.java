@@ -38,20 +38,20 @@ public class ApplicationMonitorConfigXmlDocument extends XmlDocument {
         this.tool = tool;
     }
 
-    public void writeAppMonitorConfigXmlDocument(File serverDirectory, String applicationMonitorValue) throws IOException, TransformerException, ParserConfigurationException, PluginExecutionException {
+    public void writeAppMonitorConfigXmlDocument(File serverDirectory, String appMonitorTrigger) throws IOException, TransformerException, ParserConfigurationException, PluginExecutionException {
         File appMonXml = getAppMonitorConfigXmlFile(serverDirectory);
         // if applicationMonitor not set, return
-        if (applicationMonitorValue == null) {
+        if (appMonitorTrigger == null) {
             if (appMonXml.exists()) {
                 appMonXml.delete();
             }
             return;
         }
         // continue with creating configDropins/override file
-        if (!APP_MON_VALUE_LIST.contains(applicationMonitorValue)) {
-            throw new PluginExecutionException("applicationMonitor value \"" + applicationMonitorValue + "\" is not supported. Must be one of: " + APP_MON_VALUE_LIST);
+        if (!APP_MON_VALUE_LIST.contains(appMonitorTrigger)) {
+            throw new PluginExecutionException("The appMonitorTrigger value \"" + appMonitorTrigger + "\" is not supported. Please use one of: " + APP_MON_VALUE_LIST);
         }
-        attributes.put("updateTrigger", applicationMonitorValue);
+        attributes.put("updateTrigger", appMonitorTrigger);
 
         if (!appMonXml.getParentFile().exists()) {
             appMonXml.getParentFile().mkdirs();
