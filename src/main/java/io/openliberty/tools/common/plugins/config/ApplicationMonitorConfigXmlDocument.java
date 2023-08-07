@@ -17,23 +17,38 @@ package io.openliberty.tools.common.plugins.config;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
+
 public class ApplicationMonitorConfigXmlDocument extends XmlDocument {
     public static final String APPLICATION_CONFIG_XML_FILENAME = "liberty-plugin-app-monitor-config.xml";
+    private static List<String> APP_MON_VALUE_LIST = Arrays.asList("polled", "mbean", "disabled");
+
     String tool = null;
 
     HashMap<String, String> attributes = new HashMap<>();
 
     public ApplicationMonitorConfigXmlDocument(String tool) {
         this.tool = tool;
-        attributes.put("updateTrigger", "${io.openliberty.tools.update.trigger}");
     }
 
-    public void writeAppMonitorConfigXmlDocument(File serverDirectory) throws IOException, TransformerException, ParserConfigurationException {
+    public void writeAppMonitorConfigXmlDocument(File serverDirectory, String applicationMonitorValue) throws IOException, TransformerException, ParserConfigurationException, PluginExecutionException {
+        // if applicationMonitor not set, return
+        if (applicationMonitorValue == null) {
+            return;
+        }
+        // continue with creating configDropins/override file
+        if (!APP_MON_VALUE_LIST.contains(applicationMonitorValue)) {
+            throw new PluginExecutionException("applicationMonitor value \"" + applicationMonitorValue + "\" is not supported. Must be one of: " + APP_MON_VALUE_LIST);
+        }
+        attributes.put("updateTrigger", applicationMonitorValue);
+
         File appMonXml = getAppMonitorConfigXmlFile(serverDirectory);
         if (!appMonXml.getParentFile().exists()) {
             appMonXml.getParentFile().mkdirs();
