@@ -39,8 +39,12 @@ public class ApplicationMonitorConfigXmlDocument extends XmlDocument {
     }
 
     public void writeAppMonitorConfigXmlDocument(File serverDirectory, String applicationMonitorValue) throws IOException, TransformerException, ParserConfigurationException, PluginExecutionException {
+        File appMonXml = getAppMonitorConfigXmlFile(serverDirectory);
         // if applicationMonitor not set, return
         if (applicationMonitorValue == null) {
+            if (appMonXml.exists()) {
+                appMonXml.delete();
+            }
             return;
         }
         // continue with creating configDropins/override file
@@ -49,7 +53,6 @@ public class ApplicationMonitorConfigXmlDocument extends XmlDocument {
         }
         attributes.put("updateTrigger", applicationMonitorValue);
 
-        File appMonXml = getAppMonitorConfigXmlFile(serverDirectory);
         if (!appMonXml.getParentFile().exists()) {
             appMonXml.getParentFile().mkdirs();
         }
