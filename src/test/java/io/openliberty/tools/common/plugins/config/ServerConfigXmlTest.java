@@ -31,8 +31,7 @@ public class ServerConfigXmlTest extends BaseConfigXmlTest {
         try {
             appMonXml.writeAppMonitorConfigXmlDocument(serverDirectory, "asdf");
         } catch (Exception e) {
-            assertTrue(e.getMessage().contains("applicationMonitor value"));
-            assertTrue(e.getMessage().contains("is not supported"));
+            assertTrue(e.getMessage().contains("The appMonitorTrigger value \"asdf\" is not supported."));
         }
     }
 
