@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2021.
+ * (C) Copyright IBM Corporation 2021, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +29,8 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -41,8 +39,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
-import org.apache.commons.io.FileUtils;
 
 public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
@@ -65,12 +61,9 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		installJarFile = loadInstallJarFile(installDirectory);
 
 		// check if the openliberty kernel meets min required version 21.0.0.11
-		DefaultArtifactVersion minVersion = new DefaultArtifactVersion(MIN_USER_FEATURE_VERSION);
-		DefaultArtifactVersion version = new DefaultArtifactVersion(openLibertyVersion);
-
-		if (version.compareTo(minVersion) < 0) {
+		if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) < 0) {
 			throw new PluginScenarioException(
-					"Installing user features on Liberty version "+version+" is not supported. The minimum required version of Liberty for installing user features is "+minVersion+".");
+					"Installing user features on Liberty version "+openLibertyVersion+" is not supported. The minimum required version of Liberty for installing user features is "+MIN_USER_FEATURE_VERSION+".");
 		}
 		if (installJarFile == null) {
 			throw new PluginScenarioException("Install map jar not found.");
@@ -112,7 +105,6 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @throws PluginExecutionException
 	 */
 	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) throws PluginExecutionException {
-		File json = null;
 			try {
 				String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
 				String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
