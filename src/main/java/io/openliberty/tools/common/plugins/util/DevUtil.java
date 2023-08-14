@@ -357,9 +357,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File configDirectory;
     private File projectDirectory;
     private File multiModuleProjectDirectory;
-    private List<File> resourceDirs;
+    protected List<File> resourceDirs;
     // Not all webResource dirs need to be monitored, but those for which a Maven filtering will be applied do, since they can't be added to the loose app as source
-    private List<Path> monitoredWebResourceDirs;
+    protected List<Path> monitoredWebResourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
     private boolean skipTests;
