@@ -3894,7 +3894,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
         Path outputPath = this.outputDirectory.getCanonicalFile().toPath();
 
-        Path directory = fileChanged.getParentFile().toPath();
+        Path directory = fileChanged.getParentFile().getCanonicalFile().toPath();
 
         // resource file check
         File resourceParent = null;
