@@ -1849,8 +1849,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // Also skip install feature on restart if config parameter specified.
         if (!container && !skipInstallFeature) {
             libertyInstallFeature();
-        } else {
-            info("Skipping liberty:install-feature");
+        } else if (skipInstallFeature) {
+            info("Skipping installation of features due to skipInstallFeature configuration.");
         }
         libertyDeploy();
         startServer(buildContainer, false);
