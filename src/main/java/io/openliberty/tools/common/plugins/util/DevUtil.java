@@ -357,8 +357,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File configDirectory;
     private File projectDirectory;
     private File multiModuleProjectDirectory;
-    private List<File> resourceDirs;
-    private List<Path> webResourceDirs;
+    protected List<File> resourceDirs;
+    // Not all webResource dirs need to be monitored, but those for which a Maven filtering will be applied do, since they can't be added to the loose app as source
+    protected List<Path> monitoredWebResourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
     private boolean skipTests;
@@ -443,7 +444,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempDockerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
             String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
-            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> webResourceDirs) {
+            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -509,7 +510,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.generateFeatures = generateFeatures;
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
-        this.webResourceDirs = webResourceDirs;
+        this.monitoredWebResourceDirs = monitoredWebResourceDirs;
         this.generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
         this.generatedFeaturesModified = false;
         if (this.generateFeatures) {
@@ -2835,7 +2836,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             
             HashMap<Path, Boolean> webResourceMap = new HashMap<Path, Boolean>();
-            for (Path webResourceDir : webResourceDirs) {
+            for (Path webResourceDir : monitoredWebResourceDirs) {
                 webResourceMap.put(webResourceDir, false);
                 if (Files.exists(webResourceDir)) {
                     registerAll(webResourceDir, executor);
@@ -3033,7 +3034,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
                 
                 // Check if webResourceDirectory has been added or deleted
-                for (Path webResourceDir : webResourceDirs) {
+                for (Path webResourceDir : monitoredWebResourceDirs) {
                     if (!webResourceMap.get(webResourceDir) && Files.exists(webResourceDir)) {
                     	updateLooseApp();
                         registerAll(webResourceDir, executor);
@@ -3893,7 +3894,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
         Path outputPath = this.outputDirectory.getCanonicalFile().toPath();
 
-        Path directory = fileChanged.getParentFile().toPath();
+        Path directory = fileChanged.getParentFile().getCanonicalFile().toPath();
 
         // resource file check
         File resourceParent = null;
@@ -3906,7 +3907,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         
         // webResource file check
         Path webResourceParent = null;
-        for (Path webResourceDir : webResourceDirs) {
+        for (Path webResourceDir : monitoredWebResourceDirs) {
             if (directory.startsWith(webResourceDir)) {
                 webResourceParent = webResourceDir;
                 break;
@@ -4082,9 +4083,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             }
                         }
                     }
-                    // Update the loose app in case something changed 
-                    updateLooseApp();
-                    
                 } else if (upstreamResourceParent != null
                         && directory.startsWith(upstreamResourceParent.getCanonicalFile().toPath())) { // resources
                     debug("Resource dir: " + upstreamResourceParent.toString());
@@ -4233,8 +4231,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         triggerJavaTestRecompile = true;
                     }
                 }
-                // Update the loose app in case something changed 
-                updateLooseApp();
                 runTestThread(true, executor, numApplicationUpdatedMessages, skipUTs, false, buildFile);
             }
         } else if (fileChanged.equals(dockerfileUsed)
@@ -4998,8 +4994,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // redeploy app after compilation if not loose application
                     if (!isLooseApplication()) {
                         redeployApp();
-                    } else {
-                        updateLooseApp();
                     }
                     if (projectName != null) {
                         info(projectName + " source compilation was successful.");
