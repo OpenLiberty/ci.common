@@ -434,10 +434,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> testArtifactPaths;
     protected final File generatedFeaturesFile;
     private File modifiedSrcBuildFile;
+    protected boolean skipInstallFeature;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
-            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, String applicationId,
+            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
             long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
             boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
             File dockerfile, File dockerBuildContext, String dockerRunOpts, int dockerBuildTimeout,
@@ -457,6 +458,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.skipTests = skipTests;
         this.skipUTs = skipUTs;
         this.skipITs = skipITs;
+        this.skipInstallFeature = skipInstallFeature;
         this.applicationId = applicationId;
         this.serverStartTimeout = serverStartTimeout;
         this.appStartupTimeout = appStartupTimeout;
@@ -1845,8 +1847,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         libertyCreate();
         // Skip installing features on container during restart, since the Dockerfile
         // should have 'RUN features.sh'
-        if (!container) {
+        // Also skip install feature on restart if config parameter specified.
+        if (!container && !skipInstallFeature) {
             libertyInstallFeature();
+        } else if (skipInstallFeature) {
+            info("Skipping installation of features due to skipInstallFeature configuration.");
         }
         libertyDeploy();
         startServer(buildContainer, false);
