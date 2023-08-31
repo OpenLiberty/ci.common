@@ -1328,9 +1328,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void startContainer() {
         try {
-            if (OSUtil.isLinux()) {
+            if (OSUtil.isLinux() || OSUtil.isMac()) { // Added Mac since started getting permission errors for logs folder
                 // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
                 runCmd("mkdir -p " + serverDirectory + "/logs");
+                // Added two hidden folders since started getting permissions errors on the dropins folder.
+                runCmd("mkdir -p " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps");
+                runCmd("mkdir -p " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins");
             }
 
             info("Starting Docker container...");
