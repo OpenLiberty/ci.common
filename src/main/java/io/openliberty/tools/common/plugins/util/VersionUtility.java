@@ -50,6 +50,7 @@ public class VersionUtility {
         Version minVersion = new Version(majorVersion, minorVersion, patchLevel, null, null, null);
 
         // check for and strip off any classifier
+        currentVersion = currentVersion.trim(); // guard against trailing blank space
         if (currentVersion.contains("-")) {
             currentVersion = currentVersion.substring(0, currentVersion.indexOf("-"));
         }
