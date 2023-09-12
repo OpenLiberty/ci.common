@@ -26,7 +26,7 @@ public abstract class AbstractContainerSupportUtil {
     private static final String CONTAINER_DOCKER_PREFIX = "docker ";
     private static final String CONTAINER_PODMAN_PREFIX = "podman ";
 
-    private static final int CONTAINER_TIMEOUT = 20; // seconds
+    protected static final int CONTAINER_TIMEOUT = 20; // seconds
     
     private   boolean checkedContainerType = false;
     protected boolean isDocker = true;

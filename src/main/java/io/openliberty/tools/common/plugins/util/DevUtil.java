@@ -138,7 +138,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
-    private static final int DOCKER_TIMEOUT = 20; // seconds
 
     /**
      * Log debug
@@ -1349,7 +1348,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             try {
                 // remove container in case of an error trying to run the container because the container run --rm will not rm the container
                 String containerRmCmd = "container rm " + containerName;
-                execContainerCmdWithPrefix(containerRmCmd, DOCKER_TIMEOUT);
+                execContainerCmdWithPrefix(containerRmCmd, CONTAINER_TIMEOUT);
             } catch (Exception e) {
                 // do not report the "container rm" error so that we can instead report the startContainer() error
                 debug("Exception running container command rm:", e);
@@ -1511,7 +1510,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("Stopping container...");
                 String containerStopCmd = "stop " + containerName;
                 debug("Stopping container " + containerName);
-                execContainerCmdWithPrefix(containerStopCmd, DOCKER_TIMEOUT + 20); // allow extra time for server shutdown
+                execContainerCmdWithPrefix(containerStopCmd, CONTAINER_TIMEOUT + 20); // allow extra time for server shutdown
                 writeDevcMetadata(false);
             }
         } catch (RuntimeException r) {
@@ -1674,7 +1673,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private String generateNewContainerName() throws PluginExecutionException {
         String containerContNamesCmd = "ps -a --format \"{{.Names}}\"";
         debug("container names list command: " + containerContNamesCmd);
-        String result = execContainerCmdWithPrefix(containerContNamesCmd, DOCKER_TIMEOUT);
+        String result = execContainerCmdWithPrefix(containerContNamesCmd, CONTAINER_TIMEOUT);
         if (result == null) {
             return DEVMODE_CONTAINER_BASE_NAME;
         }
@@ -1712,7 +1711,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     private String[] getContainerNetworks(String contName) throws PluginExecutionException {
         String containerNetworkCmd = "inspect -f '{{.NetworkSettings.Networks}}' " + contName;
-        String cmdResult = execContainerCmdWithPrefix(containerNetworkCmd, DOCKER_TIMEOUT, false);
+        String cmdResult = execContainerCmdWithPrefix(containerNetworkCmd, CONTAINER_TIMEOUT, false);
         if (cmdResult == null || cmdResult.contains(" RC=")) { // RC is added in execContainerCmd if there is an error
             warn("Unable to retrieve container networks.");
             return null;
@@ -1744,7 +1743,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private String getContainerIPAddress(String contName, String network) throws PluginExecutionException {
         String containerIPAddressCmd = "inspect -f '{{.NetworkSettings.Networks." + network + ".IPAddress}}' " + contName;
-        String result = execContainerCmdWithPrefix(containerIPAddressCmd, DOCKER_TIMEOUT, false);
+        String result = execContainerCmdWithPrefix(containerIPAddressCmd, CONTAINER_TIMEOUT, false);
         if (result == null || result.contains(" RC=")) { // RC is added in execContainerCmd if there is an error
             warn("Unable to retrieve container IP address for network '" + network + "'.");
             return "<no value>"; // this is what Docker/Podman displays when an IP address it not found for a network
@@ -1992,7 +1991,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private String findLocalPort(String internalContainerPort) throws PluginExecutionException {
         String containerPortCmd = "port " + containerName + " " + internalContainerPort;
-        String cmdResult = execContainerCmdWithPrefix(containerPortCmd, DOCKER_TIMEOUT, false);
+        String cmdResult = execContainerCmdWithPrefix(containerPortCmd, CONTAINER_TIMEOUT, false);
         if (cmdResult == null) {
             warn("Unable to retrieve locally mapped port.");
             return null;
