@@ -56,7 +56,7 @@ public abstract class AbstractContainerSupportUtil {
             checkDockerVersion();
         }
 
-        return !isDocker ? CONTAINER_PODMAN_PREFIX : CONTAINER_DOCKER_PREFIX;
+        return isDocker ? CONTAINER_DOCKER_PREFIX : CONTAINER_PODMAN_PREFIX;
     }
 
     /**
@@ -146,6 +146,20 @@ public abstract class AbstractContainerSupportUtil {
 
     protected String execContainerCmd(String command, int timeout) {
         return execContainerCmd(command, timeout, true);
+    }
+
+    protected String execContainerCmdWithPrefix(String command, int timeout) {
+        return execContainerCmdWithPrefix(command, timeout, true);
+    }
+
+    protected String execContainerCmdWithPrefix(String command, int timeout, boolean throwExceptionOnError) {
+        try {
+            String containerCommand = getContainerCommandPrefix() + " " + command;
+            return execContainerCmd(containerCommand, timeout, throwExceptionOnError);
+        } catch (PluginExecutionException pe) {
+            error("Error while determining container command prefix.", pe);
+            return pe.getMessage();
+        }
     }
 
     protected String readStdOut(Process p) throws IOException, InterruptedException {
