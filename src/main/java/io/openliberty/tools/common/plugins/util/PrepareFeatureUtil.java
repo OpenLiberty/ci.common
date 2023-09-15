@@ -250,6 +250,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				}	
 
 			} catch (PrivilegedActionException e) {
+				debug(e);
 				throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
 			}
 			File targetFile = new File(targetJsonFile);
@@ -267,10 +268,17 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			debug(e);
 			throw new PluginExecutionException("Cannot read or create json file " + targetJsonFile, e);
 		} finally {
-			try {
-				instream.close();
-				outstream.close();
-			} catch (IOException e) {			
+			if (instream != null) {
+				try {
+					instream.close();
+				} catch (IOException e) {
+				}
+			}
+			if (outstream != null) {
+				try {
+					outstream.close();
+				} catch (IOException e) {
+				}
 			}
 		}
 	}
