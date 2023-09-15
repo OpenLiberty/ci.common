@@ -7,8 +7,11 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.Test;
@@ -32,7 +35,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         File wlProps = new File(installDir, "lib/versions/WebSphereApplicationServer.properties");
         assertTrue(olProps.delete());
         assertTrue(wlProps.delete());
-        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), verify);
     }
     
     /**
@@ -42,7 +45,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorNoInstallMap() throws Exception {
         File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
         assertTrue(installMap.delete());
-        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), verify);
     }
     
     /**
@@ -52,7 +55,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     public void testConstructorNoOpenLibertyProperties() throws Exception {
         File olProps = new File(installDir, "lib/versions/openliberty.properties");
         assertTrue(olProps.delete());
-        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), verify);
     }
     
     /**
@@ -64,12 +67,12 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         assertTrue(olProps.delete());
         File installMap = new File(installDir, "lib/com.ibm.ws.install.map_1.0.21.jar");
         assertTrue(installMap.delete());
-        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), verify);
     }
         
     @Test
     public void testConstructorTo() throws Exception {
-        InstallFeatureUtil util = getNewInstallFeatureUtil(installDir, buildDir, null, "myextension", new HashSet<String>());
+        InstallFeatureUtil util = getNewInstallFeatureUtil(installDir, buildDir, null, "myextension", new HashSet<String>(), verify);
         assertNotNull(util);
     }
     
@@ -78,7 +81,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
      */
     @Test(expected = PluginScenarioException.class)
     public void testConstructorFrom() throws Exception {
-        getNewInstallFeatureUtil(installDir, buildDir, installDir.getAbsolutePath(), null, new HashSet<String>());
+        getNewInstallFeatureUtil(installDir, buildDir, installDir.getAbsolutePath(), null, new HashSet<String>(), verify);
     }
     
 
@@ -171,7 +174,9 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir);
         String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
         List<String> additionalJsons = new ArrayList<String>();
-        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, buildDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion, additionalJsons) {
+        String verifyOption = "enforce";
+        Collection<Map<String, String>> keyMap = new ArrayList<>();
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, buildDir, null, null, new HashSet<String>(), propertiesList, openLibertyVersion, additionalJsons, verifyOption, keyMap) {
             @Override
             public File downloadArtifact(String groupId, String artifactId, String type, String version)
                     throws PluginExecutionException {
@@ -246,4 +251,22 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         target.add("other");
         assertFalse("Collection " + reference + " should not contain all of the elements from " + target + " ignoring case", InstallFeatureUtil.containsIgnoreCase(reference, target));
     }
+    
+    /**
+     * Test valid verify option
+     */
+    @Test
+    public void testVerify() throws Exception {
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), "all");
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), "skip");
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), "enforce");
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), "warn");
+    }
+    
+    @Test(expected = PluginExecutionException.class)
+    public void testInvalidVerifyOption() throws Exception {
+        getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), "invalid");
+    }
 }
+
+

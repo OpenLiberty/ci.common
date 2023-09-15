@@ -38,6 +38,8 @@ public class InstallFeatureUtilGetInstallMapTest {
     
     private String[] input;
     private String expected;
+    private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
+    private static final String JAR_EXT = ".jar";
 
     /**
      * Initialize test data for finding the install map jar
@@ -109,7 +111,7 @@ public class InstallFeatureUtilGetInstallMapTest {
             File testFile = new File(installMapDir, testFileName);
             assertTrue(testFile.createNewFile());
         }
-        String result = InstallFeatureUtil.getMapBasedInstallKernelJar(installMapDir).getName();
+        String result = InstallFeatureUtil.getMapBasedInstallKernelJar(installMapDir, INSTALL_MAP_PREFIX, JAR_EXT).getName();
         
         assertEquals(expected, result);
     }

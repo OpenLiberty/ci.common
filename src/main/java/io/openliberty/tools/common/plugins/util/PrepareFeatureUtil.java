@@ -52,6 +52,8 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
 	public static final String FEATURES_JSON_ARTIFACT_ID = "features";
 	private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
+	private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
+	private static final String JAR_EXT = ".jar";
 
 	private File installJarFile;
 	private File jsonFile;
@@ -301,7 +303,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				return installJarOverride;
 			}
 		}
-		return InstallFeatureUtil.getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
+		return InstallFeatureUtil.getMapBasedInstallKernelJar(new File(installDirectory, "lib"), INSTALL_MAP_PREFIX, JAR_EXT);
 	}
 
 	private File downloadOverrideJar(String groupId, String artifactId) {
