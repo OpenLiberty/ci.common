@@ -34,11 +34,13 @@ import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
@@ -79,18 +81,21 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			String version = coord[2];
 			File additionalBOM = downloadArtifact(groupId, artifactId, "pom", version);
 			esaMap.putAll(populateESAMap(additionalBOM));
-			prepareFeature(groupId, artifactId, version, additionalBOM, esaMap);
+			if(esaMap.isEmpty()) {
+			    warn("There were no feature ESA files to generate feature.json. Please ignore this warning if this is not a user feature.");
+			}else {
+			    prepareFeature(groupId, artifactId, version, additionalBOM, esaMap);
+			}
 		}
 
 	}
 	
-	private Map<File, String> populateESAMap(File additionalBOM) {
+	private Map<File, String> populateESAMap(File additionalBOM) throws PluginExecutionException {
 		Map<File, String> result = new HashMap<File, String>();
 		try {	
-			result = downloadArtifactsFromBOM(additionalBOM);
+		    result = downloadArtifactsFromBOM(additionalBOM);
 		} catch (PluginExecutionException e) {
-			warn(e.getMessage());
-			warn("A features-bom file must be provided at " + additionalBOM.getAbsolutePath() +  ". Please ignore this warning if this is not a user feature.");
+		    warn(e.getMessage());
 		}
 		
 		return result;
@@ -105,24 +110,25 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @throws PluginExecutionException
 	 */
 	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) throws PluginExecutionException {
-			try {
-				String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
-				String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
-						version);
-				File generatedJson = generateJson(targetJsonFile, esaMap);
-				if (generatedJson.exists()) {
-					jsonFile = generatedJson;
-					provideJsonFileDependency(generatedJson, groupId, version);
-					info("The features.json has been generated at the following location: " + generatedJson);
-				}
-			} catch (PluginExecutionException e) {
-				warn(e.getMessage());
-			}
+	    try {
+		String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
+		String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
+			version);
+		File generatedJson = generateJson(targetJsonFile, esaMap);
+		if (generatedJson.exists()) {
+		    jsonFile = generatedJson;
+		    provideJsonFileDependency(generatedJson, groupId, version);
+		    info("The features.json has been generated at the following location: " + generatedJson);
 		}
-
+	    } catch (PluginExecutionException e) {
+		warn(e.getMessage());
+	    }
+	}
 
 	/**
-	 * Download the Artifacts mentioned within the additionalBOM pom file
+	 * Download the Artifacts mentioned within the additionalBOM pom file.
+	 * Required artifact properties are "groupId, artifactId, version and type".
+	 * If any of the properties are missing, then it will throw NullPointerException. 
 	 * 
 	 * @param additionalBOM The BOM file
 	 * @return A map of Files to groupIds
@@ -150,11 +156,12 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 					result.put(artifactFile, groupId);
 				}
 			}
-		} catch (PluginExecutionException e) { // we were unable to download artifact mentioned in BOM
-			throw e;
-		} catch (Exception e) {
-			throw new PluginExecutionException("Cannot read the BOM file " + additionalBOM.getAbsolutePath(), e);
-		}
+		} catch (ParserConfigurationException | SAXException | IOException | NullPointerException e) {
+		    // TODO Auto-generated catch block
+		    debug(e);
+		    throw new PluginExecutionException("Cannot read the BOM file " + additionalBOM.getAbsolutePath() + ". " + e.getMessage());
+		    
+		} 
 		return result;
 	}
 
@@ -291,7 +298,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 					openLibertyVersion + ", " + InstallFeatureUtil.getNextProductVersion(openLibertyVersion)));
 		} catch (PluginExecutionException e) {
 			debug("Could not find override bundle " + groupId + ":" + artifactId
-					+ " for the current Open Liberty version " + openLibertyVersion, e);
+					+ " for the current Open Liberty version " + openLibertyVersion + e.getMessage());
 			return null;
 		}
 	}
