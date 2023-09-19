@@ -43,7 +43,7 @@ public class VersionUtility {
      * @return integer representing result of comparison
      */
     public static int compareArtifactVersion(String currentVersion, String compareVersion, boolean isLibertyVersion) {
-        String[] compareVersionArray = compareVersion.split("\\.");
+        String[] compareVersionArray = compareVersion.trim().split("\\.");
         int majorVersion = Integer.parseInt(compareVersionArray[0]);
         int minorVersion = isLibertyVersion ? 0 : Integer.parseInt(compareVersionArray[1]);
         int patchLevel = isLibertyVersion ? Integer.parseInt(compareVersionArray[3]) : Integer.parseInt(compareVersionArray[2]);
@@ -54,7 +54,7 @@ public class VersionUtility {
         if (currentVersion.contains("-")) {
             currentVersion = currentVersion.substring(0, currentVersion.indexOf("-"));
         }
-        String[] currentVersionArray = currentVersion.split("\\.");
+        String[] currentVersionArray = currentVersion.trim().split("\\.");
         majorVersion = Integer.parseInt(currentVersionArray[0]);
         minorVersion = isLibertyVersion ? 0 : Integer.parseInt(currentVersionArray[1]);
         patchLevel = isLibertyVersion ? Integer.parseInt(currentVersionArray[3]) : Integer.parseInt(currentVersionArray[2]);
