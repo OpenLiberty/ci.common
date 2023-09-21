@@ -55,6 +55,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	private File installJarFile;
 	private File jsonFile;
+	
 
 	public PrepareFeatureUtil(File installDirectory, String openLibertyVersion)
 			throws PluginScenarioException, PluginExecutionException {
@@ -82,7 +83,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			File additionalBOM = downloadArtifact(groupId, artifactId, "pom", version);
 			esaMap.putAll(populateESAMap(additionalBOM));
 			if(esaMap.isEmpty()) {
-			    warn("There were no feature ESA files to generate feature.json. Please ignore this warning if this is not a user feature.");
+			    warn("\"The features.json could not be generated because the required feature ESA files were not provided for features-bom at coordinates " + groupId + ":" +artifactId + ":" +version);
 			}else {
 			    prepareFeature(groupId, artifactId, version, additionalBOM, esaMap);
 			}
@@ -90,7 +91,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	}
 	
-	private Map<File, String> populateESAMap(File additionalBOM) throws PluginExecutionException {
+	private Map<File, String> populateESAMap(File additionalBOM) {
 		Map<File, String> result = new HashMap<File, String>();
 		try {	
 		    result = downloadArtifactsFromBOM(additionalBOM);
@@ -109,7 +110,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @param version
 	 * @throws PluginExecutionException
 	 */
-	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) throws PluginExecutionException {
+	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) {
 	    try {
 		String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
 		String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
@@ -136,28 +137,37 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 *                                  artifacts
 	 */
 	private Map<File, String> downloadArtifactsFromBOM(File additionalBOM) throws PluginExecutionException {
-		Map<File, String> result = new HashMap<File, String>();
-		try {
-			DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-			DocumentBuilder db = dbf.newDocumentBuilder();
-			Document doc = db.parse(additionalBOM);
-			doc.getDocumentElement().normalize();
-			NodeList dependencyList = doc.getElementsByTagName("dependency");
-			for (int itr = 0; itr < dependencyList.getLength(); itr++) {
-				Node node = dependencyList.item(itr);
-				if (node.getNodeType() == Node.ELEMENT_NODE) {
-					Element eElement = (Element) node;
-					String groupId = eElement.getElementsByTagName("groupId").item(0).getTextContent();
-					String artifactId = eElement.getElementsByTagName("artifactId").item(0).getTextContent();
-					String version = eElement.getElementsByTagName("version").item(0).getTextContent();
-					String type = eElement.getElementsByTagName("type").item(0).getTextContent();
-
-					File artifactFile = downloadArtifact(groupId, artifactId, type, version);
-					result.put(artifactFile, groupId);
-				}
+	    Map<File, String> result = new HashMap<File, String>();
+	    String[] MavenCoord =  {"groupId", "artifactId", "type", "version"};
+	   
+	    try {
+		DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+		DocumentBuilder db = dbf.newDocumentBuilder();
+		Document doc = db.parse(additionalBOM);
+		doc.getDocumentElement().normalize();
+		NodeList dependencyList = doc.getElementsByTagName("dependency");
+		for (int itr = 0; itr < dependencyList.getLength(); itr++) {
+		    Node node = dependencyList.item(itr);
+		    if (node.getNodeType() == Node.ELEMENT_NODE) {
+			Element eElement = (Element) node;
+			// error checking
+			for (String tag : MavenCoord) {
+			    Node tmp_node = eElement.getElementsByTagName(tag).item(0);
+			    if (tmp_node == null) {
+				throw new PluginExecutionException(
+					"Error: <" + tag + "> tag nof found in BOM file.");
+			    }
 			}
-		} catch (ParserConfigurationException | SAXException | IOException | NullPointerException e) {
-		    // TODO Auto-generated catch block
+			String groupId = eElement.getElementsByTagName(MavenCoord[0]).item(0).getTextContent();
+			String artifactId = eElement.getElementsByTagName(MavenCoord[1]).item(0).getTextContent();
+			String type = eElement.getElementsByTagName(MavenCoord[2]).item(0).getTextContent();
+			String version = eElement.getElementsByTagName(MavenCoord[3]).item(0).getTextContent();
+			
+			File artifactFile = downloadArtifact(groupId, artifactId, type, version);
+			result.put(artifactFile, groupId);
+		    }
+		}
+		} catch (ParserConfigurationException | SAXException | IOException e) {
 		    debug(e);
 		    throw new PluginExecutionException("Cannot read the BOM file " + additionalBOM.getAbsolutePath() + ". " + e.getMessage());
 		    
