@@ -83,7 +83,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			File additionalBOM = downloadArtifact(groupId, artifactId, "pom", version);
 			esaMap.putAll(populateESAMap(additionalBOM));
 			if(esaMap.isEmpty()) {
-			    warn("\"The features.json could not be generated because the required feature ESA files were not provided for features-bom at coordinates " + groupId + ":" +artifactId + ":" +version);
+			    warn("The features.json could not be generated due to errors encountered while resolving the feature ESA file specified in feautres-bom file at coordinates " + groupId + ":" +artifactId + ":" +version);
 			}else {
 			    prepareFeature(groupId, artifactId, version, additionalBOM, esaMap);
 			}
@@ -129,7 +129,6 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	/**
 	 * Download the Artifacts mentioned within the additionalBOM pom file.
 	 * Required artifact properties are "groupId, artifactId, version and type".
-	 * If any of the properties are missing, then it will throw NullPointerException. 
 	 * 
 	 * @param additionalBOM The BOM file
 	 * @return A map of Files to groupIds
@@ -138,8 +137,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 */
 	private Map<File, String> downloadArtifactsFromBOM(File additionalBOM) throws PluginExecutionException {
 	    Map<File, String> result = new HashMap<File, String>();
-	    String[] MavenCoord =  {"groupId", "artifactId", "type", "version"};
-	   
+	    ArrayList<String> missing_tags = new ArrayList<>();
 	    try {
 		DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
 		DocumentBuilder db = dbf.newDocumentBuilder();
@@ -150,26 +148,35 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		    Node node = dependencyList.item(itr);
 		    if (node.getNodeType() == Node.ELEMENT_NODE) {
 			Element eElement = (Element) node;
-			// error checking
-			for (String tag : MavenCoord) {
-			    Node tmp_node = eElement.getElementsByTagName(tag).item(0);
-			    if (tmp_node == null) {
-				throw new PluginExecutionException(
-					"Error: <" + tag + "> tag nof found in BOM file.");
-			    }
+			
+			if(eElement.getElementsByTagName("groupId").item(0) == null ) {
+			    missing_tags.add("groupId");
 			}
-			String groupId = eElement.getElementsByTagName(MavenCoord[0]).item(0).getTextContent();
-			String artifactId = eElement.getElementsByTagName(MavenCoord[1]).item(0).getTextContent();
-			String type = eElement.getElementsByTagName(MavenCoord[2]).item(0).getTextContent();
-			String version = eElement.getElementsByTagName(MavenCoord[3]).item(0).getTextContent();
+			if(eElement.getElementsByTagName("artifactId").item(0) == null ) {
+			    missing_tags.add("artifactId ");
+			}
+			if(eElement.getElementsByTagName("type").item(0) == null ) {
+			    missing_tags.add("type");
+			}
+			if(eElement.getElementsByTagName("version").item(0) == null ) {
+			    missing_tags.add("version");
+			}
+			
+			if(!missing_tags.isEmpty()) {
+			    throw new PluginExecutionException("Error: "+ missing_tags.toString()  + " tag(s) not found in features-bom file " + additionalBOM);
+			}
+			
+			String groupId = eElement.getElementsByTagName("groupId").item(0).getTextContent();
+			String artifactId = eElement.getElementsByTagName("artifactId").item(0).getTextContent();
+			String type = eElement.getElementsByTagName("type").item(0).getTextContent();
+			String version = eElement.getElementsByTagName("version").item(0).getTextContent();
 			
 			File artifactFile = downloadArtifact(groupId, artifactId, type, version);
 			result.put(artifactFile, groupId);
 		    }
 		}
 		} catch (ParserConfigurationException | SAXException | IOException e) {
-		    debug(e);
-		    throw new PluginExecutionException("Cannot read the BOM file " + additionalBOM.getAbsolutePath() + ". " + e.getMessage());
+		    throw new PluginExecutionException("Cannot read the features-bom file " + additionalBOM.getAbsolutePath() + ". " + e.getMessage());
 		    
 		} 
 		return result;
