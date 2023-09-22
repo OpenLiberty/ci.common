@@ -275,6 +275,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				}	
 
 			} catch (PrivilegedActionException e) {
+				debug(e);
 				throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
 			}
 			File targetFile = new File(targetJsonFile);

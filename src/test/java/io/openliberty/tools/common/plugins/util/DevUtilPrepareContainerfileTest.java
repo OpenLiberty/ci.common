@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2020.
+ * (C) Copyright IBM Corporation 2020, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
+public class DevUtilPrepareContainerfileTest extends BaseDevUtilTest {
 
     DevUtil util;
     File dockerfiles = new File("src/test/resources/dockerbuild");
@@ -47,12 +47,12 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         }
     }
 
-    private void testPrepareDockerfile(String testFile, String expectedFile) throws PluginExecutionException, IOException {
+    private void testPrepareContainerfile(String testFile, String expectedFile) throws PluginExecutionException, IOException {
         File test = new File(dockerfiles, testFile);
         File expected = new File(dockerfiles, expectedFile);
-        result = util.prepareTempDockerfile(test, dockerfiles.getAbsolutePath());
+        result = util.prepareTempContainerfile(test, dockerfiles.getAbsolutePath());
         // trim the overall file content string since the file write can insert an extra line break at the end
-        assertEquals(util.readDockerfile(expected), util.readDockerfile(result));
+        assertEquals(util.readContainerfile(expected), util.readContainerfile(result));
     }
 
     @Test
@@ -85,61 +85,61 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     }
 
     @Test
-    public void testBasicDockerfile() throws Exception {
-        testPrepareDockerfile("basic.txt", "basic-expected.txt");
+    public void testBasicContainerfile() throws Exception {
+        testPrepareContainerfile("basic.txt", "basic-expected.txt");
         assertTrue(util.srcMount.get(0).endsWith("server.xml"));
         assertTrue(util.destMount.get(0).endsWith("/config/server.xml"));
     }
 
     @Test
-    public void testBasicDockerfileFlow() throws Exception {
+    public void testBasicContainerfileFlow() throws Exception {
         File dockerfile = new File(dockerfiles, "basic.txt");
 
-        List<String> dockerfileLines = util.readDockerfile(dockerfile);
+        List<String> dockerfileLines = util.readContainerfile(dockerfile);
 
-        List<String> expectedDockerfileLines = new ArrayList<String>();
-        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
-        expectedDockerfileLines.add("");
-        expectedDockerfileLines.add("# Add my app and config");
-        expectedDockerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
-        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
-        expectedDockerfileLines.add("");
-        expectedDockerfileLines.add("# Default setting for the verbose option");
-        expectedDockerfileLines.add("ARG VERBOSE=false");
-        expectedDockerfileLines.add("");
-        expectedDockerfileLines.add("# This script will add the requested XML snippets, grow image to be fit-for-purpose and apply interim fixes");
-        expectedDockerfileLines.add("RUN configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        List<String> expectedContainerfileLines = new ArrayList<String>();
+        expectedContainerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedContainerfileLines.add("");
+        expectedContainerfileLines.add("# Add my app and config");
+        expectedContainerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
+        expectedContainerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedContainerfileLines.add("");
+        expectedContainerfileLines.add("# Default setting for the verbose option");
+        expectedContainerfileLines.add("ARG VERBOSE=false");
+        expectedContainerfileLines.add("");
+        expectedContainerfileLines.add("# This script will add the requested XML snippets, grow image to be fit-for-purpose and apply interim fixes");
+        expectedContainerfileLines.add("RUN configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
 
         char escape = util.getEscapeCharacter(dockerfileLines);
         assertEquals(String.valueOf('\\'), String.valueOf(escape));
 
         dockerfileLines = util.getCleanedLines(dockerfileLines);
         List<String> cleanedLines = new ArrayList<String>();
-        expectedDockerfileLines.clear();
-        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
-        expectedDockerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
-        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
-        expectedDockerfileLines.add("ARG VERBOSE=false");
-        expectedDockerfileLines.add("RUN configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.clear();
+        expectedContainerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedContainerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
+        expectedContainerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedContainerfileLines.add("ARG VERBOSE=false");
+        expectedContainerfileLines.add("RUN configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
 
         dockerfileLines = util.getCombinedLines(dockerfileLines, escape);
-        expectedDockerfileLines.clear();
-        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
-        expectedDockerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
-        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
-        expectedDockerfileLines.add("ARG VERBOSE=false");
-        expectedDockerfileLines.add("RUN configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.clear();
+        expectedContainerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedContainerfileLines.add("COPY --chown=1001:0  Sample1.war /config/dropins/");
+        expectedContainerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedContainerfileLines.add("ARG VERBOSE=false");
+        expectedContainerfileLines.add("RUN configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
 
         util.removeWarFileLines(dockerfileLines);
-        expectedDockerfileLines.clear();
-        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
-        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
-        expectedDockerfileLines.add("ARG VERBOSE=false");
-        expectedDockerfileLines.add("RUN configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.clear();
+        expectedContainerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedContainerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedContainerfileLines.add("ARG VERBOSE=false");
+        expectedContainerfileLines.add("RUN configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
 
         util.processCopyLines(dockerfileLines, dockerfile.getParent());
         assertTrue(util.srcMount.get(0).endsWith("server.xml"));
@@ -154,18 +154,18 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         assertEquals(1, util.destMount.size());
 
         util.disableOpenJ9SCC(dockerfileLines);
-        expectedDockerfileLines.clear();
-        expectedDockerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
-        expectedDockerfileLines.add("COPY --chown=1001:0  server.xml /config/");
-        expectedDockerfileLines.add("ARG VERBOSE=false");
-        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
-        expectedDockerfileLines.add("RUN configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.clear();
+        expectedContainerfileLines.add("FROM openliberty/open-liberty:kernel-java8-openj9-ubi");
+        expectedContainerfileLines.add("COPY --chown=1001:0  server.xml /config/");
+        expectedContainerfileLines.add("ARG VERBOSE=false");
+        expectedContainerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedContainerfileLines.add("RUN configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
     }
 
     @Test
-    public void testMultilineDockerfile() throws Exception {
-        testPrepareDockerfile("multiline.txt", "multiline-expected.txt");
+    public void testMultilineContainerfile() throws Exception {
+        testPrepareContainerfile("multiline.txt", "multiline-expected.txt");
         assertTrue(util.srcMount.get(0).endsWith("file1.xml"));
         assertTrue(util.destMount.get(0).endsWith("/config/filenameWithoutExtension"));
         assertTrue(util.srcMount.get(1).endsWith("file2.xml"));
@@ -173,8 +173,8 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     }
 
     @Test
-    public void testMultilineEscapeDockerfile() throws Exception {
-        testPrepareDockerfile("multilineEscape.txt", "multilineEscape-expected.txt");
+    public void testMultilineEscapeContainerfile() throws Exception {
+        testPrepareContainerfile("multilineEscape.txt", "multilineEscape-expected.txt");
         assertTrue(util.srcMount.get(0).endsWith("server.xml"));
         assertTrue(util.destMount.get(0).endsWith("c:\\config\\server.xml"));
     }
@@ -201,7 +201,7 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
 
     @Test
     public void testCopyParsing() throws Exception {
-        testPrepareDockerfile("copyParsing.txt", "copyParsing-expected.txt");
+        testPrepareContainerfile("copyParsing.txt", "copyParsing-expected.txt");
         assertTrue(util.srcMount.get(0).endsWith("file1.xml"));
         assertTrue(util.destMount.get(0).endsWith("/config/file1.xml"));
         assertTrue(util.srcMount.get(1).endsWith("file2.xml"));
@@ -211,9 +211,9 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     }
 
     @Test
-    public void testDockerBuildContext() throws Exception {
+    public void testContainerBuildContext() throws Exception {
         File test = new File(dockerfiles, "dockerBuildContext.txt");
-        result = util.prepareTempDockerfile(test, new File("my/context").getAbsolutePath());
+        result = util.prepareTempContainerfile(test, new File("my/context").getAbsolutePath());
         // use Paths comparison to be OS agnostic
         assertTrue(Paths.get(util.srcMount.get(0)).endsWith("my/context/path1/path2/file1.xml"));
         assertTrue(util.destMount.get(0).endsWith("/config/file1.xml"));
@@ -226,52 +226,52 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     @Test
     public void testDisableOpenJ9SCC_lowercase() throws Exception {
         List<String> dockerfileLines = new ArrayList<String>();
-        List<String> expectedDockerfileLines = new ArrayList<String>();
+        List<String> expectedContainerfileLines = new ArrayList<String>();
         dockerfileLines.add("FROM openliberty/open-liberty");
         dockerfileLines.add("run configure.sh");
         util.disableOpenJ9SCC(dockerfileLines);
-        expectedDockerfileLines.add("FROM openliberty/open-liberty");
-        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
-        expectedDockerfileLines.add("run configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.add("FROM openliberty/open-liberty");
+        expectedContainerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedContainerfileLines.add("run configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
     }
 
     @Test
     public void testDisableOpenJ9SCC_uppercase() throws Exception {
         List<String> dockerfileLines = new ArrayList<String>();
-        List<String> expectedDockerfileLines = new ArrayList<String>();
+        List<String> expectedContainerfileLines = new ArrayList<String>();
         dockerfileLines.add("FROM openliberty/open-liberty");
         dockerfileLines.add("RUN configure.sh");
         util.disableOpenJ9SCC(dockerfileLines);
-        expectedDockerfileLines.add("FROM openliberty/open-liberty");
-        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
-        expectedDockerfileLines.add("RUN configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.add("FROM openliberty/open-liberty");
+        expectedContainerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedContainerfileLines.add("RUN configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
     }
 
     @Test
     public void testDisableOpenJ9SCC_mixedcase() throws Exception {
         List<String> dockerfileLines = new ArrayList<String>();
-        List<String> expectedDockerfileLines = new ArrayList<String>();
+        List<String> expectedContainerfileLines = new ArrayList<String>();
         dockerfileLines.add("FROM openliberty/open-liberty");
         dockerfileLines.add("RuN configure.sh");
         util.disableOpenJ9SCC(dockerfileLines);
-        expectedDockerfileLines.add("FROM openliberty/open-liberty");
-        expectedDockerfileLines.add("ENV OPENJ9_SCC=false");
-        expectedDockerfileLines.add("RuN configure.sh");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.add("FROM openliberty/open-liberty");
+        expectedContainerfileLines.add("ENV OPENJ9_SCC=false");
+        expectedContainerfileLines.add("RuN configure.sh");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
     }
 
     @Test
     public void testDisableOpenJ9SCC_negative() throws Exception {
         List<String> dockerfileLines = new ArrayList<String>();
-        List<String> expectedDockerfileLines = new ArrayList<String>();
+        List<String> expectedContainerfileLines = new ArrayList<String>();
         dockerfileLines.add("FROM openliberty/open-liberty");
         dockerfileLines.add("RUN configure.shaaaaaaaaaa");
         util.disableOpenJ9SCC(dockerfileLines);
-        expectedDockerfileLines.add("FROM openliberty/open-liberty");
-        expectedDockerfileLines.add("RUN configure.shaaaaaaaaaa");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.add("FROM openliberty/open-liberty");
+        expectedContainerfileLines.add("RUN configure.shaaaaaaaaaa");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
     }
 
     @Test
@@ -298,12 +298,12 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     @Test
     public void testRemoveEarFileLines() throws Exception {
         List<String> dockerfileLines = new ArrayList<String>();
-        List<String> expectedDockerfileLines = new ArrayList<String>();
+        List<String> expectedContainerfileLines = new ArrayList<String>();
         dockerfileLines.add("FROM openliberty/open-liberty");
         dockerfileLines.add("COPY --chown=1001:0  target/guide-maven-multimodules-ear.ear /config/apps/");
         util.removeEarFileLines(dockerfileLines);
-        expectedDockerfileLines.add("FROM openliberty/open-liberty");
-        assertEquals(expectedDockerfileLines, dockerfileLines);
+        expectedContainerfileLines.add("FROM openliberty/open-liberty");
+        assertEquals(expectedContainerfileLines, dockerfileLines);
     }
 
 }

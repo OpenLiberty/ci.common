@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018, 2020.
+ * (C) Copyright IBM Corporation 2018, 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,16 @@ public class OSUtil {
     public static boolean isLinux() {
         String osName = System.getProperty("os.name", "unknown").toLowerCase();
         return osName.indexOf("linux") >= 0;
+    }
+
+    /**
+     * Determines if the current OS is a MAC OS.
+     * 
+     * @return true if running on Mac, false otherwise
+     */
+    public static boolean isMac() {
+        String osName = System.getProperty("os.name", "unknown").toLowerCase();
+        return osName.indexOf("mac") >= 0;
     }
 
 }
