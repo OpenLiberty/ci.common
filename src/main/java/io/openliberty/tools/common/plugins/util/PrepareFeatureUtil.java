@@ -34,11 +34,13 @@ import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
@@ -53,6 +55,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	private File installJarFile;
 	private File jsonFile;
+	
 
 	public PrepareFeatureUtil(File installDirectory, String openLibertyVersion)
 			throws PluginScenarioException, PluginExecutionException {
@@ -79,7 +82,11 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			String version = coord[2];
 			File additionalBOM = downloadArtifact(groupId, artifactId, "pom", version);
 			esaMap.putAll(populateESAMap(additionalBOM));
-			prepareFeature(groupId, artifactId, version, additionalBOM, esaMap);
+			if(esaMap.isEmpty()) {
+			    warn("The features.json could not be generated due to errors encountered while resolving the feature ESA file specified in feautres-bom file at coordinates " + groupId + ":" +artifactId + ":" +version);
+			}else {
+			    prepareFeature(groupId, artifactId, version, additionalBOM, esaMap);
+			}
 		}
 
 	}
@@ -87,10 +94,9 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	private Map<File, String> populateESAMap(File additionalBOM) {
 		Map<File, String> result = new HashMap<File, String>();
 		try {	
-			result = downloadArtifactsFromBOM(additionalBOM);
+		    result = downloadArtifactsFromBOM(additionalBOM);
 		} catch (PluginExecutionException e) {
-			warn(e.getMessage());
-			warn("A features-bom file must be provided at " + additionalBOM.getAbsolutePath() +  ". Please ignore this warning if this is not a user feature.");
+		    warn(e.getMessage());
 		}
 		
 		return result;
@@ -104,25 +110,28 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @param version
 	 * @throws PluginExecutionException
 	 */
-	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) throws PluginExecutionException {
-			try {
-				String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
-				String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
-						version);
-				File generatedJson = generateJson(targetJsonFile, esaMap);
-				if (generatedJson.exists()) {
-					jsonFile = generatedJson;
-					provideJsonFileDependency(generatedJson, groupId, version);
-					info("The features.json has been generated at the following location: " + generatedJson);
-				}
-			} catch (PluginExecutionException e) {
-				warn(e.getMessage());
-			}
+	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) {
+	    try {
+		String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
+		String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
+			version);
+		File generatedJson = generateJson(targetJsonFile, esaMap);
+		if (generatedJson.exists()) {
+		    jsonFile = generatedJson;
+		    provideJsonFileDependency(generatedJson, groupId, version);
+		    info("The features.json has been generated at the following location: " + generatedJson);
+		}else {
+		    warn("The features.json could not be generated at the following location: " + generatedJson);
 		}
-
+	    } catch (PluginExecutionException e) {
+		warn("Error: The features.json could not be generated.");
+		warn(e.getMessage());
+	    }
+	}
 
 	/**
-	 * Download the Artifacts mentioned within the additionalBOM pom file
+	 * Download the Artifacts mentioned within the additionalBOM pom file.
+	 * Required artifact properties are "groupId, artifactId, version and type".
 	 * 
 	 * @param additionalBOM The BOM file
 	 * @return A map of Files to groupIds
@@ -130,31 +139,49 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 *                                  artifacts
 	 */
 	private Map<File, String> downloadArtifactsFromBOM(File additionalBOM) throws PluginExecutionException {
-		Map<File, String> result = new HashMap<File, String>();
-		try {
-			DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-			DocumentBuilder db = dbf.newDocumentBuilder();
-			Document doc = db.parse(additionalBOM);
-			doc.getDocumentElement().normalize();
-			NodeList dependencyList = doc.getElementsByTagName("dependency");
-			for (int itr = 0; itr < dependencyList.getLength(); itr++) {
-				Node node = dependencyList.item(itr);
-				if (node.getNodeType() == Node.ELEMENT_NODE) {
-					Element eElement = (Element) node;
-					String groupId = eElement.getElementsByTagName("groupId").item(0).getTextContent();
-					String artifactId = eElement.getElementsByTagName("artifactId").item(0).getTextContent();
-					String version = eElement.getElementsByTagName("version").item(0).getTextContent();
-					String type = eElement.getElementsByTagName("type").item(0).getTextContent();
-
-					File artifactFile = downloadArtifact(groupId, artifactId, type, version);
-					result.put(artifactFile, groupId);
-				}
+	    Map<File, String> result = new HashMap<File, String>();
+	    ArrayList<String> missing_tags = new ArrayList<>();
+	    try {
+		DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+		DocumentBuilder db = dbf.newDocumentBuilder();
+		Document doc = db.parse(additionalBOM);
+		doc.getDocumentElement().normalize();
+		NodeList dependencyList = doc.getElementsByTagName("dependency");
+		for (int itr = 0; itr < dependencyList.getLength(); itr++) {
+		    Node node = dependencyList.item(itr);
+		    if (node.getNodeType() == Node.ELEMENT_NODE) {
+			Element eElement = (Element) node;
+			
+			if(eElement.getElementsByTagName("groupId").item(0) == null ) {
+			    missing_tags.add("groupId");
 			}
-		} catch (PluginExecutionException e) { // we were unable to download artifact mentioned in BOM
-			throw e;
-		} catch (Exception e) {
-			throw new PluginExecutionException("Cannot read the BOM file " + additionalBOM.getAbsolutePath(), e);
+			if(eElement.getElementsByTagName("artifactId").item(0) == null ) {
+			    missing_tags.add("artifactId ");
+			}
+			if(eElement.getElementsByTagName("type").item(0) == null ) {
+			    missing_tags.add("type");
+			}
+			if(eElement.getElementsByTagName("version").item(0) == null ) {
+			    missing_tags.add("version");
+			}
+			
+			if(!missing_tags.isEmpty()) {
+			    throw new PluginExecutionException("Error: "+ missing_tags.toString()  + " tag(s) not found in features-bom file " + additionalBOM);
+			}
+			
+			String groupId = eElement.getElementsByTagName("groupId").item(0).getTextContent();
+			String artifactId = eElement.getElementsByTagName("artifactId").item(0).getTextContent();
+			String type = eElement.getElementsByTagName("type").item(0).getTextContent();
+			String version = eElement.getElementsByTagName("version").item(0).getTextContent();
+			
+			File artifactFile = downloadArtifact(groupId, artifactId, type, version);
+			result.put(artifactFile, groupId);
+		    }
 		}
+		} catch (ParserConfigurationException | SAXException | IOException e) {
+		    throw new PluginExecutionException("Cannot read the features-bom file " + additionalBOM.getAbsolutePath() + ". " + e.getMessage());
+		    
+		} 
 		return result;
 	}
 
@@ -219,8 +246,6 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @throws PluginExecutionException Throws an error if unable to generate JSON
 	 */
 	public File generateJson(String targetJsonFile, Map<File, String> esaFileMap) throws PluginExecutionException {
-		FileInputStream instream = null;
-		FileOutputStream outstream = null;
 		try {
 			Path targetDir = Files.createTempDirectory("generatedJson");
 			URL installJarURL = null;
@@ -254,33 +279,19 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
 			}
 			File targetFile = new File(targetJsonFile);
-			instream = new FileInputStream(json);
 			targetFile.getParentFile().mkdirs();
-			outstream = new FileOutputStream(targetFile);
-			byte[] buffer = new byte[1024];
-			int length;
-			while ((length = instream.read(buffer)) > 0) {
-				outstream.write(buffer, 0, length);
+			try(FileInputStream instream = new FileInputStream(json); FileOutputStream outstream = new FileOutputStream(targetFile)){
+			    byte[] buffer = new byte[1024];
+				int length;
+				while ((length = instream.read(buffer)) > 0) {
+					outstream.write(buffer, 0, length);
+				}
 			}
-			
 			return targetFile;
 		} catch (IOException e) {
 			debug(e);
 			throw new PluginExecutionException("Cannot read or create json file " + targetJsonFile, e);
-		} finally {
-			if (instream != null) {
-				try {
-					instream.close();
-				} catch (IOException e) {
-				}
-			}
-			if (outstream != null) {
-				try {
-					outstream.close();
-				} catch (IOException e) {
-				}
-			}
-		}
+		} 
 	}
 
 	private File loadInstallJarFile(File installDirectory) {
@@ -299,7 +310,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 					openLibertyVersion + ", " + InstallFeatureUtil.getNextProductVersion(openLibertyVersion)));
 		} catch (PluginExecutionException e) {
 			debug("Could not find override bundle " + groupId + ":" + artifactId
-					+ " for the current Open Liberty version " + openLibertyVersion, e);
+					+ " for the current Open Liberty version " + openLibertyVersion + e.getMessage());
 			return null;
 		}
 	}
