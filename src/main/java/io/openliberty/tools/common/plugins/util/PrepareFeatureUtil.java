@@ -120,6 +120,8 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		    jsonFile = generatedJson;
 		    provideJsonFileDependency(generatedJson, groupId, version);
 		    info("The features.json has been generated at the following location: " + generatedJson);
+		}else {
+		    warn("The features.json could not be generated at the following location: " + generatedJson);
 		}
 	    } catch (PluginExecutionException e) {
 		warn("Error: The features.json could not be generated.");
@@ -244,8 +246,6 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 * @throws PluginExecutionException Throws an error if unable to generate JSON
 	 */
 	public File generateJson(String targetJsonFile, Map<File, String> esaFileMap) throws PluginExecutionException {
-		FileInputStream instream = null;
-		FileOutputStream outstream = null;
 		try {
 			Path targetDir = Files.createTempDirectory("generatedJson");
 			URL installJarURL = null;
@@ -278,26 +278,19 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 				throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
 			}
 			File targetFile = new File(targetJsonFile);
-			instream = new FileInputStream(json);
 			targetFile.getParentFile().mkdirs();
-			outstream = new FileOutputStream(targetFile);
-			byte[] buffer = new byte[1024];
-			int length;
-			while ((length = instream.read(buffer)) > 0) {
-				outstream.write(buffer, 0, length);
+			try(FileInputStream instream = new FileInputStream(json); FileOutputStream outstream = new FileOutputStream(targetFile)){
+			    byte[] buffer = new byte[1024];
+				int length;
+				while ((length = instream.read(buffer)) > 0) {
+					outstream.write(buffer, 0, length);
+				}
 			}
-			
 			return targetFile;
 		} catch (IOException e) {
 			debug(e);
 			throw new PluginExecutionException("Cannot read or create json file " + targetJsonFile, e);
-		} finally {
-			try {
-				instream.close();
-				outstream.close();
-			} catch (IOException e) {			
-			}
-		}
+		} 
 	}
 
 	private File loadInstallJarFile(File installDirectory) {
