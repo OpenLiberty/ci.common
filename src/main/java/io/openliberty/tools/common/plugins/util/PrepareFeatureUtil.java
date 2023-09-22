@@ -122,6 +122,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		    info("The features.json has been generated at the following location: " + generatedJson);
 		}
 	    } catch (PluginExecutionException e) {
+		warn("Error: The features.json could not be generated.");
 		warn(e.getMessage());
 	    }
 	}
