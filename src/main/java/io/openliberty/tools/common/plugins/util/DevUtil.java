@@ -2689,12 +2689,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param outputDirectory
      * @param testOutputDirectory
      * @param executor
-     * @param compileArtifactPaths    Compile classpath elements, or null if this
-     *                                DevUtil instance has useBuildRecompile=true
-     * @param testArtifactPaths       Test classpath elements, or null if this
-     *                                DevUtil instance has useBuildRecompile=true
-     * @param serverXmlFile           Can be null when using the server.xml from the
-     *                                configDirectory, which has a default value.
+     * @param serverXmlFile           Can be null when using the server.xml from the configDirectory, which has a default value.
      * @param bootstrapPropertiesFile
      * @param jvmOptionsFile
      * @throws Exception
@@ -3192,7 +3187,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * 
-     * @return Collection<String> of class paths
+     * @return {@code Collection<String>} of class paths
      * @throws IOException
      */
     public Collection<String> getJavaSourceClassPaths() throws IOException {
@@ -3202,7 +3197,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * 
      * @param classFiles javaSourceClassFiles that have been modified
-     * @return Collection<String> of class paths
+     * @return {@code Collection<String>} of class paths
      * @throws IOException
      */
     private Collection<String> getClassPaths(Collection<File> classFiles) throws IOException {
