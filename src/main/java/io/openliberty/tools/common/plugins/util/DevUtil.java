@@ -1723,8 +1723,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
      /**
      * Parses container network names from a "docker inspect" command result on a container.
-     * @param containerResult the result from the command "docker inspect -f '{{.NetworkSettings.Networks}}' containerName"
-     * -> containerResult must not contain surrounding quotes or leading/trailing whitespace
+     * @param containerResult the result from the command "docker inspect -f '{{.NetworkSettings.Networks}}' containerName", it must not contain surrounding quotes or leading/trailing whitespace
      * @return a String array containing the names of the networks contained in the containerResult parameter
      */
     protected static String[] parseNetworks(String containerResult) {
