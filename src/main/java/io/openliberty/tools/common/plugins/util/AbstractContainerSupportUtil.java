@@ -65,32 +65,31 @@ public abstract class AbstractContainerSupportUtil {
      * Throw an exception if there is a problem with the version.
      */
     private static final String MIN_DOCKER_VERSION = "18.03.0"; // Must use Docker 18.03.0 or higher
-    protected void checkDockerVersion() throws PluginExecutionException {
+    protected boolean checkDockerVersion() throws PluginExecutionException {
         String versionCmd = "docker version --format {{.Client.Version}}";
         String dockerVersion = execContainerCmd(versionCmd, CONTAINER_TIMEOUT);
         if (dockerVersion == null) {
-            checkPodmanVersion(); // Check Podman version if no Docker 
-            return;
+            return checkPodmanVersion(); // Check Podman version if no Docker 
         }
         debug("Detected Docker version: " + dockerVersion);
         
         if (VersionUtility.compareArtifactVersion(dockerVersion, MIN_DOCKER_VERSION, false) < 0) {
-            checkPodmanVersion(); // Check that bad Docker version isn't just a Podman version
-            if (!isDocker) {
-                return;
-            }
-            throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be " + MIN_DOCKER_VERSION + " or higher.");
+            // Check that bad Docker version isn't just a Podman version
+            if (!checkPodmanVersion()) {
+                throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be " + MIN_DOCKER_VERSION + " or higher.");
+            } 
         }
         isDocker = true;
         checkedContainerType = true;
+        return true;
     }
 
     private static final String MIN_PODMAN_VERSION = "4.4.4"; // Must use Docker 4.4.4 or higher
-    private void checkPodmanVersion() throws PluginExecutionException  {
+    private boolean checkPodmanVersion() throws PluginExecutionException  {
         String versionCmd = "podman version --format {{.Client.Version}}";
         String podmanVersion = execContainerCmd(versionCmd, CONTAINER_TIMEOUT);
         if (podmanVersion == null) {
-            return; // Can't tell if the version is valid.
+            return false; // Can't tell if the version is valid.
         }
         debug("Detected Podman version: " + podmanVersion);
         
@@ -99,6 +98,7 @@ public abstract class AbstractContainerSupportUtil {
         }
         isDocker = false;
         checkedContainerType = true;
+        return true;
     }
 
     /**
@@ -137,9 +137,9 @@ public abstract class AbstractContainerSupportUtil {
             error("An interruption error occurred while running a container command: " + e.getMessage(), e);
             throw new RuntimeException(e.getMessage());
         } catch (IOException e) {
-            // Logging IOExceptions in info stream. This is thrown if Docker or Podman are not installed on the system.
-            info("An error occurred while running a container command: " + e.getMessage());
-            info("This message will occur when Docker or Podman are not installed.");
+            // Logging IOExceptions in debug stream. This is thrown if Docker or Podman are not installed on the system.
+            debug("An error occurred while running a container command: " + e.getMessage());
+            debug("This message will occur when Docker or Podman are not installed.");
         }
         return result;
     }
