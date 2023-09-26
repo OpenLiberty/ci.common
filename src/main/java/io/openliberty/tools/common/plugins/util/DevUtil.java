@@ -33,7 +33,6 @@ import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -81,7 +80,6 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -763,7 +761,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             enableServerDebug();
 
             if (container) {
-                checkDockerVersion();
+                if (!checkDockerVersion()) {
+                    // Did not find valid docker or podman installation
+                    throw new PluginExecutionException("Could not find a valid Docker or Podman installation.");
+                }
             }
 
             // build container image if in container mode
