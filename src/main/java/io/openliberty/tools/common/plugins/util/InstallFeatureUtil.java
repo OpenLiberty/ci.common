@@ -1150,7 +1150,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
-    private void installFeaturesOnContainer(List<String> features, boolean acceptLicense) throws PluginExecutionException {
+    private void installFeaturesOnContainer(List<String> features, boolean acceptLicense, VerifyOption verifyOption) throws PluginExecutionException {
         if (features == null || features.isEmpty()) {
             debug("Skipping installing features on container " + containerName + " since no features were specified.");
             return;
@@ -1173,7 +1173,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             featureUtilityCommand += "--verify=" + verifyOption.name();
         }
         
-        String cmdResult = execDockerCmd(featureUtilityCommand, 600, false);
+        String cmdResult = execContainerCmd(featureUtilityCommand, 600, false);
         if (cmdResult.contains(" RC=")) { // This piece of the string is added in execDockerCmd if there is an error
             if (cmdResult.contains("CWWKF1250I")) {
                 // The features are already installed message
