@@ -1327,13 +1327,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void startContainer() throws PluginExecutionException {
         try {
-            if (OSUtil.isLinux() || OSUtil.isMac()) { // Added Mac since started getting permission errors for logs folder
-                // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
-                runCmd("mkdir -p " + serverDirectory + "/logs");
-                // Added two hidden folders since started getting permissions errors on the dropins folder.
-                runCmd("mkdir -p " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/apps");
-                runCmd("mkdir -p " + buildDirectory + "/" + DEVC_HIDDEN_FOLDER + "/dropins");
-            }
+            // Allow the server to write to the log files. If we don't create it here docker daemon will create it as root.
+            new File(serverDirectory, "logs").mkdirs();
+            // Added two hidden folders since started getting permissions errors on the dropins folder.
+            new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/apps").mkdirs();
+            new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/dropins").mkdirs();
 
             info("Starting container...");
             String startContainerCommand = getContainerCommand();
