@@ -1386,7 +1386,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Thread logCopyErrorThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                firstErrorLine.append(copyStreamToBuildLog(startingProcess.getErrorStream(), false));
+                if (OSUtil.isLinux() && !isDocker) {
+                    firstErrorLine.append(copyStreamToBuildLog(startingProcess.getErrorStream(), true));
+                } else {
+                    firstErrorLine.append(copyStreamToBuildLog(startingProcess.getErrorStream(), false));
+                }
             }
         });
         logCopyErrorThread.start();
