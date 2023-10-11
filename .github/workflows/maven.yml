@@ -19,7 +19,7 @@ jobs:
       matrix:
         # test against latest update of each major Java version, as well as specific updates of LTS versions:
         os: [ ubuntu-latest, windows-latest ]
-        java: [ 8, 11, 17 ]
+        java: [ 8, 11, 17, 21 ]
 
     steps:
     - name: Checkout ci.common
@@ -37,6 +37,6 @@ jobs:
         cache: 'maven'
     - name: Install ci.ant
       run: |
-        ./mvnw -V clean install -f ci.ant
+        ./mvnw -V clean install -f ci.ant -DskipTests
     - name: Build and run tests
       run: ./mvnw -V clean install
