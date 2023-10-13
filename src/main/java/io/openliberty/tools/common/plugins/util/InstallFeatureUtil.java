@@ -725,7 +725,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
             
 
-            debug("Installing features: " + featuresToInstall);
+            info("Installing features: " + featuresToInstall);
             StringBuilder installedFeaturesBuilder = new StringBuilder();
             Collection<String> actionReturnResult = new ArrayList<String>();
             for (File esaFile : artifacts) {
@@ -1163,7 +1163,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         String featureUtilityCommand = getContainerCommandPrefix() + " exec -e FEATURE_LOCAL_REPO=/devmode-maven-cache " + containerName + " featureUtility installFeature " + featureList;
         if (acceptLicense) {
-            featureUtilityCommand += "--acceptLicense";
+            featureUtilityCommand += " --acceptLicense";
         }
         
 
