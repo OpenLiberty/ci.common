@@ -496,6 +496,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         	downloadSignature(downloadedEsa, groupId, artifactId, "esa.asc", version);
             }catch(PluginExecutionException e) {
         	if(this.verifyOption == VerifyOption.all) {
+        	    //At this point, we don't know if the download failed for the Liberty feature or the user feature. 
+        	    //Only throw exception for VerifyOption.all. 
         	    throw e;
         	}else {
         	    warn("Signature at coordinates " + mavenCoordinates + " could not be downloaded." + e.getMessage());
@@ -681,12 +683,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     	}
     	    		
     	if(featuresToInstall.isEmpty()) {
-    	    	info("featuresToInstall is empty");
+    	    	debug("featuresToInstall is empty");
     		return;
     	}
-
-    	
-    	info("featuresToInstall is not empty: " + featuresToInstall.toString());
     	
         if (containerName != null) {
             installFeaturesOnContainer(featuresToInstall, isAcceptLicense, verifyOption);
@@ -726,10 +725,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             }
             
 
-            info("Installing features: " + featuresToInstall);
+            debug("Installing features: " + featuresToInstall);
             StringBuilder installedFeaturesBuilder = new StringBuilder();
             Collection<String> actionReturnResult = new ArrayList<String>();
-            info("local esa install: " + mapBasedInstallKernel.get("install.local.esa"));
             for (File esaFile : artifacts) {
                 mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
                 mapBasedInstallKernel.put("action.install", esaFile);
@@ -1170,7 +1168,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         
 
         if(verifyOption != null) {
-            featureUtilityCommand += "--verify=" + verifyOption.name();
+            featureUtilityCommand += " --verify=" + verifyOption.name();
         }
         
         String cmdResult = execContainerCmd(featureUtilityCommand, 600, false);
