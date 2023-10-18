@@ -51,9 +51,15 @@ public abstract class AbstractContainerSupportUtil {
      */
     public abstract void info(String msg);
 
-    public void setIsDocker(boolean isDocker) {
+    public void setIsDocker(boolean isDocker) throws PluginExecutionException {
         this.isDocker = isDocker;
         this.checkedContainerType = true;
+
+        if (this.isDocker) {
+            checkDockerVersion();
+        } else {
+            checkPodmanVersion();
+        }
     }
 
     protected String getContainerCommandPrefix() throws PluginExecutionException {
@@ -86,7 +92,8 @@ public abstract class AbstractContainerSupportUtil {
         }
 
         if (!checkedContainerType) {
-            setIsDocker(true);
+            isDocker = true;
+            checkedContainerType = true;
         }
         return true;
     }
@@ -105,7 +112,8 @@ public abstract class AbstractContainerSupportUtil {
         }
 
         if (!checkedContainerType) {
-            setIsDocker(false);
+            isDocker = false;
+            checkedContainerType = true;
         }
         return true;
     }
