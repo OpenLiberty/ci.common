@@ -111,10 +111,9 @@ public abstract class AbstractContainerSupportUtil {
             throw new PluginExecutionException("The detected Podman client version number is not supported:" + podmanVersion.trim() + ". Podman version must be " + MIN_PODMAN_VERSION + " or higher.");
         }
 
-        if (!checkedContainerType) {
-            isDocker = false;
-            checkedContainerType = true;
-        }
+        isDocker = false;
+        checkedContainerType = true;
+
         return true;
     }
 
