@@ -51,6 +51,17 @@ public abstract class AbstractContainerSupportUtil {
      */
     public abstract void info(String msg);
 
+    public void setIsDocker(boolean isDocker) throws PluginExecutionException {
+        this.isDocker = isDocker;
+        this.checkedContainerType = true;
+
+        if (this.isDocker) {
+            checkDockerVersion();
+        } else {
+            checkPodmanVersion();
+        }
+    }
+
     protected String getContainerCommandPrefix() throws PluginExecutionException {
         if (!checkedContainerType) {
             checkDockerVersion();
@@ -79,8 +90,11 @@ public abstract class AbstractContainerSupportUtil {
                 throw new PluginExecutionException("The detected Docker client version number is not supported:" + dockerVersion.trim() + ". Docker version must be " + MIN_DOCKER_VERSION + " or higher.");
             } 
         }
-        isDocker = true;
-        checkedContainerType = true;
+
+        if (!checkedContainerType) {
+            isDocker = true;
+            checkedContainerType = true;
+        }
         return true;
     }
 
@@ -96,8 +110,10 @@ public abstract class AbstractContainerSupportUtil {
         if (VersionUtility.compareArtifactVersion(podmanVersion, MIN_PODMAN_VERSION, false) < 0) {
             throw new PluginExecutionException("The detected Podman client version number is not supported:" + podmanVersion.trim() + ". Podman version must be " + MIN_PODMAN_VERSION + " or higher.");
         }
+
         isDocker = false;
         checkedContainerType = true;
+
         return true;
     }
 
