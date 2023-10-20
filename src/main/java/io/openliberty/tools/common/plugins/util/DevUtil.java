@@ -88,6 +88,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.NameFileFilter;
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.input.CloseShieldInputStream;
+import org.apache.commons.io.monitor.FileAlterationListener;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.w3c.dom.Document;
@@ -3246,7 +3247,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException unable to read the canonical path name
      */
     private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor, boolean removeOnContainerRebuild) throws IOException {
-        if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
+       if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
             String parentPath = registerFile.getParentFile().getCanonicalPath();
 
             debug("Registering single file polling for " + registerFile.toString());
@@ -3257,11 +3258,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 tempCombinedObservers.addAll(fileObservers);
                 tempCombinedObservers.addAll(newFileObservers);
 
+                FileAlterationObserver existingObserver = null;
+
                 // if this path is already observed, ignore it
                 for (FileAlterationObserver observer : tempCombinedObservers) {
                     if (parentPath.equals(observer.getDirectory().getCanonicalPath())) {
-                        debug("Skipping single file polling for " + registerFile.toString() + " since its parent directory is already being observed");
-                        return;
+                        debug("Updating file polling for " + registerFile.toString() + " since its parent directory is already being observed");
+                        existingObserver = observer;
+                        if (fileObservers.contains(existingObserver)) {
+                            debug("Found existing observer in fileObservers");
+                        } else if (newFileObservers.contains(existingObserver)) {
+                            debug("Found existing observer in newFileObservers");
+                        }
                     }
                 }
 
@@ -3282,17 +3290,24 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 };
 
                 try {
-                    debug("Adding single file observer for: " + registerFile.toString());
-                    FileAlterationObserver observer = addFileAlterationObserver(executor, parentPath, singleFileFilter);
+                    FileAlterationObserver observer = existingObserver;
+                    if (observer != null) {
+                        debug("Updating parent file observer for: " + registerFile.toString());
+                        observer = addFileAlterationObserver(executor, observer, parentPath, singleFileFilter);
+                    } else {
+                        debug("Adding single file observer for: " + registerFile.toString());
+                        observer = addFileAlterationObserver(executor, parentPath, singleFileFilter);
+                    }
                     if (removeOnContainerRebuild) {
-                        debug("Adding file to containerfileDirectoriesFileObservers: " + registerFile.toString());
-                        containerfileDirectoriesFileObservers.add(observer);
+                            debug("Adding file to containerfileDirectoriesFileObservers: " + registerFile.toString());
+                            containerfileDirectoriesFileObservers.add(observer);
                     }
                 } catch (Exception e) {
                     error("Could not observe single file " + registerFile.toString(), e);
                 }
             }
         }
+        
         if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
             debug("Adding directory to WatchService " + registerFile.getParentFile().toPath() + " for single file " + registerFile.getName());
             WatchKey key = registerFile.getParentFile().toPath().register(
@@ -3307,6 +3322,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    private FileAlterationObserver addFileAlterationObserver(final ThreadPoolExecutor executor, FileAlterationObserver observer, String parentPath, FileFilter filter)
+            throws Exception {
+        FileAlterationObserver newObserver = getFileAlterationObserver(executor, parentPath, filter);
+        for (FileAlterationListener nextListener: observer.getListeners()) {
+            newObserver.addListener(nextListener);
+        }
+        newObserver.initialize();
+        // clean up old existing observer
+        fileObservers.remove(observer);
+        newFileObservers.remove(observer);
+        // add new observer with the combined listeners
+        newFileObservers.add(newObserver);
+        return newObserver;
+    }
+
     private FileAlterationObserver addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath, FileFilter filter)
             throws Exception {
         FileAlterationObserver observer = getFileAlterationObserver(executor, parentPath, filter);
@@ -3315,8 +3345,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return observer;
     }
 
-    private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final String parentPath, FileFilter filter) {
+    private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final String parentPath, FileFilter filter) throws Exception {
         FileAlterationObserver observer = new FileAlterationObserver(parentPath, filter);
+        addFileAlterationListener(executor, observer, parentPath, filter);
+        return observer;
+    }
+
+    private void addFileAlterationListener(final ThreadPoolExecutor executor, FileAlterationObserver observer, final String parentPath, FileFilter filter) {
         observer.addListener(new FileAlterationListenerAdaptor() {
             @Override
             public void onDirectoryCreate(File file) {
@@ -3354,18 +3389,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     try {
                         WatchKey wk = null;
                         if (watcher != null) {
-                            wk = watcher.poll(100, TimeUnit.MILLISECONDS);
+                            // use bigger timeout on first file change to determine FILE_WATCHER vs POLLING (issue 1741)
+                            wk = watcher.poll(1000, TimeUnit.MILLISECONDS);   
                         }
                         List<WatchEvent<?>> events = null;
                         if (wk != null) {
                             events = wk.pollEvents();
                         }
                         if ((events == null) || events.isEmpty()) {
+                            debug("Setting file track mode to POLLING since no file watcher events were found.");
                             trackingMode = FileTrackMode.POLLING;
                             if (watcher != null) {
                                 watcher.close();
                             }
                         } else {
+                            debug("Setting file track mode to FILE_WATCHER.");
                             trackingMode = FileTrackMode.FILE_WATCHER;
                             disablePolling();
                         }
@@ -3381,7 +3419,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
             }
         });
-        return observer;
     }
 
     /**
