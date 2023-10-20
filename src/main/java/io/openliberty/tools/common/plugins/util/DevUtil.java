@@ -3247,7 +3247,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException unable to read the canonical path name
      */
     private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor, boolean removeOnContainerRebuild) throws IOException {
-       if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
+        if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
             String parentPath = registerFile.getParentFile().getCanonicalPath();
 
             debug("Registering single file polling for " + registerFile.toString());
@@ -3265,11 +3265,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (parentPath.equals(observer.getDirectory().getCanonicalPath())) {
                         debug("Updating file polling for " + registerFile.toString() + " since its parent directory is already being observed");
                         existingObserver = observer;
-                        if (fileObservers.contains(existingObserver)) {
-                            debug("Found existing observer in fileObservers");
-                        } else if (newFileObservers.contains(existingObserver)) {
-                            debug("Found existing observer in newFileObservers");
-                        }
                     }
                 }
 
@@ -3299,8 +3294,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         observer = addFileAlterationObserver(executor, parentPath, singleFileFilter);
                     }
                     if (removeOnContainerRebuild) {
-                            debug("Adding file to containerfileDirectoriesFileObservers: " + registerFile.toString());
-                            containerfileDirectoriesFileObservers.add(observer);
+                        debug("Adding file to containerfileDirectoriesFileObservers: " + registerFile.toString());
+                        containerfileDirectoriesFileObservers.add(observer);
                     }
                 } catch (Exception e) {
                     error("Could not observe single file " + registerFile.toString(), e);
@@ -3324,14 +3319,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private FileAlterationObserver addFileAlterationObserver(final ThreadPoolExecutor executor, FileAlterationObserver observer, String parentPath, FileFilter filter)
             throws Exception {
+        // create new observer for filter
         FileAlterationObserver newObserver = getFileAlterationObserver(executor, parentPath, filter);
+        // iterate through existing listeners on observer and add them to newObserver
         for (FileAlterationListener nextListener: observer.getListeners()) {
             newObserver.addListener(nextListener);
         }
         newObserver.initialize();
-        // clean up old existing observer
+        // clean up previous observer
         fileObservers.remove(observer);
         newFileObservers.remove(observer);
+        try {
+            // destroy the observer
+            observer.destroy();
+        } catch (Exception e) {
+            debug("Could not destroy file observer", e);
+        }
         // add new observer with the combined listeners
         newFileObservers.add(newObserver);
         return newObserver;
