@@ -18,8 +18,11 @@ package io.openliberty.tools.common.plugins.util;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
@@ -37,6 +40,7 @@ public class BaseInstallFeatureUtilTest {
     
     public File installDir;
     public File buildDir;
+    public String verify = "enforce";
     
     @Rule
     public TemporaryFolder temp = new TemporaryFolder();
@@ -51,8 +55,8 @@ public class BaseInstallFeatureUtilTest {
     }
     
     public class InstallFeatureTestUtil extends InstallFeatureUtil {
-        public InstallFeatureTestUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, List<String> additionalJsons)  throws PluginScenarioException, PluginExecutionException {
-            super(installDirectory, buildDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, null, additionalJsons);
+        public InstallFeatureTestUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, List<String> additionalJsons, String verifyOption, Collection<Map<String,String>> keyMap)  throws PluginScenarioException, PluginExecutionException {
+            super(installDirectory, buildDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, null, additionalJsons, verifyOption, keyMap);
         }
 
         @Override
@@ -99,18 +103,24 @@ public class BaseInstallFeatureUtilTest {
         public File downloadArtifact(String groupId, String artifactId, String type, String version) throws PluginExecutionException {
             return new File("dummy");
         }
+        
+        @Override
+        public File downloadSignature(File esa, String groupId, String artifactId, String type, String version) throws PluginExecutionException {
+            return new File("dummy");
+        }
     }
     
     public InstallFeatureUtil getNewInstallFeatureUtil() throws PluginExecutionException, PluginScenarioException {
-        return getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>());
+        return getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), verify);
     }
 
-    public InstallFeatureUtil getNewInstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginExecutionException, PluginScenarioException {
+    public InstallFeatureUtil getNewInstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, String verifyOption) throws PluginExecutionException, PluginScenarioException {
         List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDirectory);
         String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
         List<String> additionalJsons = new ArrayList<String>();
+        Collection<Map<String, String>> keyMap = new ArrayList<>();
 
-        return new InstallFeatureTestUtil(installDirectory, buildDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, additionalJsons);
+        return new InstallFeatureTestUtil(installDirectory, buildDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, additionalJsons, verifyOption, keyMap);
     }
     
 }
