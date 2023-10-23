@@ -1,0 +1,3 @@
+<server description="">
+    <variable name="project.artifactId.five" value="test-war-five"/>
+</server>

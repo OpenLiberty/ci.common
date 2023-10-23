@@ -22,9 +22,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 import java.util.Map;
 import java.util.Properties;
 
@@ -360,17 +366,18 @@ public class ServerConfigDocument {
 
                 if (includeFileName == null || includeFileName.trim().isEmpty()) {
                     log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
-                    return;
+                    continue;
                 }
 
-                Document docIncl = getIncludeDoc(includeFileName);
-
-                if (docIncl != null) {
-                    parseApplication(docIncl, XPATH_SERVER_APPLICATION);
-                    parseApplication(docIncl, XPATH_SERVER_WEB_APPLICATION);
-                    parseApplication(docIncl, XPATH_SERVER_ENTERPRISE_APPLICATION);
-                    // handle nested include elements
-                    parseInclude(docIncl);
+                ArrayList<Document> inclDocs = getIncludeDoc(includeFileName);
+                for (Document inclDoc : inclDocs) {
+                    if (inclDoc != null) {
+                        parseApplication(inclDoc, XPATH_SERVER_APPLICATION);
+                        parseApplication(inclDoc, XPATH_SERVER_WEB_APPLICATION);
+                        parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
+                        // handle nested include elements
+                        parseInclude(inclDoc);
+                    }
                 }
             }
         }
@@ -422,8 +429,8 @@ public class ServerConfigDocument {
         }
     }
 
-    private static Document getIncludeDoc(String loc) throws IOException, SAXException {
-
+    private static ArrayList<Document> getIncludeDoc(String loc) throws IOException, SAXException {
+        ArrayList<Document> docs = new ArrayList<Document>();
         Document doc = null;
         File locFile = null;
 
@@ -432,13 +439,14 @@ public class ServerConfigDocument {
                 URL url = new URL(loc);
                 URLConnection connection = url.openConnection();
                 doc = parseDocument(connection.getInputStream());
+                docs.add(doc);
             }
         } else if (loc.startsWith("file:")) {
             if (isValidURL(loc)) {
                 locFile = new File(loc);
                 if (locFile.exists()) {
-                    InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
-                    doc = parseDocument(inputStream);
+                    doc = parseDocument(locFile);
+                    docs.add(doc);
                 }
             }
         } else if (loc.startsWith("ftp:")) {
@@ -449,8 +457,13 @@ public class ServerConfigDocument {
             // check if absolute file
             if (locFile.isAbsolute()) {
                 if (locFile.exists()) {
-                    InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
-                    doc = parseDocument(inputStream);
+                    if (locFile.isFile()) {
+                        doc = parseDocument(locFile);
+                        docs.add(doc);
+                    }
+                    if (locFile.isDirectory()) {
+                        parseDocumentsInDirectory(locFile, docs);
+                    }
                 }
             } else {
                 // check configDirectory first if exists
@@ -463,11 +476,36 @@ public class ServerConfigDocument {
                 }
 
                 if (locFile != null && locFile.exists()) {
-                    InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
-                    doc = parseDocument(inputStream);
+                    if (locFile.isFile()) {
+                        doc = parseDocument(locFile);
+                        docs.add(doc);
+                    }
+                    if (locFile.isDirectory()) {
+                        parseDocumentsInDirectory(locFile, docs);
+                    }
                 }
             }
         }
+        return docs;
+    }
+
+    private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) throws IOException {
+        DirectoryStream<Path> dstream = Files.newDirectoryStream(directory.toPath(), "*.xml");
+        StreamSupport.stream(dstream.spliterator(), false)
+            .sorted(Comparator.comparing(Path::toString))
+            .forEach(p -> { 
+                try {
+                    docs.add(parseDocument(p.toFile()));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+    }
+
+    private static Document parseDocument(File file) throws FileNotFoundException, IOException, SAXException {
+        InputStream is = new FileInputStream(file.getCanonicalPath());
+        Document doc = parseDocument(is);
+        is.close();
         return doc;
     }
 
@@ -559,17 +597,19 @@ public class ServerConfigDocument {
 
                 if (includeFileName == null || includeFileName.trim().isEmpty()) {
                     log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
-                    return;
+                    continue;
                 }
-                    
-                Document docIncl = getIncludeDoc(includeFileName);
 
-                if (docIncl != null) {
-                    parseVariablesForBothValues(docIncl);
-                    // handle nested include elements
-                    parseIncludeVariables(docIncl);
-                } else {
-                    log.warn("Unable to parse include file "+includeFileName+". Skipping the included file during application location processing.");
+                ArrayList<Document> inclDocs = getIncludeDoc(includeFileName);
+
+                for (Document inclDoc : inclDocs) {
+                    if (inclDoc != null) {
+                        parseVariablesForBothValues(inclDoc);
+                        // handle nested include elements
+                        parseIncludeVariables(inclDoc);
+                    } else {
+                        log.warn("Unable to parse include file "+includeFileName+". Skipping the included file during application location processing.");
+                    }
                 }
             }
         }

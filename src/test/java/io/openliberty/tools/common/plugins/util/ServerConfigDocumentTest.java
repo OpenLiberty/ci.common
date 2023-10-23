@@ -46,6 +46,8 @@ public class ServerConfigDocumentTest {
 		String compareAppLocation3 = "test-war-three.war";
 		 // this next one won't resolve because the var referenced in the include location uses a variable with a non-default value in server.xml
 		String compareAppLocation4 = "${project.artifactId.four}.ear"; 
+		String compareAppLocation5 = "test-war-five.war";
+		String compareAppLocation6 = "test-war-six.war";
 
 		Map<String, File> libertyDirectoryPropertyToFile = getLibertyDirectoryPropertyFiles(log, serverDirectory);
 
@@ -53,12 +55,14 @@ public class ServerConfigDocumentTest {
 
 		ServerConfigDocument scd = ServerConfigDocument.getInstance(log, serverXML, serverDirectory, null, null, null, true, libertyDirectoryPropertyToFile);
 		Set<String> locations = scd.getLocations();
-		assertTrue("Expected four app locations", locations.size() == 4);
+		assertTrue("Expected six app locations", locations.size() == 6);
 
 		boolean locOneFound = false;
 		boolean locTwoFound = false;
 		boolean locThreeFound = false;
 		boolean locFourFound = false;
+		boolean locFiveFound = false;
+		boolean locSixFound = false;
 
 		for (String loc : locations) {
 			if (loc.contains("-two")) {
@@ -70,6 +74,12 @@ public class ServerConfigDocumentTest {
 			} else if (loc.endsWith(".ear")) {
 				assertTrue("Unexpected app location found: "+loc, loc.equals(compareAppLocation4));
 				locFourFound = true;
+			} else if (loc.contains("-five")) {
+				assertTrue("Unexpected app location found: "+loc, loc.equals(compareAppLocation5));
+				locFiveFound = true;
+			} else if (loc.contains("-six")) {
+				assertTrue("Unexpected app location found: "+loc, loc.equals(compareAppLocation6));
+				locSixFound = true;
 			} else {
 				assertTrue("Unexpected app location found: "+loc, loc.equals(compareAppLocation1));
 				locOneFound = true;
@@ -80,6 +90,8 @@ public class ServerConfigDocumentTest {
 		assertTrue("App location two not found.", locTwoFound);
 		assertTrue("App location three not found.", locThreeFound);
 		assertTrue("App location four not found.", locFourFound);
+		assertTrue("App location five not found.", locFiveFound);
+		assertTrue("App location six not found.", locSixFound);
 
 	}
 
