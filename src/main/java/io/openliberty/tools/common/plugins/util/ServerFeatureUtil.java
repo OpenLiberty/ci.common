@@ -20,12 +20,17 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.net.URLClassLoader;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,6 +42,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.StreamSupport;
+import java.util.logging.Level;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -75,6 +81,11 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     private boolean lowerCaseFeatures = true;
     protected boolean suppressLogs = false; // set to true when info and warning messages should not be displayed to
                                             // users, messages are logged as debug instead
+  
+    protected File installJarFile;
+    private URLClassLoader installMapLoader = null;
+    private Class<Map<String, Object>> installMapClass = null;
+    protected Map<String, Object> mapBasedInstallKernel= null;
     
     /**
      * Log debug
@@ -557,6 +568,117 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     		return null;
     	}
     	return libertyDirectoryPropertyToFile.get(USR_EXTENSION_DIR);
+    }
+    
+    /**
+     * @return ClassLoader of com.ibm.ws.install.map.jar
+     * @throws MalformedURLException
+     * @throws PluginExecutionException
+     */
+    private ClassLoader getInstallMapClassLoader() throws MalformedURLException, PluginExecutionException {
+        if (installJarFile == null) {
+            throw new PluginExecutionException("Install map jar not found.");
+        }
+        
+        if (installMapLoader == null) {
+            ClassLoader cl = this.getClass().getClassLoader();
+            installMapLoader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, cl);
+        }
+        return installMapLoader;
+    }
+
+    /**
+     * @return com.ibm.ws.install.map.InstallMap.class
+     * @throws MalformedURLException
+     * @throws PrivilegedActionException
+     * @throws PluginExecutionException
+     */
+    private Class<Map<String, Object>> getInstallMapClass() throws MalformedURLException, PrivilegedActionException, PluginExecutionException {
+        if (installMapClass == null) {
+            final ClassLoader cl = getInstallMapClassLoader();
+            installMapClass = AccessController.doPrivileged(new PrivilegedExceptionAction <Class<Map<String, Object>>>() {
+                @SuppressWarnings({ "unchecked" })
+                @Override
+                public Class<Map<String, Object>> run() throws Exception {
+                    installMapClass = (Class<Map<String, Object>>) cl.loadClass("com.ibm.ws.install.map.InstallMap");
+                    return installMapClass;
+                }
+            });
+        }
+        
+        if (installMapClass == null){
+        	throw new PluginExecutionException("Cannot run install jar file " + installJarFile);
+        }
+        
+        return installMapClass;
+    }
+
+    /**
+     * @return creates a new instance of com.ibm.ws.install.map.InstallMap.class
+     * @throws MalformedURLException
+     * @throws PluginExecutionException
+     * @throws SecurityException
+     * @throws PrivilegedActionException
+     */
+    private Map<String, Object> getInstallMapObject()
+	    throws MalformedURLException, PluginExecutionException, SecurityException, PrivilegedActionException {
+	if (mapBasedInstallKernel == null) {
+	    Class<Map<String, Object>> clazz = getInstallMapClass();
+	    try {
+		mapBasedInstallKernel = (Map<String, Object>) clazz.getDeclaredConstructor().newInstance();
+	    } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+		    | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+		// TODO Auto-generated catch block
+		throw new PluginExecutionException("Error finding install kernel map using reflection", e);
+	    }
+
+	    if (mapBasedInstallKernel == null) {
+		throw new PluginExecutionException("Error finding install kernel map using reflection");
+	    }
+	}
+	return mapBasedInstallKernel;
+    }
+    
+    /**
+     * This creates a Install map and initializes basic information such as installDir, usrDir, logging level, etc.   
+     * @param jars to override
+     * @param installDirectory
+     * @return Map<String, Object> of Install map
+     * @throws PrivilegedActionException
+     * @throws PluginExecutionException
+     * @throws MalformedURLException
+     */
+    protected Map<String, Object> createMapBasedInstallKernelInstance(String bundle, File installDirectory)
+            throws PrivilegedActionException, PluginExecutionException, MalformedURLException {
+	mapBasedInstallKernel = getInstallMapObject();
+
+        // Init
+        if (bundle != null) {
+            List<String> bundles = new ArrayList<String>();
+            bundles.add(bundle);
+            debug("Overriding jar using: " + bundle);
+            mapBasedInstallKernel.put("override.jar.bundles", bundles);
+        }
+        mapBasedInstallKernel.put("runtime.install.dir", installDirectory);
+        try {
+            mapBasedInstallKernel.put("install.map.jar.file", installJarFile);
+            debug("install.map.jar.file: " + installJarFile);
+        } catch (RuntimeException e) {
+            debug("This version of the install map does not support the key \"install.map.jar.file\"", e);
+            String installJarFileSubpath = installJarFile.getParentFile().getName() + File.separator + installJarFile.getName();
+            mapBasedInstallKernel.put("install.map.jar", installJarFileSubpath);
+            debug("install.map.jar: " + installJarFileSubpath);
+        }
+        debug("install.kernel.init.code: " + mapBasedInstallKernel.get("install.kernel.init.code"));
+        debug("install.kernel.init.error.message: " + mapBasedInstallKernel.get("install.kernel.init.error.message"));
+        File usrDir = new File(installDirectory, "usr");
+        mapBasedInstallKernel.put("target.user.directory", usrDir);
+	if (isDebugEnabled()) {
+	    mapBasedInstallKernel.put("debug", Level.FINEST);
+        }else {
+            mapBasedInstallKernel.put("debug", Level.INFO);
+        }
+        return mapBasedInstallKernel;
     }
 
 }

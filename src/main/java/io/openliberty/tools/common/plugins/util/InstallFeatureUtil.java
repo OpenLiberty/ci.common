@@ -25,6 +25,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -49,6 +50,7 @@ import java.util.jar.Manifest;
 import java.util.logging.Level;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.regex.Matcher;
@@ -76,8 +78,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     private final File buildDirectory;
 
-    private File installJarFile;
-
     private final List<ProductProperties> propertiesList;
 
     private final String to;
@@ -88,17 +88,31 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     
     private final Set<String> pluginListedEsas;
     
+    private final VerifyOption verifyOption;
+    
+    private final Collection<Map<String, String>> keyMap;
+    
+    
+    
+    /**
+     * An enum for specifying verify option
+     */
+    public enum VerifyOption {
+        enforce, warn, skip, all;
+    }
+    
     //Map (symbolic name, short name) of the manually installed user feature. 
     private Map<String, String> manuallyInstalledUsrFeatureMap;
 
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
-    private static final String INSTALL_MAP_SUFFIX = ".jar";
+    private static final String JAR_EXT = ".jar";
     private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
     private static final String CLOSED_LIBERTY_PRODUCT_ID = "com.ibm.websphere.appserver";
     private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
     private static final String FEATURES_JSON_ARTIFACT_ID = "features";
     private static final String TO_USER = "usr";
     private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
+    private static final String MIN_VERIFY_FEATURE_VERSION = "23.0.0.9";
 
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
@@ -126,7 +140,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @throws PluginExecutionException If properties files cannot be found in the
      *                                  installDirectory/lib/versions
      */
-    public InstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, String containerName, List<String> additionalJsons) throws PluginScenarioException, PluginExecutionException {
+    public InstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, String containerName, List<String> additionalJsons, String verifyValue, Collection<Map<String, String>> keyMap) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
         this.buildDirectory = buildDirectory;
         this.to = to;
@@ -136,6 +150,18 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         this.additionalJsons = additionalJsons;
         this.pluginListedEsas = pluginListedEsas;
         this.manuallyInstalledUsrFeatureMap = new HashMap<String, String>();
+        
+        if(keyMap == null) {
+            this.keyMap = new ArrayList<>();
+        }else {
+            this.keyMap = keyMap;
+        }
+        
+        try {
+          this.verifyOption = VerifyOption.valueOf(verifyValue);
+	} catch (IllegalArgumentException e) {
+	    throw new PluginExecutionException("The "+ verifyValue + " verify option isn't valid. Specify one of the following valid options: enforce, warn, skip, all");
+	}
         
         if (containerName == null) {
             installJarFile = loadInstallJarFile(installDirectory);
@@ -205,16 +231,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
 
         return Jsons;
-    }
-
-	private File loadInstallJarFile(File installDirectory) {
-        if (openLibertyVersion != null) {
-            File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
-            if (installJarOverride != null && installJarOverride.exists()) {
-                return installJarOverride;
-            }
-        }
-        return getMapBasedInstallKernelJar(new File(installDirectory, "lib"));
     }
 
     /**
@@ -288,6 +304,21 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      */
     public abstract File downloadArtifact(String groupId, String artifactId, String type, String version)
             throws PluginExecutionException;
+    /**
+     * Download the signature file from the specified Maven coordinates, or retrieve it
+     * from the cache if it already exists. This is same as downloadArtifact method, but for Gradle 
+     * the signature file need to be copied to ESA file directory to be verified. 
+     * 
+     * @param esa    	 The ESA file for the signature
+     * @param groupId    The group ID
+     * @param artifactId The artifact ID
+     * @param type       The type e.g. esa
+     * @param version    The version
+     * @return The file corresponding to the downloaded artifact
+     * @throws PluginExecutionException If the artifact could not be downloaded
+     */
+    public abstract File downloadSignature(File esa, String groupId, String artifactId, String type, String version) 
+	    throws PluginExecutionException;
 
     /**
      * Combine the given String collections into a set using case-insensitive
@@ -458,7 +489,23 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         String groupId = mavenCoordinateArray[0];
         String artifactId = mavenCoordinateArray[1];
         String version = mavenCoordinateArray[2];
-        return downloadArtifact(groupId, artifactId, "esa", version);
+        File downloadedEsa = downloadArtifact(groupId, artifactId, "esa", version);
+        if(this.verifyOption != VerifyOption.skip) {
+            //download signature file for this esa
+            try {
+        	downloadSignature(downloadedEsa, groupId, artifactId, "esa.asc", version);
+            }catch(PluginExecutionException e) {
+        	if(this.verifyOption == VerifyOption.all) {
+        	    //At this point, we don't know if the download failed for the Liberty feature or the user feature. 
+        	    //Only throw exception for VerifyOption.all. 
+        	    throw e;
+        	}else {
+        	    warn("Signature at coordinates " + mavenCoordinates + " could not be downloaded." + e.getMessage());
+        	}
+            }
+            
+        }
+        return downloadedEsa;
     }
 
     private Map<File, String> downloadEsas(Collection<?> mavenCoordsList, Map<String, String> artifactIdToExt) throws PluginExecutionException {
@@ -615,7 +662,6 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     			info("Neither InstallUtility nor FeatureUtility is available to install user feature esa.");
     			info("Attempting to manually install the user feature esa without resolving its dependencies.");
     			info("Recommended user action: upgrade to OpenLiberty version " + MIN_USER_FEATURE_VERSION + " or higher and provide features-bom file for the user feature esa.");
-    			info("To directly install the esa file without providing features-bom file, upgrade to OpenLiberty version 23.0.0.2 or later.");
     			
     			copyUserFeature(pluginListedEsas, installDirectory);
     		}
@@ -637,16 +683,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     	}
     	    		
     	if(featuresToInstall.isEmpty()) {
+    	    	debug("featuresToInstall is empty");
     		return;
     	}
     	
         if (containerName != null) {
-            installFeaturesOnContainer(featuresToInstall, isAcceptLicense);
+            installFeaturesOnContainer(featuresToInstall, isAcceptLicense, verifyOption);
             return;
         }
-
-        info("Installing features: " + featuresToInstall);
-
+        
         List<File> jsonRepos = new ArrayList<File>(downloadedJsons);
         debug("JSON repos: " + jsonRepos);
 
@@ -659,49 +704,28 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         } catch (MalformedURLException e) {
             throw new PluginExecutionException("Could not resolve URL from file " + installJarFile, e);
         }
-        Map<String, Object> mapBasedInstallKernel = null;
 
         disableCacheInURLClassLoader();
-        try (final URLClassLoader loader = new URLClassLoader(new URL[] { installJarURL }, getClass().getClassLoader())) {
-            mapBasedInstallKernel = createMapBasedInstallKernelInstance(loader, installDirectory);
-            mapBasedInstallKernel.put("install.local.esa", true);
-            mapBasedInstallKernel.put("single.json.file", jsonRepos);
-            mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
-            mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
-            mapBasedInstallKernel.put("is.install.server.feature", true);
-
-            if (isDebugEnabled()) {
-                mapBasedInstallKernel.put("debug", Level.FINEST);
-            }
-
-            Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
-            if (resolvedFeatures == null) {
-                debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
-                String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
-                throw new PluginExecutionException(exceptionMessage);
-            } else if (resolvedFeatures.isEmpty()) {
-                debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
-                String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
-                if (exceptionMessage == null) {
-                    debug("resolvedFeatures was empty but the install kernel did not issue any messages");
-                    info("The features are already installed, so no action is needed.");
-                    return;
-                } else if (exceptionMessage.contains("CWWKF1250I")) {
-                    info(exceptionMessage);
-                    info("The features are already installed, so no action is needed.");
-                    return;
-                } else {
-                    if (isFeatureConflict(exceptionMessage)) {
-                        throw new PluginExecutionException(
-                               CONFLICT_MESSAGE + featuresToInstall
-                                        + ": " + exceptionMessage);
-                    }
-                    throw new PluginExecutionException(exceptionMessage);
-                }
-            }
+        try {
+            String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID);
+	    mapBasedInstallKernel = createMapBasedInstallKernelInstance(bundle, installDirectory);
+	    
+	    
+	    Collection<?> resolvedFeatures = resolveFeatures(featuresToInstall, jsonRepos, acceptLicenseMapValue);
+	    if(resolvedFeatures == null || resolvedFeatures.isEmpty()) {
+		return;
+	    }
+	    
             Map<File, String> artifactsToExt = downloadEsas(resolvedFeatures, featureToExtMap);
             Set<File> artifacts = artifactsToExt.keySet();
+            
+            
+            if (verifyOption != null && verifyOption != VerifyOption.skip) {
+		verifyFeatures(artifacts, installJarURL);
+            }
+            
 
+            info("Installing features: " + featuresToInstall);
             StringBuilder installedFeaturesBuilder = new StringBuilder();
             Collection<String> actionReturnResult = new ArrayList<String>();
             for (File esaFile : artifacts) {
@@ -767,6 +791,54 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
+
+
+    /**
+     * @param featuresToInstall
+     * @param jsonRepos
+     * @param acceptLicenseMapValue
+     * @return Collection of resolved features
+     * @throws PluginExecutionException
+     */
+    private Collection<?> resolveFeatures(List<String> featuresToInstall, List<File> jsonRepos,
+	    boolean acceptLicenseMapValue) throws PluginExecutionException {
+	info("Resolving features... " );
+	
+	mapBasedInstallKernel.put("install.local.esa", true);
+	mapBasedInstallKernel.put("single.json.file", jsonRepos);
+	mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
+	mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
+	mapBasedInstallKernel.put("is.install.server.feature", true);
+	
+	
+	Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
+	if (resolvedFeatures == null) {
+	    debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
+	    String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
+	    throw new PluginExecutionException(exceptionMessage);
+	} else if (resolvedFeatures.isEmpty()) {
+	    debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
+	    String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
+	    if (exceptionMessage == null) {
+	        debug("resolvedFeatures was empty but the install kernel did not issue any messages");
+	        info("The features are already installed, so no action is needed.");
+	        return resolvedFeatures;
+	    } else if (exceptionMessage.contains("CWWKF1250I")) {
+	        info(exceptionMessage);
+	        info("The features are already installed, so no action is needed.");
+	        return resolvedFeatures;
+	    } else {
+	        if (isFeatureConflict(exceptionMessage)) {
+	            throw new PluginExecutionException(
+	                   CONFLICT_MESSAGE + featuresToInstall
+	                            + ": " + exceptionMessage);
+	        }
+	        throw new PluginExecutionException(exceptionMessage);
+	    }
+	}
+	return resolvedFeatures;
+    }
+
     // Attempt to disable connection caching in the URLClassLoader so that the jar files will
     // all close when we close the class loader. Use reflection because this is not supported
     // in Java 8. Save the current value to restore it later for performance reasons.
@@ -804,46 +876,34 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             saveURLCacheStatus = null;
         }
     }
-
-    private Map<String, Object> createMapBasedInstallKernelInstance(final ClassLoader loader, File installDirectory)
-            throws PrivilegedActionException, PluginExecutionException {
-        Map<String, Object> mapBasedInstallKernel = AccessController.doPrivileged(new PrivilegedExceptionAction<Map<String, Object>>() {
-                @SuppressWarnings({ "unchecked" })
-                @Override
-                public Map<String, Object> run() throws Exception {
-                    
-                    Class<Map<String, Object>> clazz;
-                    clazz = (Class<Map<String, Object>>) loader.loadClass("com.ibm.ws.install.map.InstallMap");
-                    return clazz.newInstance();
-                }
-            });
-        if (mapBasedInstallKernel == null){
-            throw new PluginExecutionException("Cannot run install jar file " + installJarFile);
-        }
-
-        // Init
-        String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID);
-        if (bundle != null) {
-            List<String> bundles = new ArrayList<String>();
-            bundles.add(bundle);
-            debug("Overriding jar using: " + bundle);
-            mapBasedInstallKernel.put("override.jar.bundles", bundles);
-        }
-        mapBasedInstallKernel.put("runtime.install.dir", installDirectory);
+    
+    private File downloadOverrideJar(String groupId, String artifactId) {
         try {
-            mapBasedInstallKernel.put("install.map.jar.file", installJarFile);
-            debug("install.map.jar.file: " + installJarFile);
-        } catch (RuntimeException e) {
-            debug("This version of the install map does not support the key \"install.map.jar.file\"", e);
-            String installJarFileSubpath = installJarFile.getParentFile().getName() + File.separator + installJarFile.getName();
-            mapBasedInstallKernel.put("install.map.jar", installJarFileSubpath);
-            debug("install.map.jar: " + installJarFileSubpath);
+            return downloadArtifact(groupId, artifactId, "jar",
+                    String.format("[%s)", openLibertyVersion + ", " + getNextProductVersion(openLibertyVersion)));
+        } catch (PluginExecutionException e) {
+            debug("Using jar from Liberty directory for " + artifactId + " bundle.");
+            return null;
         }
-        debug("install.kernel.init.code: " + mapBasedInstallKernel.get("install.kernel.init.code"));
-        debug("install.kernel.init.error.message: " + mapBasedInstallKernel.get("install.kernel.init.error.message"));
-        File usrDir = new File(installDirectory, "usr");
-        mapBasedInstallKernel.put("target.user.directory", usrDir);
-        return mapBasedInstallKernel;
+    }
+    
+    private File loadInstallJarFile(File installDirectory) {
+	if(installJarFile == null) {
+	    if (openLibertyVersion != null) {
+		File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
+		if (installJarOverride != null && installJarOverride.exists()) {
+		    installJarFile = installJarOverride;
+		} else {
+		    installJarFile = getMapBasedInstallKernelJar(new File(installDirectory, "lib"), INSTALL_MAP_PREFIX,
+			    JAR_EXT);
+		}
+	    } else {
+		installJarFile = getMapBasedInstallKernelJar(new File(installDirectory, "lib"), INSTALL_MAP_PREFIX,
+			JAR_EXT);
+	    }
+	}
+   	
+   	return installJarFile;
     }
 
     /**
@@ -870,15 +930,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         return null;
     }
 
-    private File downloadOverrideJar(String groupId, String artifactId) {
-        try {
-            return downloadArtifact(groupId, artifactId, "jar",
-                    String.format("[%s)", openLibertyVersion + ", " + getNextProductVersion(openLibertyVersion)));
-        } catch (PluginExecutionException e) {
-            debug("Using jar from Liberty directory for " + artifactId + " bundle.");
-            return null;
-        }
-    }
+    
 
     /**
      * Gets the next product version number.
@@ -929,19 +981,17 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 }
             }
         }
-    }
-    
-    /**
+    }    /**
      * Find latest install map jar from specified directory
      * 
      * @return the install map jar file
      */
-    public static File getMapBasedInstallKernelJar(File dir) {
+    public static File getMapBasedInstallKernelJar(File dir, String prefix, String suffix) {
 
         File[] installMapJars = dir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.startsWith(INSTALL_MAP_PREFIX) && name.endsWith(INSTALL_MAP_SUFFIX);
+                return name.startsWith(INSTALL_MAP_PREFIX) && name.endsWith(JAR_EXT);
             }
         });
 
@@ -984,7 +1034,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      */
     private static String extractVersion(String fileName) {
         int startIndex = INSTALL_MAP_PREFIX.length() + 1; // skip the underscore after the prefix
-        int endIndex = fileName.lastIndexOf(INSTALL_MAP_SUFFIX);
+        int endIndex = fileName.lastIndexOf(JAR_EXT);
         if (startIndex < endIndex) {
             return fileName.substring(startIndex, endIndex);
         } else {
@@ -1098,7 +1148,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }
     }
 
-    private void installFeaturesOnContainer(List<String> features, boolean acceptLicense) throws PluginExecutionException {
+    private void installFeaturesOnContainer(List<String> features, boolean acceptLicense, VerifyOption verifyOption) throws PluginExecutionException {
         if (features == null || features.isEmpty()) {
             debug("Skipping installing features on container " + containerName + " since no features were specified.");
             return;
@@ -1113,11 +1163,16 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         String featureUtilityCommand = getContainerCommandPrefix() + " exec -e FEATURE_LOCAL_REPO=/devmode-maven-cache " + containerName + " featureUtility installFeature " + featureList;
         if (acceptLicense) {
-            featureUtilityCommand += "--acceptLicense";
+            featureUtilityCommand += " --acceptLicense";
+        }
+        
+
+        if(verifyOption != null) {
+            featureUtilityCommand += " --verify=" + verifyOption.name();
         }
         
         String cmdResult = execContainerCmd(featureUtilityCommand, 600, false);
-        if (cmdResult.contains(" RC=")) { // This piece of the string is added in execContainerCmd if there is an error
+        if (cmdResult.contains(" RC=")) { // This piece of the string is added in execDockerCmd if there is an error
             if (cmdResult.contains("CWWKF1250I")) {
                 // The features are already installed message
                 debug(cmdResult);
@@ -1140,4 +1195,55 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         Matcher m = conflictPattern.matcher(exceptionMessage);
         return m.find();
     }
+
+    
+    /**
+     * Verifies signatures(.asc) of downloaded artifacts(.esa), which is available from Liberty 23.0.0.9
+     * @param artifacts downloaded artifacts  
+     * @param installJarURL
+     * @throws PluginExecutionException
+     */
+    public void verifyFeatures(Set<File> artifacts, URL installJarURL) throws PluginExecutionException {
+	
+	if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_VERIFY_FEATURE_VERSION, true) < 0) {
+	    warn("Skipping feature verification. Minimum required Liberty version is " + MIN_VERIFY_FEATURE_VERSION);
+	    return;
+	}
+	
+	downloadPublicKeys();
+	
+	info("Verifying features");
+	mapBasedInstallKernel.put("action.verify", artifacts.stream().collect(Collectors.toList()));
+	mapBasedInstallKernel.get("action.result");
+	if (mapBasedInstallKernel.get("action.error.message") != null) {
+	    // error with installation
+	    if (mapBasedInstallKernel.get("action.exception.stacktrace") != null) {
+		debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
+	    }
+	    throw new PluginExecutionException((String) mapBasedInstallKernel.get("action.error.message"));
+	}
+
+    }
+
+
+
+    /**
+     * Downloads public key to verify signatures
+     * @throws PluginExecutionException
+     */
+    private void downloadPublicKeys() throws PluginExecutionException {
+	info("Downloading public key(s) for signature verification");
+	mapBasedInstallKernel.get("environment.variable.map");
+	mapBasedInstallKernel.put("verify.option", verifyOption.name());
+	mapBasedInstallKernel.put("user.public.keys", keyMap);
+	mapBasedInstallKernel.get("download.pubkeys");
+
+	if (mapBasedInstallKernel.get("action.error.message") != null) {
+	if (mapBasedInstallKernel.get("action.exception.stacktrace") != null) {
+	    debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
+	}
+	throw new PluginExecutionException((String) mapBasedInstallKernel.get("action.error.message"));
+	}
+    }
+    
 }
