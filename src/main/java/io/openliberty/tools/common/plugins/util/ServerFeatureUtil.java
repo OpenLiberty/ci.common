@@ -23,6 +23,9 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,6 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -401,9 +405,10 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      *         parsed xml files only have featureManager sections but no
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
+     * @throws IOException
      */
     private Set<String> parseIncludeNode(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
-            List<File> updatedParsedXmls) {
+            List<File> updatedParsedXmls) throws IOException {
         Set<String> result = origResult;
         // Need to handle more variable substitution for include location.
         String nodeValue = node.getAttribute("location");
@@ -442,13 +447,32 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
             debug("Exception received: "+e.getMessage(), e);
             return result;
         }
-        if (!updatedParsedXmls.contains(includeFile)) {
-            String onConflict = node.getAttribute("onConflict");
-            Set<String> features = getServerXmlFeatures(null, serverDirectory, includeFile, bootstrapProperties, updatedParsedXmls);
-            if (features != null && !features.isEmpty()) {
-                info("Features were included for file "+ includeFileName);
+
+        ArrayList<File> includeFiles = new ArrayList<File>();
+        if (includeFile.isDirectory()) {
+            DirectoryStream<Path> dstream = Files.newDirectoryStream(includeFile.toPath(), "*.xml");
+            StreamSupport.stream(dstream.spliterator(), false)
+                .sorted(Comparator.comparing(Path::toString))
+                .forEach(p -> { 
+                    try {
+                        includeFiles.add(p.toFile());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+        } else {
+            includeFiles.add(includeFile);
+        }
+
+        for (File file : includeFiles) {
+            if (!updatedParsedXmls.contains(file)) {
+                String onConflict = node.getAttribute("onConflict");
+                Set<String> features = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
+                if (features != null && !features.isEmpty()) {
+                    info("Features were included for file "+ file.getCanonicalPath());
+                }
+                result = handleOnConflict(result, onConflict, features);
             }
-            result = handleOnConflict(result, onConflict, features);
         }
         return result;
     }
@@ -523,7 +547,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         } catch (IOException e1) {
             debug("Unable to determine the file path of " + serverFile + " relative to the server directory "
                     + serverDirectory);
-           return serverFile.toString();
+            return serverFile.toString();
         }
     }
     

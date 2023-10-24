@@ -444,10 +444,7 @@ public class ServerConfigDocument {
         } else if (loc.startsWith("file:")) {
             if (isValidURL(loc)) {
                 locFile = new File(loc);
-                if (locFile.exists()) {
-                    doc = parseDocument(locFile);
-                    docs.add(doc);
-                }
+                parseDocumentFromFile(locFile, docs);
             }
         } else if (loc.startsWith("ftp:")) {
             // TODO handle ftp protocol
@@ -456,15 +453,7 @@ public class ServerConfigDocument {
 
             // check if absolute file
             if (locFile.isAbsolute()) {
-                if (locFile.exists()) {
-                    if (locFile.isFile()) {
-                        doc = parseDocument(locFile);
-                        docs.add(doc);
-                    }
-                    if (locFile.isDirectory()) {
-                        parseDocumentsInDirectory(locFile, docs);
-                    }
-                }
+                parseDocumentFromFile(locFile, docs);
             } else {
                 // check configDirectory first if exists
                 if (configDirectory != null && configDirectory.exists()) {
@@ -474,21 +463,41 @@ public class ServerConfigDocument {
                 if (locFile == null || !locFile.exists()) {
                     locFile = new File(getServerXML().getParentFile(), loc);
                 }
-
-                if (locFile != null && locFile.exists()) {
-                    if (locFile.isFile()) {
-                        doc = parseDocument(locFile);
-                        docs.add(doc);
-                    }
-                    if (locFile.isDirectory()) {
-                        parseDocumentsInDirectory(locFile, docs);
-                    }
-                }
+                parseDocumentFromFile(locFile, docs);
             }
         }
         return docs;
     }
 
+    /**
+     * Parses file or directory for all xml documents.
+     * @param file
+     * @param docs
+     * @throws FileNotFoundException
+     * @throws IOException
+     * @throws SAXException
+     */
+    private static void parseDocumentFromFile(File file, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
+        Document doc = null;
+        if (file == null || !file.exists()) {
+            log.debug("Unable to parse from file: " + file.getCanonicalPath());
+            return;
+        }
+        if (file.isFile()) {
+            doc = parseDocument(file);
+            docs.add(doc);
+        }
+        if (file.isDirectory()) {
+            parseDocumentsInDirectory(file, docs);
+        }
+    }
+
+    /**
+     * In a given directory, parse all direct children xml files in alphabetical order by filename.
+     * @param directory
+     * @param docs
+     * @throws IOException
+     */
     private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) throws IOException {
         DirectoryStream<Path> dstream = Files.newDirectoryStream(directory.toPath(), "*.xml");
         StreamSupport.stream(dstream.spliterator(), false)

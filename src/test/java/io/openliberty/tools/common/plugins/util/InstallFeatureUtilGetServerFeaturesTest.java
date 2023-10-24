@@ -59,15 +59,17 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     
     private void copy(String origName) throws IOException {
         File file = new File(src, origName);
-        FileUtils.copyFileToDirectory(file, serverDirectory);
+        if (file.isFile()) {
+            FileUtils.copyFileToDirectory(file, serverDirectory);
+        } else {
+            FileUtils.copyDirectoryToDirectory(file, serverDirectory);
+        }
     }
     
     private void verifyServerFeatures(Set<String> expected) throws Exception {
         Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
         assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
     }
-
-        
     private void verifyServerFeatures(Set<String> expected, Set<String> ignoreFiles) throws Exception {
         Set<String> getServerResult = util.getServerFeatures(serverDirectory, null, ignoreFiles);
         assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
@@ -588,6 +590,52 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         String content = new String(Files.readAllBytes(serverXmlPath), StandardCharsets.UTF_8);
         content = content.replaceAll("@includeReplacementToken@", includeReplacement);
         Files.write(serverXmlPath, content.getBytes(charset));
+    }
+
+    /**
+     * Tests server.xml with include dir
+     * @throws Exception
+     */
+    @Test
+    public void testIncludeDir() throws Exception {
+        replaceIncludeDir("includeDir");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+        expected.add("extra2");
+        expected.add("extra4");
+
+        verifyServerFeatures(expected);
+    }
+
+    @Test
+    public void testIncludeDirReplace() throws Exception {
+        copyAsName("server_dir_replace.xml", "server.xml");
+        copy("includeDir");
+
+        // only the last replace should be kept
+        Set<String> expected = new HashSet<String>();
+        expected.add("extra4");
+
+        verifyServerFeatures(expected);
+    }
+
+    @Test
+    public void testIncludeDirIgnore() throws Exception {
+        copyAsName("server_dir_ignore.xml", "server.xml");
+        copy("includeDir");
+
+        // only the last replace should be kept
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+
+        verifyServerFeatures(expected);
+    }
+
+    private void replaceIncludeDir(String includeDirName) throws Exception {
+        File includeDir = new File(src, includeDirName);
+        replaceIncludeLocation(includeDir.getCanonicalPath());
     }
     
     /**
