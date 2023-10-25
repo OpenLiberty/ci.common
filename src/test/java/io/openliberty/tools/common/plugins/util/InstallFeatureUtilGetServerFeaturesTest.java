@@ -599,6 +599,7 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     @Test
     public void testIncludeDir() throws Exception {
         replaceIncludeDir("includeDir");
+        copy("includeDir");
 
         Set<String> expected = new HashSet<String>();
         expected.add("orig");
@@ -635,7 +636,7 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
 
     private void replaceIncludeDir(String includeDirName) throws Exception {
         File includeDir = new File(src, includeDirName);
-        replaceIncludeLocation(includeDir.getCanonicalPath());
+        replaceIncludeLocation(includeDir.getName());
     }
     
     /**

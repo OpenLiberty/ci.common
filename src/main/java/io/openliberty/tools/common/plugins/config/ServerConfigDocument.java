@@ -442,7 +442,7 @@ public class ServerConfigDocument {
         } else if (loc.startsWith("file:")) {
             if (isValidURL(loc)) {
                 locFile = new File(loc);
-                // While Java URIs support directories, the Liberty include implementation does not support them yet.
+                // While URIs support directories, the Liberty include implementation does not support them yet.
                 doc = parseDocument(locFile);
                 docs.add(doc);
             }
