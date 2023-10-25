@@ -483,7 +483,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                 String onConflict = node.getAttribute("onConflict");
                 Set<String> features = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
                 if (features != null && !features.isEmpty()) {
-                    info("Features were included for file "+ file.getCanonicalPath());
+                    info("Features were included for file "+ file.toString());
                 }
                 result = handleOnConflict(result, onConflict, features);
             }

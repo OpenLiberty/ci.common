@@ -510,7 +510,7 @@ public class ServerConfigDocument {
                 try {
                     docs.add(parseDocument(p.toFile()));
                 } catch (Exception e) {
-                    log.warn("Unable to parse from file " + p.getFileName() + " in include directory: " + directory.getName());
+                    log.warn("Unable to parse from file " + p.getFileName() + " from specified include directory: " + directory.getPath());
                 }
             });
     }
