@@ -22,9 +22,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 import java.util.Map;
 import java.util.Properties;
 
@@ -360,17 +366,16 @@ public class ServerConfigDocument {
 
                 if (includeFileName == null || includeFileName.trim().isEmpty()) {
                     log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
-                    return;
+                    continue;
                 }
 
-                Document docIncl = getIncludeDoc(includeFileName);
-
-                if (docIncl != null) {
-                    parseApplication(docIncl, XPATH_SERVER_APPLICATION);
-                    parseApplication(docIncl, XPATH_SERVER_WEB_APPLICATION);
-                    parseApplication(docIncl, XPATH_SERVER_ENTERPRISE_APPLICATION);
+                ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
+                for (Document inclDoc : inclDocs) {
+                    parseApplication(inclDoc, XPATH_SERVER_APPLICATION);
+                    parseApplication(inclDoc, XPATH_SERVER_WEB_APPLICATION);
+                    parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
                     // handle nested include elements
-                    parseInclude(docIncl);
+                    parseInclude(inclDoc);
                 }
             }
         }
@@ -422,8 +427,8 @@ public class ServerConfigDocument {
         }
     }
 
-    private static Document getIncludeDoc(String loc) throws IOException, SAXException {
-
+    private static ArrayList<Document> getIncludeDocs(String loc) throws IOException, SAXException {
+        ArrayList<Document> docs = new ArrayList<Document>();
         Document doc = null;
         File locFile = null;
 
@@ -432,14 +437,14 @@ public class ServerConfigDocument {
                 URL url = new URL(loc);
                 URLConnection connection = url.openConnection();
                 doc = parseDocument(connection.getInputStream());
+                docs.add(doc);
             }
         } else if (loc.startsWith("file:")) {
             if (isValidURL(loc)) {
                 locFile = new File(loc);
-                if (locFile.exists()) {
-                    InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
-                    doc = parseDocument(inputStream);
-                }
+                // While URIs support directories, the Liberty include implementation does not support them yet.
+                doc = parseDocument(locFile);
+                docs.add(doc);
             }
         } else if (loc.startsWith("ftp:")) {
             // TODO handle ftp protocol
@@ -448,10 +453,7 @@ public class ServerConfigDocument {
 
             // check if absolute file
             if (locFile.isAbsolute()) {
-                if (locFile.exists()) {
-                    InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
-                    doc = parseDocument(inputStream);
-                }
+                parseDocumentFromFileOrDirectory(locFile, docs);
             } else {
                 // check configDirectory first if exists
                 if (configDirectory != null && configDirectory.exists()) {
@@ -461,14 +463,69 @@ public class ServerConfigDocument {
                 if (locFile == null || !locFile.exists()) {
                     locFile = new File(getServerXML().getParentFile(), loc);
                 }
-
-                if (locFile != null && locFile.exists()) {
-                    InputStream inputStream = new FileInputStream(locFile.getCanonicalPath());
-                    doc = parseDocument(inputStream);
-                }
+                parseDocumentFromFileOrDirectory(locFile, docs);
             }
         }
-        return doc;
+
+        if (docs.isEmpty()) {
+            log.warn("Did not parse any file(s) from include location: " + loc);
+        }
+        return docs;
+    }
+
+    /**
+     * Parses file or directory for all xml documents, and adds to ArrayList<Document>
+     * @param file - file or directory to parse documents from
+     * @param docs - ArrayList to store parsed Documents.
+     * @throws FileNotFoundException
+     * @throws IOException
+     * @throws SAXException
+     */
+    private static void parseDocumentFromFileOrDirectory(File file, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
+        Document doc = null;
+        if (file == null || !file.exists()) {
+            log.warn("Unable to parse from file: " + file.getCanonicalPath());
+            return;
+        }
+        if (file.isFile()) {
+            doc = parseDocument(file);
+            docs.add(doc);
+        }
+        if (file.isDirectory()) {
+            parseDocumentsInDirectory(file, docs);
+        }
+    }
+
+    /**
+     * In a given directory, parse all direct children xml files in alphabetical order by filename, and adds to ArrayList<Document>
+     * @param directory - directory to parse documents from
+     * @param docs - ArrayList to store parsed Documents.
+     * @throws IOException
+     */
+    private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) throws IOException {
+        DirectoryStream<Path> dstream = Files.newDirectoryStream(directory.toPath(), "*.xml");
+        StreamSupport.stream(dstream.spliterator(), false)
+            .sorted(Comparator.comparing(Path::toString))
+            .forEach(p -> { 
+                try {
+                    docs.add(parseDocument(p.toFile()));
+                } catch (Exception e) {
+                    log.warn("Unable to parse from file " + p.getFileName() + " from specified include directory: " + directory.getPath());
+                }
+            });
+    }
+
+    /**
+     * Parse Document from XML file
+     * @param file - XML file to parse for Document
+     * @return
+     * @throws FileNotFoundException
+     * @throws IOException
+     * @throws SAXException
+     */
+    private static Document parseDocument(File file) throws FileNotFoundException, IOException, SAXException {
+        InputStream is = new FileInputStream(file.getCanonicalPath());
+        return parseDocument(is);
     }
 
     private static Document parseDocument(InputStream in) throws SAXException, IOException {
@@ -559,17 +616,15 @@ public class ServerConfigDocument {
 
                 if (includeFileName == null || includeFileName.trim().isEmpty()) {
                     log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
-                    return;
+                    continue;
                 }
-                    
-                Document docIncl = getIncludeDoc(includeFileName);
 
-                if (docIncl != null) {
-                    parseVariablesForBothValues(docIncl);
+                ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
+
+                for (Document inclDoc : inclDocs) {
+                    parseVariablesForBothValues(inclDoc);
                     // handle nested include elements
-                    parseIncludeVariables(docIncl);
-                } else {
-                    log.warn("Unable to parse include file "+includeFileName+". Skipping the included file during application location processing.");
+                    parseIncludeVariables(inclDoc);
                 }
             }
         }

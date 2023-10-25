@@ -17,4 +17,8 @@
     <include location="${includeLocationNonDefault}/firstInclude.xml"/>    
     <webApplication location="${project.artifactId.four}.ear"/>
 
+    <include location="${server.config.dir}/includeDir"/>
+    <webApplication location="${project.artifactId.five}.war"/>
+    <webApplication location="${project.artifactId.six}.war"/>
+
 </server>
