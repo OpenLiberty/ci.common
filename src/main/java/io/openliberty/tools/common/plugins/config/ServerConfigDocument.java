@@ -371,13 +371,11 @@ public class ServerConfigDocument {
 
                 ArrayList<Document> inclDocs = getIncludeDoc(includeFileName);
                 for (Document inclDoc : inclDocs) {
-                    if (inclDoc != null) {
-                        parseApplication(inclDoc, XPATH_SERVER_APPLICATION);
-                        parseApplication(inclDoc, XPATH_SERVER_WEB_APPLICATION);
-                        parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
-                        // handle nested include elements
-                        parseInclude(inclDoc);
-                    }
+                    parseApplication(inclDoc, XPATH_SERVER_APPLICATION);
+                    parseApplication(inclDoc, XPATH_SERVER_WEB_APPLICATION);
+                    parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
+                    // handle nested include elements
+                    parseInclude(inclDoc);
                 }
             }
         }
@@ -622,11 +620,9 @@ public class ServerConfigDocument {
                 ArrayList<Document> inclDocs = getIncludeDoc(includeFileName);
 
                 for (Document inclDoc : inclDocs) {
-                    if (inclDoc != null) {
-                        parseVariablesForBothValues(inclDoc);
-                        // handle nested include elements
-                        parseIncludeVariables(inclDoc);
-                    }
+                    parseVariablesForBothValues(inclDoc);
+                    // handle nested include elements
+                    parseIncludeVariables(inclDoc);
                 }
             }
         }
