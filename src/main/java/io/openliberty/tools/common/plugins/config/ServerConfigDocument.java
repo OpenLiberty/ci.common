@@ -466,13 +466,17 @@ public class ServerConfigDocument {
                 parseDocumentFromFile(locFile, docs);
             }
         }
+
+        if (docs.isEmpty()) {
+            log.warn("Did not parse any file(s) from include location: " + loc);
+        }
         return docs;
     }
 
     /**
-     * Parses file or directory for all xml documents.
-     * @param file
-     * @param docs
+     * Parses file or directory for all xml documents, and adds to ArrayList<Document>
+     * @param file - file or directory to parse documents from
+     * @param docs - ArrayList to store parsed Documents.
      * @throws FileNotFoundException
      * @throws IOException
      * @throws SAXException
@@ -480,7 +484,7 @@ public class ServerConfigDocument {
     private static void parseDocumentFromFile(File file, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
         Document doc = null;
         if (file == null || !file.exists()) {
-            log.debug("Unable to parse from file: " + file.getCanonicalPath());
+            log.warn("Unable to parse from file: " + file.getCanonicalPath());
             return;
         }
         if (file.isFile()) {
@@ -493,9 +497,9 @@ public class ServerConfigDocument {
     }
 
     /**
-     * In a given directory, parse all direct children xml files in alphabetical order by filename.
-     * @param directory
-     * @param docs
+     * In a given directory, parse all direct children xml files in alphabetical order by filename, and adds to ArrayList<Document>
+     * @param directory - directory to parse documents from
+     * @param docs - ArrayList to store parsed Documents.
      * @throws IOException
      */
     private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) throws IOException {
@@ -506,16 +510,22 @@ public class ServerConfigDocument {
                 try {
                     docs.add(parseDocument(p.toFile()));
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    log.warn("Unable to parse from file " + p.getFileName() + " in include directory: " + directory.getName());
                 }
             });
     }
 
+    /**
+     * Parse Document from XML file
+     * @param file - XML file to parse for Document
+     * @return
+     * @throws FileNotFoundException
+     * @throws IOException
+     * @throws SAXException
+     */
     private static Document parseDocument(File file) throws FileNotFoundException, IOException, SAXException {
         InputStream is = new FileInputStream(file.getCanonicalPath());
-        Document doc = parseDocument(is);
-        is.close();
-        return doc;
+        return parseDocument(is);
     }
 
     private static Document parseDocument(InputStream in) throws SAXException, IOException {
@@ -616,8 +626,6 @@ public class ServerConfigDocument {
                         parseVariablesForBothValues(inclDoc);
                         // handle nested include elements
                         parseIncludeVariables(inclDoc);
-                    } else {
-                        log.warn("Unable to parse include file "+includeFileName+". Skipping the included file during application location processing.");
                     }
                 }
             }

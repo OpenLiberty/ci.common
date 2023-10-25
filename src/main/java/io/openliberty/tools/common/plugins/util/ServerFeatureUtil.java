@@ -419,7 +419,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      * @throws IOException
      */
     private Set<String> parseIncludeNode(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
-            List<File> updatedParsedXmls) throws IOException {
+            List<File> updatedParsedXmls) {
         Set<String> result = origResult;
         // Need to handle more variable substitution for include location.
         String nodeValue = node.getAttribute("location");
@@ -461,16 +461,19 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
 
         ArrayList<File> includeFiles = new ArrayList<File>();
         if (includeFile.isDirectory()) {
-            DirectoryStream<Path> dstream = Files.newDirectoryStream(includeFile.toPath(), "*.xml");
-            StreamSupport.stream(dstream.spliterator(), false)
-                .sorted(Comparator.comparing(Path::toString))
-                .forEach(p -> { 
-                    try {
-                        includeFiles.add(p.toFile());
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                });
+            try (DirectoryStream<Path> dstream = Files.newDirectoryStream(includeFile.toPath(), "*.xml")) {
+                StreamSupport.stream(dstream.spliterator(), false)
+                    .sorted(Comparator.comparing(Path::toString))
+                    .forEach(p -> { 
+                        try {
+                            includeFiles.add(p.toFile());
+                        } catch (Exception e) {
+                            debug("Failed to resolve file from path: " + p);
+                        }
+                    });
+            } catch (IOException e) {
+                debug("Unable to open include directory: " + includeFileName);
+            }
         } else {
             includeFiles.add(includeFile);
         }
