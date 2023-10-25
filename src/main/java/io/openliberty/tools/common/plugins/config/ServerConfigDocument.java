@@ -369,7 +369,7 @@ public class ServerConfigDocument {
                     continue;
                 }
 
-                ArrayList<Document> inclDocs = getIncludeDoc(includeFileName);
+                ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
                 for (Document inclDoc : inclDocs) {
                     parseApplication(inclDoc, XPATH_SERVER_APPLICATION);
                     parseApplication(inclDoc, XPATH_SERVER_WEB_APPLICATION);
@@ -427,7 +427,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static ArrayList<Document> getIncludeDoc(String loc) throws IOException, SAXException {
+    private static ArrayList<Document> getIncludeDocs(String loc) throws IOException, SAXException {
         ArrayList<Document> docs = new ArrayList<Document>();
         Document doc = null;
         File locFile = null;
@@ -442,7 +442,9 @@ public class ServerConfigDocument {
         } else if (loc.startsWith("file:")) {
             if (isValidURL(loc)) {
                 locFile = new File(loc);
-                parseDocumentFromFile(locFile, docs);
+                // While Java URIs support directories, the Liberty include implementation does not support them yet.
+                doc = parseDocument(locFile);
+                docs.add(doc);
             }
         } else if (loc.startsWith("ftp:")) {
             // TODO handle ftp protocol
@@ -451,7 +453,7 @@ public class ServerConfigDocument {
 
             // check if absolute file
             if (locFile.isAbsolute()) {
-                parseDocumentFromFile(locFile, docs);
+                parseDocumentFromFileOrDirectory(locFile, docs);
             } else {
                 // check configDirectory first if exists
                 if (configDirectory != null && configDirectory.exists()) {
@@ -461,7 +463,7 @@ public class ServerConfigDocument {
                 if (locFile == null || !locFile.exists()) {
                     locFile = new File(getServerXML().getParentFile(), loc);
                 }
-                parseDocumentFromFile(locFile, docs);
+                parseDocumentFromFileOrDirectory(locFile, docs);
             }
         }
 
@@ -479,7 +481,7 @@ public class ServerConfigDocument {
      * @throws IOException
      * @throws SAXException
      */
-    private static void parseDocumentFromFile(File file, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
+    private static void parseDocumentFromFileOrDirectory(File file, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
         Document doc = null;
         if (file == null || !file.exists()) {
             log.warn("Unable to parse from file: " + file.getCanonicalPath());
@@ -617,7 +619,7 @@ public class ServerConfigDocument {
                     continue;
                 }
 
-                ArrayList<Document> inclDocs = getIncludeDoc(includeFileName);
+                ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
 
                 for (Document inclDoc : inclDocs) {
                     parseVariablesForBothValues(inclDoc);
