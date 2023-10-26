@@ -593,7 +593,7 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
 
     /**
-     * Tests server.xml with include dir
+     * Tests server.xml with include dir (must end with trailing slash)
      * @throws Exception
      */
     @Test
@@ -607,6 +607,22 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("extra");
         expected.add("extra2");
         expected.add("extra4");
+
+        verifyServerFeatures(expected);
+    }
+
+    /**
+     * Tests include directory without the trailing slash.
+     * Liberty treats this as a file, which conflicts with it being a dir, and throws an error.
+     * @throws Exception
+     */
+    @Test
+    public void testInvalidIncludeDir() throws Exception {
+        replaceIncludeLocation("includeDir"); 
+        copy("includeDir");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
 
         verifyServerFeatures(expected);
     }

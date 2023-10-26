@@ -473,15 +473,16 @@ public class ServerConfigDocument {
     /**
      * Parses file or directory for all xml documents, and adds to ArrayList<Document>
      * @param f - file or directory to parse documents from
-     * @param isLibertyDirectory - indicates if directory. Liberty bases this off of the presence of trailing File.separator
+     * @param locationString - String representation of filepath for f
      * @param docs - ArrayList to store parsed Documents.
      * @throws FileNotFoundException
      * @throws IOException
      * @throws SAXException
      */
-    private static void parseDocumentFromFileOrDirectory(File f, String loc, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
+    private static void parseDocumentFromFileOrDirectory(File f, String locationString, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
         Document doc = null;
-        boolean isLibertyDirectory = loc.endsWith("/"); // Liberty uses this to determine if directory
+        // Earlier call to VariableUtility.resolveVariables() already converts all \ to /
+        boolean isLibertyDirectory = locationString.endsWith("/");  // Liberty uses this to determine if directory. 
 
         if (f == null || !f.exists()) {
             log.warn("Unable to parse from file: " + f.getCanonicalPath());
@@ -489,17 +490,16 @@ public class ServerConfigDocument {
         }
         // If file mismatches Liberty definition of directory
         if (f.isFile() && isLibertyDirectory) {
-            log.error("Path specified a directory, but resource exists as a file (path=" + loc + ")");
+            log.error("Path specified a directory, but resource exists as a file (path=" + locationString + ")");
             return;
         } else if (f.isDirectory() && !isLibertyDirectory) {
-            log.error("Path specified a file, but resource exists as a directory (path=" + loc + ")");
+            log.error("Path specified a file, but resource exists as a directory (path=" + locationString + ")");
             return;
         }
 
         if (f.isDirectory()) {
             parseDocumentsInDirectory(f, docs);
-        }
-        if (f.isFile()) {
+        } else {
             doc = parseDocument(f);
             docs.add(doc);
         }

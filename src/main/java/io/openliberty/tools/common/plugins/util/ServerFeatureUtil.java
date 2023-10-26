@@ -423,7 +423,6 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         Set<String> result = origResult;
         // Need to handle more variable substitution for include location.
         String nodeValue = node.getAttribute("location");
-        // NOTE: resolveVariables converts Windows \ into /
         String includeFileName = VariableUtility.resolveVariables(this, nodeValue, null, bootstrapProperties, new Properties(), getLibertyDirectoryPropertyFiles());
 
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
@@ -476,7 +475,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     }
 
     private ArrayList<File> parseIncludeFileOrDirectory(String includeFileName, File includeFile) {
-        boolean isLibertyDirectory = includeFileName.endsWith("/"); // Note, resolveVariables converts Windows File.separator to use forward slash
+        // Earlier call to VariableUtility.resolveVariables() already converts all \ to /
+        boolean isLibertyDirectory = includeFileName.endsWith("/"); // Liberty uses this to determine if directory. 
         ArrayList<File> includeFiles = new ArrayList<File>();
         if (includeFile.isFile() && isLibertyDirectory) {
             error("Path specified a directory, but resource exists as a file (path=" + includeFileName + ")");
