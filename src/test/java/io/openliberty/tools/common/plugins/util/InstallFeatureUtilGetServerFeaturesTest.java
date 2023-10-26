@@ -598,7 +598,8 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
      */
     @Test
     public void testIncludeDir() throws Exception {
-        replaceIncludeDir("includeDir");
+        // Note: Both the product code and test code end up converting Windows \ into /
+        replaceIncludeLocation("includeDir/"); 
         copy("includeDir");
 
         Set<String> expected = new HashSet<String>();
@@ -632,11 +633,6 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("orig");
 
         verifyServerFeatures(expected);
-    }
-
-    private void replaceIncludeDir(String includeDirName) throws Exception {
-        File includeDir = new File(src, includeDirName);
-        replaceIncludeLocation(includeDir.getName());
     }
     
     /**

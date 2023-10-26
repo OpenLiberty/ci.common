@@ -450,11 +450,8 @@ public class ServerConfigDocument {
             // TODO handle ftp protocol
         } else {
             locFile = new File(loc);
-
             // check if absolute file
-            if (locFile.isAbsolute()) {
-                parseDocumentFromFileOrDirectory(locFile, docs);
-            } else {
+            if (!locFile.isAbsolute()) {
                 // check configDirectory first if exists
                 if (configDirectory != null && configDirectory.exists()) {
                     locFile = new File(configDirectory, loc);
@@ -463,8 +460,8 @@ public class ServerConfigDocument {
                 if (locFile == null || !locFile.exists()) {
                     locFile = new File(getServerXML().getParentFile(), loc);
                 }
-                parseDocumentFromFileOrDirectory(locFile, docs);
             }
+            parseDocumentFromFileOrDirectory(locFile, loc, docs);
         }
 
         if (docs.isEmpty()) {
@@ -475,24 +472,36 @@ public class ServerConfigDocument {
 
     /**
      * Parses file or directory for all xml documents, and adds to ArrayList<Document>
-     * @param file - file or directory to parse documents from
+     * @param f - file or directory to parse documents from
+     * @param isLibertyDirectory - indicates if directory. Liberty bases this off of the presence of trailing File.separator
      * @param docs - ArrayList to store parsed Documents.
      * @throws FileNotFoundException
      * @throws IOException
      * @throws SAXException
      */
-    private static void parseDocumentFromFileOrDirectory(File file, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
+    private static void parseDocumentFromFileOrDirectory(File f, String loc, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
         Document doc = null;
-        if (file == null || !file.exists()) {
-            log.warn("Unable to parse from file: " + file.getCanonicalPath());
+        boolean isLibertyDirectory = loc.endsWith("/"); // Liberty uses this to determine if directory
+
+        if (f == null || !f.exists()) {
+            log.warn("Unable to parse from file: " + f.getCanonicalPath());
             return;
         }
-        if (file.isFile()) {
-            doc = parseDocument(file);
-            docs.add(doc);
+        // If file mismatches Liberty definition of directory
+        if (f.isFile() && isLibertyDirectory) {
+            log.error("Path specified a directory, but resource exists as a file (path=" + loc + ")");
+            return;
+        } else if (f.isDirectory() && !isLibertyDirectory) {
+            log.error("Path specified a file, but resource exists as a directory (path=" + loc + ")");
+            return;
         }
-        if (file.isDirectory()) {
-            parseDocumentsInDirectory(file, docs);
+
+        if (f.isDirectory()) {
+            parseDocumentsInDirectory(f, docs);
+        }
+        if (f.isFile()) {
+            doc = parseDocument(f);
+            docs.add(doc);
         }
     }
 

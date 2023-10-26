@@ -3,5 +3,5 @@
     <featureManager>
         <feature>orig</feature>
     </featureManager>
-    <include location="includeDir" onConflict="IGNORE"/>
+    <include location="includeDir/" onConflict="IGNORE"/>
 </server>

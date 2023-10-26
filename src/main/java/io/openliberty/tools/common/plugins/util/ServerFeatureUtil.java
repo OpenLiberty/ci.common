@@ -423,6 +423,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         Set<String> result = origResult;
         // Need to handle more variable substitution for include location.
         String nodeValue = node.getAttribute("location");
+        // NOTE: resolveVariables converts Windows \ into /
         String includeFileName = VariableUtility.resolveVariables(this, nodeValue, null, bootstrapProperties, new Properties(), getLibertyDirectoryPropertyFiles());
 
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
@@ -459,7 +460,32 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
             return result;
         }
 
+        ArrayList<File> includeFiles = parseIncludeFileOrDirectory(includeFileName, includeFile);
+
+        for (File file : includeFiles) {
+            if (!updatedParsedXmls.contains(file)) {
+                String onConflict = node.getAttribute("onConflict");
+                Set<String> features = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
+                if (features != null && !features.isEmpty()) {
+                    info("Features were included for file "+ file.toString());
+                }
+                result = handleOnConflict(result, onConflict, features);
+            }
+        }
+        return result;
+    }
+
+    private ArrayList<File> parseIncludeFileOrDirectory(String includeFileName, File includeFile) {
+        boolean isLibertyDirectory = includeFileName.endsWith("/"); // Note, resolveVariables converts Windows File.separator to use forward slash
         ArrayList<File> includeFiles = new ArrayList<File>();
+        if (includeFile.isFile() && isLibertyDirectory) {
+            error("Path specified a directory, but resource exists as a file (path=" + includeFileName + ")");
+            return includeFiles;
+        } else if (includeFile.isDirectory() && !isLibertyDirectory) {
+            error("Path specified a file, but resource exists as a directory (path=" + includeFileName + ")");
+            return includeFiles;
+        }
+
         if (includeFile.isDirectory()) {
             try (DirectoryStream<Path> dstream = Files.newDirectoryStream(includeFile.toPath(), "*.xml")) {
                 StreamSupport.stream(dstream.spliterator(), false)
@@ -477,19 +503,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         } else {
             includeFiles.add(includeFile);
         }
-
-        for (File file : includeFiles) {
-            if (!updatedParsedXmls.contains(file)) {
-                String onConflict = node.getAttribute("onConflict");
-                Set<String> features = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
-                if (features != null && !features.isEmpty()) {
-                    info("Features were included for file "+ file.toString());
-                }
-                result = handleOnConflict(result, onConflict, features);
-            }
-        }
-        return result;
-    }
+        return includeFiles;
+    } 
     
     private static boolean isURL(String url) {
         try {
