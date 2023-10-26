@@ -625,6 +625,7 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("orig");
 
         verifyServerFeatures(expected);
+        util.containsErrorMessage("Path specified a file, but resource exists as a directory (path=includeDir)");
     }
 
     @Test
