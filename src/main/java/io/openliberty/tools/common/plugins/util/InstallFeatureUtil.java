@@ -285,6 +285,18 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     public abstract void error(String msg, Throwable e);
 
     /**
+     * Check if any of the logged errors contain the given string.
+     * Default does nothing - 
+     * Override this method to use as needed.
+     * 
+     * @param msg
+     * @return
+     */
+    public boolean containsErrorMessage(String msg) {
+        return false;
+    }
+
+    /**
      * Returns whether debug is enabled by the current logger
      * 
      * @return whether debug is enabled

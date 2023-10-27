@@ -15,6 +15,7 @@
  */
 package io.openliberty.tools.common.plugins.util;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -593,12 +594,13 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
 
     /**
-     * Tests server.xml with include dir
+     * Tests server.xml with include dir (must end with trailing slash)
      * @throws Exception
      */
     @Test
     public void testIncludeDir() throws Exception {
-        replaceIncludeDir("includeDir");
+        // Note: Both the product code and test code end up converting Windows \ into /
+        replaceIncludeLocation("includeDir/"); 
         copy("includeDir");
 
         Set<String> expected = new HashSet<String>();
@@ -608,6 +610,23 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("extra4");
 
         verifyServerFeatures(expected);
+    }
+
+    /**
+     * Tests include directory without the trailing slash.
+     * Liberty treats this as a file, which conflicts with it being a dir, and throws an error.
+     * @throws Exception
+     */
+    @Test
+    public void testInvalidIncludeDir() throws Exception {
+        replaceIncludeLocation("includeDir"); 
+        copy("includeDir");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+
+        verifyServerFeatures(expected);
+        assertTrue(util.containsErrorMessage("Path specified a file, but resource exists as a directory (path=includeDir)"));
     }
 
     @Test
@@ -632,11 +651,6 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("orig");
 
         verifyServerFeatures(expected);
-    }
-
-    private void replaceIncludeDir(String includeDirName) throws Exception {
-        File includeDir = new File(src, includeDirName);
-        replaceIncludeLocation(includeDir.getName());
     }
     
     /**

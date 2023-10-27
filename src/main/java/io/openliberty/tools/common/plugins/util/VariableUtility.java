@@ -28,10 +28,12 @@ public class VariableUtility {
     private static final String VARIABLE_NAME_PATTERN = "\\$\\{(.*?)\\}";
     private static final Pattern varNamePattern = Pattern.compile(VARIABLE_NAME_PATTERN);
 
-    /*
+    /**
      * Attempts to resolve all variables in the passed in nodeValue. Variable value/defaultValue can reference other variables.
      * This method is called recursively to resolve the variables. The variableChain collection keeps track of the variable references
      * in a resolution chain in order to prevent an infinite loop. The variableChain collection should be passed as null on the initial call.
+     * 
+     * NOTE: This method also replaces all back slashes with forward slashes
      */
     public static String resolveVariables(CommonLoggerI log, String nodeValue, Collection<String> variableChain, 
                                             Properties props, Properties defaultProps, Map<String, File> libDirPropFiles) {

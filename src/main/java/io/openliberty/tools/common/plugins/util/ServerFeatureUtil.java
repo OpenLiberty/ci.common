@@ -459,7 +459,33 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
             return result;
         }
 
+        ArrayList<File> includeFiles = parseIncludeFileOrDirectory(includeFileName, includeFile);
+
+        for (File file : includeFiles) {
+            if (!updatedParsedXmls.contains(file)) {
+                String onConflict = node.getAttribute("onConflict");
+                Set<String> features = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
+                if (features != null && !features.isEmpty()) {
+                    info("Features were included for file "+ file.toString());
+                }
+                result = handleOnConflict(result, onConflict, features);
+            }
+        }
+        return result;
+    }
+
+    private ArrayList<File> parseIncludeFileOrDirectory(String includeFileName, File includeFile) {
+        // Earlier call to VariableUtility.resolveVariables() already converts all \ to /
+        boolean isLibertyDirectory = includeFileName.endsWith("/"); // Liberty uses this to determine if directory. 
         ArrayList<File> includeFiles = new ArrayList<File>();
+        if (includeFile.isFile() && isLibertyDirectory) {
+            error("Path specified a directory, but resource exists as a file (path=" + includeFileName + ")");
+            return includeFiles;
+        } else if (includeFile.isDirectory() && !isLibertyDirectory) {
+            error("Path specified a file, but resource exists as a directory (path=" + includeFileName + ")");
+            return includeFiles;
+        }
+
         if (includeFile.isDirectory()) {
             try (DirectoryStream<Path> dstream = Files.newDirectoryStream(includeFile.toPath(), "*.xml")) {
                 StreamSupport.stream(dstream.spliterator(), false)
@@ -477,19 +503,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         } else {
             includeFiles.add(includeFile);
         }
-
-        for (File file : includeFiles) {
-            if (!updatedParsedXmls.contains(file)) {
-                String onConflict = node.getAttribute("onConflict");
-                Set<String> features = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
-                if (features != null && !features.isEmpty()) {
-                    info("Features were included for file "+ file.toString());
-                }
-                result = handleOnConflict(result, onConflict, features);
-            }
-        }
-        return result;
-    }
+        return includeFiles;
+    } 
     
     private static boolean isURL(String url) {
         try {

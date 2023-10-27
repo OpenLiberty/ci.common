@@ -41,6 +41,8 @@ public class BaseInstallFeatureUtilTest {
     public File installDir;
     public File buildDir;
     public String verify = "enforce";
+
+    private ArrayList<String> errorMessages = new ArrayList<String>();
     
     @Rule
     public TemporaryFolder temp = new TemporaryFolder();
@@ -87,11 +89,22 @@ public class BaseInstallFeatureUtilTest {
         @Override
         public void error(String msg) {
             // not needed for tests
+            errorMessages.add(msg);
         }
 
         @Override
         public void error(String msg, Throwable e) {
             // not needed for tests
+        }
+
+        @Override
+        public boolean containsErrorMessage(String msg) {
+            for (String error : errorMessages) {
+                if (error.contains(msg)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
