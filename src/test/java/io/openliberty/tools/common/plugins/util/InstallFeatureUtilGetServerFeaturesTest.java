@@ -15,6 +15,7 @@
  */
 package io.openliberty.tools.common.plugins.util;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -625,7 +626,7 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("orig");
 
         verifyServerFeatures(expected);
-        util.containsErrorMessage("Path specified a file, but resource exists as a directory (path=includeDir)");
+        assertTrue(util.containsErrorMessage("Path specified a file, but resource exists as a directory (path=includeDir)"));
     }
 
     @Test
