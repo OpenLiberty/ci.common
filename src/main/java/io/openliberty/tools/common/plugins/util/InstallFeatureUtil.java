@@ -286,6 +286,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     /**
      * Check if any of the logged errors contain the given string.
+     * Default does nothing - 
+     * Override this method to use as needed.
      * 
      * @param msg
      * @return
