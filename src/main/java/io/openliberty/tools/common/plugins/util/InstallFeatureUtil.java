@@ -290,7 +290,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @param msg
      * @return
      */
-    public abstract boolean containsErrorMessage(String msg);
+    public boolean containsErrorMessage(String msg) {
+        return false;
+    }
 
     /**
      * Returns whether debug is enabled by the current logger
