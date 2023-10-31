@@ -539,10 +539,18 @@ public class DevUtilTest extends BaseDevUtilTest {
         String content = FileUtils.readFileToString(metaDataXml, "UTF-8");
         assertTrue(content.contains("<containerName>liberty-dev</containerName"));
         assertTrue(content.contains("<containerAlive>true</containerAlive>"));
+        assertTrue(content.contains("<containerBuildTimeout>600</containerBuildTimeout>"));
+        assertTrue(content.contains("<containerEngine>docker</containerEngine>"));
+        assertTrue(content.contains("<containerRunOpts></containerRunOpts>"));
+        assertTrue(content.contains("<imageName></imageName>"));
 
         util.writeDevcMetadata(false);
         content = FileUtils.readFileToString(metaDataXml, "UTF-8");
         assertTrue(content.contains("<containerName>liberty-dev</containerName"));
         assertTrue(content.contains("<containerAlive>false</containerAlive>"));
+        assertTrue(content.contains("<containerBuildTimeout>600</containerBuildTimeout>"));
+        assertTrue(content.contains("<containerEngine>docker</containerEngine>"));
+        assertTrue(content.contains("<containerRunOpts></containerRunOpts>"));
+        assertTrue(content.contains("<imageName></imageName>"));
     }
 }

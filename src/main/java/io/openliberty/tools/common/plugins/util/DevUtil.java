@@ -5701,13 +5701,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             metadataWriter.writeStartElement("devcModeMetaData");
             writeElement(metadataWriter, "containerEngine", isDocker ? DEVC_CONTAINER_DOCKER : DEVC_CONTAINER_PODMAN);
             writeElement(metadataWriter, "containerName", containerName != null ? containerName : DEVMODE_CONTAINER_BASE_NAME);
+            writeElement(metadataWriter, "imageName", imageName);
+            if (containerfile != null) {
+                writeElement(metadataWriter, "containerfile", containerfile.getCanonicalPath());
+            }
+            if (containerBuildContext != null) {
+                writeElement(metadataWriter, "containerBuildContext", containerBuildContext.getCanonicalPath());
+            }
             writeElement(metadataWriter, "containerAlive", String.valueOf(alive));
+            writeElement(metadataWriter, "containerBuildTimeout", Integer.toString(containerBuildTimeout));
+            writeElement(metadataWriter, "containerRunOpts", containerRunOpts);
             metadataWriter.writeEndElement();
             metadataWriter.writeEndDocument();
             metadataWriter.flush();
             metadataWriter.close();
         } catch (Exception e) {
-            warn("Failed to write metadata.");
+            warn("Failed to write metadata.\n" + e.getMessage());
         }
     }
 
