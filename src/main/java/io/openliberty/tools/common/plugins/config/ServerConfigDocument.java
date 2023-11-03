@@ -22,15 +22,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.StreamSupport;
 import java.util.Map;
 import java.util.Properties;
 
@@ -43,6 +39,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -384,41 +381,33 @@ public class ServerConfigDocument {
     private static void parseConfigDropinsDir() throws XPathExpressionException, IOException, SAXException {
         File configDropins = getConfigDropinsDir();
 
-        if (configDropins != null && configDropins.exists()) {
-            File overrides = new File(configDropins, "overrides");
-            if (overrides.exists()) {
-                parseDropinsFiles(overrides.listFiles());
-            }
+        if (configDropins == null || !configDropins.exists()) {
+            return;
+        }
 
-            File defaults = new File(configDropins, "defaults");
-            if (defaults.exists()) {
-                parseDropinsFiles(defaults.listFiles());
-            }
+        File overrides = new File(configDropins, "overrides");
+        if (overrides.exists()) {
+            parseDropinsFiles(overrides.listFiles());
+        }
+
+        File defaults = new File(configDropins, "defaults");
+        if (defaults.exists()) {
+            parseDropinsFiles(defaults.listFiles());
         }
     }
 
     private static void parseDropinsFiles(File[] files) throws XPathExpressionException, IOException, SAXException {
-        for (int i = 0; i < files.length; i++) {
-            if (files[i].isFile()) {
-                parseDropinsFile(files[i]);
+        Arrays.sort(files, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
+        for (File file : files) {
+            if (file.isFile()) {
+                parseDropinsFile(file);
             }
-        }
-    }
-
-    private static Document parseDropinsXMLFile(File file) throws FileNotFoundException, IOException {
-        try (FileInputStream is = new FileInputStream(file)) {
-            return parseDocument(is);
-        } catch (SAXException ex) {
-            // If the file was not valid XML, assume it was some other non XML
-            // file in dropins.
-            log.info("Skipping parsing " + file.getAbsolutePath() + " because it was not recognized as XML.");
-            return null;
         }
     }
 
     private static void parseDropinsFile(File file) throws IOException, XPathExpressionException, SAXException {
         // get input XML Document
-        Document doc = parseDropinsXMLFile(file);
+        Document doc = parseDocument(file);
         if (doc != null) {
             parseApplication(doc, XPATH_SERVER_APPLICATION);
             parseApplication(doc, XPATH_SERVER_WEB_APPLICATION);
@@ -511,17 +500,19 @@ public class ServerConfigDocument {
      * @param docs - ArrayList to store parsed Documents.
      * @throws IOException
      */
-    private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) throws IOException {
-        DirectoryStream<Path> dstream = Files.newDirectoryStream(directory.toPath(), "*.xml");
-        StreamSupport.stream(dstream.spliterator(), false)
-            .sorted(Comparator.comparing(Path::toString))
-            .forEach(p -> { 
-                try {
-                    docs.add(parseDocument(p.toFile()));
-                } catch (Exception e) {
-                    log.warn("Unable to parse from file " + p.getFileName() + " from specified include directory: " + directory.getPath());
-                }
-            });
+    private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) {
+        // OpenLiberty reference code for behavior, parseInclude() method
+        // https://github.com/OpenLiberty/open-liberty/blob/integration/dev/com.ibm.ws.config/src/com/ibm/ws/config/xml/internal/XMLConfigParser.java#L409C8-L409C8
+        // uses Collections.sort on filenames which is case-sensitive (all uppercase comes before lowercase)
+        File[] files = directory.listFiles();
+        Arrays.sort(files, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
+        for (File file : files) {
+            try {
+                docs.add(parseDocument(file));
+            } catch (Exception e) {
+                log.warn("Unable to parse from file " + file.getPath() + " from specified include directory: " + directory.getPath());
+            }
+        }
     }
 
     /**
@@ -532,9 +523,15 @@ public class ServerConfigDocument {
      * @throws IOException
      * @throws SAXException
      */
-    private static Document parseDocument(File file) throws FileNotFoundException, IOException, SAXException {
-        InputStream is = new FileInputStream(file.getCanonicalPath());
-        return parseDocument(is);
+    private static Document parseDocument(File file) throws FileNotFoundException, IOException {
+        try (FileInputStream is = new FileInputStream(file)) {
+            return parseDocument(is);
+        } catch (SAXException ex) {
+            // If the file was not valid XML, assume it was some other non XML
+            // file in dropins.
+            log.info("Skipping parsing " + file.getAbsolutePath() + " because it was not recognized as XML.");
+            return null;
+        }
     }
 
     private static Document parseDocument(InputStream in) throws SAXException, IOException {
@@ -657,18 +654,20 @@ public class ServerConfigDocument {
     private static void parseConfigDropinsDirVariables(String inDir)
             throws XPathExpressionException, SAXException, IOException {
         File configDropins = getConfigDropinsDir();
+        if (configDropins == null || !configDropins.exists()) {
+            return;
+        }
 
-        if (configDropins != null && configDropins.exists()) {
-            File dir = new File(configDropins, inDir);
+        File dir = new File(configDropins, inDir);
+        if (!dir.exists()) {
+            return;
+        }
 
-            if (dir.exists()) {
-                File[] cfgFiles = dir.listFiles();
-
-                for (int i = 0; i < cfgFiles.length; i++) {
-                    if (cfgFiles[i].isFile()) {
-                        parseDropinsFilesVariables(cfgFiles[i]);
-                    }
-                }
+        File[] cfgFiles = dir.listFiles();
+        Arrays.sort(cfgFiles, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
+        for (File file : cfgFiles) {
+            if (file.isFile()) {
+                parseDropinsFilesVariables(file);
             }
         }
     }
@@ -676,7 +675,7 @@ public class ServerConfigDocument {
     private static void parseDropinsFilesVariables(File file)
             throws SAXException, IOException, XPathExpressionException {
         // get input XML Document
-        Document doc = parseDropinsXMLFile(file);
+        Document doc = parseDocument(file);
         if (doc != null) {
             parseVariablesForBothValues(doc);
             parseIncludeVariables(doc);
