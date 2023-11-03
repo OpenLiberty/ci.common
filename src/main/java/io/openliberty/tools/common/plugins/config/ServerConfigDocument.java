@@ -501,9 +501,8 @@ public class ServerConfigDocument {
      * @throws IOException
      */
     private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) {
-        // OpenLiberty reference code for behavior, parseInclude() method
-        // https://github.com/OpenLiberty/open-liberty/blob/integration/dev/com.ibm.ws.config/src/com/ibm/ws/config/xml/internal/XMLConfigParser.java#L409C8-L409C8
-        // uses Collections.sort on filenames which is case-sensitive (all uppercase comes before lowercase)
+        // OpenLiberty reference code for behavior: https://github.com/OpenLiberty/open-liberty
+        // ServerXMLConfiguration.java:parseDirectoryFiles() and XMLConfigParser.java:parseInclude()
         File[] files = directory.listFiles();
         Arrays.sort(files, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
         for (File file : files) {
