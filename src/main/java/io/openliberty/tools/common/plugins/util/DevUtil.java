@@ -80,6 +80,8 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
+import io.openliberty.tools.ant.ServerTask;
+
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
@@ -95,8 +97,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
-
-import io.openliberty.tools.ant.ServerTask;
 
 /**
  * Utility class for dev mode.
@@ -1280,7 +1280,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 info("The RUN features.sh command is detected in the Containerfile and extra time may be necessary when installing features.");
             }
             long startTime = System.currentTimeMillis();
-            execContainerCmdAndLog(getRunProcess(buildCmd), containerBuildTimeout);
+
+            execContainerCmdAndLog(getRunProcess(buildCmd), containerBuildTimeout, false);
+
             checkContainerBuildTime(startTime, buildContext);
             info("Completed building container image.");
         } catch (IllegalThreadStateException  e) {
@@ -1338,7 +1340,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             String startContainerCommand = getContainerCommand();
             info(startContainerCommand);
             containerRunProcess = getRunProcess(startContainerCommand);
-            execContainerCmdAndLog(containerRunProcess, 0);
+            execContainerCmdAndLog(containerRunProcess, 0, true);
         } catch (IOException e) {
             error("Error starting container: " + e.getMessage());
             throw new RuntimeException(e);
@@ -1374,7 +1376,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return processBuilder.start();
     }
 
-    private void execContainerCmdAndLog(final Process startingProcess, int timeout) throws InterruptedException {
+    private void execContainerCmdAndLog(final Process startingProcess, int timeout, boolean isStartCommand) throws InterruptedException {
         Thread logCopyInputThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -1396,7 +1398,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         });
         logCopyErrorThread.start();
 
-        writeDevcMetadata(true);
+        if (isStartCommand) {
+            writeDevcMetadata(true);
+        }
+
         if (timeout == 0) {
             startingProcess.waitFor();
         } else {
@@ -1411,7 +1416,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("Unexpected exit running container command, return value=" + startingProcess.exitValue());
             // show first message from standard err
             String errorMessage = new String(firstErrorLine).trim() + " RC=" + startingProcess.exitValue();
-            writeDevcMetadata(false);
+            if (isStartCommand) {
+                writeDevcMetadata(false);
+            }
             throw new RuntimeException(errorMessage);
         }
     }
@@ -5695,8 +5702,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public void writeDevcMetadata(boolean alive) {
         File metaFile = new File(buildDirectory, serverDirectory.getName() + "-liberty-devc-metadata.xml");
+
+        FileWriter metaFileWriter = null;
+        XMLStreamWriter metadataWriter = null;
         try {
-            XMLStreamWriter metadataWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(new FileWriter(metaFile)) ;
+            metaFileWriter = new FileWriter(metaFile);
+            metadataWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(metaFileWriter) ;
             metadataWriter.writeStartDocument();
             metadataWriter.writeStartElement("devcModeMetaData");
             writeElement(metadataWriter, "containerEngine", isDocker ? DEVC_CONTAINER_DOCKER : DEVC_CONTAINER_PODMAN);
@@ -5713,10 +5724,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             writeElement(metadataWriter, "containerRunOpts", containerRunOpts);
             metadataWriter.writeEndElement();
             metadataWriter.writeEndDocument();
-            metadataWriter.flush();
-            metadataWriter.close();
         } catch (Exception e) {
             warn("Failed to write metadata.\n" + e.getMessage());
+        } finally {
+            try {
+                if (metadataWriter != null) {
+                    metadataWriter.flush();
+                    metadataWriter.close();
+                }
+                if (metaFileWriter != null) {
+                    metaFileWriter.flush();
+                    metaFileWriter.close();
+                }
+            } catch (Exception e) {
+                warn("Failed to close metadata writer due to an error.\n" + e.getMessage());
+            }
         }
     }
 
