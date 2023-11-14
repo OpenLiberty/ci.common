@@ -246,7 +246,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.endsWith(".xml") && (dropinsFilesToIgnore == null || !dropinsFilesToIgnore.contains(name));
+                return name.toLowerCase().endsWith(".xml") && (dropinsFilesToIgnore == null || !dropinsFilesToIgnore.contains(name));
             }
         });
         if (configDropinsXmls == null || configDropinsXmls.length == 0) {
@@ -484,7 +484,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         }
 
         if (includeFile.isDirectory()) {
-            File[] files = includeFile.listFiles();
+            File[] files = includeFile.listFiles((dir, name) -> name.toLowerCase().endsWith(".xml"));
             Arrays.sort(files, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
             for (File file : files) {
                 includeFiles.add(file);

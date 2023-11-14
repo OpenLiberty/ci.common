@@ -200,7 +200,7 @@ public class ServerConfigDocument {
             props = new Properties();
             defaultProps = new Properties();
 
-            Document doc = parseDocument(new FileInputStream(serverXMLFile));
+            Document doc = parseDocument(serverXMLFile);
 
             // Server variable precedence in ascending order if defined in
             // multiple locations.
@@ -424,8 +424,7 @@ public class ServerConfigDocument {
         if (loc.startsWith("http:") || loc.startsWith("https:")) {
             if (isValidURL(loc)) {
                 URL url = new URL(loc);
-                URLConnection connection = url.openConnection();
-                doc = parseDocument(connection.getInputStream());
+                doc = parseDocument(url);
                 docs.add(doc);
             }
         } else if (loc.startsWith("file:")) {
@@ -530,6 +529,13 @@ public class ServerConfigDocument {
             // file in dropins.
             log.info("Skipping parsing " + file.getAbsolutePath() + " because it was not recognized as XML.");
             return null;
+        }
+    }
+
+    private static Document parseDocument(URL url) throws IOException, SAXException {
+        URLConnection connection = url.openConnection();
+        try (InputStream is = connection.getInputStream()) {
+            return parseDocument(is);
         }
     }
 
