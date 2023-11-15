@@ -24,9 +24,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.net.URLClassLoader;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
@@ -41,7 +38,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.stream.StreamSupport;
 import java.util.logging.Level;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -49,6 +45,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -249,7 +246,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.endsWith(".xml") && (dropinsFilesToIgnore == null || !dropinsFilesToIgnore.contains(name));
+                return name.toLowerCase().endsWith(".xml") && (dropinsFilesToIgnore == null || !dropinsFilesToIgnore.contains(name));
             }
         });
         if (configDropinsXmls == null || configDropinsXmls.length == 0) {
@@ -487,18 +484,10 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         }
 
         if (includeFile.isDirectory()) {
-            try (DirectoryStream<Path> dstream = Files.newDirectoryStream(includeFile.toPath(), "*.xml")) {
-                StreamSupport.stream(dstream.spliterator(), false)
-                    .sorted(Comparator.comparing(Path::toString))
-                    .forEach(p -> { 
-                        try {
-                            includeFiles.add(p.toFile());
-                        } catch (Exception e) {
-                            debug("Failed to resolve file from path: " + p);
-                        }
-                    });
-            } catch (IOException e) {
-                debug("Unable to open include directory: " + includeFileName);
+            File[] files = includeFile.listFiles((dir, name) -> name.toLowerCase().endsWith(".xml"));
+            Arrays.sort(files, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
+            for (File file : files) {
+                includeFiles.add(file);
             }
         } else {
             includeFiles.add(includeFile);
