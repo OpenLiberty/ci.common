@@ -676,8 +676,12 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     			info("Recommended user action: upgrade to OpenLiberty version " + MIN_USER_FEATURE_VERSION + " or higher and provide features-bom file for the user feature esa.");
     			
     			copyUserFeature(pluginListedEsas, installDirectory);
-    		}
+            } else {
+    		    featuresToInstall.addAll(pluginListedEsas);
+            }
     	}
+    	
+        	
     		   	
     	for (String feature: featuresList) {
     		if (feature.contains(":")) {
@@ -723,7 +727,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 	    mapBasedInstallKernel = createMapBasedInstallKernelInstance(bundle, installDirectory);
 	    
 	    
-	    Collection<?> resolvedFeatures = resolveFeatures(featuresToInstall, jsonRepos, acceptLicenseMapValue);
+	    Collection<?> resolvedFeatures = resolveFeatures(featuresToInstall, jsonRepos, acceptLicenseMapValue, pluginListedEsas);
 	    if(resolvedFeatures == null || resolvedFeatures.isEmpty()) {
 		return;
 	    }
@@ -813,7 +817,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @throws PluginExecutionException
      */
     private Collection<?> resolveFeatures(List<String> featuresToInstall, List<File> jsonRepos,
-	    boolean acceptLicenseMapValue) throws PluginExecutionException {
+	    boolean acceptLicenseMapValue, Set<String> localESA) throws PluginExecutionException {
 	info("Resolving features... " );
 	
 	mapBasedInstallKernel.put("install.local.esa", true);
@@ -821,8 +825,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 	mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
 	mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
 	mapBasedInstallKernel.put("is.install.server.feature", true);
-	
-	
+	if(!localESA.isEmpty()) {
+	    mapBasedInstallKernel.put("install.individual.esas", true);
+	    mapBasedInstallKernel.put("individual.esas", localESA.stream().map(File::new).collect(Collectors.toList()));
+	}
+
 	Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
 	if (resolvedFeatures == null) {
 	    debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
