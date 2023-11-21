@@ -5710,7 +5710,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             metadataWriter = XMLOutputFactory.newInstance().createXMLStreamWriter(metaFileWriter) ;
             metadataWriter.writeStartDocument();
             metadataWriter.writeStartElement("devcModeMetaData");
-            writeElement(metadataWriter, "containerEngine", isDocker ? DEVC_CONTAINER_DOCKER : DEVC_CONTAINER_PODMAN);
+            writeElement(metadataWriter, "containerType", isDocker ? DEVC_CONTAINER_DOCKER : DEVC_CONTAINER_PODMAN);
             writeElement(metadataWriter, "containerName", containerName != null ? containerName : DEVMODE_CONTAINER_BASE_NAME);
             writeElement(metadataWriter, "imageName", imageName);
             if (containerfile != null) {
