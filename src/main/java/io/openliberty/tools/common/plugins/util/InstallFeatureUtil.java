@@ -699,7 +699,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     	}
     	    		
     	if(featuresToInstall.isEmpty()) {
-    	    	debug("featuresToInstall is empty");
+    	    debug("featuresToInstall is empty");
     		return;
     	}
     	
@@ -724,20 +724,20 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         disableCacheInURLClassLoader();
         try {
             String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID);
-	    mapBasedInstallKernel = createMapBasedInstallKernelInstance(bundle, installDirectory);
+	        mapBasedInstallKernel = createMapBasedInstallKernelInstance(bundle, installDirectory);
 	    
 	    
-	    Collection<?> resolvedFeatures = resolveFeatures(featuresToInstall, jsonRepos, acceptLicenseMapValue, pluginListedEsas);
-	    if(resolvedFeatures == null || resolvedFeatures.isEmpty()) {
-		return;
-	    }
+	        Collection<?> resolvedFeatures = resolveFeatures(featuresToInstall, jsonRepos, acceptLicenseMapValue, pluginListedEsas);
+	        if(resolvedFeatures == null || resolvedFeatures.isEmpty()) {
+		        return;
+	        }
 	    
             Map<File, String> artifactsToExt = downloadEsas(resolvedFeatures, featureToExtMap);
             Set<File> artifacts = artifactsToExt.keySet();
             
             
             if (verifyOption != null && verifyOption != VerifyOption.skip) {
-		verifyFeatures(artifacts, installJarURL);
+		        verifyFeatures(artifacts, installJarURL);
             }
             
 

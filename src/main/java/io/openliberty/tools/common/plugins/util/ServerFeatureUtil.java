@@ -657,7 +657,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      */
     protected Map<String, Object> createMapBasedInstallKernelInstance(String bundle, File installDirectory)
             throws PrivilegedActionException, PluginExecutionException, MalformedURLException {
-	mapBasedInstallKernel = getInstallMapObject();
+	    mapBasedInstallKernel = getInstallMapObject();
 
         // Init
         if (bundle != null) {
@@ -680,11 +680,11 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         debug("install.kernel.init.error.message: " + mapBasedInstallKernel.get("install.kernel.init.error.message"));
         File usrDir = new File(installDirectory, "usr");
         mapBasedInstallKernel.put("target.user.directory", usrDir);
-	if (isDebugEnabled()) {
-	    mapBasedInstallKernel.put("debug", Level.FINEST);
-        }else {
+	    if (isDebugEnabled()) {
+	        mapBasedInstallKernel.put("debug", Level.FINEST);
+        } /* else { removed due to "java.lang.ClassNotFoundException: com.ibm.websphere.ras.DataFormatHelper" reported in ci.gradle issue 867
             mapBasedInstallKernel.put("debug", Level.INFO);
-        }
+        } */
         return mapBasedInstallKernel;
     }
 
