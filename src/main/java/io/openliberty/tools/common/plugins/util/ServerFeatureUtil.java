@@ -682,9 +682,9 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         mapBasedInstallKernel.put("target.user.directory", usrDir);
 	    if (isDebugEnabled()) {
 	        mapBasedInstallKernel.put("debug", Level.FINEST);
-        } /* else { removed due to "java.lang.ClassNotFoundException: com.ibm.websphere.ras.DataFormatHelper" reported in ci.gradle issue 867
+        } else { //removed due to "java.lang.ClassNotFoundException: com.ibm.websphere.ras.DataFormatHelper" reported in ci.gradle issue 867
             mapBasedInstallKernel.put("debug", Level.INFO);
-        } */
+        } 
         return mapBasedInstallKernel;
     }
 
