@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2023.
+ * (C) Copyright IBM Corporation 2017, 2024.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,22 +53,18 @@ import io.openliberty.tools.common.plugins.util.VariableUtility;
 // Moved from ci.maven/liberty-maven-plugin/src/main/java/net/wasdev/wlp/maven/plugins/ServerConfigDocument.java
 public class ServerConfigDocument {
 
-    private static ServerConfigDocument instance;
+    private CommonLoggerI log;
 
-    private static CommonLoggerI log;
+    private File configDirectory;
+    private File serverXMLFile;
 
-    private static DocumentBuilder docBuilder;
-
-    private static File configDirectory;
-    private static File serverXMLFile;
-
-    private static Set<String> names;
-    private static Set<String> namelessLocations;
-    private static Set<String> locations;
-    private static HashMap<String, String> locationsAndNames;
-    private static Properties props;
-    private static Properties defaultProps;
-    private static Map<String, File> libertyDirectoryPropertyToFile = null;
+    private Set<String> names;
+    private Set<String> namelessLocations;
+    private Set<String> locations;
+    private HashMap<String, String> locationsAndNames;
+    private Properties props;
+    private Properties defaultProps;
+    private Map<String, File> libertyDirectoryPropertyToFile = null;
 
     private static final XPathExpression XPATH_SERVER_APPLICATION;
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
@@ -104,30 +100,20 @@ public class ServerConfigDocument {
         return namelessLocations;
     }
 
-    public static Properties getProperties() {
+    public Properties getProperties() {
         return props;
     }
 
-    public static Map<String, File> getLibertyDirPropertyFiles() {
+    public Map<String, File> getLibertyDirPropertyFiles() {
         return libertyDirectoryPropertyToFile;
     }
 
-    public static Properties getDefaultProperties() {
+    public Properties getDefaultProperties() {
         return defaultProps;
     }
 
-    private static File getServerXML() {
+    public File getServerXML() {
         return serverXMLFile;
-    }
-
-    public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile) {
-        this(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true, null);
-    }
-
-    public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) {
-        this(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, null);
     }
 
     public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
@@ -135,55 +121,28 @@ public class ServerConfigDocument {
         initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
     }
 
-    private static DocumentBuilder getDocumentBuilder() {
-        if (docBuilder == null) {
-            DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
-            docBuilderFactory.setIgnoringComments(true);
-            docBuilderFactory.setCoalescing(true);
-            docBuilderFactory.setIgnoringElementContentWhitespace(true);
-            docBuilderFactory.setValidating(false);
-            try {
-                docBuilder = docBuilderFactory.newDocumentBuilder();
-            } catch (ParserConfigurationException e) {
-                // fail catastrophically if we can't create a document builder
-                throw new RuntimeException(e);
-            }
+    private DocumentBuilder getDocumentBuilder() {
+        DocumentBuilder docBuilder;
+
+        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+        docBuilderFactory.setIgnoringComments(true);
+        docBuilderFactory.setCoalescing(true);
+        docBuilderFactory.setIgnoringElementContentWhitespace(true);
+        docBuilderFactory.setValidating(false);
+        try {
+            docBuilder = docBuilderFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            // fail catastrophically if we can't create a document builder
+            throw new RuntimeException(e);
         }
+
         return docBuilder;
     }
 
-    /**
-     * Nulls out cached instance so a new one will be created next time a getInstance() is done.
-     * Not thread-safe.
-     */
-    public static void markInstanceStale() {
-        instance = null;
-    }
-    
-    public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile) throws IOException {
-        return getInstance(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, true, null);
-    }
-
-    public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence) throws IOException {
-        return getInstance(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, null);
-    }
-
-    public static ServerConfigDocument getInstance(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) throws IOException {
-        // Initialize if instance is not created yet, or source server xml file
-        // location has been changed.
-        if (instance == null || !serverXML.getCanonicalPath().equals(getServerXML().getCanonicalPath())) {
-            instance = new ServerConfigDocument(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
-        }
-        return instance;
-    }
-
-    private static void initializeAppsLocation(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
+    private void initializeAppsLocation(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
         try {
-            ServerConfigDocument.log = log;
+            this.log = log;
             serverXMLFile = serverXML;
             configDirectory = configDir;
             if (libertyDirPropertyFiles != null) {
@@ -268,7 +227,7 @@ public class ServerConfigDocument {
     }
 
     //Checks for application names in the document. Will add locations without names to a Set
-    private static void parseNames(Document doc, String expression) throws XPathExpressionException, IOException, SAXException {
+    private void parseNames(Document doc, String expression) throws XPathExpressionException, IOException, SAXException {
         // parse input document
         XPath xPath = XPathFactory.newInstance().newXPath();
         NodeList nodeList = (NodeList) xPath.compile(expression).evaluate(doc, XPathConstants.NODESET);
@@ -315,7 +274,7 @@ public class ServerConfigDocument {
         }
     }
 
-    public static String findNameForLocation(String location) {
+    public String findNameForLocation(String location) {
         String appName = locationsAndNames.get(location);
 
         if (appName == null || appName.isEmpty()) {
@@ -325,7 +284,7 @@ public class ServerConfigDocument {
         return appName;
     }
 
-    private static void parseApplication(Document doc, XPathExpression expression) throws XPathExpressionException {
+    private void parseApplication(Document doc, XPathExpression expression) throws XPathExpressionException {
 
         NodeList nodeList = (NodeList) expression.evaluate(doc, XPathConstants.NODESET);
 
@@ -349,7 +308,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static void parseInclude(Document doc) throws XPathExpressionException, IOException, SAXException {
+    private void parseInclude(Document doc) throws XPathExpressionException, IOException, SAXException {
         // parse include document in source server xml
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
@@ -378,7 +337,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static void parseConfigDropinsDir() throws XPathExpressionException, IOException, SAXException {
+    private void parseConfigDropinsDir() throws XPathExpressionException, IOException, SAXException {
         File configDropins = getConfigDropinsDir();
 
         if (configDropins == null || !configDropins.exists()) {
@@ -396,7 +355,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static void parseDropinsFiles(File[] files) throws XPathExpressionException, IOException, SAXException {
+    private void parseDropinsFiles(File[] files) throws XPathExpressionException, IOException, SAXException {
         Arrays.sort(files, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
         for (File file : files) {
             if (file.isFile()) {
@@ -405,7 +364,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static void parseDropinsFile(File file) throws IOException, XPathExpressionException, SAXException {
+    private void parseDropinsFile(File file) throws IOException, XPathExpressionException, SAXException {
         // get input XML Document
         Document doc = parseDocument(file);
         if (doc != null) {
@@ -416,7 +375,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static ArrayList<Document> getIncludeDocs(String loc) throws IOException, SAXException {
+    private ArrayList<Document> getIncludeDocs(String loc) throws IOException, SAXException {
         ArrayList<Document> docs = new ArrayList<Document>();
         Document doc = null;
         File locFile = null;
@@ -467,7 +426,7 @@ public class ServerConfigDocument {
      * @throws IOException
      * @throws SAXException
      */
-    private static void parseDocumentFromFileOrDirectory(File f, String locationString, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
+    private void parseDocumentFromFileOrDirectory(File f, String locationString, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
         Document doc = null;
         // Earlier call to VariableUtility.resolveVariables() already converts all \ to /
         boolean isLibertyDirectory = locationString.endsWith("/");  // Liberty uses this to determine if directory. 
@@ -499,7 +458,7 @@ public class ServerConfigDocument {
      * @param docs - ArrayList to store parsed Documents.
      * @throws IOException
      */
-    private static void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) {
+    private void parseDocumentsInDirectory(File directory, ArrayList<Document> docs) {
         // OpenLiberty reference code for behavior: https://github.com/OpenLiberty/open-liberty
         // ServerXMLConfiguration.java:parseDirectoryFiles() and XMLConfigParser.java:parseInclude()
         File[] files = directory.listFiles();
@@ -521,7 +480,7 @@ public class ServerConfigDocument {
      * @throws IOException
      * @throws SAXException
      */
-    private static Document parseDocument(File file) throws FileNotFoundException, IOException {
+    private Document parseDocument(File file) throws FileNotFoundException, IOException {
         try (FileInputStream is = new FileInputStream(file)) {
             return parseDocument(is);
         } catch (SAXException ex) {
@@ -532,20 +491,20 @@ public class ServerConfigDocument {
         }
     }
 
-    private static Document parseDocument(URL url) throws IOException, SAXException {
+    private Document parseDocument(URL url) throws IOException, SAXException {
         URLConnection connection = url.openConnection();
         try (InputStream is = connection.getInputStream()) {
             return parseDocument(is);
         }
     }
 
-    private static Document parseDocument(InputStream in) throws SAXException, IOException {
+    private Document parseDocument(InputStream in) throws SAXException, IOException {
         try (InputStream ins = in) { // ins will be auto-closed
             return getDocumentBuilder().parse(ins);
         }
     }
 
-    private static void parseProperties(InputStream ins) throws Exception {
+    private void parseProperties(InputStream ins) throws Exception {
         try {
             props.load(ins);
         } catch (Exception e) {
@@ -557,7 +516,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static boolean isValidURL(String url) {
+    private boolean isValidURL(String url) {
         try {
             URL testURL = new URL(url);
             testURL.toURI();
@@ -568,19 +527,19 @@ public class ServerConfigDocument {
     }
 
 
-    private static void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
+    private void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
         parseVariables(doc, true, false, false);
     }
 
-    private static void parseVariablesForValues(Document doc) throws XPathExpressionException {
+    private void parseVariablesForValues(Document doc) throws XPathExpressionException {
         parseVariables(doc, false, true, false);
     }
 
-    private static void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
+    private void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
         parseVariables(doc, false, false, true);
     }
 
-    private static void parseVariables(Document doc, boolean defaultValues, boolean values, boolean both) throws XPathExpressionException {
+    private void parseVariables(Document doc, boolean defaultValues, boolean values, boolean both) throws XPathExpressionException {
             // parse input document
         NodeList nodeList = (NodeList) XPATH_SERVER_VARIABLE.evaluate(doc, XPathConstants.NODESET);
 
@@ -605,7 +564,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static String getValue(NamedNodeMap attr, String nodeName) {
+    private String getValue(NamedNodeMap attr, String nodeName) {
         String value = null;
         Node valueNode = attr.getNamedItem(nodeName);
         if (valueNode != null) {
@@ -614,7 +573,7 @@ public class ServerConfigDocument {
         return value;
     }
 
-    private static void parseIncludeVariables(Document doc) throws XPathExpressionException, IOException, SAXException {
+    private void parseIncludeVariables(Document doc) throws XPathExpressionException, IOException, SAXException {
         // parse include document in source server xml
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
@@ -641,7 +600,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static File getConfigDropinsDir() {
+    private File getConfigDropinsDir() {
         File configDropins = null;
 
         // if configDirectory exists and contains configDropins directory,
@@ -656,7 +615,7 @@ public class ServerConfigDocument {
         return configDropins;
     }
 
-    private static void parseConfigDropinsDirVariables(String inDir)
+    private void parseConfigDropinsDirVariables(String inDir)
             throws XPathExpressionException, SAXException, IOException {
         File configDropins = getConfigDropinsDir();
         if (configDropins == null || !configDropins.exists()) {
@@ -677,7 +636,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private static void parseDropinsFilesVariables(File file)
+    private void parseDropinsFilesVariables(File file)
             throws SAXException, IOException, XPathExpressionException {
         // get input XML Document
         Document doc = parseDocument(file);
@@ -693,7 +652,7 @@ public class ServerConfigDocument {
      * If giveConfigDirPrecedence is set to false, return specificFile if it exists;
      * otherwise return the file from the configDirectory if it exists, or null if not.
      */
-    private static File findConfigFile(String fileName, File specificFile, boolean giveConfigDirPrecedence) {
+    private File findConfigFile(String fileName, File specificFile, boolean giveConfigDirPrecedence) {
         File f = new File(configDirectory, fileName);
 
         if (giveConfigDirPrecedence) {
@@ -718,7 +677,7 @@ public class ServerConfigDocument {
     /*
      * Get the file from configDrectory if it exists, or null if not
      */
-    private static File getFileFromConfigDirectory(String file) {
+    private File getFileFromConfigDirectory(String file) {
         File f = new File(configDirectory, file);
         if (configDirectory != null && f.exists()) {
             return f;

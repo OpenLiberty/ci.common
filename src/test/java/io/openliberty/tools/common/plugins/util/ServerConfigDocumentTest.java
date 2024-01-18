@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2023.
+ * (C) Copyright IBM Corporation 2023, 2024.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import org.junit.Test;
 
 import java.io.File;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -53,7 +52,7 @@ public class ServerConfigDocumentTest {
 
 		File serverXML = new File(serverDirectory, "server.xml");
 
-		ServerConfigDocument scd = ServerConfigDocument.getInstance(log, serverXML, serverDirectory, null, null, null, true, libertyDirectoryPropertyToFile);
+		ServerConfigDocument scd = new ServerConfigDocument(log, serverXML, serverDirectory, null, null, null, true, libertyDirectoryPropertyToFile);
 		Set<String> locations = scd.getLocations();
 		assertTrue("Expected six app locations", locations.size() == 6);
 
