@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2023.
+ * (C) Copyright IBM Corporation 2019, 2024.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -680,11 +680,15 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         debug("install.kernel.init.error.message: " + mapBasedInstallKernel.get("install.kernel.init.error.message"));
         File usrDir = new File(installDirectory, "usr");
         mapBasedInstallKernel.put("target.user.directory", usrDir);
-	    if (isDebugEnabled()) {
-	        mapBasedInstallKernel.put("debug", Level.FINEST);
-        } else { //removed due to "java.lang.ClassNotFoundException: com.ibm.websphere.ras.DataFormatHelper" reported in ci.gradle issue 867
-            mapBasedInstallKernel.put("debug", Level.INFO);
-        } 
+
+        // Avoid "java.lang.ClassNotFoundException: com.ibm.websphere.ras.DataFormatHelper" reported in ci.gradle issue 867.
+        // When fix goes into OpenLiberty, remove this change. Then add check for OL version and set debug level accordingly.
+        // Reference PR: https://github.com/OpenLiberty/open-liberty/pull/27416
+	    // if (isDebugEnabled()) {
+	    //     mapBasedInstallKernel.put("debug", Level.FINEST);
+        // } else { 
+             mapBasedInstallKernel.put("debug", Level.INFO);
+        // } 
         return mapBasedInstallKernel;
     }
 
