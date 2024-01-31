@@ -310,7 +310,10 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
             debug("The server file " + canonicalServerFile + " is empty.");
         } else {
             try {
-                DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+                DocumentBuilder db = dbf.newDocumentBuilder();
                 db.setErrorHandler(new ErrorHandler() {
                     @Override
                     public void warning(SAXParseException e) throws SAXException {

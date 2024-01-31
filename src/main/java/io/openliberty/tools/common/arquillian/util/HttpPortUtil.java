@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2020
+ * (C) Copyright IBM Corporation 2017, 2024
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,9 +47,15 @@ public class HttpPortUtil {
     private static final XPath XPATH = XPathFactory.newInstance().newXPath();
 
     private static final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    static {
-        factory.setNamespaceAware(true);
-    }
+    private static boolean factoryInitialized = false;
+
+    public static void initDocumentBuilderFactory() throws ParserConfigurationException {
+        if (!factoryInitialized) {
+            factory.setNamespaceAware(true);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+        }
+   }
 
     public static Integer getHttpPort(File serverXML, File bootstrapProperties)
             throws FileNotFoundException, IOException, ParserConfigurationException, SAXException,
@@ -83,6 +89,7 @@ public class HttpPortUtil {
 
     protected static Integer getHttpPortForServerXML(String serverXML, Properties bootstrapProperties, String configVariableXML) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException,
             ArquillianConfigurationException {
+        initDocumentBuilderFactory();
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(new ByteArrayInputStream(serverXML.getBytes()));
 

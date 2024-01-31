@@ -130,6 +130,8 @@ public class ServerConfigDocument {
         docBuilderFactory.setIgnoringElementContentWhitespace(true);
         docBuilderFactory.setValidating(false);
         try {
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
             docBuilder = docBuilderFactory.newDocumentBuilder();
         } catch (ParserConfigurationException e) {
             // fail catastrophically if we can't create a document builder
