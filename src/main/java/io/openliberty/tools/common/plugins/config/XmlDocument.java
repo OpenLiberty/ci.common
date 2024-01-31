@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2021.
+ * (C) Copyright IBM Corporation 2017, 2024.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,9 @@ public abstract class XmlDocument {
         builderFactory.setCoalescing(true);
         builderFactory.setIgnoringElementContentWhitespace(true);
         builderFactory.setValidating(false);
-        DocumentBuilder builder = builderFactory.newDocumentBuilder();
+        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
+        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+    DocumentBuilder builder = builderFactory.newDocumentBuilder();
         doc = builder.parse(xmlFile);
     }
 

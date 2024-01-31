@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2021, 2023.
+ * (C) Copyright IBM Corporation 2021, 2024.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,20 +114,20 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 */
 	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) {
 	    try {
-		String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
-		String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
-			version);
-		File generatedJson = generateJson(targetJsonFile, esaMap);
-		if (generatedJson.exists()) {
-		    jsonFile = generatedJson;
-		    provideJsonFileDependency(generatedJson, groupId, version);
-		    info("The features.json has been generated at the following location: " + generatedJson);
-		}else {
-		    warn("The features.json could not be generated at the following location: " + generatedJson);
-		}
+            String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
+            String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
+                version);
+            File generatedJson = generateJson(targetJsonFile, esaMap);
+            if (generatedJson.exists()) {
+                jsonFile = generatedJson;
+                provideJsonFileDependency(generatedJson, groupId, version);
+                info("The features.json has been generated at the following location: " + generatedJson);
+            }else {
+                warn("The features.json could not be generated at the following location: " + generatedJson);
+            }
 	    } catch (PluginExecutionException e) {
-		warn("Error: The features.json could not be generated.");
-		warn(e.getMessage());
+            warn("Error: The features.json could not be generated.");
+            warn(e.getMessage());
 	    }
 	}
 
@@ -144,42 +144,44 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	    Map<File, String> result = new HashMap<File, String>();
 	    ArrayList<String> missing_tags = new ArrayList<>();
 	    try {
-		DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-		DocumentBuilder db = dbf.newDocumentBuilder();
-		Document doc = db.parse(additionalBOM);
-		doc.getDocumentElement().normalize();
-		NodeList dependencyList = doc.getElementsByTagName("dependency");
-		for (int itr = 0; itr < dependencyList.getLength(); itr++) {
-		    Node node = dependencyList.item(itr);
-		    if (node.getNodeType() == Node.ELEMENT_NODE) {
-			Element eElement = (Element) node;
-			
-			if(eElement.getElementsByTagName("groupId").item(0) == null ) {
-			    missing_tags.add("groupId");
-			}
-			if(eElement.getElementsByTagName("artifactId").item(0) == null ) {
-			    missing_tags.add("artifactId ");
-			}
-			if(eElement.getElementsByTagName("type").item(0) == null ) {
-			    missing_tags.add("type");
-			}
-			if(eElement.getElementsByTagName("version").item(0) == null ) {
-			    missing_tags.add("version");
-			}
-			
-			if(!missing_tags.isEmpty()) {
-			    throw new PluginExecutionException("Error: "+ missing_tags.toString()  + " tag(s) not found in features-bom file " + additionalBOM);
-			}
-			
-			String groupId = eElement.getElementsByTagName("groupId").item(0).getTextContent();
-			String artifactId = eElement.getElementsByTagName("artifactId").item(0).getTextContent();
-			String type = eElement.getElementsByTagName("type").item(0).getTextContent();
-			String version = eElement.getElementsByTagName("version").item(0).getTextContent();
-			
-			File artifactFile = downloadArtifact(groupId, artifactId, type, version);
-			result.put(artifactFile, groupId);
-		    }
-		}
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
+            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(additionalBOM);
+            doc.getDocumentElement().normalize();
+            NodeList dependencyList = doc.getElementsByTagName("dependency");
+            for (int itr = 0; itr < dependencyList.getLength(); itr++) {
+                Node node = dependencyList.item(itr);
+                if (node.getNodeType() == Node.ELEMENT_NODE) {
+                Element eElement = (Element) node;
+                
+                if(eElement.getElementsByTagName("groupId").item(0) == null ) {
+                    missing_tags.add("groupId");
+                }
+                if(eElement.getElementsByTagName("artifactId").item(0) == null ) {
+                    missing_tags.add("artifactId ");
+                }
+                if(eElement.getElementsByTagName("type").item(0) == null ) {
+                    missing_tags.add("type");
+                }
+                if(eElement.getElementsByTagName("version").item(0) == null ) {
+                    missing_tags.add("version");
+                }
+                
+                if(!missing_tags.isEmpty()) {
+                    throw new PluginExecutionException("Error: "+ missing_tags.toString()  + " tag(s) not found in features-bom file " + additionalBOM);
+                }
+                
+                String groupId = eElement.getElementsByTagName("groupId").item(0).getTextContent();
+                String artifactId = eElement.getElementsByTagName("artifactId").item(0).getTextContent();
+                String type = eElement.getElementsByTagName("type").item(0).getTextContent();
+                String version = eElement.getElementsByTagName("version").item(0).getTextContent();
+                
+                File artifactFile = downloadArtifact(groupId, artifactId, type, version);
+                result.put(artifactFile, groupId);
+                }
+            }
 		} catch (ParserConfigurationException | SAXException | IOException e) {
 		    throw new PluginExecutionException("Cannot read the features-bom file " + additionalBOM.getAbsolutePath() + ". " + e.getMessage());
 		    

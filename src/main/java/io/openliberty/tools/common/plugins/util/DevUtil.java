@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2023.
+ * (C) Copyright IBM Corporation 2019, 2024.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3446,6 +3446,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             if (looseAppFile != null && looseAppFile.exists()) {
                 DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
                 DocumentBuilder db = dbf.newDocumentBuilder();
                 Document document = db.parse(looseAppFile);
                 NodeList archiveList = document.getElementsByTagName("archive");
