@@ -121,10 +121,14 @@ public class ServerConfigDocument {
         initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
     }
 
+    // LCLS constructor
     public ServerConfigDocument(CommonLoggerI log) {
         this.log = log;
         props = new Properties();
         defaultProps = new Properties();
+
+       // TODO: populate with workspace information
+        libertyDirectoryPropertyToFile = new HashMap<String, File>();   
     }
 
     private DocumentBuilder getDocumentBuilder() {
