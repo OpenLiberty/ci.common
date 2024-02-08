@@ -121,6 +121,12 @@ public class ServerConfigDocument {
         initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
     }
 
+    public ServerConfigDocument(CommonLoggerI log) {
+        this.log = log;
+        props = new Properties();
+        defaultProps = new Properties();
+    }
+
     private DocumentBuilder getDocumentBuilder() {
         DocumentBuilder docBuilder;
 
@@ -482,7 +488,7 @@ public class ServerConfigDocument {
      * @throws IOException
      * @throws SAXException
      */
-    private Document parseDocument(File file) throws FileNotFoundException, IOException {
+    public Document parseDocument(File file) throws FileNotFoundException, IOException {
         try (FileInputStream is = new FileInputStream(file)) {
             return parseDocument(is);
         } catch (SAXException ex) {
@@ -537,7 +543,7 @@ public class ServerConfigDocument {
         parseVariables(doc, false, true, false);
     }
 
-    private void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
+    public void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
         parseVariables(doc, false, false, true);
     }
 
@@ -575,7 +581,7 @@ public class ServerConfigDocument {
         return value;
     }
 
-    private void parseIncludeVariables(Document doc) throws XPathExpressionException, IOException, SAXException {
+    public void parseIncludeVariables(Document doc) throws XPathExpressionException, IOException, SAXException {
         // parse include document in source server xml
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
