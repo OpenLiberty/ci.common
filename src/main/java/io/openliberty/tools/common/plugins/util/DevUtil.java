@@ -1267,21 +1267,30 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // Name rules: may contain lowercase letters, digits and a period, one or two underscores, or one or more dashes. Cannot start with dash.
             imageName = imageName.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("^[\\-]+", "").toLowerCase();
 
-            StringBuilder sb = new StringBuilder();
-            sb.append(getContainerCommandPrefix());
-            sb.append(" build ");
+            // Use List<String> for building the command. This will be converted to a String[] when passed to ProcessBuilder. 
+            // The ProcessBuilder will handle quoting of paths (for blanks) as needed for various OS.
+            List<String> commandElements = new ArrayList<String>();
+            commandElements.add(getContainerCommandPrefix().trim());
+            commandElements.add("build");
+
             if (pullParentImage) {
-                sb.append("--pull ");
+                commandElements.add("--pull");
             }
-            sb.append("-f " + tempContainerfile + " -t " + imageName + " " + buildContext.getAbsolutePath());
-            String buildCmd = sb.toString();
-            info(buildCmd);
+            commandElements.add("-f");
+            commandElements.add(tempContainerfile.getAbsolutePath());
+            commandElements.add("-t");
+            commandElements.add(imageName);
+            commandElements.add(buildContext.getAbsolutePath());
+
+            String[] newCommand = commandElements.toArray(new String[commandElements.size()]);
+            info("Container command: "+String.join(" ", newCommand));
+    
             if (hasFeaturesSh.get()) {
                 info("The RUN features.sh command is detected in the Containerfile and extra time may be necessary when installing features.");
             }
             long startTime = System.currentTimeMillis();
 
-            execContainerCmdAndLog(getRunProcess(buildCmd), containerBuildTimeout, false);
+            execContainerCmdAndLog(getRunProcess(newCommand), containerBuildTimeout, false);
 
             checkContainerBuildTime(startTime, buildContext);
             info("Completed building container image.");
@@ -1337,8 +1346,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/dropins").mkdirs();
 
             info("Starting container...");
-            String startContainerCommand = getContainerCommand();
-            info(startContainerCommand);
+            String[] startContainerCommand = getContainerCommand();
+            // Use String[] instead for command parameters. It will handle quoting of paths for various OS.
             containerRunProcess = getRunProcess(startContainerCommand);
             execContainerCmdAndLog(containerRunProcess, 0, true);
         } catch (IOException e) {
@@ -1359,9 +1368,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private Process getRunProcess(String command) throws IOException {
+    // Pass String[] containing command and all of its individual arguments. 
+    // This ensures proper escaping/quoting for arguments that might contain spaces or special characters.
+    private Process getRunProcess(String[] command) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(getCommandTokens(command));
+        processBuilder.command(command);
         Map<String, String> env = processBuilder.environment();
         if (!OSUtil.isLinux()){
             if (!env.keySet().contains("DOCKER_BUILDKIT")) { // don't touch if already set
@@ -1569,8 +1580,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * the CMD attribute of the Open Liberty docker image. 
      * @return the command string to use to start the container
      */
-    private String getContainerCommand() throws IOException, PluginExecutionException {
-        StringBuilder command = new StringBuilder(getContainerCommandPrefix() + "run --rm");
+    private String[] getContainerCommand() throws IOException, PluginExecutionException {
+        // Use List<String> for building the command. This will be converted to a String[] when passed to ProcessBuilder. 
+        // The ProcessBuilder will handle quoting of paths (for blanks) as needed for various OS.
+        List<String> commandElements = new ArrayList<String>();
+        commandElements.add(getContainerCommandPrefix().trim());
+        commandElements.add("run");
+        commandElements.add("--rm");
+
         if (!skipDefaultPorts) {
             int httpPortToUse, httpsPortToUse;
             try {
@@ -1581,8 +1598,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
                 httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
             }
-            command.append(" -p ").append(httpPortToUse).append(":").append(LIBERTY_DEFAULT_HTTP_PORT);
-            command.append(" -p ").append(httpsPortToUse).append(":").append(LIBERTY_DEFAULT_HTTPS_PORT);
+            commandElements.add("-p");
+            commandElements.add(httpPortToUse+":"+LIBERTY_DEFAULT_HTTP_PORT);
+
+            commandElements.add("-p");
+            commandElements.add(httpsPortToUse+":"+LIBERTY_DEFAULT_HTTPS_PORT);
         }
         
         if (libertyDebug) {
@@ -1600,34 +1620,46 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } catch (IOException x) {
                 containerDebugPort = hostDebugPort = libertyDebugPort;
             }
-            command.append(" -p " + hostDebugPort + ":" + containerDebugPort);
+            commandElements.add("-p");
+            commandElements.add(hostDebugPort+":"+containerDebugPort);
             // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
             // and to allow remote debugging into the container
-            command.append(" -e WLP_DEBUG_SUSPEND=n -e WLP_DEBUG_ADDRESS=" + containerDebugPort + " -e WLP_DEBUG_REMOTE=y");
+            commandElements.add("-e");
+            commandElements.add("WLP_DEBUG_SUSPEND=n");
+            commandElements.add("-e");
+            commandElements.add("WLP_DEBUG_ADDRESS=" + containerDebugPort);
+            commandElements.add("-e");
+            commandElements.add("WLP_DEBUG_REMOTE=y");
         }
 
         // mount potential directories containing .war.xml from devc specific folder - override /config/apps and /config/dropins
         File tempApps = new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/apps");
         File tempDropins = new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/dropins");
-        command.append(" -v " + tempApps + ":/config/apps");
-        command.append(" -v " + tempDropins + ":/config/dropins");
+        commandElements.add("-v");
+        commandElements.add(tempApps + ":/config/apps");
+
+        commandElements.add("-v");
+        commandElements.add(tempDropins + ":/config/dropins");
 
         // mount the loose application resources in the container using the appropriate project root
         File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
-        command.append(" -v " + looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+        commandElements.add("-v");
+        commandElements.add(looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
         // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
         File logsDir = new File(serverDirectory.getAbsolutePath(), "logs");
-        command.append(" -v " + logsDir + ":/logs");
+        commandElements.add("-v");
+        commandElements.add(logsDir + ":/logs");
 
         // mount the Maven .m2 cache directory for featureUtility to use. For now, featureUtility does not support Gradle cache.
-        command.append(" -v " + mavenCacheLocation + ":/devmode-maven-cache");
+        commandElements.add("-v");
+        commandElements.add(mavenCacheLocation + ":/devmode-maven-cache");
 
         // mount all files from COPY commands in the Containerfile to allow for hot deployment
-        command.append(getCopiedFiles());
+        addCopiedFiles(commandElements);
 
         // Add a --user option when running Linux
-        command.append(getUserId());
+        addUserId(commandElements);
 
         // Do not generate a name if the user has specified a name
         String name = getContainerOption("--name");
@@ -1637,7 +1669,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // now generate a name so that the container errors make some sense to the user.
             }
             containerName = generateNewContainerName();
-            command.append(" --name " +  containerName);
+            commandElements.add("--name");
+            commandElements.add(containerName);
         } else {
             containerName = name;
         }
@@ -1645,18 +1678,35 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         // Allow the user to add their own options to this command via a system property.
         if (containerRunOpts != null) {
-            command.append(" "+containerRunOpts);
+            // If something in containerRunOpts contains spaces and needs quoting/escaping, this getCommandTokens method won't handle it correctly.
+            // But what was here before would not either.
+            String[] runOpts = getCommandTokens(containerRunOpts);
+            for (int i=0; i < runOpts.length; i++) {
+                commandElements.add(runOpts[i]);
+            }
         }
 
         // Options must precede this in any order. Image name and command code follows.
-        command.append(" " + imageName);
+        commandElements.add(imageName);
+
         // Command to start the server
-        command.append(" server" + ((libertyDebug) ? " debug " : " run ")  + "defaultServer");
+        commandElements.add("server");
+        if (libertyDebug) {
+            commandElements.add("debug");
+        } else {
+            commandElements.add("run");
+        }
+        commandElements.add("defaultServer");
+
         // All the Liberty variable definitions must appear after the -- option.
         // Important: other Liberty options must appear before --
-        command.append(" -- --"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
+        commandElements.add("--");
+        commandElements.add("--"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
 
-        return command.toString();
+        //return command.toString();
+        String[] newCommand = commandElements.toArray(new String[commandElements.size()]);
+        info("Container command: "+String.join(" ", newCommand));
+        return newCommand;
     }
 
     /**
@@ -1769,25 +1819,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     // Read all the files from the array list.
-    private String getCopiedFiles() {
-        StringBuilder param = new StringBuilder(256); // estimate of size needed
+    private void addCopiedFiles(List<String> commandElements) {
         for (int i=0; i < srcMount.size(); i++) {
             if (new File(srcMount.get(i)).exists()) { // only Files are in this list
-                param.append(" -v ").append(srcMount.get(i)).append(":").append(destMount.get(i));
+                commandElements.add("-v");
+                commandElements.add(srcMount.get(i)+":"+destMount.get(i));
             } else {
                 error("A file referenced by the Containerfile is not found: " + srcMount.get(i) +
                     ". Update the Containerfile or ensure the file is in the correct location.");
             }
         }
-        return param.toString();
     }
 
-    private String getUserId() {
+    private void addUserId(List<String> commandElements) {
         if (OSUtil.isLinux() || !isDocker) {
             try {
                 String id = runCmd("id -u");
                 if (id != null) {
-                    return " --user " + id;
+                    commandElements.add("--user");
+                    commandElements.add(id);
                 }
             } catch (IOException e) {
                 // can't get user id. runCmd has printed an error message.
@@ -1795,7 +1845,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // can't get user id. runCmd has printed an error message.
             }
         }
-        return "";
     }
 
     public abstract void libertyCreate() throws PluginExecutionException;
