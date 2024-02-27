@@ -123,12 +123,8 @@ public class ServerConfigDocument {
 
     // LCLS constructor
     public ServerConfigDocument(CommonLoggerI log) {
-        this.log = log;
-        props = new Properties();
-        defaultProps = new Properties();
-
-       // TODO: populate with workspace information
-        libertyDirectoryPropertyToFile = new HashMap<String, File>();   
+        // TODO: populate libertyDirectoryPropertyToFile with workspace information
+        initializeFields(log, null, null, null);
     }
 
     private DocumentBuilder getDocumentBuilder() {
@@ -154,22 +150,7 @@ public class ServerConfigDocument {
     private void initializeAppsLocation(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
         try {
-            this.log = log;
-            serverXMLFile = serverXML;
-            configDirectory = configDir;
-            if (libertyDirPropertyFiles != null) {
-                libertyDirectoryPropertyToFile = new HashMap(libertyDirPropertyFiles);
-            } else {
-                log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
-                libertyDirectoryPropertyToFile = new HashMap<String,File>();
-            }
-    
-            locations = new HashSet<String>();
-            names = new HashSet<String>();
-            namelessLocations = new HashSet<String>();
-            locationsAndNames = new HashMap<String, String>();
-            props = new Properties();
-            defaultProps = new Properties();
+            initializeFields(log, serverXML, configDir, libertyDirPropertyFiles);
 
             Document doc = parseDocument(serverXMLFile);
 
@@ -191,28 +172,10 @@ public class ServerConfigDocument {
             parseVariablesForDefaultValues(doc);
 
             // 2. get variables from server.env
-            File cfgFile = findConfigFile("server.env", serverEnvFile, giveConfigDirPrecedence);
-
-            if (cfgFile != null) {
-                parseProperties(new FileInputStream(cfgFile));
-            }
+            processServerEnv(serverEnvFile, giveConfigDirPrecedence);
 
             // 3. get variables from bootstrap.properties
-            File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
-
-            if (giveConfigDirPrecedence && cfgDirFile != null) {
-                parseProperties(new FileInputStream(cfgDirFile));
-            } else if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
-                for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
-                    if (entry.getValue() != null) {
-                        props.setProperty(entry.getKey(),entry.getValue());  
-                    } 
-                }
-            } else if (bootstrapFile != null && bootstrapFile.exists()) {
-                parseProperties(new FileInputStream(bootstrapFile));
-            } else if (cfgDirFile != null) {
-                parseProperties(new FileInputStream(cfgDirFile));
-            }
+            processBootstrapProperties(bootstrapFile, bootstrapProp, giveConfigDirPrecedence);
 
             // 4. parse variables from include files (both default and non-default values - which we store separately)
             parseIncludeVariables(doc);
@@ -235,6 +198,53 @@ public class ServerConfigDocument {
 
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public void processServerEnv(File serverEnvFile, boolean giveConfigDirPrecedence)
+            throws Exception, FileNotFoundException {
+        File cfgFile = findConfigFile("server.env", serverEnvFile, giveConfigDirPrecedence);
+        if (cfgFile != null) {
+            parseProperties(new FileInputStream(cfgFile));
+        }
+    }
+
+    public void initializeFields(CommonLoggerI log, File serverXML, File configDir,
+            Map<String, File> libertyDirPropertyFiles) {
+        this.log = log;
+        serverXMLFile = serverXML;
+        configDirectory = configDir;
+        if (libertyDirPropertyFiles != null) {
+            libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
+        } else {
+            log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
+            libertyDirectoryPropertyToFile = new HashMap<String,File>();
+        }
+   
+        locations = new HashSet<String>();
+        names = new HashSet<String>();
+        namelessLocations = new HashSet<String>();
+        locationsAndNames = new HashMap<String, String>();
+        props = new Properties();
+        defaultProps = new Properties();
+    }
+
+    public void processBootstrapProperties(File bootstrapFile, Map<String, String> bootstrapProp, boolean giveConfigDirPrecedence)
+            throws Exception, FileNotFoundException {
+        File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
+
+        if (giveConfigDirPrecedence && cfgDirFile != null) {
+            parseProperties(new FileInputStream(cfgDirFile));
+        } else if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
+            for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
+                if (entry.getValue() != null) {
+                    props.setProperty(entry.getKey(),entry.getValue());  
+                } 
+            }
+        } else if (bootstrapFile != null && bootstrapFile.exists()) {
+            parseProperties(new FileInputStream(bootstrapFile));
+        } else if (cfgDirFile != null) {
+            parseProperties(new FileInputStream(cfgDirFile));
         }
     }
 
@@ -539,7 +549,7 @@ public class ServerConfigDocument {
     }
 
 
-    private void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
+    public void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
         parseVariables(doc, true, false, false);
     }
 

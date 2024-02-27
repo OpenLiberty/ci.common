@@ -21,4 +21,6 @@
     <webApplication location="${project.artifactId.five}.war"/>
     <webApplication location="${project.artifactId.six}.war"/>
 
+    <variable name="overriden_value" value="new_value"/>
+    <variable name="my.env.var.level" value="${my.env.var}"/>
 </server>
