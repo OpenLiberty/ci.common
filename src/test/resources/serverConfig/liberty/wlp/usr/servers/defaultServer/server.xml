@@ -22,5 +22,7 @@
     <webApplication location="${project.artifactId.six}.war"/>
 
     <variable name="overriden_value" value="new_value"/>
-    <variable name="my.env.var.level" value="${my.env.var}"/>
+    <variable name="server.env.defined" defaultValue="${this.value}"/>
+    <variable name="server.env.defined" value="${this.value}"/>
+    <variable name="bootstrap.property.defined" value = "${that.value}"/>
 </server>

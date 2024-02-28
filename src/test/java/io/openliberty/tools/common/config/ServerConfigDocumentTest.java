@@ -2,14 +2,15 @@ package io.openliberty.tools.common.config;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Logger;
+import java.util.Properties;
 
 import javax.xml.xpath.XPathExpressionException;
 
@@ -33,18 +34,17 @@ import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
  */
 
 public class ServerConfigDocumentTest {
-    public final static Logger LOGGER = Logger.getLogger(ServerConfigDocumentTest.class.getName());
-    private final static String RESOURCES_DIR = "src/test/resources/";
-    private final static String WLP_DIR = "serverConfig/liberty/wlp/";
-    private final static String WLP_USER_DIR = "serverConfig/liberty/wlp/usr/";
-    private final static String DEFAULT_USER_SERVER_DIR = "servers/defaultServer/";
-    private final static String DEFAULT_SERVER_DIR = "servers/";
+    private final static Path RESOURCES_DIR = Paths.get("src/test/resources/");
+    private final static Path WLP_DIR = RESOURCES_DIR.resolve("serverConfig/liberty/wlp/");
+    private final static Path WLP_USER_DIR = RESOURCES_DIR.resolve("serverConfig/liberty/wlp/usr/");
+    private final static Path DEFAULTSERVER_CONFIG_DIR = WLP_USER_DIR.resolve("servers/defaultServer");
+    private final static Path MOCK_SERVER_DIR = RESOURCES_DIR.resolve("servers/");
     
     // 1. variable default values in server.xml file
     // 6. variable values declared in the server.xml file
     @Test
     public void processServerXml() throws FileNotFoundException, IOException, XPathExpressionException, SAXException {
-        File serversDir = new File(RESOURCES_DIR + DEFAULT_SERVER_DIR);
+        File serversDir = MOCK_SERVER_DIR.toFile();
         Document doc;
 
         // no variables defined
@@ -83,100 +83,100 @@ public class ServerConfigDocumentTest {
         // configDropins/overrides
     }
 
+    // when a server.xml references an environment variable that could not be resolved, additionally search for:
+    //   1. replace all non-alphanumeric characters with underscore char '_'
+    //   2. change all characters to uppercase
+    @Test
+    public void serverXmlEnvVarVariationLookup() throws FileNotFoundException, Exception {
+        File serverXml = DEFAULTSERVER_CONFIG_DIR.resolve("server.xml").toFile();
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
+        configDocument.initializeFields(new TestLogger(), serverXml, DEFAULTSERVER_CONFIG_DIR.toFile(), new HashMap<>());
+        Document serverXmlDoc = configDocument.parseDocument(serverXml);
+        configDocument.parseVariablesForBothValues(serverXmlDoc);
+        assertEquals("${this.value}", configDocument.getDefaultProperties().getProperty("server.env.defined"));
+        assertEquals("${this.value}", configDocument.getProperties().getProperty("server.env.defined"));
+        configDocument.processBootstrapProperties(new HashMap<>(), null);
+        configDocument.processServerEnv();
+
+        configDocument.parseVariablesForBothValues(serverXmlDoc);
+        // TODO: implement feature and uncomment these lines
+        // assertEquals("DEFINED", configDocument.getProperties().getProperty("server.env.defined"));
+        // assertEquals("DEFINED", configDocument.getProperties().getProperty("bootstrap.properties.defined"));
+    }
+    
     // server.env files are read in increasing precedence
     //   1. {wlp.install.dir}/etc
     //   2. {wlp.user.dir}/shared
     //   3. {server.config.dir}
-    // Table of directories: https://openliberty.io/docs/latest/reference/directory-locations-properties.html
+    // Liberty Directory Properties: https://openliberty.io/docs/latest/reference/directory-locations-properties.html
     @Test
     public void processServerEnv() throws FileNotFoundException, Exception {
-        File serverDir = new File(RESOURCES_DIR + WLP_USER_DIR + DEFAULT_USER_SERVER_DIR);
-        File specificFile = new File(serverDir, "server2.env");
+        File wlpInstallDir = WLP_DIR.toFile();
+        File wlpUserDir = WLP_USER_DIR.toFile();
+        File serverDir = DEFAULTSERVER_CONFIG_DIR.toFile();
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serverDir, null);
-        configDocument.processServerEnv(specificFile, false);
-        assertEquals("TEST", configDocument.getProperties().getProperty("keystore_password"));
+        Map<String, File> libertyDirectoryPropertyToFileMap = new HashMap<String, File>();
+        libertyDirectoryPropertyToFileMap.put("wlp.install.dir", wlpInstallDir);
+        libertyDirectoryPropertyToFileMap.put("wlp.user.dir", wlpUserDir);
+        libertyDirectoryPropertyToFileMap.put("server.config.dir", serverDir);
 
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serverDir, null);
-        configDocument.processServerEnv(specificFile, true);
-        assertNotEquals("TEST", configDocument.getProperties().getProperty("keystore_password"));
+        configDocument.initializeFields(new TestLogger(), null, serverDir, libertyDirectoryPropertyToFileMap);
+        configDocument.processServerEnv();
+        Properties props = configDocument.getProperties();
 
-        // TODO: multiple file locations
-        // File wlpDir = new File(RESOURCES_DIR + WLP_DIR);
+        // {wlp.install.dir}/etc
+        assertEquals("true", props.get("etc.unique"));
+
+        // {wlp.user.dir}/shared
+        assertEquals("true", props.get("shared.unique"));
+        assertEquals("true", props.get("shared.overriden"));
+        
+        // {server.config.dir}
+        assertEquals("old_value", props.get("overriden_value"));
+        assertEquals("1111", props.get("http.port"));
     }
 
     // 2. environment variables
-    // TODO: test without using processServerEnv
     @Test
     public void environmentVariables() throws FileNotFoundException, Exception {
-        // TODO: alt var lookups - https://github.com/OpenLiberty/ci.common/issues/126
-        File serverConfigDir = new File(RESOURCES_DIR + WLP_USER_DIR + DEFAULT_USER_SERVER_DIR);
-        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), new File(serverConfigDir, "server.xml"), serverConfigDir, null);
-        Document doc = configDocument.parseDocument(new File(serverConfigDir, "server.xml"));
-        
-        // env var not set
-        configDocument.parseVariablesForBothValues(doc);
-        assertEquals("${my.env.var}", configDocument.getProperties().getProperty("my.env.var.level"));
-       
-        // replace non-alphanumeric characters with '_' and to uppercase
-        configDocument.processServerEnv(new File(serverConfigDir, "server2.env"), false);
-        assertEquals("3", configDocument.getProperties().getProperty("MY_ENV_VAR"));
-        configDocument.parseVariablesForBothValues(doc);
-        // assertEquals("3", configDocument.getProperties().getProperty("my.env.var.level"));
 
-        // replace non-alphanumeric characters with '_'
-        configDocument.processServerEnv(null, true);
-        assertEquals("2", configDocument.getProperties().getProperty("my_env_var"));
-        configDocument.parseVariablesForBothValues(doc);
-        // assertEquals("2", configDocument.getProperties().getProperty("my.env.var.level"));
     }
 
 
     // 3. bootstrap.properties
     @Test
     public void processBootstrapProperties() throws FileNotFoundException, Exception {
-        File serversDir = new File(RESOURCES_DIR + DEFAULT_SERVER_DIR);
-        File altBootstrapPropertiesFile = new File(serversDir, "bootstrap2.properties");
-        Map<String, String> bootstrapProp = new HashMap<String, String>();
-        bootstrapProp.put("http.port", "1000");
+        File serversDir = MOCK_SERVER_DIR.toFile();
         ServerConfigDocument configDocument;
 
-        // lowest to highest precedence
-        // default bootstrap.properties in config dir
+        // bootstrap.properties in config dir
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new File("DOES_NOT_EXIST"), new HashMap<>(), false);
+        configDocument.processBootstrapProperties(new HashMap<>(), new File("DOES_NOT_EXIST"));
         assertEquals(1, configDocument.getProperties().size());
 
-        // use bootstrapFile
+        // use bootstrapFile, kept for flexibility
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(altBootstrapPropertiesFile, new HashMap<>(), false);
+        configDocument.processBootstrapProperties(new HashMap<>(), DEFAULTSERVER_CONFIG_DIR.resolve("bootstrap.properties").toFile());
         assertEquals(2, configDocument.getProperties().size());
-        assertEquals("9080", configDocument.getProperties().getProperty("http.port"));
+        assertEquals("DEFINED", configDocument.getProperties().getProperty("THAT_VALUE"));
 
-        // test bootstrapProperty overrides
+        // test bootstrapProperty map overrides
+        Map<String, String> bootstrapPropertyMap = new HashMap<String, String>();
+        bootstrapPropertyMap.put("http.port", "1000");
         File serverXml = new File(serversDir, "definedVariables.xml");
         configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        Document doc = configDocument.parseDocument(serverXml);
-        configDocument.parseVariablesForBothValues(doc);
+        configDocument.initializeFields(new TestLogger(), serverXml, serversDir, null);
+        configDocument.parseVariablesForBothValues(configDocument.parseDocument(serverXml));
         assertEquals("9081", configDocument.getProperties().getProperty("http.port"));
-        configDocument.processBootstrapProperties(altBootstrapPropertiesFile, bootstrapProp, false);
+        configDocument.processBootstrapProperties(bootstrapPropertyMap, null);
         assertEquals("1000", configDocument.getProperties().getProperty("http.port"));
-
-        // use giveConfigDirPrecedence
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(altBootstrapPropertiesFile, new HashMap<>(), true);
-        assertEquals(1, configDocument.getProperties().size());
 
         // TODO: bootstraps.include
         // configDocument = new ServerConfigDocument(new TestLogger());
         // configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        // configDocument.processBootstrapProperties(new File(serversDir, "bootstrapsInclude.properties"), new HashMap<>(), false);
+        // configDocument.processBootstrapProperties(new HashMap<>(), MOCK_SERVER_DIR.resolve("bootstrapInclude.properties").toFile());
         // assertEquals("9080", configDocument.getProperties().getProperty("http.port"));
     }
 
@@ -207,8 +207,7 @@ public class ServerConfigDocumentTest {
     // server.xml override bootstrap.properties, jvm.options, and server.env
     @Test
     public void overrides() {
-        File serversDir = new File(RESOURCES_DIR + WLP_USER_DIR + DEFAULT_USER_SERVER_DIR);
-
+        File serversDir = DEFAULTSERVER_CONFIG_DIR.toFile();
         // server.xml overrides server.env
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), 
                 new File(serversDir, "server.xml"), serversDir, new File(serversDir, "bootstrap.properties"), 

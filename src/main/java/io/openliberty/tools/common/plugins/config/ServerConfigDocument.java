@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -57,6 +58,11 @@ public class ServerConfigDocument {
 
     private File configDirectory;
     private File serverXMLFile;
+    private static final String WLP_INSTALL_DIR_PROPERTY = "wlp.install.dir";
+    private static final String WLP_USER_DIR_PROPERTY = "wlp.user.dir";
+    private static final String SERVER_CONFIG_DIR_PROPERTY = "server.config.dir";
+    // private static final String CONFIGDROPINS_DEFAULT;
+    // private static final String CONFIGDROPINS_OVERRIDES;
 
     private Set<String> names;
     private Set<String> namelessLocations;
@@ -116,6 +122,17 @@ public class ServerConfigDocument {
         return serverXMLFile;
     }
 
+    /**
+     * 
+     * @param log
+     * @param serverXML
+     * @param configDir
+     * @param bootstrapFile
+     * @param bootstrapProp
+     * @param serverEnvFile
+     * @param giveConfigDirPrecedence
+     * @param libertyDirPropertyFiles - Contains a property to file mapping of direcdty locations
+     */
     public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
         initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
@@ -154,28 +171,26 @@ public class ServerConfigDocument {
 
             Document doc = parseDocument(serverXMLFile);
 
-            // Server variable precedence in ascending order if defined in
-            // multiple locations.
-            //
-            // 1. defaultValue from variables defined in server.xml or defined in <include/> files
-            // e.g. <variable name="myVarName" defaultValue="myVarValue" />
-            // 2. variables from 'server.env'
-            // 3. variables from 'bootstrap.properties'
-            // 4. variables defined in <include/> files
-            // 5. variables from configDropins/defaults/<file_name>
-            // 6. variables defined in server.xml
-            // e.g. <variable name="myVarName" value="myVarValue" />
-            // 7. variables from configDropins/overrides/<file_name>
+            // Server variable precedence in ascending order if defined in multiple locations.
+            //  1. variable default values in the server.xml file
+            //  2. environment variables
+            //  3. bootstrap.properties
+            //  4. Java system properties
+            //  5. Variables loaded from files in the ${server.config.dir}/variables directory or other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
+            //  6. variable values declared in the server.xml file
+            //  7. variables declared on the command line
 
             // 1. Need to parse variables in the server.xml for default values before trying to find the include files in case one of the variables is used
             // in the location.
             parseVariablesForDefaultValues(doc);
 
             // 2. get variables from server.env
-            processServerEnv(serverEnvFile, giveConfigDirPrecedence);
+            processServerEnv();
+
+            // 3. get variables from jvm.options
 
             // 3. get variables from bootstrap.properties
-            processBootstrapProperties(bootstrapFile, bootstrapProp, giveConfigDirPrecedence);
+            processBootstrapProperties(bootstrapProp, bootstrapFile);
 
             // 4. parse variables from include files (both default and non-default values - which we store separately)
             parseIncludeVariables(doc);
@@ -201,16 +216,29 @@ public class ServerConfigDocument {
         }
     }
 
-    public void processServerEnv(File serverEnvFile, boolean giveConfigDirPrecedence)
-            throws Exception, FileNotFoundException {
-        File cfgFile = findConfigFile("server.env", serverEnvFile, giveConfigDirPrecedence);
-        if (cfgFile != null) {
-            parseProperties(new FileInputStream(cfgFile));
+    /**
+     * server.env file read order
+     *   1. {wlp.install.dir}/etc/
+     *   2. {wlp.user.dir}/shared/
+     *   3. {server.config.dir}/
+     * @param serverEnvFile
+     * @throws Exception
+     * @throws FileNotFoundException
+     */
+    public void processServerEnv() throws Exception, FileNotFoundException {
+        final String serverEnvString = "server.env";
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(WLP_INSTALL_DIR_PROPERTY), "etc" + File.separator + serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(WLP_USER_DIR_PROPERTY), "shared" + File.separator + serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(SERVER_CONFIG_DIR_PROPERTY), serverEnvString));
+    }
+
+    public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
+        if (propertiesFile != null && propertiesFile.exists()) {
+            parseProperties(new FileInputStream(propertiesFile));
         }
     }
 
-    public void initializeFields(CommonLoggerI log, File serverXML, File configDir,
-            Map<String, File> libertyDirPropertyFiles) {
+    public void initializeFields(CommonLoggerI log, File serverXML, File configDir, Map<String, File> libertyDirPropertyFiles) {
         this.log = log;
         serverXMLFile = serverXML;
         configDirectory = configDir;
@@ -220,7 +248,6 @@ public class ServerConfigDocument {
             log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
             libertyDirectoryPropertyToFile = new HashMap<String,File>();
         }
-   
         locations = new HashSet<String>();
         names = new HashSet<String>();
         namelessLocations = new HashSet<String>();
@@ -229,13 +256,17 @@ public class ServerConfigDocument {
         defaultProps = new Properties();
     }
 
-    public void processBootstrapProperties(File bootstrapFile, Map<String, String> bootstrapProp, boolean giveConfigDirPrecedence)
-            throws Exception, FileNotFoundException {
+    /**
+     * Process bootstrap.properties and boostrap.include 
+     * @param bootstrapProp
+     * @param bootstrapFile - Optional specific file
+     * @throws Exception
+     * @throws FileNotFoundException
+     */
+    public void processBootstrapProperties(Map<String, String> bootstrapProp, File bootstrapFile) throws Exception, FileNotFoundException {
         File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
-
-        if (giveConfigDirPrecedence && cfgDirFile != null) {
-            parseProperties(new FileInputStream(cfgDirFile));
-        } else if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
+        // TODO: bootstrap.include
+        if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
             for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
                 if (entry.getValue() != null) {
                     props.setProperty(entry.getKey(),entry.getValue());  
