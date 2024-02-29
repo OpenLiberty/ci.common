@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -49,6 +50,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.xml.sax.SAXException;
 
 import io.openliberty.tools.common.CommonLoggerI;
+import io.openliberty.tools.common.plugins.util.ServerFeatureUtil;
 import io.openliberty.tools.common.plugins.util.VariableUtility;
 
 // Moved from ci.maven/liberty-maven-plugin/src/main/java/net/wasdev/wlp/maven/plugins/ServerConfigDocument.java
@@ -58,11 +60,8 @@ public class ServerConfigDocument {
 
     private File configDirectory;
     private File serverXMLFile;
-    private static final String WLP_INSTALL_DIR_PROPERTY = "wlp.install.dir";
-    private static final String WLP_USER_DIR_PROPERTY = "wlp.user.dir";
-    private static final String SERVER_CONFIG_DIR_PROPERTY = "server.config.dir";
-    // private static final String CONFIGDROPINS_DEFAULT;
-    // private static final String CONFIGDROPINS_OVERRIDES;
+    private static final String CONFIGDROPINS_DEFAULT = Paths.get("configDropins/default/").toString();
+    private static final String CONFIGDROPINS_OVERRIDES = Paths.get("configDropins/overrides/").toString();
 
     private Set<String> names;
     private Set<String> namelessLocations;
@@ -188,6 +187,7 @@ public class ServerConfigDocument {
             processServerEnv();
 
             // 3. get variables from jvm.options
+            processJvmOptions();
 
             // 3. get variables from bootstrap.properties
             processBootstrapProperties(bootstrapProp, bootstrapFile);
@@ -216,6 +216,24 @@ public class ServerConfigDocument {
         }
     }
 
+
+    /**
+     * jvm.options file read order
+     *   1. {wlp.user.dir}/
+     *   2. {server.config.dir}/configDropins/defaults/
+     *   3. {server.config.dir}/
+     *   4. {server.config.dir}/configDropins/overrides/
+     * @throws FileNotFoundException
+     * @throws Exception
+     */
+    public void processJvmOptions() throws FileNotFoundException, Exception {
+        final String jvmOptionsString = "jvm.options";
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR), jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_DEFAULT + File.separator + jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_OVERRIDES + File.separator + jvmOptionsString));
+    }
+
     /**
      * server.env file read order
      *   1. {wlp.install.dir}/etc/
@@ -227,9 +245,9 @@ public class ServerConfigDocument {
      */
     public void processServerEnv() throws Exception, FileNotFoundException {
         final String serverEnvString = "server.env";
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(WLP_INSTALL_DIR_PROPERTY), "etc" + File.separator + serverEnvString));
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(WLP_USER_DIR_PROPERTY), "shared" + File.separator + serverEnvString));
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(SERVER_CONFIG_DIR_PROPERTY), serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_INSTALL_DIR), "etc" + File.separator + serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR), "shared" + File.separator + serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR), serverEnvString));
     }
 
     public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
@@ -265,7 +283,6 @@ public class ServerConfigDocument {
      */
     public void processBootstrapProperties(Map<String, String> bootstrapProp, File bootstrapFile) throws Exception, FileNotFoundException {
         File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
-        // TODO: bootstrap.include
         if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
             for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
                 if (entry.getValue() != null) {
@@ -276,6 +293,15 @@ public class ServerConfigDocument {
             parseProperties(new FileInputStream(bootstrapFile));
         } else if (cfgDirFile != null) {
             parseProperties(new FileInputStream(cfgDirFile));
+        }
+
+        if (props.containsKey("bootstrap.include")) {
+            Path bootstrapIncludePath = Paths.get(props.getProperty("bootstrap.include")).normalize();
+            File bootstrapIncludeFile = bootstrapIncludePath.isAbsolute() ? 
+                    new File(bootstrapIncludePath.toString()) : new File(configDirectory, bootstrapIncludePath.toString());
+            if (bootstrapIncludeFile.exists()) {
+                parseProperties(new FileInputStream(bootstrapIncludeFile));
+            }
         }
     }
 
