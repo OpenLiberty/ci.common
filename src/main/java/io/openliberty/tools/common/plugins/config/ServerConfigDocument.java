@@ -223,6 +223,7 @@ public class ServerConfigDocument {
      *   2. {server.config.dir}/configDropins/defaults/
      *   3. {server.config.dir}/
      *   4. {server.config.dir}/configDropins/overrides/
+     * TODO: potential processing for system property tags? (-D prefixes?)
      * @throws FileNotFoundException
      * @throws Exception
      */
@@ -276,13 +277,16 @@ public class ServerConfigDocument {
 
     /**
      * Process bootstrap.properties and boostrap.include 
-     * @param bootstrapProp
-     * @param bootstrapFile - Optional specific file
+     * @param bootstrapProp - Populated in Maven/Gradle
+     * @param bootstrapFile - Optional specific file which will take precedence over config dir file
      * @throws Exception
      * @throws FileNotFoundException
      */
     public void processBootstrapProperties(Map<String, String> bootstrapProp, File bootstrapFile) throws Exception, FileNotFoundException {
-        File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
+        File configDirBootstrapProperties = getFileFromConfigDirectory("bootstrap.properties");
+        File processedFile = null;
+
+        // Initial bootstrap.properties processing
         if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
             for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
                 if (entry.getValue() != null) {
@@ -291,18 +295,47 @@ public class ServerConfigDocument {
             }
         } else if (bootstrapFile != null && bootstrapFile.exists()) {
             parseProperties(new FileInputStream(bootstrapFile));
-        } else if (cfgDirFile != null) {
-            parseProperties(new FileInputStream(cfgDirFile));
+            processedFile = bootstrapFile;
+        } else if (configDirBootstrapProperties != null) {
+            parseProperties(new FileInputStream(configDirBootstrapProperties));
+            processedFile = configDirBootstrapProperties;
         }
 
+        // Recursive processing for bootstrap.include
         if (props.containsKey("bootstrap.include")) {
-            Path bootstrapIncludePath = Paths.get(props.getProperty("bootstrap.include")).normalize();
-            File bootstrapIncludeFile = bootstrapIncludePath.isAbsolute() ? 
-                    new File(bootstrapIncludePath.toString()) : new File(configDirectory, bootstrapIncludePath.toString());
-            if (bootstrapIncludeFile.exists()) {
-                parseProperties(new FileInputStream(bootstrapIncludeFile));
+            Set<String> visited = new HashSet<String>();
+            if (processedFile != null) {
+                visited.add(processedFile.getAbsolutePath());
             }
+            processBootstrapInclude(getBootstrapIncludeProperty(), visited);
         }
+    }
+
+    /**
+     * Recursive processing for a series of bootstrap.include that terminates upon revisit
+     * @param bootstrapIncludeLocation
+     * @param processedBootstrapIncludes
+     * @throws Exception 
+     * @throws FileNotFoundException 
+     */
+    private void processBootstrapInclude(String bootstrapIncludeLocation, Set<String> processedBootstrapIncludes) throws FileNotFoundException, Exception {
+        Path bootstrapIncludePath = Paths.get(bootstrapIncludeLocation);
+        File bootstrapIncludeFile = bootstrapIncludePath.isAbsolute() ?
+                new File(bootstrapIncludePath.toString()) : new File(configDirectory, bootstrapIncludePath.toString());
+
+        if (processedBootstrapIncludes.contains(bootstrapIncludeFile.getAbsolutePath())) {
+            return;
+        }
+        
+        if (bootstrapIncludeFile.exists()) {
+            parseProperties(new FileInputStream(bootstrapIncludeFile));
+            processedBootstrapIncludes.add(bootstrapIncludeFile.getAbsolutePath());
+            processBootstrapInclude(getBootstrapIncludeProperty(), processedBootstrapIncludes);
+        }
+    }
+
+    private String getBootstrapIncludeProperty() {
+        return props.getProperty("bootstrap.include");
     }
 
     //Checks for application names in the document. Will add locations without names to a Set

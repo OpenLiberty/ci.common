@@ -142,7 +142,6 @@ public class ServerConfigDocumentTest {
 
     }
 
-
     // 3. bootstrap.properties
     @Test
     public void processBootstrapProperties() throws FileNotFoundException, Exception {
@@ -173,10 +172,16 @@ public class ServerConfigDocumentTest {
         configDocument.processBootstrapProperties(bootstrapPropertyMap, null);
         assertEquals("1000", configDocument.getProperties().getProperty("http.port"));
 
+        // bootstrap.include
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
         configDocument.processBootstrapProperties(new HashMap<>(), MOCK_SERVER_DIR.resolve("bootstrapInclude.properties").toFile());
         assertEquals("extraFeatures.xml", configDocument.getProperties().getProperty("extras.filename"));
+
+        // bootstrap.include infinite termination check
+        configDocument = new ServerConfigDocument(new TestLogger());
+        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
+        configDocument.processBootstrapProperties(new HashMap<>(), MOCK_SERVER_DIR.resolve("bootstrapOuroboros.properties").toFile());
     }
 
     // 4. Java system properties
