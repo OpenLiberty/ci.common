@@ -24,6 +24,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -143,6 +144,24 @@ public class ServerConfigDocument {
         initializeFields(log, null, null, null);
     }
 
+    public void initializeFields(CommonLoggerI log, File serverXML, File configDir, Map<String, File> libertyDirPropertyFiles) {
+        this.log = log;
+        serverXMLFile = serverXML;
+        configDirectory = configDir;
+        if (libertyDirPropertyFiles != null) {
+            libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
+        } else {
+            log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
+            libertyDirectoryPropertyToFile = new HashMap<String,File>();
+        }
+        locations = new HashSet<String>();
+        names = new HashSet<String>();
+        namelessLocations = new HashSet<String>();
+        locationsAndNames = new HashMap<String, String>();
+        props = new Properties();
+        defaultProps = new Properties();
+    }
+
     private DocumentBuilder getDocumentBuilder() {
         DocumentBuilder docBuilder;
 
@@ -187,10 +206,24 @@ public class ServerConfigDocument {
             processServerEnv();
 
             // 3. get variables from jvm.options
-            processJvmOptions();
+            // processJvmOptions();
 
             // 3. get variables from bootstrap.properties
             processBootstrapProperties(bootstrapProp, bootstrapFile);
+
+            // 4. Java system properties
+            // configured in Maven/Gradle
+
+            // 5. Variables loaded from 'variables' directory
+            processVariablesDirectory();
+
+            // 6. variable values declared in server.xml
+            // processVariablesForValues(doc);
+
+            // 7. variables delcared on the command line
+            // configured in Maven/Gradle
+
+            // TODO: cleanup rest
 
             // 4. parse variables from include files (both default and non-default values - which we store separately)
             parseIncludeVariables(doc);
@@ -216,23 +249,10 @@ public class ServerConfigDocument {
         }
     }
 
-
-    /**
-     * jvm.options file read order
-     *   1. {wlp.user.dir}/
-     *   2. {server.config.dir}/configDropins/defaults/
-     *   3. {server.config.dir}/
-     *   4. {server.config.dir}/configDropins/overrides/
-     * TODO: potential processing for system property tags? (-D prefixes?)
-     * @throws FileNotFoundException
-     * @throws Exception
-     */
-    public void processJvmOptions() throws FileNotFoundException, Exception {
-        final String jvmOptionsString = "jvm.options";
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR), jvmOptionsString));
-        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_DEFAULT + File.separator + jvmOptionsString));
-        parsePropertiesFromFile(getFileFromConfigDirectory(jvmOptionsString));
-        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_OVERRIDES + File.separator + jvmOptionsString));
+    public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
+        if (propertiesFile != null && propertiesFile.exists()) {
+            parseProperties(new FileInputStream(propertiesFile));
+        }
     }
 
     /**
@@ -251,28 +271,17 @@ public class ServerConfigDocument {
         parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR), serverEnvString));
     }
 
-    public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
-        if (propertiesFile != null && propertiesFile.exists()) {
-            parseProperties(new FileInputStream(propertiesFile));
-        }
-    }
-
-    public void initializeFields(CommonLoggerI log, File serverXML, File configDir, Map<String, File> libertyDirPropertyFiles) {
-        this.log = log;
-        serverXMLFile = serverXML;
-        configDirectory = configDir;
-        if (libertyDirPropertyFiles != null) {
-            libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
-        } else {
-            log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
-            libertyDirectoryPropertyToFile = new HashMap<String,File>();
-        }
-        locations = new HashSet<String>();
-        names = new HashSet<String>();
-        namelessLocations = new HashSet<String>();
-        locationsAndNames = new HashMap<String, String>();
-        props = new Properties();
-        defaultProps = new Properties();
+    /**
+     * Likely not needed to be processed by the LMP/LGP tools. These properties benefit the JVM.
+     * @throws FileNotFoundException
+     * @throws Exception
+     */
+    public void processJvmOptions() throws FileNotFoundException, Exception {
+        final String jvmOptionsString = "jvm.options";
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR), jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_DEFAULT + File.separator + jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_OVERRIDES + File.separator + jvmOptionsString));
     }
 
     /**
@@ -326,7 +335,7 @@ public class ServerConfigDocument {
         if (processedBootstrapIncludes.contains(bootstrapIncludeFile.getAbsolutePath())) {
             return;
         }
-        
+ 
         if (bootstrapIncludeFile.exists()) {
             parseProperties(new FileInputStream(bootstrapIncludeFile));
             processedBootstrapIncludes.add(bootstrapIncludeFile.getAbsolutePath());
@@ -336,6 +345,77 @@ public class ServerConfigDocument {
 
     private String getBootstrapIncludeProperty() {
         return props.getProperty("bootstrap.include");
+    }
+
+    /**
+     * By default, ${server.config.directory}/variables is processed.
+     * If VARIABLE_SOURCE_DIRS is defined, those directories are processed instead.
+     * The path delimiter for the property is ';' on Windows, and is ':' on Unix
+     * @throws Exception 
+     * @throws FileNotFoundException 
+     */
+    public void processVariablesDirectory() throws FileNotFoundException, Exception {
+        final String variableDirectoryProperty = "VARIABLE_SOURCE_DIRS";
+
+        ArrayList<File> toProcess = new ArrayList<File>();
+        if (!props.containsKey(variableDirectoryProperty)) {
+            toProcess.add(getFileFromConfigDirectory("variables"));
+        } else {
+            String delimiter = (File.separator.equals("/")) ? ":" : ";";    // OS heuristic
+            String[] splitDirectories = props.get(variableDirectoryProperty).toString().split(delimiter);
+            for (String directory : splitDirectories) {
+                Path directoryPath = Paths.get(directory);
+                File directoryFile = directoryPath.toFile();
+                if (directoryFile.exists()) {
+                    toProcess.add(directoryFile);
+                }
+            }
+        }
+
+        processVariableSourceDirs(toProcess);
+    }
+
+    /**
+     * The file name is the variable and the contents are the values.
+     * If a directory is within the directory, it is recurisvely processed. 
+     * The parent dir gets prepended to the file name for the property name ("{parent directory}/{file name}")
+     * If the file name ends with *.properties, then it's processed as a properties file.
+     * @param directories - The root directories to process
+     * @throws Exception 
+     * @throws FileNotFoundException 
+     */
+    public void processVariableSourceDirs(ArrayList<File> directories) throws FileNotFoundException, Exception {
+        for (File directory : directories) {
+            if (!directory.isDirectory()) {
+                continue;
+            }
+            processNestedVariableSourceDirs(directory, "");
+        }  
+    }
+
+    /**
+     * The nested operation
+     * @param directory      - The directory being processed
+     * @param propertyPrefix - Tracks the nested directories to prepend
+     * @throws FileNotFoundException
+     * @throws Exception
+     */
+    public void processNestedVariableSourceDirs(File directory, String propertyPrefix) throws FileNotFoundException, Exception {
+        for (File child : directory.listFiles()) {
+            if (child.isDirectory()) {
+                processNestedVariableSourceDirs(child, child.getName() + File.separator);
+                continue;
+            }
+
+            if (child.getName().endsWith(".properties")) {
+                parsePropertiesFromFile(child);
+                continue;
+            }
+
+            String propertyName = propertyPrefix + child.getName();
+            String propertyValue = Files.readString(child.toPath());
+            props.setProperty(propertyName, propertyValue);
+        }
     }
 
     //Checks for application names in the document. Will add locations without names to a Set

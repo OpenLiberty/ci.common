@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import javax.xml.bind.annotation.XmlElement.DEFAULT;
 import javax.xml.xpath.XPathExpressionException;
 
 import org.junit.Test;
@@ -37,14 +38,14 @@ public class ServerConfigDocumentTest {
     private final static Path RESOURCES_DIR = Paths.get("src/test/resources/");
     private final static Path WLP_DIR = RESOURCES_DIR.resolve("serverConfig/liberty/wlp/");
     private final static Path WLP_USER_DIR = RESOURCES_DIR.resolve("serverConfig/liberty/wlp/usr/");
-    private final static Path DEFAULTSERVER_CONFIG_DIR = WLP_USER_DIR.resolve("servers/defaultServer");
-    private final static Path MOCK_SERVER_DIR = RESOURCES_DIR.resolve("servers/");
+    private final static Path SERVER_CONFIG_DIR = WLP_USER_DIR.resolve("servers/defaultServer");
+    private final static Path SERVERS_RESOURCES_DIR = RESOURCES_DIR.resolve("servers/");
     
     // 1. variable default values in server.xml file
     // 6. variable values declared in the server.xml file
     @Test
     public void processServerXml() throws FileNotFoundException, IOException, XPathExpressionException, SAXException {
-        File serversDir = MOCK_SERVER_DIR.toFile();
+        File serversDir = SERVERS_RESOURCES_DIR.toFile();
         Document doc;
 
         // no variables defined
@@ -88,9 +89,9 @@ public class ServerConfigDocumentTest {
     //   2. change all characters to uppercase
     @Test
     public void serverXmlEnvVarVariationLookup() throws FileNotFoundException, Exception {
-        File serverXml = DEFAULTSERVER_CONFIG_DIR.resolve("server.xml").toFile();
+        File serverXml = SERVER_CONFIG_DIR.resolve("server.xml").toFile();
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), serverXml, DEFAULTSERVER_CONFIG_DIR.toFile(), new HashMap<>());
+        configDocument.initializeFields(new TestLogger(), serverXml, SERVER_CONFIG_DIR.toFile(), new HashMap<>());
         Document serverXmlDoc = configDocument.parseDocument(serverXml);
         configDocument.parseVariablesForBothValues(serverXmlDoc);
         assertEquals("${this.value}", configDocument.getDefaultProperties().getProperty("server.env.defined"));
@@ -113,7 +114,7 @@ public class ServerConfigDocumentTest {
     public void processServerEnv() throws FileNotFoundException, Exception {
         File wlpInstallDir = WLP_DIR.toFile();
         File wlpUserDir = WLP_USER_DIR.toFile();
-        File serverDir = DEFAULTSERVER_CONFIG_DIR.toFile();
+        File serverDir = SERVER_CONFIG_DIR.toFile();
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
         Map<String, File> libertyDirectoryPropertyToFileMap = new HashMap<String, File>();
         libertyDirectoryPropertyToFileMap.put("wlp.install.dir", wlpInstallDir);
@@ -145,7 +146,7 @@ public class ServerConfigDocumentTest {
     // 3. bootstrap.properties
     @Test
     public void processBootstrapProperties() throws FileNotFoundException, Exception {
-        File serversDir = MOCK_SERVER_DIR.toFile();
+        File serversDir = SERVERS_RESOURCES_DIR.toFile();
         ServerConfigDocument configDocument;
 
         // bootstrap.properties in config dir
@@ -157,7 +158,7 @@ public class ServerConfigDocumentTest {
         // use bootstrapFile, kept for flexibility
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new HashMap<>(), DEFAULTSERVER_CONFIG_DIR.resolve("bootstrap.properties").toFile());
+        configDocument.processBootstrapProperties(new HashMap<>(), SERVER_CONFIG_DIR.resolve("bootstrap.properties").toFile());
         assertEquals(2, configDocument.getProperties().size());
         assertEquals("DEFINED", configDocument.getProperties().getProperty("THAT_VALUE"));
 
@@ -175,13 +176,13 @@ public class ServerConfigDocumentTest {
         // bootstrap.include
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new HashMap<>(), MOCK_SERVER_DIR.resolve("bootstrapInclude.properties").toFile());
+        configDocument.processBootstrapProperties(new HashMap<>(), SERVERS_RESOURCES_DIR.resolve("bootstrapInclude.properties").toFile());
         assertEquals("extraFeatures.xml", configDocument.getProperties().getProperty("extras.filename"));
 
         // bootstrap.include infinite termination check
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new HashMap<>(), MOCK_SERVER_DIR.resolve("bootstrapOuroboros.properties").toFile());
+        configDocument.processBootstrapProperties(new HashMap<>(), SERVERS_RESOURCES_DIR.resolve("bootstrapOuroboros.properties").toFile());
     }
 
     // 4. Java system properties
@@ -193,12 +194,36 @@ public class ServerConfigDocumentTest {
     // 5. Variables loaded from files in the ${server.config.dir}/variables directory or other 
     //    directories as specified by the VARIABLE_SOURCE_DIRS environment variable
     @Test
-    public void variablesDir() {
-        // TODO: not yet implemented. read copied dir instead of src for now
-        // see https://github.com/OpenLiberty/ci.common/issues/126
+    public void variablesDir() throws FileNotFoundException, Exception {
+        File serversDir = SERVER_CONFIG_DIR.toFile();
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
+        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
+        configDocument.processVariablesDirectory();
+       
+        Properties props = configDocument.getProperties(); 
+        assertEquals("9080", props.getProperty("httpPort"));
+        assertEquals("1000", props.getProperty("nested/httpPort"));
+        assertEquals("1", props.getProperty("VALUE_1"));
+        assertEquals("2", props.getProperty("VALUE_2"));
+
+        // process VARIABLE_SOURCE_DIRS
+        configDocument = new ServerConfigDocument(new TestLogger());
+        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
+        Map<String, String> bootstrapProp = new HashMap<String, String>();
+        String delimiter = (File.separator.equals("/")) ? ":" : ";";
+        String variableSourceDirsTestValue = String.join(delimiter, 
+                SERVERS_RESOURCES_DIR.resolve("variables").toString(), 
+                SERVER_CONFIG_DIR.toString(), 
+                "DOES_NOT_EXIST");
+        bootstrapProp.put("VARIABLE_SOURCE_DIRS", variableSourceDirsTestValue);
+        configDocument.processBootstrapProperties(bootstrapProp, null);
+        configDocument.processVariablesDirectory();
+
+        props = configDocument.getProperties();
+        assertEquals("outer_space", props.getProperty("outer.source"));
+        assertEquals("1", props.getProperty("VALUE_1"));
     }
     
-
     // 7. variables declared on the command line
     @Test
     public void CLI() {
@@ -211,7 +236,7 @@ public class ServerConfigDocumentTest {
     // server.xml override bootstrap.properties, jvm.options, and server.env
     @Test
     public void overrides() {
-        File serversDir = DEFAULTSERVER_CONFIG_DIR.toFile();
+        File serversDir = SERVER_CONFIG_DIR.toFile();
         // server.xml overrides server.env
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), 
                 new File(serversDir, "server.xml"), serversDir, new File(serversDir, "bootstrap.properties"), 

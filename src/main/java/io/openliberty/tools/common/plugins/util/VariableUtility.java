@@ -28,6 +28,10 @@ public class VariableUtility {
     private static final String VARIABLE_NAME_PATTERN = "\\$\\{(.*?)\\}";
     private static final Pattern varNamePattern = Pattern.compile(VARIABLE_NAME_PATTERN);
 
+    // If a property is not immediately found, replace non-alphanumeric values with '_'. If still not found, search with toUpper
+    // Integer value properties can be evaluated if 'simple' arithemetic
+    // A list of ports can be defined using keyword 'list'
+
     /**
      * Attempts to resolve all variables in the passed in nodeValue. Variable value/defaultValue can reference other variables.
      * This method is called recursively to resolve the variables. The variableChain collection keeps track of the variable references
