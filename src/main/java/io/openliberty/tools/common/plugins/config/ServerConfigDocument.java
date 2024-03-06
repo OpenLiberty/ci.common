@@ -138,6 +138,10 @@ public class ServerConfigDocument {
         initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
     }
 
+    public ServerConfigDocument() {
+
+    }
+
     // LCLS constructor
     public ServerConfigDocument(CommonLoggerI log) {
         // TODO: populate libertyDirectoryPropertyToFile with workspace information
@@ -192,6 +196,10 @@ public class ServerConfigDocument {
             // Server variable precedence in ascending order if defined in multiple locations.
             //  1. variable default values in the server.xml file
             //  2. environment variables
+            //  server.env
+            //     a. ${wlp.install.dir}/etc/
+            //     b. ${wlp.user.dir}/shared/
+            //     c. ${server.config.dir}/
             //  3. bootstrap.properties
             //  4. Java system properties
             //  5. Variables loaded from files in the ${server.config.dir}/variables directory or other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
@@ -209,7 +217,7 @@ public class ServerConfigDocument {
             // processJvmOptions();
 
             // 3. get variables from bootstrap.properties
-            processBootstrapProperties(bootstrapProp, bootstrapFile);
+            processBootstrapProperties();
 
             // 4. Java system properties
             // configured in Maven/Gradle
@@ -218,14 +226,17 @@ public class ServerConfigDocument {
             processVariablesDirectory();
 
             // 6. variable values declared in server.xml
-            // processVariablesForValues(doc);
+            parseVariablesForValues(doc);
 
             // 7. variables delcared on the command line
             // configured in Maven/Gradle
 
             // TODO: cleanup rest
-
+            // current code parses the includes section for a list of files to iterate through
+            // includes section needs to resolve the variables because it's in the server.xml
+            // after includes is determined, configDropins are analyzed
             // 4. parse variables from include files (both default and non-default values - which we store separately)
+
             parseIncludeVariables(doc);
 
             // 5. variables from configDropins/defaults/<file_name>
@@ -249,11 +260,6 @@ public class ServerConfigDocument {
         }
     }
 
-    public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
-        if (propertiesFile != null && propertiesFile.exists()) {
-            parseProperties(new FileInputStream(propertiesFile));
-        }
-    }
 
     /**
      * server.env file read order
@@ -299,32 +305,17 @@ public class ServerConfigDocument {
      * @throws Exception
      * @throws FileNotFoundException
      */
-    public void processBootstrapProperties(Map<String, String> bootstrapProp, File bootstrapFile) throws Exception, FileNotFoundException {
+    public void processBootstrapProperties() throws Exception, FileNotFoundException {
         File configDirBootstrapProperties = getFileFromConfigDirectory("bootstrap.properties");
-        File processedFile = null;
-
-        // Initial bootstrap.properties processing
-        if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
-            for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
-                if (entry.getValue() != null) {
-                    props.setProperty(entry.getKey(),entry.getValue());  
-                } 
-            }
-        } else if (bootstrapFile != null && bootstrapFile.exists()) {
-            parseProperties(new FileInputStream(bootstrapFile));
-            processedFile = bootstrapFile;
-        } else if (configDirBootstrapProperties != null) {
-            parseProperties(new FileInputStream(configDirBootstrapProperties));
-            processedFile = configDirBootstrapProperties;
+        if (configDirBootstrapProperties == null) {
+            return;
         }
 
-        // Recursive processing for bootstrap.include
+        parseProperties(new FileInputStream(configDirBootstrapProperties));
         if (props.containsKey("bootstrap.include")) {
             Set<String> visited = new HashSet<String>();
-            if (processedFile != null) {
-                visited.add(processedFile.getAbsolutePath());
-            }
-            processBootstrapInclude(getBootstrapIncludeProperty(), visited);
+            visited.add(configDirBootstrapProperties.getAbsolutePath());
+            processBootstrapInclude(visited);
         }
     }
 
@@ -335,8 +326,9 @@ public class ServerConfigDocument {
      * @throws Exception 
      * @throws FileNotFoundException 
      */
-    private void processBootstrapInclude(String bootstrapIncludeLocation, Set<String> processedBootstrapIncludes) throws FileNotFoundException, Exception {
-        Path bootstrapIncludePath = Paths.get(bootstrapIncludeLocation);
+    private void processBootstrapInclude(Set<String> processedBootstrapIncludes) throws FileNotFoundException, Exception {
+        String bootstrapIncludeLocationString = props.getProperty("bootstrap.include");
+        Path bootstrapIncludePath = Paths.get(bootstrapIncludeLocationString);
         File bootstrapIncludeFile = bootstrapIncludePath.isAbsolute() ?
                 new File(bootstrapIncludePath.toString()) : new File(configDirectory, bootstrapIncludePath.toString());
 
@@ -347,12 +339,8 @@ public class ServerConfigDocument {
         if (bootstrapIncludeFile.exists()) {
             parseProperties(new FileInputStream(bootstrapIncludeFile));
             processedBootstrapIncludes.add(bootstrapIncludeFile.getAbsolutePath());
-            processBootstrapInclude(getBootstrapIncludeProperty(), processedBootstrapIncludes);
+            processBootstrapInclude(processedBootstrapIncludes);
         }
-    }
-
-    private String getBootstrapIncludeProperty() {
-        return props.getProperty("bootstrap.include");
     }
 
     /**
@@ -701,6 +689,12 @@ public class ServerConfigDocument {
     private Document parseDocument(InputStream in) throws SAXException, IOException {
         try (InputStream ins = in) { // ins will be auto-closed
             return getDocumentBuilder().parse(ins);
+        }
+    }
+
+    public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
+        if (propertiesFile != null && propertiesFile.exists()) {
+            parseProperties(new FileInputStream(propertiesFile));
         }
     }
 

@@ -96,7 +96,7 @@ public class ServerConfigDocumentTest {
         configDocument.parseVariablesForBothValues(serverXmlDoc);
         assertEquals("${this.value}", configDocument.getDefaultProperties().getProperty("server.env.defined"));
         assertEquals("${this.value}", configDocument.getProperties().getProperty("server.env.defined"));
-        configDocument.processBootstrapProperties(new HashMap<>(), null);
+        configDocument.processBootstrapProperties();
         configDocument.processServerEnv();
 
         configDocument.parseVariablesForBothValues(serverXmlDoc);
@@ -105,11 +105,6 @@ public class ServerConfigDocumentTest {
         // assertEquals("DEFINED", configDocument.getProperties().getProperty("bootstrap.properties.defined"));
     }
     
-    // server.env files are read in increasing precedence
-    //   1. {wlp.install.dir}/etc
-    //   2. {wlp.user.dir}/shared
-    //   3. {server.config.dir}
-    // Liberty Directory Properties: https://openliberty.io/docs/latest/reference/directory-locations-properties.html
     @Test
     public void processServerEnv() throws FileNotFoundException, Exception {
         File wlpInstallDir = WLP_DIR.toFile();
@@ -125,14 +120,15 @@ public class ServerConfigDocumentTest {
         configDocument.processServerEnv();
         Properties props = configDocument.getProperties();
 
-        // {wlp.install.dir}/etc
+        // in increasing precedence
+        // 1. {wlp.install.dir}/etc
         assertEquals("true", props.get("etc.unique"));
 
-        // {wlp.user.dir}/shared
+        // 2. {wlp.user.dir}/shared
         assertEquals("true", props.get("shared.unique"));
         assertEquals("true", props.get("shared.overriden"));
-        
-        // {server.config.dir}
+ 
+        // 3. {server.config.dir}
         assertEquals("old_value", props.get("overriden_value"));
         assertEquals("1111", props.get("http.port"));
     }
@@ -149,40 +145,25 @@ public class ServerConfigDocumentTest {
         File serversDir = SERVERS_RESOURCES_DIR.toFile();
         ServerConfigDocument configDocument;
 
-        // bootstrap.properties in config dir
+        // bootstrap.properties
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new HashMap<>(), new File("DOES_NOT_EXIST"));
+        configDocument.processBootstrapProperties();
         assertEquals(1, configDocument.getProperties().size());
-
-        // use bootstrapFile, kept for flexibility
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new HashMap<>(), SERVER_CONFIG_DIR.resolve("bootstrap.properties").toFile());
-        assertEquals(2, configDocument.getProperties().size());
-        assertEquals("DEFINED", configDocument.getProperties().getProperty("THAT_VALUE"));
-
-        // test bootstrapProperty map overrides
-        Map<String, String> bootstrapPropertyMap = new HashMap<String, String>();
-        bootstrapPropertyMap.put("http.port", "1000");
-        File serverXml = new File(serversDir, "definedVariables.xml");
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), serverXml, serversDir, null);
-        configDocument.parseVariablesForBothValues(configDocument.parseDocument(serverXml));
-        assertEquals("9081", configDocument.getProperties().getProperty("http.port"));
-        configDocument.processBootstrapProperties(bootstrapPropertyMap, null);
-        assertEquals("1000", configDocument.getProperties().getProperty("http.port"));
+        assertEquals("extraFeatures.xml", configDocument.getProperties().getProperty("extras.filename"));
 
         // bootstrap.include
         configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new HashMap<>(), SERVERS_RESOURCES_DIR.resolve("bootstrapInclude.properties").toFile());
+        configDocument.initializeFields(new TestLogger(), null, new File(serversDir, "bootstrapInclude"), null);
+        configDocument.processBootstrapProperties();
+        assertEquals(2, configDocument.getProperties().size());
+        assertTrue(configDocument.getProperties().containsKey("bootstrap.include"));
         assertEquals("extraFeatures.xml", configDocument.getProperties().getProperty("extras.filename"));
 
-        // bootstrap.include infinite termination check
+        // bootstrap.include termination check
         configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        configDocument.processBootstrapProperties(new HashMap<>(), SERVERS_RESOURCES_DIR.resolve("bootstrapOuroboros.properties").toFile());
+        configDocument.initializeFields(new TestLogger(), null, new File(serversDir, "bootstrapOuroboros"), null);
+        configDocument.processBootstrapProperties();
     }
 
     // 4. Java system properties
@@ -209,14 +190,12 @@ public class ServerConfigDocumentTest {
         // process VARIABLE_SOURCE_DIRS
         configDocument = new ServerConfigDocument(new TestLogger());
         configDocument.initializeFields(new TestLogger(), null, serversDir, null);
-        Map<String, String> bootstrapProp = new HashMap<String, String>();
         String delimiter = (File.separator.equals("/")) ? ":" : ";";
         String variableSourceDirsTestValue = String.join(delimiter, 
                 SERVERS_RESOURCES_DIR.resolve("variables").toString(), 
                 SERVER_CONFIG_DIR.toString(), 
                 "DOES_NOT_EXIST");
-        bootstrapProp.put("VARIABLE_SOURCE_DIRS", variableSourceDirsTestValue);
-        configDocument.processBootstrapProperties(bootstrapProp, null);
+        configDocument.getProperties().put("VARIABLE_SOURCE_DIRS", variableSourceDirsTestValue);
         configDocument.processVariablesDirectory();
 
         props = configDocument.getProperties();
