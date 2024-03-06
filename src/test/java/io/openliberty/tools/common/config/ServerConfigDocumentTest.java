@@ -202,7 +202,7 @@ public class ServerConfigDocumentTest {
        
         Properties props = configDocument.getProperties(); 
         assertEquals("9080", props.getProperty("httpPort"));
-        assertEquals("1000", props.getProperty("nested/httpPort"));
+        assertEquals("1000", props.getProperty(String.join(File.separator, "nested", "httpPort")));
         assertEquals("1", props.getProperty("VALUE_1"));
         assertEquals("2", props.getProperty("VALUE_2"));
 

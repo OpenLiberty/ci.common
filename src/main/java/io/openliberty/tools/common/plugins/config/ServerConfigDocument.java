@@ -266,19 +266,27 @@ public class ServerConfigDocument {
      */
     public void processServerEnv() throws Exception, FileNotFoundException {
         final String serverEnvString = "server.env";
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_INSTALL_DIR), "etc" + File.separator + serverEnvString));
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR), "shared" + File.separator + serverEnvString));
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR), serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_INSTALL_DIR), 
+                "etc" + File.separator + serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
+                "shared" + File.separator + serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR), 
+                serverEnvString));
     }
 
     /**
-     * Likely not needed to be processed by the LMP/LGP tools. These properties benefit the JVM.
+     * Likely not needed to be processed by the LMP/LGP tools. These properties benefit the JVM
+     *   1. ${wlp.user.dir}/shared/jvm.options
+     *   2. ${server.config.dir}/configDropins/defaults/
+     *   3. ${server.config.dir}/
+     *   4. ${server.config.dir}/configDropins/overrides/
      * @throws FileNotFoundException
      * @throws Exception
      */
     public void processJvmOptions() throws FileNotFoundException, Exception {
         final String jvmOptionsString = "jvm.options";
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR), jvmOptionsString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
+                "shared" + File.separator + jvmOptionsString));
         parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_DEFAULT + File.separator + jvmOptionsString));
         parsePropertiesFromFile(getFileFromConfigDirectory(jvmOptionsString));
         parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_OVERRIDES + File.separator + jvmOptionsString));
@@ -413,7 +421,7 @@ public class ServerConfigDocument {
             }
 
             String propertyName = propertyPrefix + child.getName();
-            String propertyValue = Files.readString(child.toPath());
+            String propertyValue = new String(Files.readAllBytes(child.toPath()));
             props.setProperty(propertyName, propertyValue);
         }
     }
