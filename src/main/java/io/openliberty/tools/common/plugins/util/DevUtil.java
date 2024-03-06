@@ -1837,7 +1837,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 String id = runCmd("id -u");
                 if (id != null) {
                     commandElements.add("--user");
-                    commandElements.add(id);
+                    commandElements.add(id.trim());
                 }
             } catch (IOException e) {
                 // can't get user id. runCmd has printed an error message.
