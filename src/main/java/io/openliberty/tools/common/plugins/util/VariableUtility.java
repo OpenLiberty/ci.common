@@ -28,10 +28,6 @@ public class VariableUtility {
     private static final String VARIABLE_NAME_PATTERN = "\\$\\{(.*?)\\}";
     private static final Pattern varNamePattern = Pattern.compile(VARIABLE_NAME_PATTERN);
 
-    // If a property is not immediately found, replace non-alphanumeric values with '_'. If still not found, search with toUpper
-    // Integer value properties can be evaluated if 'simple' arithemetic
-    // A list of ports can be defined using keyword 'list'
-
     /**
      * Attempts to resolve all variables in the passed in nodeValue. Variable value/defaultValue can reference other variables.
      * This method is called recursively to resolve the variables. The variableChain collection keeps track of the variable references
@@ -59,7 +55,7 @@ public class VariableUtility {
         }
 
         for (String nextVariable : variablesToResolve) {
-            String value = getPropertyValue(nextVariable, props, defaultProps, libDirPropFiles);
+            String value = getPropertyValueDraft(nextVariable, props, defaultProps, libDirPropFiles);
 
             if (value == null || value.isEmpty()) {
                 // Variable could not be resolved. Log message and return null.
@@ -93,6 +89,53 @@ public class VariableUtility {
         return resolved;
     }
 
+    // TODO: Integer value properties can be evaluated if 'simple' arithemetic
+    // TODO: A list of ports can be defined using keyword 'list', e.g. list(httpPort) -> 89,9889 versus literal '89,9889'
+    public static String getPropertyValueDraft(String propertyName, Properties prop, Properties defaultProps, Map<String, File> libertyDirPropFiles) {
+        String value = null;
+        if (libertyDirPropFiles.containsKey(propertyName)) {
+            return stripQuotes(libertyDirPropFiles.get(propertyName).toString());
+        }
+
+        value = lookupProperty(prop, defaultProps, propertyName);
+        if (value != null) {
+            return stripQuotes(value);
+        }
+
+        // try again with non-alphanumeric values replaced with '_', which is exactly \W in regex
+        String propertyNameVariation = propertyName.replaceAll("\\W", "_");
+        value = lookupProperty(prop, defaultProps, propertyNameVariation);
+        if (value != null) {
+            return stripQuotes(value);
+        }
+
+        // try again with propertyNameVariation.toUpperCase()
+        propertyNameVariation = propertyNameVariation.toUpperCase();
+        value = lookupProperty(prop, defaultProps, propertyNameVariation);
+        if (value != null) {
+            return stripQuotes(value);
+        }
+
+        return value; 
+    }
+
+    private static String stripQuotes(String value) {
+        if (value.startsWith("\"") && value.endsWith("\"") && value.length() > 2) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
+    }
+
+    private static String lookupProperty(Properties prop, Properties defaultProps, String propertyName) {
+        if (prop.containsKey(propertyName)) {
+            return stripQuotes(prop.getProperty(propertyName));
+        }
+        if (defaultProps.containsKey(propertyName)) {
+            return stripQuotes(defaultProps.getProperty(propertyName));
+        }
+        return null;
+    }
+
     public static String getPropertyValue(String propertyName, Properties props, Properties defaultProps, Map<String, File> libDirPropFiles) {
         String value = null;
         if(!libDirPropFiles.containsKey(propertyName)) {
@@ -123,5 +166,4 @@ public class VariableUtility {
         }
         return value;
     }
-    
 }
