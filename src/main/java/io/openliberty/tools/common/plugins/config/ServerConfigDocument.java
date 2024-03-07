@@ -196,14 +196,24 @@ public class ServerConfigDocument {
             // Server variable precedence in ascending order if defined in multiple locations.
             //  1. variable default values in the server.xml file
             //  2. environment variables
-            //  server.env
-            //     a. ${wlp.install.dir}/etc/
-            //     b. ${wlp.user.dir}/shared/
-            //     c. ${server.config.dir}/
+            //     server.env
+            //       a. ${wlp.install.dir}/etc/
+            //       b. ${wlp.user.dir}/shared/
+            //       c. ${server.config.dir}/
+            //     jvm.options
+            //       a. ${wlp.user.dir}/shared/jvm.options
+            //       b. ${server.config.dir}/configDropins/defaults/
+            //       c. ${server.config.dir}/
+            //       d. ${server.config.dir}/configDropins/overrides/ 
             //  3. bootstrap.properties
+            //       a. additional references by bootstrap.include
             //  4. Java system properties
-            //  5. Variables loaded from files in the ${server.config.dir}/variables directory or other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
+            //  5. Variables loaded from files in the ${server.config.dir}/variables directory or 
+            //     other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
             //  6. variable values declared in the server.xml file
+            //       a. ${server.config.dir}/configDropins/defaults/
+            //       b. ${server.config.dir}/server.xml
+            //       c. ${server.config.dir}/configDropins/overrides/
             //  7. variables declared on the command line
 
             // 1. Need to parse variables in the server.xml for default values before trying to find the include files in case one of the variables is used
@@ -226,7 +236,10 @@ public class ServerConfigDocument {
             processVariablesDirectory();
 
             // 6. variable values declared in server.xml
-            parseVariablesForValues(doc);
+            // resolve variable references along the way
+            // configDropins/defaults
+            // server.xml
+            // configDropins/overrides
 
             // 7. variables delcared on the command line
             // configured in Maven/Gradle
@@ -346,7 +359,7 @@ public class ServerConfigDocument {
     /**
      * By default, ${server.config.directory}/variables is processed.
      * If VARIABLE_SOURCE_DIRS is defined, those directories are processed instead.
-     * The path delimiter for the property is ';' on Windows, and is ':' on Unix
+     * A list of directories are delimited by ';' on Windows, and ':' on Unix
      * @throws Exception 
      * @throws FileNotFoundException 
      */
@@ -358,8 +371,8 @@ public class ServerConfigDocument {
             toProcess.add(getFileFromConfigDirectory("variables"));
         } else {
             String delimiter = (File.separator.equals("/")) ? ":" : ";";    // OS heuristic
-            String[] splitDirectories = props.get(variableDirectoryProperty).toString().split(delimiter);
-            for (String directory : splitDirectories) {
+            String[] directories = props.get(variableDirectoryProperty).toString().split(delimiter);
+            for (String directory : directories) {
                 Path directoryPath = Paths.get(directory);
                 File directoryFile = directoryPath.toFile();
                 if (directoryFile.exists()) {
@@ -368,38 +381,29 @@ public class ServerConfigDocument {
             }
         }
 
-        processVariableSourceDirs(toProcess);
-    }
-
-    /**
-     * The file name is the variable and the contents are the values.
-     * If a directory is within the directory, it is recurisvely processed. 
-     * The parent dir gets prepended to the file name for the property name ("{parent directory}/{file name}")
-     * If the file name ends with *.properties, then it's processed as a properties file.
-     * @param directories - The root directories to process
-     * @throws Exception 
-     * @throws FileNotFoundException 
-     */
-    public void processVariableSourceDirs(ArrayList<File> directories) throws FileNotFoundException, Exception {
-        for (File directory : directories) {
+        for (File directory : toProcess) {
             if (!directory.isDirectory()) {
                 continue;
             }
-            processNestedVariableSourceDirs(directory, "");
+            processVariablesDirectory(directory, "");
         }  
     }
 
     /**
-     * The nested operation
+     * The file name defines the variable name and its contents define the value.
+     * If a directory is nested within a directory, it is recurisvely processed. 
+     * A nested file will have its parent dir prepended for the property name e.g. {parent directory}/{file name}
+     * If the file name ends with *.properties, then it's processed as a properties file.
      * @param directory      - The directory being processed
      * @param propertyPrefix - Tracks the nested directories to prepend
      * @throws FileNotFoundException
      * @throws Exception
      */
-    public void processNestedVariableSourceDirs(File directory, String propertyPrefix) throws FileNotFoundException, Exception {
+    private void processVariablesDirectory(File directory, String propertyPrefix)
+            throws FileNotFoundException, Exception {
         for (File child : directory.listFiles()) {
             if (child.isDirectory()) {
-                processNestedVariableSourceDirs(child, child.getName() + File.separator);
+                processVariablesDirectory(child, child.getName() + File.separator);
                 continue;
             }
 
@@ -772,24 +776,26 @@ public class ServerConfigDocument {
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
-            if (nodeList.item(i) instanceof Element) {
-                Element child = (Element) nodeList.item(i);
-                // Need to handle more variable substitution for include location.
-                String nodeValue = child.getAttribute("location");
-                String includeFileName = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
+            if (!(nodeList.item(i) instanceof Element)) {
+                continue;
+            }
 
-                if (includeFileName == null || includeFileName.trim().isEmpty()) {
-                    log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
-                    continue;
-                }
+            Element child = (Element) nodeList.item(i);
+            // Need to handle more variable substitution for include location.
+            String nodeValue = child.getAttribute("location");
+            String includeFileName = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
 
-                ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
+            if (includeFileName == null || includeFileName.trim().isEmpty()) {
+                log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
+                continue;
+            }
 
-                for (Document inclDoc : inclDocs) {
-                    parseVariablesForBothValues(inclDoc);
-                    // handle nested include elements
-                    parseIncludeVariables(inclDoc);
-                }
+            ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
+
+            for (Document inclDoc : inclDocs) {
+                parseVariablesForBothValues(inclDoc);
+                // handle nested include elements
+                parseIncludeVariables(inclDoc);
             }
         }
     }
