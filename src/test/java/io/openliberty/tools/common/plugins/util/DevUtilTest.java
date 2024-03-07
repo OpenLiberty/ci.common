@@ -51,7 +51,7 @@ public class DevUtilTest extends BaseDevUtilTest {
     public static final String RUN_OPTS_SINGLE = "-e MY_OPT=value";
     public static final String RUN_OPTS_SINGLE_WITH_SPACE = "-e MY_OPT=value with space";
     public static final String RUN_OPTS_DOUBLE = "-e MY_OPT=value -e MY_SECOND_OPT=value2";
-    public static final String RUN_OPTS_DOUBLE_WITH_SPACE = "-e MY_OPT=value with space -e MY_SECOND_OPT=value 2";
+    public static final String RUN_OPTS_DOUBLE_WITH_EXTRA_SPACES = "  -e  MY_OPT=value with space   -e   MY_SECOND_OPT=value 2";
 
     File serverDirectory;
     File configDirectory;
@@ -160,10 +160,10 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertTrue("RUN_OPTS_SINGLE_WITH_SPACE incorrectly split into "+options.size()+" parameters. Expected 2 parameters.", options.size() == 2);
 
         options.clear();
-        opts = util.getCommandTokens(RUN_OPTS_DOUBLE_WITH_SPACE);
+        opts = util.getCommandTokens(RUN_OPTS_DOUBLE_WITH_EXTRA_SPACES);
         // note that we really want to see this split into four parameters instead of the seven that getCommandTokens returns
         assertTrue("RUN_OPTS_DOUBLE_WITH_SPACE incorrectly split into "+opts.length+" parameters. Expected 7 parameters.", opts.length == 7);
-        util.addContainerRunOpts(RUN_OPTS_DOUBLE_WITH_SPACE, options);
+        util.addContainerRunOpts(RUN_OPTS_DOUBLE_WITH_EXTRA_SPACES, options);
         assertTrue("RUN_OPTS_DOUBLE_WITH_SPACE incorrectly split into "+options.size()+" parameters. Expected 4 parameters.", options.size() == 4);
 
         // RUN_OPTS_DOUBLE_WITH_SPACE = "-e MY_OPT=value with space -e MY_SECOND_OPT=value 2";
