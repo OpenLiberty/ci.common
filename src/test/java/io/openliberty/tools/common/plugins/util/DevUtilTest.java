@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import javax.xml.stream.FactoryConfigurationError;
@@ -46,6 +47,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class DevUtilTest extends BaseDevUtilTest {
+
+    public static final String RUN_OPTS_SINGLE = "-e MY_OPT=value";
+    public static final String RUN_OPTS_SINGLE_WITH_SPACE = "-e MY_OPT=value with space";
+    public static final String RUN_OPTS_DOUBLE = "-e MY_OPT=value -e MY_SECOND_OPT=value2";
+    public static final String RUN_OPTS_DOUBLE_WITH_SPACE = "-e MY_OPT=value with space -e MY_SECOND_OPT=value 2";
 
     File serverDirectory;
     File configDirectory;
@@ -130,6 +136,45 @@ public class DevUtilTest extends BaseDevUtilTest {
         String serverEnvContents = new String(Files.readAllBytes(serverEnv.toPath()));
         assertEquals(serverEnvContents, "backup");
         assertFalse(serverEnvBak.exists());
+    }
+
+    @Test
+    public void testContainerRunOpts() throws Exception {
+        List<String> options = new ArrayList<String>();
+        String[] opts = util.getCommandTokens(RUN_OPTS_SINGLE);
+        assertTrue("RUN_OPTS_SINGLE incorrectly split into "+opts.length+" parameters. Expected 2 parameters.", opts.length == 2);
+        util.addContainerRunOpts(RUN_OPTS_SINGLE, options);
+        assertTrue("RUN_OPTS_SINGLE incorrectly split into "+options.size()+" parameters. Expected 2 parameters.", options.size() == 2);
+
+        options.clear();
+        opts = util.getCommandTokens(RUN_OPTS_DOUBLE);
+        assertTrue("RUN_OPTS_DOUBLE incorrectly split into "+opts.length+" parameters. Expected 4 parameters.", opts.length == 4);
+        util.addContainerRunOpts(RUN_OPTS_DOUBLE, options);
+        assertTrue("RUN_OPTS_DOUBLE incorrectly split into "+options.size()+" parameters. Expected 4 parameters.", options.size() == 4);
+
+        options.clear();
+        opts = util.getCommandTokens(RUN_OPTS_SINGLE_WITH_SPACE);
+        // note that we really want to see this split into two parameters instead of the four that getCommandTokens returns
+        assertTrue("RUN_OPTS_SINGLE_WITH_SPACE incorrectly split into "+opts.length+" parameters. Expected 4 parameters.", opts.length == 4);
+        util.addContainerRunOpts(RUN_OPTS_SINGLE_WITH_SPACE, options);
+        assertTrue("RUN_OPTS_SINGLE_WITH_SPACE incorrectly split into "+options.size()+" parameters. Expected 2 parameters.", options.size() == 2);
+
+        options.clear();
+        opts = util.getCommandTokens(RUN_OPTS_DOUBLE_WITH_SPACE);
+        // note that we really want to see this split into four parameters instead of the seven that getCommandTokens returns
+        assertTrue("RUN_OPTS_DOUBLE_WITH_SPACE incorrectly split into "+opts.length+" parameters. Expected 7 parameters.", opts.length == 7);
+        util.addContainerRunOpts(RUN_OPTS_DOUBLE_WITH_SPACE, options);
+        assertTrue("RUN_OPTS_DOUBLE_WITH_SPACE incorrectly split into "+options.size()+" parameters. Expected 4 parameters.", options.size() == 4);
+
+        // RUN_OPTS_DOUBLE_WITH_SPACE = "-e MY_OPT=value with space -e MY_SECOND_OPT=value 2";
+        List<String> expectedResult = new ArrayList<String>();
+        expectedResult.add("-e");
+        expectedResult.add("MY_OPT=value with space");
+        expectedResult.add("-e");
+        expectedResult.add("MY_SECOND_OPT=value 2");
+       
+        assertTrue("List does not contain expected values.", expectedResult.equals(options));
+
     }
 
     @Test

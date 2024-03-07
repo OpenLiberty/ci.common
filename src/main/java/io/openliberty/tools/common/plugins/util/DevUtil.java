@@ -1514,7 +1514,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return false;
     }
 
-    private String[] getCommandTokens(String command) {
+    // Add the passed runOpts to the commandElements as separate options with the option and value specified individually.
+    //
+    // Note: If an option's value in runOpts contains spaces and needs quoting/escaping, the getCommandTokens method won't handle it correctly.
+    // Two ways to approach this:
+    //  1) parse the opts into separate options ('-xyz abc' or '--xyz abc') and then break the option apart from its value at the first space
+    //  2) use the returned String[] from getCommandTokens and detect incorrectly broken up option values and splice them back together 
+    //
+    // Going with option 2.
+    protected void addContainerRunOpts(String runOpts, List<String> commandElements) {
+        String[] opts = getCommandTokens(runOpts);
+        int index = 0;
+        while (index < opts.length) {
+            if ((index == 0) || opts[index].startsWith("-")) {
+                commandElements.add(opts[index]);
+            } else {
+                String lastListElement = commandElements.get(commandElements.size()-1);
+                if (!lastListElement.startsWith("-")) {
+                    // add this to previous element
+                    commandElements.set(commandElements.size()-1, lastListElement+" "+opts[index]);
+                } else {
+                    commandElements.add(opts[index]);
+                }
+            }
+            index++;
+        }
+    }
+
+    protected String[] getCommandTokens(String command) {
         StringTokenizer stringTokenizer = new StringTokenizer(command);
         String[] commandTokens = new String[stringTokenizer.countTokens()];
         for (int i = 0; stringTokenizer.hasMoreTokens(); i++) {
@@ -1678,12 +1705,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         // Allow the user to add their own options to this command via a system property.
         if (containerRunOpts != null) {
-            // If something in containerRunOpts contains spaces and needs quoting/escaping, this getCommandTokens method won't handle it correctly.
-            // But what was here before would not either.
-            String[] runOpts = getCommandTokens(containerRunOpts);
-            for (int i=0; i < runOpts.length; i++) {
-                commandElements.add(runOpts[i]);
-            }
+            addContainerRunOpts(containerRunOpts, commandElements);
         }
 
         // Options must precede this in any order. Image name and command code follows.
