@@ -54,37 +54,36 @@ public class VariableUtility {
                 // Found recursive reference when resolving variables. Log message and return null.
                 log.debug("Found a recursive variable reference when resolving ${" + varName + "}");
                 return null;
-            } else {
-                variablesToResolve.add(varName);
             }
+            variablesToResolve.add(varName);
         }
 
         for (String nextVariable : variablesToResolve) {
             String value = getPropertyValue(nextVariable, props, defaultProps, libDirPropFiles);
 
-            if (value != null && !value.isEmpty()) {
-                Collection<String> thisVariableChain = new HashSet<String> ();
-                thisVariableChain.add(nextVariable);
-
-                if (variableChain != null && !variableChain.isEmpty()) {
-                    thisVariableChain.addAll(variableChain);
-                }
-
-                String resolvedValue = resolveVariables(log, value, thisVariableChain, props, defaultProps, libDirPropFiles);
-
-                if (resolvedValue != null) {
-                    String escapedVariable = Matcher.quoteReplacement(nextVariable);
-                    // For Windows, avoid escaping the backslashes in the resolvedValue by changing to forward slashes
-                    resolvedValue = resolvedValue.replace("\\","/");
-                    resolved = resolved.replaceAll("\\$\\{" + escapedVariable + "\\}", resolvedValue);
-                } else {
-                    // Variable value could not be resolved. Log message and return null.
-                    log.debug("Could not resolve the value " + value + " for variable ${" + nextVariable + "}");
-                    return null;
-                }
-            } else {
+            if (value == null || value.isEmpty()) {
                 // Variable could not be resolved. Log message and return null.
                 log.debug("Variable " + nextVariable + " cannot be resolved.");
+                return null;
+            }
+
+            Collection<String> thisVariableChain = new HashSet<String> ();
+            thisVariableChain.add(nextVariable);
+
+            if (variableChain != null && !variableChain.isEmpty()) {
+                thisVariableChain.addAll(variableChain);
+            }
+
+            String resolvedValue = resolveVariables(log, value, thisVariableChain, props, defaultProps, libDirPropFiles);
+
+            if (resolvedValue != null) {
+                String escapedVariable = Matcher.quoteReplacement(nextVariable);
+                // For Windows, avoid escaping the backslashes in the resolvedValue by changing to forward slashes
+                resolvedValue = resolvedValue.replace("\\","/");
+                resolved = resolved.replaceAll("\\$\\{" + escapedVariable + "\\}", resolvedValue);
+            } else {
+                // Variable value could not be resolved. Log message and return null.
+                log.debug("Could not resolve the value " + value + " for variable ${" + nextVariable + "}");
                 return null;
             }
         }
