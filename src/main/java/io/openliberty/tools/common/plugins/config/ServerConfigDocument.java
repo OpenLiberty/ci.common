@@ -123,7 +123,7 @@ public class ServerConfigDocument {
     }
 
     /**
-     * 
+     * Deprecated. Migrate to the simpler constructor.
      * @param log
      * @param serverXML
      * @param configDir
@@ -131,25 +131,11 @@ public class ServerConfigDocument {
      * @param bootstrapProp
      * @param serverEnvFile
      * @param giveConfigDirPrecedence
-     * @param libertyDirPropertyFiles - Contains a property to file mapping of direcdty locations
+     * @param libertyDirPropertyFiles - Contains a property to file mapping of directory locations
      */
     public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
             Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
-        initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
-    }
-
-    public ServerConfigDocument() {
-
-    }
-
-    // LCLS constructor
-    public ServerConfigDocument(CommonLoggerI log) {
-        // TODO: populate libertyDirectoryPropertyToFile with workspace information
-        initializeFields(log, null, null, null);
-    }
-
-    public void initializeFields(CommonLoggerI log, File serverXML, File configDir, Map<String, File> libertyDirPropertyFiles) {
-        this.log = log;
+                this.log = log;
         serverXMLFile = serverXML;
         configDirectory = configDir;
         if (libertyDirPropertyFiles != null) {
@@ -164,6 +150,39 @@ public class ServerConfigDocument {
         locationsAndNames = new HashMap<String, String>();
         props = new Properties();
         defaultProps = new Properties();
+
+        initializeAppsLocation();
+    }
+
+    /**
+     * Adapt when ready. Expects the libertyDirPropertyFiles to be populated
+     * @param log
+     * @param libertyDirPropertyFiles
+     */
+    public ServerConfigDocument(CommonLoggerI log, Map<String, File> libertyDirPropertyFiles) {
+        this.log = log;
+        if (libertyDirPropertyFiles != null) {
+            libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
+            configDirectory = libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR);
+            serverXMLFile = getFileFromConfigDirectory("server.xml");
+        } else {
+            log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
+            libertyDirectoryPropertyToFile = new HashMap<String,File>();
+        }
+        locations = new HashSet<String>();
+        names = new HashSet<String>();
+        namelessLocations = new HashSet<String>();
+        locationsAndNames = new HashMap<String, String>();
+        props = new Properties();
+        defaultProps = new Properties();
+
+        // initializeAppsLocation();
+    }
+
+    // LCLS constructor
+    // TODO: populate libertyDirectoryPropertyToFile with workspace information
+    public ServerConfigDocument(CommonLoggerI log) {
+        this(log, null);
     }
 
     private DocumentBuilder getDocumentBuilder() {
@@ -186,38 +205,35 @@ public class ServerConfigDocument {
         return docBuilder;
     }
 
-    private void initializeAppsLocation(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
+    /** 
+    //  Server variable precedence in ascending order if defined in multiple locations.
+    //  1. variable default values in the server.xml file
+    //  2. environment variables
+    //     server.env
+    //       a. ${wlp.install.dir}/etc/
+    //       b. ${wlp.user.dir}/shared/
+    //       c. ${server.config.dir}/
+    //     jvm.options
+    //       a. ${wlp.user.dir}/shared/jvm.options
+    //       b. ${server.config.dir}/configDropins/defaults/
+    //       c. ${server.config.dir}/
+    //       d. ${server.config.dir}/configDropins/overrides/ 
+    //  3. bootstrap.properties
+    //       a. additional references by bootstrap.include
+    //  4. Java system properties
+    //  5. Variables loaded from files in the ${server.config.dir}/variables directory or 
+    //     other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
+    //  6. variable values declared in the server.xml file
+    //       a. ${server.config.dir}/configDropins/defaults/
+    //       b. ${server.config.dir}/server.xml
+    //       c. ${server.config.dir}/configDropins/overrides/
+    //  7. variables declared on the command line
+    */
+    public void initializeAppsLocation() {
         try {
-            initializeFields(log, serverXML, configDir, libertyDirPropertyFiles);
-
+            // 1. Need to parse variables in the server.xml for default values before trying to 
+            //    find the include files in case one of the variables is used in the location.
             Document doc = parseDocument(serverXMLFile);
-
-            // Server variable precedence in ascending order if defined in multiple locations.
-            //  1. variable default values in the server.xml file
-            //  2. environment variables
-            //     server.env
-            //       a. ${wlp.install.dir}/etc/
-            //       b. ${wlp.user.dir}/shared/
-            //       c. ${server.config.dir}/
-            //     jvm.options
-            //       a. ${wlp.user.dir}/shared/jvm.options
-            //       b. ${server.config.dir}/configDropins/defaults/
-            //       c. ${server.config.dir}/
-            //       d. ${server.config.dir}/configDropins/overrides/ 
-            //  3. bootstrap.properties
-            //       a. additional references by bootstrap.include
-            //  4. Java system properties
-            //  5. Variables loaded from files in the ${server.config.dir}/variables directory or 
-            //     other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
-            //  6. variable values declared in the server.xml file
-            //       a. ${server.config.dir}/configDropins/defaults/
-            //       b. ${server.config.dir}/server.xml
-            //       c. ${server.config.dir}/configDropins/overrides/
-            //  7. variables declared on the command line
-
-            // 1. Need to parse variables in the server.xml for default values before trying to find the include files in case one of the variables is used
-            // in the location.
             parseVariablesForDefaultValues(doc);
 
             // 2. get variables from server.env
@@ -235,31 +251,11 @@ public class ServerConfigDocument {
             // 5. Variables loaded from 'variables' directory
             processVariablesDirectory();
 
-            // 6. variable values declared in server.xml
-            // resolve variable references along the way
-            // configDropins/defaults
-            // server.xml
-            // configDropins/overrides
+            // 6. variable values declared in server.xml(s)
+            processServerXml(doc);
 
             // 7. variables delcared on the command line
             // configured in Maven/Gradle
-
-            // TODO: cleanup rest
-            // current code parses the includes section for a list of files to iterate through
-            // includes section needs to resolve the variables because it's in the server.xml
-            // after includes is determined, configDropins are analyzed
-            // 4. parse variables from include files (both default and non-default values - which we store separately)
-
-            parseIncludeVariables(doc);
-
-            // 5. variables from configDropins/defaults/<file_name>
-            parseConfigDropinsDirVariables("defaults");
-
-            // 6. variables defined in server.xml - non-default values
-            parseVariablesForValues(doc);
-
-            // 7. variables from configDropins/overrides/<file_name>
-            parseConfigDropinsDirVariables("overrides");
 
             parseApplication(doc, XPATH_SERVER_APPLICATION);
             parseApplication(doc, XPATH_SERVER_WEB_APPLICATION);
@@ -267,12 +263,10 @@ public class ServerConfigDocument {
             parseNames(doc, "/server/application | /server/webApplication | /server/enterpriseApplication");
             parseInclude(doc);
             parseConfigDropinsDir();
-
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 
     /**
      * server.env file read order
@@ -289,8 +283,7 @@ public class ServerConfigDocument {
                 "etc" + File.separator + serverEnvString));
         parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
                 "shared" + File.separator + serverEnvString));
-        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR), 
-                serverEnvString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(serverEnvString));
     }
 
     /**
@@ -319,15 +312,15 @@ public class ServerConfigDocument {
      * @throws FileNotFoundException
      */
     public void processBootstrapProperties() throws Exception, FileNotFoundException {
-        File configDirBootstrapProperties = getFileFromConfigDirectory("bootstrap.properties");
-        if (configDirBootstrapProperties == null) {
+        File bootstrapFile = getFileFromConfigDirectory("bootstrap.properties");
+        if (bootstrapFile == null) {
             return;
         }
 
-        parseProperties(new FileInputStream(configDirBootstrapProperties));
+        parsePropertiesFromFile(bootstrapFile);
         if (props.containsKey("bootstrap.include")) {
             Set<String> visited = new HashSet<String>();
-            visited.add(configDirBootstrapProperties.getAbsolutePath());
+            visited.add(bootstrapFile.getAbsolutePath());
             processBootstrapInclude(visited);
         }
     }
@@ -382,7 +375,7 @@ public class ServerConfigDocument {
         }
 
         for (File directory : toProcess) {
-            if (!directory.isDirectory()) {
+            if (directory == null || !directory.isDirectory()) {
                 continue;
             }
             processVariablesDirectory(directory, "");
@@ -416,6 +409,20 @@ public class ServerConfigDocument {
             String propertyValue = new String(Files.readAllBytes(child.toPath()));
             props.setProperty(propertyName, propertyValue);
         }
+    }
+
+    /**
+     * 
+     * @param doc
+     * @throws XPathExpressionException
+     * @throws IOException
+     * @throws SAXException
+     */
+    public void processServerXml(Document doc) throws XPathExpressionException, IOException, SAXException {
+        parseIncludeVariables(doc);
+        parseConfigDropinsDirVariables("defaults");
+        parseVariablesForValues(doc);
+        parseConfigDropinsDirVariables("overrides");
     }
 
     //Checks for application names in the document. Will add locations without names to a Set
@@ -700,6 +707,7 @@ public class ServerConfigDocument {
         if (propertiesFile != null && propertiesFile.exists()) {
             parseProperties(new FileInputStream(propertiesFile));
         }
+        log.debug("Ignoring non-existing properties file: " + propertiesFile.getAbsolutePath());
     }
 
     private void parseProperties(InputStream ins) throws Exception {
@@ -847,38 +855,10 @@ public class ServerConfigDocument {
     }
 
     /*
-     * If giveConfigDirPrecedence is set to true, return the file from the configDirectory if it exists;
-     * otherwise return specificFile if it exists, or null if not.
-     * If giveConfigDirPrecedence is set to false, return specificFile if it exists;
-     * otherwise return the file from the configDirectory if it exists, or null if not.
-     */
-    private File findConfigFile(String fileName, File specificFile, boolean giveConfigDirPrecedence) {
-        File f = new File(configDirectory, fileName);
-
-        if (giveConfigDirPrecedence) {
-            if (configDirectory != null && f.exists()) {
-                return f;
-            }
-            if (specificFile != null && specificFile.exists()) {
-                return specificFile;
-            }
-        } else {
-            if (specificFile != null && specificFile.exists()) {
-                return specificFile;
-            }
-            if (configDirectory != null && f.exists()) {
-                return f;
-            }
-        }
-
-        return null;
-    }
-
-    /*
      * Get the file from configDrectory if it exists, or null if not
      */
-    private File getFileFromConfigDirectory(String file) {
-        File f = new File(configDirectory, file);
+    private File getFileFromConfigDirectory(String filename) {
+        File f = new File(configDirectory, filename);
         if (configDirectory != null && f.exists()) {
             return f;
         }

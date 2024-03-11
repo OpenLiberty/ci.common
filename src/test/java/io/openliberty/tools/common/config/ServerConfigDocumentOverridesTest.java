@@ -2,6 +2,7 @@ package io.openliberty.tools.common.config;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -12,7 +13,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import javax.xml.bind.annotation.XmlElement.DEFAULT;
 import javax.xml.xpath.XPathExpressionException;
 
 import org.junit.Test;
@@ -21,6 +21,8 @@ import org.xml.sax.SAXException;
 
 import io.openliberty.tools.common.TestLogger;
 import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
+import io.openliberty.tools.common.plugins.util.ServerFeatureUtil;
+import io.openliberty.tools.common.plugins.util.VariableUtility;
 
 /*
  Docs: https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html
@@ -34,7 +36,7 @@ import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
  7. variables declared on the command line
  */
 
-public class ServerConfigDocumentTest {
+public class ServerConfigDocumentOverridesTest {
     private final static Path RESOURCES_DIR = Paths.get("src/test/resources/");
     private final static Path WLP_DIR = RESOURCES_DIR.resolve("serverConfig/liberty/wlp/");
     private final static Path WLP_USER_DIR = RESOURCES_DIR.resolve("serverConfig/liberty/wlp/usr/");
@@ -45,19 +47,21 @@ public class ServerConfigDocumentTest {
     // 6. variable values declared in the server.xml file
     @Test
     public void processServerXml() throws FileNotFoundException, IOException, XPathExpressionException, SAXException {
-        File serversDir = SERVERS_RESOURCES_DIR.toFile();
+        File serversResourceDir = SERVERS_RESOURCES_DIR.toFile();
         Document doc;
+        Map<String, File> libertyDirPropMap = new HashMap<String, File>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serversResourceDir);
 
         // no variables defined
-        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
-        File empty = new File(serversDir, "emptyList.xml");
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
+        File empty = new File(serversResourceDir, "emptyList.xml");
         doc = configDocument.parseDocument(empty);
         configDocument.parseVariablesForBothValues(doc);
         assertTrue(configDocument.getDefaultProperties().isEmpty() && configDocument.getProperties().isEmpty());
 
         // variables defined
-        configDocument = new ServerConfigDocument(new TestLogger());
-        File defined = new File(serversDir, "definedVariables.xml");
+        configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
+        File defined = new File(serversResourceDir, "definedVariables.xml");
         doc = configDocument.parseDocument(defined);
         configDocument.parseVariablesForBothValues(doc);
         assertEquals(1, configDocument.getDefaultProperties().size());
@@ -66,9 +70,8 @@ public class ServerConfigDocumentTest {
         assertEquals("9081", configDocument.getProperties().getProperty("http.port"));
 
         // variables defined in <include/> files
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), new File(serversDir, "server.xml"), null, null);
-        File include = new File(serversDir, "testIncludeParseVariables.xml");
+        configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
+        File include = new File(serversResourceDir, "testIncludeParseVariables.xml");
         doc = configDocument.parseDocument(include);
         assertTrue(configDocument.getDefaultProperties().isEmpty() && configDocument.getProperties().isEmpty());
         configDocument.parseIncludeVariables(doc);
@@ -76,12 +79,16 @@ public class ServerConfigDocumentTest {
         assertEquals("9080", configDocument.getDefaultProperties().getProperty("default.http.port"));
         assertEquals(1, configDocument.getProperties().size());
         assertEquals("9081", configDocument.getProperties().getProperty("http.port"));
-
-        // server.xmls read in increasing precedence
-        // TODO: refactor
-        // configDropins/defaults
-        // server.xml
-        // configDropins/overrides
+        
+        // server.xml configDropins precedence
+        File serverConfigDir = SERVER_CONFIG_DIR.toFile();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
+        configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
+        doc = configDocument.parseDocument(new File(serverConfigDir, "server.xml"));
+        configDocument.processServerXml(doc);   // Variable resolution warnings can be ignored here
+        assertEquals("1", configDocument.getProperties().getProperty("config.dropins.defaults"));
+        assertEquals("2", configDocument.getProperties().getProperty("config.dropins.server"));
+        assertEquals("3", configDocument.getProperties().getProperty("config.dropins.overrides"));
     }
 
     // when a server.xml references an environment variable that could not be resolved, additionally search for:
@@ -89,20 +96,32 @@ public class ServerConfigDocumentTest {
     //   2. change all characters to uppercase
     @Test
     public void serverXmlEnvVarVariationLookup() throws FileNotFoundException, Exception {
-        File serverXml = SERVER_CONFIG_DIR.resolve("server.xml").toFile();
-        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), serverXml, SERVER_CONFIG_DIR.toFile(), new HashMap<>());
-        Document serverXmlDoc = configDocument.parseDocument(serverXml);
+        File serverConfigDir = SERVER_CONFIG_DIR.toFile();
+        Map<String, File> libertyDirPropMap = new HashMap<String, File>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
+
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
+        Document serverXmlDoc = configDocument.parseDocument(new File(serverConfigDir, "server.xml"));
         configDocument.parseVariablesForBothValues(serverXmlDoc);
         assertEquals("${this.value}", configDocument.getDefaultProperties().getProperty("server.env.defined"));
         assertEquals("${this.value}", configDocument.getProperties().getProperty("server.env.defined"));
+        assertEquals("${that.value}", configDocument.getProperties().getProperty("bootstrap.property.defined"));
+        
         configDocument.processBootstrapProperties();
+        assertFalse(configDocument.getProperties().containsKey("that.value"));
+        assertTrue(configDocument.getProperties().containsKey("THAT_VALUE"));
         configDocument.processServerEnv();
+        assertFalse(configDocument.getProperties().containsKey("this.value"));
+        assertTrue(configDocument.getProperties().containsKey("this_value"));
 
         configDocument.parseVariablesForBothValues(serverXmlDoc);
-        // TODO: implement feature and uncomment these lines
-        // assertEquals("DEFINED", configDocument.getProperties().getProperty("server.env.defined"));
-        // assertEquals("DEFINED", configDocument.getProperties().getProperty("bootstrap.properties.defined"));
+        String resolveUnderscore = VariableUtility.resolveVariables(new TestLogger(), "${this.value}", 
+                null, configDocument.getProperties(), configDocument.getDefaultProperties(), libertyDirPropMap);
+        assertEquals("DEFINED", resolveUnderscore);
+        String resolveUnderscoreToUpper = VariableUtility.resolveVariables(new TestLogger(), "${that.value}", 
+                null, configDocument.getProperties(), configDocument.getDefaultProperties(), libertyDirPropMap);
+        assertEquals("DEFINED", resolveUnderscoreToUpper);
+
     }
     
     @Test
@@ -110,13 +129,11 @@ public class ServerConfigDocumentTest {
         File wlpInstallDir = WLP_DIR.toFile();
         File wlpUserDir = WLP_USER_DIR.toFile();
         File serverDir = SERVER_CONFIG_DIR.toFile();
-        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
         Map<String, File> libertyDirectoryPropertyToFileMap = new HashMap<String, File>();
-        libertyDirectoryPropertyToFileMap.put("wlp.install.dir", wlpInstallDir);
-        libertyDirectoryPropertyToFileMap.put("wlp.user.dir", wlpUserDir);
-        libertyDirectoryPropertyToFileMap.put("server.config.dir", serverDir);
-
-        configDocument.initializeFields(new TestLogger(), null, serverDir, libertyDirectoryPropertyToFileMap);
+        libertyDirectoryPropertyToFileMap.put(ServerFeatureUtil.WLP_INSTALL_DIR, wlpInstallDir);
+        libertyDirectoryPropertyToFileMap.put(ServerFeatureUtil.WLP_USER_DIR, wlpUserDir);
+        libertyDirectoryPropertyToFileMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverDir);
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), libertyDirectoryPropertyToFileMap);
         configDocument.processServerEnv();
         Properties props = configDocument.getProperties();
 
@@ -144,25 +161,26 @@ public class ServerConfigDocumentTest {
     public void processBootstrapProperties() throws FileNotFoundException, Exception {
         File serversDir = SERVERS_RESOURCES_DIR.toFile();
         ServerConfigDocument configDocument;
+        Map<String, File> libertyDirPropMap = new HashMap<String, File>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serversDir);
 
         // bootstrap.properties
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
+        configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
         configDocument.processBootstrapProperties();
         assertEquals(1, configDocument.getProperties().size());
         assertEquals("extraFeatures.xml", configDocument.getProperties().getProperty("extras.filename"));
 
         // bootstrap.include
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, new File(serversDir, "bootstrapInclude"), null);
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, new File(serversDir, "bootstrapInclude"));
+        configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
         configDocument.processBootstrapProperties();
         assertEquals(2, configDocument.getProperties().size());
         assertTrue(configDocument.getProperties().containsKey("bootstrap.include"));
         assertEquals("extraFeatures.xml", configDocument.getProperties().getProperty("extras.filename"));
 
         // bootstrap.include termination check
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, new File(serversDir, "bootstrapOuroboros"), null);
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, new File(serversDir, "bootstrapOuroboros"));
+        configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
         configDocument.processBootstrapProperties();
     }
 
@@ -177,10 +195,11 @@ public class ServerConfigDocumentTest {
     @Test
     public void variablesDir() throws FileNotFoundException, Exception {
         File serversDir = SERVER_CONFIG_DIR.toFile();
-        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
+        Map<String, File> libertyDirPropMap = new HashMap<String, File>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serversDir);
+
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
         configDocument.processVariablesDirectory();
-       
         Properties props = configDocument.getProperties(); 
         assertEquals("9080", props.getProperty("httpPort"));
         assertEquals("1000", props.getProperty(String.join(File.separator, "nested", "httpPort")));
@@ -188,8 +207,7 @@ public class ServerConfigDocumentTest {
         assertEquals("2", props.getProperty("VALUE_2"));
 
         // process VARIABLE_SOURCE_DIRS
-        configDocument = new ServerConfigDocument(new TestLogger());
-        configDocument.initializeFields(new TestLogger(), null, serversDir, null);
+        configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
         String delimiter = (File.separator.equals("/")) ? ":" : ";";
         String variableSourceDirsTestValue = String.join(delimiter, 
                 SERVERS_RESOURCES_DIR.resolve("variables").toString(), 
@@ -215,11 +233,37 @@ public class ServerConfigDocumentTest {
     // server.xml override bootstrap.properties, jvm.options, and server.env
     @Test
     public void overrides() {
-        File serversDir = SERVER_CONFIG_DIR.toFile();
+        File serverConfigDir = SERVER_CONFIG_DIR.toFile();
+
         // server.xml overrides server.env
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), 
-                new File(serversDir, "server.xml"), serversDir, new File(serversDir, "bootstrap.properties"), 
-                new HashMap<>(), new File(serversDir, "server.env"), false, null);
+                new File(serverConfigDir, "server.xml"), serverConfigDir, new File(serverConfigDir, "bootstrap.properties"), 
+                new HashMap<>(), new File(serverConfigDir, "server.env"), false, null);
         assertEquals("new_value", configDocument.getProperties().getProperty("overriden_value"));
+    }
+
+    @Test
+    public void initializeAppsLocation() {
+        File serverConfigDir = SERVER_CONFIG_DIR.toFile();
+        Map<String, File> libertyDirPropMap = new HashMap<String, File>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
+        libertyDirPropMap.put(ServerFeatureUtil.WLP_INSTALL_DIR, WLP_DIR.toFile());
+        libertyDirPropMap.put(ServerFeatureUtil.WLP_USER_DIR, WLP_USER_DIR.toFile());
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap);
+        configDocument.initializeAppsLocation();
+
+        Properties properties = configDocument.getProperties();
+        Properties defaultProperties = configDocument.getDefaultProperties();
+
+        // default properties in server.xml
+        assertEquals(3, defaultProperties.size());
+
+        // server.env, wlp/etc and wlp/shared
+
+        // bootstrap.properties
+
+        // variables dir
+
+        // configDropins
     }
 }
