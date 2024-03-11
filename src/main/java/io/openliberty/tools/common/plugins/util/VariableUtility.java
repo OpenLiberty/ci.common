@@ -78,8 +78,8 @@ public class VariableUtility {
                 resolvedValue = resolvedValue.replace("\\","/");
                 resolved = resolved.replaceAll("\\$\\{" + escapedVariable + "\\}", resolvedValue);
             } else {
-                // Variable value could not be resolved. Log message and return null.
-                log.debug("Could not resolve the value " + value + " for variable ${" + nextVariable + "}");
+                // Variable could not be resolved. Log message and return null.
+                log.debug("Variable " + nextVariable + " cannot be resolved.");
                 return null;
             }
         }
