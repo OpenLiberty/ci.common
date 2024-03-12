@@ -140,6 +140,9 @@ public class ServerConfigDocument {
         configDirectory = configDir;
         if (libertyDirPropertyFiles != null) {
             libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
+            if (libertyDirPropertyFiles.containsKey(ServerFeatureUtil.SERVER_CONFIG_DIR)) {
+                configDirectory = libertyDirPropertyFiles.get(ServerFeatureUtil.SERVER_CONFIG_DIR);
+            }
         } else {
             log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
             libertyDirectoryPropertyToFile = new HashMap<String,File>();
@@ -314,6 +317,7 @@ public class ServerConfigDocument {
     public void processBootstrapProperties() throws Exception, FileNotFoundException {
         File bootstrapFile = getFileFromConfigDirectory("bootstrap.properties");
         if (bootstrapFile == null) {
+            log.debug("bootstrap.properties not found in: " + configDirectory.getAbsolutePath());
             return;
         }
 
@@ -707,7 +711,6 @@ public class ServerConfigDocument {
         if (propertiesFile != null && propertiesFile.exists()) {
             parseProperties(new FileInputStream(propertiesFile));
         }
-        log.debug("Ignoring non-existing properties file: " + propertiesFile.getAbsolutePath());
     }
 
     private void parseProperties(InputStream ins) throws Exception {

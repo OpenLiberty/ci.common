@@ -24,18 +24,8 @@ import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil;
 import io.openliberty.tools.common.plugins.util.VariableUtility;
 
-/*
- Docs: https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html
- # Variable substitution in increasing order of precedence (7 overrides 1)
- 1. variable default values in the server.xml file
- 2. environment variables
- 3. bootstrap.properties
- 4. Java system properties
- 5. Variables loaded from files in the ${server.config.dir}/variables directory or other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
- 6. variable values declared in the server.xml file
- 7. variables declared on the command line
- */
 
+// Docs: https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html
 public class ServerConfigDocumentOverridesTest {
     private final static Path RESOURCES_DIR = Paths.get("src/test/resources/");
     private final static Path WLP_DIR = RESOURCES_DIR.resolve("serverConfig/liberty/wlp/");
@@ -121,7 +111,6 @@ public class ServerConfigDocumentOverridesTest {
         String resolveUnderscoreToUpper = VariableUtility.resolveVariables(new TestLogger(), "${that.value}", 
                 null, configDocument.getProperties(), configDocument.getDefaultProperties(), libertyDirPropMap);
         assertEquals("DEFINED", resolveUnderscoreToUpper);
-
     }
     
     @Test
@@ -227,23 +216,9 @@ public class ServerConfigDocumentOverridesTest {
 
     }
 
-    // TODO: test each overrides layer
-    // jvm.options override server.env
-    // bootstrap.properties override jvm.options and server.env
-    // server.xml override bootstrap.properties, jvm.options, and server.env
+    // Run the method
     @Test
-    public void overrides() {
-        File serverConfigDir = SERVER_CONFIG_DIR.toFile();
-
-        // server.xml overrides server.env
-        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), 
-                new File(serverConfigDir, "server.xml"), serverConfigDir, new File(serverConfigDir, "bootstrap.properties"), 
-                new HashMap<>(), new File(serverConfigDir, "server.env"), false, null);
-        assertEquals("new_value", configDocument.getProperties().getProperty("overriden_value"));
-    }
-
-    @Test
-    public void initializeAppsLocation() {
+    public void initializeAppsLocationTest() {
         File serverConfigDir = SERVER_CONFIG_DIR.toFile();
         Map<String, File> libertyDirPropMap = new HashMap<String, File>();
         libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
@@ -257,13 +232,15 @@ public class ServerConfigDocumentOverridesTest {
 
         // default properties in server.xml
         assertEquals(3, defaultProperties.size());
-
         // server.env, wlp/etc and wlp/shared
-
+        assertEquals("true", properties.get("etc.unique"));                     // etc
+        assertEquals("true", properties.get("shared.overriden"));               // shared > etc
+        assertEquals("1111", properties.get("http.port"));                      // serverConfig > shared
         // bootstrap.properties
-
+        assertEquals("true", properties.get("bootstrap.properties.override"));  // overrides server.env
         // variables dir
-
+        assertEquals("true", properties.get("variables.override"));             // overrides bootstrap.prop
         // configDropins
+        assertEquals("7777", properties.get("httpPort"));                       // overrides variable dir
     }
 }
