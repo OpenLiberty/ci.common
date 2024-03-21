@@ -61,8 +61,6 @@ public class ServerConfigDocument {
 
     private File configDirectory;
     private File serverXMLFile;
-    private static final String CONFIGDROPINS_DEFAULT = Paths.get("configDropins/default/").toString();
-    private static final String CONFIGDROPINS_OVERRIDES = Paths.get("configDropins/overrides/").toString();
 
     private Set<String> names;
     private Set<String> namelessLocations;
@@ -242,7 +240,7 @@ public class ServerConfigDocument {
             // 2. get variables from server.env
             processServerEnv();
 
-            // 3. get variables from jvm.options
+            // 3. get variables from jvm.options. Incomplete uncommon usecase. Uncomment when ready.
             // processJvmOptions();
 
             // 3. get variables from bootstrap.properties
@@ -257,7 +255,7 @@ public class ServerConfigDocument {
             // 6. variable values declared in server.xml(s)
             processServerXml(doc);
 
-            // 7. variables delcared on the command line
+            // 7. variables declared on the command line
             // configured in Maven/Gradle
 
             parseApplication(doc, XPATH_SERVER_APPLICATION);
@@ -291,6 +289,7 @@ public class ServerConfigDocument {
 
     /**
      * Likely not needed to be processed by the LMP/LGP tools. These properties benefit the JVM
+     * System properties would need to process out -D. jvm.options do not support variable substitution
      *   1. ${wlp.user.dir}/shared/jvm.options
      *   2. ${server.config.dir}/configDropins/defaults/
      *   3. ${server.config.dir}/
@@ -302,9 +301,9 @@ public class ServerConfigDocument {
         final String jvmOptionsString = "jvm.options";
         parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
                 "shared" + File.separator + jvmOptionsString));
-        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_DEFAULT + File.separator + jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory("configDropins/default/" + jvmOptionsString));
         parsePropertiesFromFile(getFileFromConfigDirectory(jvmOptionsString));
-        parsePropertiesFromFile(getFileFromConfigDirectory(CONFIGDROPINS_OVERRIDES + File.separator + jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory("configDropins/overrides/" + jvmOptionsString));
     }
 
     /**
@@ -317,7 +316,6 @@ public class ServerConfigDocument {
     public void processBootstrapProperties() throws Exception, FileNotFoundException {
         File bootstrapFile = getFileFromConfigDirectory("bootstrap.properties");
         if (bootstrapFile == null) {
-            log.debug("bootstrap.properties not found in: " + configDirectory.getAbsolutePath());
             return;
         }
 
@@ -347,7 +345,7 @@ public class ServerConfigDocument {
         }
  
         if (bootstrapIncludeFile.exists()) {
-            parseProperties(new FileInputStream(bootstrapIncludeFile));
+            parsePropertiesFromFile(bootstrapIncludeFile);
             processedBootstrapIncludes.add(bootstrapIncludeFile.getAbsolutePath());
             processBootstrapInclude(processedBootstrapIncludes);
         }
@@ -710,6 +708,7 @@ public class ServerConfigDocument {
     public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
         if (propertiesFile != null && propertiesFile.exists()) {
             parseProperties(new FileInputStream(propertiesFile));
+            log.debug("Processed properties from file: " + propertiesFile.getAbsolutePath());
         }
     }
 
@@ -865,6 +864,7 @@ public class ServerConfigDocument {
         if (configDirectory != null && f.exists()) {
             return f;
         }
+        log.debug(filename + " was not found in: " + configDirectory.getAbsolutePath());
         return null;
     }
 }

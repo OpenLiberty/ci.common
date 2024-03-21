@@ -77,13 +77,14 @@ public class ServerConfigDocumentOverridesTest {
         doc = configDocument.parseDocument(new File(serverConfigDir, "server.xml"));
         configDocument.processServerXml(doc);   // Variable resolution warnings can be ignored here
         assertEquals("1", configDocument.getProperties().getProperty("config.dropins.defaults"));
-        assertEquals("2", configDocument.getProperties().getProperty("config.dropins.server"));
-        assertEquals("3", configDocument.getProperties().getProperty("config.dropins.overrides"));
+        assertEquals("The value is expected to be overriden from 1 to 2", "2", configDocument.getProperties().getProperty("config.dropins.server"));
+        assertEquals("The value is expected to be overriden from 1 to 3", "3", configDocument.getProperties().getProperty("config.dropins.overrides"));
     }
 
     // when a server.xml references an environment variable that could not be resolved, additionally search for:
     //   1. replace all non-alphanumeric characters with underscore char '_'
     //   2. change all characters to uppercase
+    //   3. remove the env. prefix (<19.0.0.3 behavior)
     @Test
     public void serverXmlEnvVarVariationLookup() throws FileNotFoundException, Exception {
         File serverConfigDir = SERVER_CONFIG_DIR.toFile();
@@ -111,6 +112,9 @@ public class ServerConfigDocumentOverridesTest {
         String resolveUnderscoreToUpper = VariableUtility.resolveVariables(new TestLogger(), "${that.value}", 
                 null, configDocument.getProperties(), configDocument.getDefaultProperties(), libertyDirPropMap);
         assertEquals("DEFINED", resolveUnderscoreToUpper);
+        String resolveEnvPrefix = VariableUtility.resolveVariables(new TestLogger(), "${env.HOST}", 
+                null, configDocument.getProperties(), configDocument.getDefaultProperties(), libertyDirPropMap);
+        assertEquals("localhost", resolveEnvPrefix);
     }
     
     @Test
@@ -132,11 +136,11 @@ public class ServerConfigDocumentOverridesTest {
 
         // 2. {wlp.user.dir}/shared
         assertEquals("true", props.get("shared.unique"));
-        assertEquals("true", props.get("shared.overriden"));
+        assertEquals("This value is expected to be overriden from false to true","true", props.get("shared.overriden"));
  
         // 3. {server.config.dir}
         assertEquals("old_value", props.get("overriden_value"));
-        assertEquals("1111", props.get("http.port"));
+        assertEquals("This value is expected to be overriden from 9081 to 1111", "1111", props.get("http.port"));
     }
 
     // 2. environment variables
@@ -232,15 +236,20 @@ public class ServerConfigDocumentOverridesTest {
 
         // default properties in server.xml
         assertEquals(3, defaultProperties.size());
-        // server.env, wlp/etc and wlp/shared
-        assertEquals("true", properties.get("etc.unique"));                     // etc
-        assertEquals("true", properties.get("shared.overriden"));               // shared > etc
-        assertEquals("1111", properties.get("http.port"));                      // serverConfig > shared
-        // bootstrap.properties
-        assertEquals("true", properties.get("bootstrap.properties.override"));  // overrides server.env
-        // variables dir
-        assertEquals("true", properties.get("variables.override"));             // overrides bootstrap.prop
-        // configDropins
-        assertEquals("7777", properties.get("httpPort"));                       // overrides variable dir
+
+        // server.env
+        // wlp/etc
+        assertEquals("true", properties.get("etc.unique"));                     
+        // wlp/shared > etc
+        assertEquals("The value is expected to be overriden from false to true","true", properties.get("shared.overriden"));
+        // serverConfig > shared
+        assertEquals("The value is expected to be overriden from 9081 to 1111","1111", properties.get("http.port"));
+
+        // bootstrap.properties, overrides server.env
+        assertEquals("The value is expected to be overriden from false to true","true", properties.get("bootstrap.properties.override"));
+        // variables dir, overrides bootstrap.prop
+        assertEquals("The value is expected to be overriden from false to true","true", properties.get("variables.override"));
+        // configDropins, overrides variable dir
+        assertEquals("The value is expected to be overriden from 9080 to 7777","7777", properties.get("httpPort"));
     }
 }

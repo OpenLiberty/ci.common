@@ -55,7 +55,7 @@ public class VariableUtility {
         }
 
         for (String nextVariable : variablesToResolve) {
-            String value = getPropertyValueDraft(nextVariable, props, defaultProps, libDirPropFiles);
+            String value = getPropertyValue(nextVariable, props, defaultProps, libDirPropFiles);
 
             if (value == null || value.isEmpty()) {
                 // Variable could not be resolved. Log message and return null.
@@ -91,7 +91,7 @@ public class VariableUtility {
 
     // TODO: Integer value properties can be evaluated if 'simple' arithemetic
     // TODO: A list of ports can be defined using keyword 'list', e.g. list(httpPort) -> 89,9889 versus literal '89,9889'
-    public static String getPropertyValueDraft(String propertyName, Properties prop, Properties defaultProps, Map<String, File> libertyDirPropFiles) {
+    public static String getPropertyValue(String propertyName, Properties prop, Properties defaultProps, Map<String, File> libertyDirPropFiles) {
         String value = null;
         if (libertyDirPropFiles.containsKey(propertyName)) {
             return stripQuotes(libertyDirPropFiles.get(propertyName).toString());
@@ -99,21 +99,29 @@ public class VariableUtility {
 
         value = lookupProperty(prop, defaultProps, propertyName);
         if (value != null) {
-            return stripQuotes(value);
+            return value;
         }
 
         // try again with non-alphanumeric values replaced with '_', which is exactly \W in regex
         String propertyNameVariation = propertyName.replaceAll("\\W", "_");
         value = lookupProperty(prop, defaultProps, propertyNameVariation);
         if (value != null) {
-            return stripQuotes(value);
+            return value;
         }
 
         // try again with propertyNameVariation.toUpperCase()
         propertyNameVariation = propertyNameVariation.toUpperCase();
         value = lookupProperty(prop, defaultProps, propertyNameVariation);
         if (value != null) {
-            return stripQuotes(value);
+            return value;
+        }
+
+        // support for versions <19.0.0.3. Look for property without the 'env.' prefix
+        if (propertyName != null && propertyName.startsWith("env.") && propertyName.length() > 4) {
+            value = lookupProperty(prop, defaultProps, propertyName.substring(4));
+            if (value != null) {
+                return value;
+            }
         }
 
         return value; 
@@ -134,36 +142,5 @@ public class VariableUtility {
             return stripQuotes(defaultProps.getProperty(propertyName));
         }
         return null;
-    }
-
-    public static String getPropertyValue(String propertyName, Properties props, Properties defaultProps, Map<String, File> libDirPropFiles) {
-        String value = null;
-        if(!libDirPropFiles.containsKey(propertyName)) {
-            value = props.getProperty(propertyName);
-            if (value == null) {
-                // Check for default value since no other value found.
-                value = defaultProps.getProperty(propertyName);
-            }
-            if (value == null && propertyName.startsWith("env.") && propertyName.length() > 4) {
-                // Look for property without the 'env.' prefix
-                String newPropName = propertyName.substring(4);
-                value = props.getProperty(newPropName);
-                if (value == null) {
-                    // Check for default value since no other value found.
-                    value = defaultProps.getProperty(newPropName);
-                }
-            }
-        } else {
-            File envDirectory = libDirPropFiles.get(propertyName);
-            value = envDirectory.toString();
-        }  
-        
-        if (value != null && value.startsWith("\"") && value.endsWith("\"")) {
-            // need to remove beginning/ending quotes
-            if (value.length() > 2) {
-                value = value.substring(1, value.length() -1);
-            }
-        }
-        return value;
     }
 }
