@@ -177,13 +177,28 @@ public class ServerConfigDocument {
         props = new Properties();
         defaultProps = new Properties();
 
-        // initializeAppsLocation();
+        initializeAppsLocation();
     }
 
     // LCLS constructor
     // TODO: populate libertyDirectoryPropertyToFile with workspace information
     public ServerConfigDocument(CommonLoggerI log) {
         this(log, null);
+    }
+
+    // test constructor that takes in initial properties to be called modularly
+    public ServerConfigDocument(CommonLoggerI log, Map<String, File> libertyDirPropertyFiles, Properties initProperties) {
+        this.log = log;
+        libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
+        configDirectory = libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR);
+        serverXMLFile = getFileFromConfigDirectory("server.xml");
+        locations = new HashSet<String>();
+        names = new HashSet<String>();
+        namelessLocations = new HashSet<String>();
+        locationsAndNames = new HashMap<String, String>();
+        props = new Properties();
+        if (initProperties != null) props.putAll(initProperties);
+        defaultProps = new Properties();
     }
 
     private DocumentBuilder getDocumentBuilder() {
@@ -247,7 +262,7 @@ public class ServerConfigDocument {
             processBootstrapProperties();
 
             // 4. Java system properties
-            // configured in Maven/Gradle
+            processSystemProperties();
 
             // 5. Variables loaded from 'variables' directory
             processVariablesDirectory();
@@ -256,7 +271,8 @@ public class ServerConfigDocument {
             processServerXml(doc);
 
             // 7. variables declared on the command line
-            // configured in Maven/Gradle
+            // Maven: https://github.com/OpenLiberty/ci.maven/blob/main/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties
+            // Gradle: https://github.com/dshimo/ci.gradle/blob/main/docs/libertyExtensions.md
 
             parseApplication(doc, XPATH_SERVER_APPLICATION);
             parseApplication(doc, XPATH_SERVER_WEB_APPLICATION);
@@ -349,6 +365,10 @@ public class ServerConfigDocument {
             processedBootstrapIncludes.add(bootstrapIncludeFile.getAbsolutePath());
             processBootstrapInclude(processedBootstrapIncludes);
         }
+    }
+
+    private void processSystemProperties() {
+        props.putAll(System.getProperties());
     }
 
     /**
