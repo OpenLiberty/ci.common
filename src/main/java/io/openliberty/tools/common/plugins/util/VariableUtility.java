@@ -128,6 +128,9 @@ public class VariableUtility {
     }
 
     private static String stripQuotes(String value) {
+        if (value == null) {
+            return null;
+        }
         if (value.startsWith("\"") && value.endsWith("\"") && value.length() > 2) {
             return value.substring(1, value.length() - 1);
         }
