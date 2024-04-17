@@ -143,12 +143,6 @@ public class ServerConfigDocumentOverridesTest {
         assertEquals("This value is expected to be overriden from 9081 to 1111", "1111", props.get("http.port"));
     }
 
-    // 2. environment variables
-    @Test
-    public void environmentVariables() throws FileNotFoundException, Exception {
-
-    }
-
     // 3. bootstrap.properties
     @Test
     public void processBootstrapProperties() throws FileNotFoundException, Exception {
@@ -175,12 +169,6 @@ public class ServerConfigDocumentOverridesTest {
         libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, new File(serversDir, "bootstrapOuroboros"));
         configDocument = new ServerConfigDocument(new TestLogger(), libertyDirPropMap, null);
         configDocument.processBootstrapProperties();
-    }
-
-    // 4. Java system properties
-    @Test
-    public void jvmOptions() {
-
     }
 
     // 5. Variables loaded from files in the ${server.config.dir}/variables directory or other 
@@ -213,12 +201,6 @@ public class ServerConfigDocumentOverridesTest {
         props = configDocument.getProperties();
         assertEquals("outer_space", props.getProperty("outer.source"));
         assertEquals("1", props.getProperty("VALUE_1"));
-    }
-    
-    // 7. variables declared on the command line
-    @Test
-    public void CLI() {
-
     }
 
     // Run the method
