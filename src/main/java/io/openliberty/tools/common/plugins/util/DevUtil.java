@@ -691,6 +691,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     error(e.getMessage(), e);
                 }
             }
+        } else {
+            if (projectName != null) {
+                info("Tests will not run on demand for " + projectName + " because skipTests is set to true.");
+            } else {
+                info("Tests will not run on demand because skipTests is set to true.");
+            }
         }
     }
 
@@ -2522,12 +2528,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printTestsMessage(boolean formatForAttention) {
-        if (hotTests) {
-            String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : message);
-        } else {
-            String message = "run tests on demand, press Enter.";
-            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : "To " + message);
+        // setting skipTests to true overrides the setting of hotTests, and prevents any tests from running in dev mode (automatically or on demand)
+        if (!skipTests) {
+             if (hotTests) {
+                String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
+                info(formatForAttention ? formatAttentionMessage("Enter - " + message) : message);
+            } else {
+                String message = "run tests on demand, press Enter.";
+                info(formatForAttention ? formatAttentionMessage("Enter - " + message) : "To " + message);
+            }
         }
     }
 
