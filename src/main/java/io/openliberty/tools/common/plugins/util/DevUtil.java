@@ -364,6 +364,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected List<Path> monitoredWebResourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
+    private boolean changeOnDemandTestsAction;
     private boolean skipTests;
     private boolean skipUTs;
     private boolean skipITs;
@@ -440,7 +441,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected boolean skipInstallFeature;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs,
+            File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
             boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
             long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
             boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
@@ -457,6 +458,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.projectDirectory = projectDirectory;
         this.multiModuleProjectDirectory = multiModuleProjectDirectory;
         this.resourceDirs = resourceDirs;
+        this.changeOnDemandTestsAction = changeOnDemandTestsAction;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
         this.skipUTs = skipUTs;
@@ -2532,12 +2534,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (skipTests) {
             return;
         }
+        String actionKey = changeOnDemandTestsAction ? "t" : "Enter";
+        String actionKeyInstruction = changeOnDemandTestsAction ? "type 't' and press Enter" : "press the Enter key";
+        String message = hotTests ? "Tests will run automatically when changes are detected. You can also "+actionKeyInstruction+" to run tests on demand." : "run tests on demand, "+actionKeyInstruction+".";
+
         if (hotTests) {
-            String message = "Tests will run automatically when changes are detected. You can also press the Enter key to run tests on demand.";
-            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : message);
+            info(formatForAttention ? formatAttentionMessage(actionKey + " - " + message) : message);
         } else {
-            String message = "run tests on demand, press Enter.";
-            info(formatForAttention ? formatAttentionMessage("Enter - " + message) : "To " + message);
+            info(formatForAttention ? formatAttentionMessage(actionKey + " - " + message) : "To " + message);
         }
     }
 
@@ -2685,13 +2689,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey r = new HotKey("r");
             HotKey g = new HotKey("g");
             HotKey o = new HotKey("o");
+            HotKey t = new HotKey("t");
             HotKey enter = new HotKey("");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
                 }
                 while (!shutdown) {
-                    debug("Waiting for Enter key to run tests");
+                    debug("Waiting for action key");
+                    
                     if (!scanner.hasNextLine()) {
                         break;
                     }
@@ -2721,14 +2727,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
                         }
-                    } else if (enter.isPressed(line)){
-                        debug("Detected Enter key. Running tests... ");
+                    } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
+                        debug("Detected test command. Running tests... ");
                         if (isMultiModuleProject()) {
                             // force run tests across all modules in multi module scenario
                             runTestThread(false, executor, -1, true, getAllBuildFiles());
                         } else {
                             runTestThread(false, executor, -1, true, buildFile);
                         }
+                    } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
+                        warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
                     } else {
                         warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
                     }
@@ -5494,6 +5502,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     public boolean isMultiModuleProject() {
         return (upstreamProjects != null && !upstreamProjects.isEmpty());
+    }
+
+    /**
+     * Returns the value of changeOnDemandTestsAction boolean.
+     * 
+     * @return value of changeOnDemandTestsAction
+     */
+    public boolean isChangeOnDemandTestsAction() {
+        return this.changeOnDemandTestsAction;
     }
 
     /**
