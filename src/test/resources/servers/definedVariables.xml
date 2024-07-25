@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="new server">
+    <variable name="default.http.port" defaultValue="9080"/>
+    <variable name="http.port" value="9081"/>
+</server>
