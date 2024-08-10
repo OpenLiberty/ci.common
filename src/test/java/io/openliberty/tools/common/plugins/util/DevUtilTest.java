@@ -24,9 +24,13 @@ import static org.junit.Assert.assertTrue;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -275,24 +279,64 @@ public class DevUtilTest extends BaseDevUtilTest {
     
     @Test
     public void testEnableServerDebugBackup() throws Exception {
-        String serverEnvContent = "abc=123\nxyz=321";
-        
+        String serverEnvContent = "abc=123\nxyz=321\nmultyByte=寿司";
+
         File serverEnv = new File(serverDirectory, "server.env");
         serverEnv.createNewFile();
         BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnv));
         writer.write(serverEnvContent);
         writer.close();
-        
+
         int port = enableServerDebugAtRandomPort();
         File serverEnvBackup = new File(serverDirectory, "server.env.bak");
         assertTrue(serverEnvBackup.exists());
-        
+
         BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
         try {
             assertEquals("abc=123", reader.readLine());
             assertEquals("xyz=321", reader.readLine());
+            assertEquals("multyByte=寿司", reader.readLine());
             assertEquals("WLP_DEBUG_SUSPEND=n", reader.readLine());
-            assertEquals("WLP_DEBUG_ADDRESS=" + port, reader.readLine());    
+            assertEquals("WLP_DEBUG_ADDRESS=" + port, reader.readLine());
+        } finally {
+            reader.close();
+        }
+    }
+
+    @Test
+    public void testEnableServerDebugWithEncode() throws Exception {
+        File serverEnv = new File(serverDirectory, "server.env");
+        File serverEnvBackup = new File(serverDirectory, "server.env.bak");
+        String charsetName = "MS932";
+
+        String serverContent = "multiByte=寿司\nabc=123";
+        serverEnv.createNewFile();
+        // create with encoding
+        BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(serverEnv), charsetName));
+        writer.write(serverContent);
+        writer.close();
+        assertTrue(serverEnv.exists());
+        assertFalse(serverEnvBackup.exists());
+
+        // assert server.env content
+        assertEquals(serverContent, FileUtils.readFileToString(serverEnv, charsetName));
+
+        // set system property
+        System.setProperty("serverenv.encoding", charsetName);
+        // enable debug
+        int port = enableServerDebugAtRandomPort();
+        assertTrue(serverEnv.exists());
+        assertTrue(serverEnvBackup.exists());
+
+        // check server.env content
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(serverEnv), charsetName));
+        try {
+            assertEquals("multiByte=寿司", reader.readLine());
+            assertEquals("abc=123", reader.readLine());
+            assertEquals("WLP_DEBUG_SUSPEND=n", reader.readLine());
+            assertEquals("WLP_DEBUG_ADDRESS=" + port, reader.readLine());
         } finally {
             reader.close();
         }

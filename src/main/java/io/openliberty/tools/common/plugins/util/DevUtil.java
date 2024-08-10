@@ -22,11 +22,13 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -2245,6 +2247,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         File serverEnvFile = new File(serverEnvPath);
         StringBuilder sb = new StringBuilder();
         File serverEnvBackup = new File(serverEnvPath + ".bak");
+        String encoding = System.getProperty("serverenv.encoding");
+        
         if (serverEnvFile.exists()) {
             debug("server.env already exists");
 
@@ -2253,8 +2257,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (!deleted) {
                 error("Could not move existing server.env file");
             }
-
-            BufferedReader reader = new BufferedReader(new FileReader(serverEnvBackup));
+            BufferedReader reader;
+            if (encoding == null) {
+                reader = new BufferedReader(new FileReader(serverEnvBackup));
+            } else {
+                reader = new BufferedReader(new InputStreamReader(new FileInputStream(serverEnvBackup), encoding));
+            }
             try {
                 String line;
                 while ((line = reader.readLine()) != null) {
@@ -2279,7 +2287,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         sb.append("\n");
 
-        BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvFile));
+        BufferedWriter writer;
+        if (encoding == null) {
+            writer = new BufferedWriter(new FileWriter(serverEnvFile));
+        } else {
+            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(serverEnvFile), encoding));
+        }
         try {
             writer.write(sb.toString());
         } finally {
