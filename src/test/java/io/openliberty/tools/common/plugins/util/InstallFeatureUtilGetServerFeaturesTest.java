@@ -34,6 +34,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
+
 public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureUtilTest {
     private static File serverDirectory = null;
     private static File src = null;
@@ -68,18 +70,18 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
     
     private void verifyServerFeatures(Set<String> expected) throws Exception {
-        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+    	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult.getFeatures());
     }
     private void verifyServerFeatures(Set<String> expected, Set<String> ignoreFiles) throws Exception {
-        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null, ignoreFiles);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+    	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null, ignoreFiles);
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult.getFeatures());
     }
     
     private void verifyServerFeaturesPreserveCase(Set<String> expected) throws Exception {
         util.setLowerCaseFeatures(false);
-        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+        FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult.getFeatures());
         util.setLowerCaseFeatures(true); // restore default
     }
     
