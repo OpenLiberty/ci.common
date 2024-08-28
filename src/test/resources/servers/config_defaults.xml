@@ -2,5 +2,6 @@
 <server description="new server">
     <featureManager>
         <feature>defaults</feature>
+        <platform>plat-defaults</platform>
     </featureManager>
 </server>

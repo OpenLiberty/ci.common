@@ -2,5 +2,6 @@
 <server description="new server">
     <featureManager>
         <feature>overrides</feature>
+        <platform>plat-overrides</platform>
     </featureManager>
 </server>
