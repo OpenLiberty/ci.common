@@ -95,7 +95,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
         InstallFeatureUtil util = getNewInstallFeatureUtil();
         List<String> featuresToInstall = new ArrayList<String>();
         featuresToInstall.add("a-1.0");
-        util.installFeatures(true, featuresToInstall);
+        util.installFeatures(true, featuresToInstall, new ArrayList<String>());
     }
     
     @Test

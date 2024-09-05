@@ -661,7 +661,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      *                                  installed
      */
     @SuppressWarnings("unchecked")
-    public void installFeatures(boolean isAcceptLicense, List<String> featuresList)
+    public void installFeatures(boolean isAcceptLicense, List<String> featuresList, List<String> platformsList)
             throws PluginExecutionException {
     	
     	Map<String, String> featureToExtMap = new HashMap<String, String>();
@@ -727,7 +727,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 	        mapBasedInstallKernel = createMapBasedInstallKernelInstance(bundle, installDirectory);
 	    
 	    
-	        Collection<?> resolvedFeatures = resolveFeatures(featuresToInstall, jsonRepos, acceptLicenseMapValue, pluginListedEsas);
+	        Collection<?> resolvedFeatures = resolveFeatures(featuresToInstall, platformsList,jsonRepos, acceptLicenseMapValue, pluginListedEsas);
 	        if(resolvedFeatures == null || resolvedFeatures.isEmpty()) {
 		        return;
 	        }
@@ -816,13 +816,14 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @return Collection of resolved features
      * @throws PluginExecutionException
      */
-    private Collection<?> resolveFeatures(List<String> featuresToInstall, List<File> jsonRepos,
+    private Collection<?> resolveFeatures(List<String> featuresToInstall,List<String> platforms, List<File> jsonRepos,
 	    boolean acceptLicenseMapValue, Set<String> localESA) throws PluginExecutionException {
 	info("Resolving features... " );
 	
 	mapBasedInstallKernel.put("install.local.esa", true);
 	mapBasedInstallKernel.put("single.json.file", jsonRepos);
 	mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
+	mapBasedInstallKernel.put("platforms", platforms);
 	mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
 	mapBasedInstallKernel.put("is.install.server.feature", true);
 	if(!localESA.isEmpty()) {
