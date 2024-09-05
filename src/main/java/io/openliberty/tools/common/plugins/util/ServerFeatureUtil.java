@@ -393,7 +393,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                         Element child = (Element) nodes.item(i);
                         if ("featureManager".equals(child.getNodeName())) {
                             if (result == null) {
-                                result = new FeaturesPlatforms(new HashSet<String>(), new HashSet<String>());
+                                result = new FeaturesPlatforms();
                             }
                             FeaturesPlatforms fp = parseFeatureManagerNode(child);
                             result.getFeatures().addAll(fp.getFeatures());
@@ -459,26 +459,17 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                 String content = platformElements.item(j).getTextContent();
                 if (content != null) {
                 	content = content.trim();
-                	if (content.contains(":")) {
-                		String[] contentsplit = content.split(":");
-                		if (contentsplit.length > 2) {
-                			debug("The format of platform " + content + " in the server.xml is not valid and its installation will be skipped.");
-                		} else {
-                			platforms.add(contentsplit[0] + ":" + contentsplit[1].trim().toLowerCase());
-                		}
-                	} else {
-                        if (lowerCaseFeatures) {
-                            content = content.trim().toLowerCase();
-                        } else {
-                            content = content.trim();
-                        }
-                        // Check for empty feature element, skip it and log warning.
-                        if (content.isEmpty()) {
-                            warn("An empty platform was specified in a server configuration file. Ensure that the platforms are valid.");
-                        } else {
-                        	platforms.add(content);
-                        }
-                	}
+                    if (lowerCaseFeatures) {
+                        content = content.trim().toLowerCase();
+                    } else {
+                        content = content.trim();
+                    }
+                    // Check for empty feature element, skip it and log warning.
+                    if (content.isEmpty()) {
+                        warn("An empty platform was specified in a server configuration file. Ensure that the platforms are valid.");
+                    } else {
+                    	platforms.add(content);
+                    }
                 }
             }
         }
