@@ -71,22 +71,40 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     
     private void verifyServerFeatures(Set<String> expected) throws Exception {
     	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult.getFeatures());
+    	Set<String> featuresToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, featuresToInstall);
     }
     private void verifyServerFeaturesAndPlatforms(Set<String> expectedFeatures,Set<String> expectedPlatforms) throws Exception {
     	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expectedFeatures, getServerResult.getFeatures());
-        assertEquals("The platforms returned from getServerFeatures do not equal the expected platforms.", expectedPlatforms, getServerResult.getPlatforms());
+    	Set<String> featuresToInstall = new HashSet<String>();
+        Set<String> platformsToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        	platformsToInstall = getServerResult.getPlatforms();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expectedFeatures, featuresToInstall);
+        assertEquals("The platforms returned from getServerFeatures do not equal the expected platforms.", expectedPlatforms, platformsToInstall);
     }
     private void verifyServerFeatures(Set<String> expected, Set<String> ignoreFiles) throws Exception {
     	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null, ignoreFiles);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult.getFeatures());
+    	Set<String> featuresToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, featuresToInstall);
     }
     
     private void verifyServerFeaturesPreserveCase(Set<String> expected) throws Exception {
         util.setLowerCaseFeatures(false);
         FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult.getFeatures());
+        Set<String> featuresToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, featuresToInstall);
         util.setLowerCaseFeatures(true); // restore default
     }
     

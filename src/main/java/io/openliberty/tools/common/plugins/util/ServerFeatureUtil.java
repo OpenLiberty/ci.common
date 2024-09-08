@@ -396,8 +396,14 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                                 result = new FeaturesPlatforms();
                             }
                             FeaturesPlatforms fp = parseFeatureManagerNode(child);
-                            result.getFeatures().addAll(fp.getFeatures());
-                            result.getPlatforms().addAll(fp.getPlatforms());
+                            Set<String> featuresToInstall = new HashSet<String>();
+                            Set<String> platformsToInstall = new HashSet<String>();
+                            if (fp != null) {
+                            	featuresToInstall = fp.getFeatures();
+                            	platformsToInstall = fp.getPlatforms();
+                            }
+                            result.getFeatures().addAll(featuresToInstall);
+                            result.getPlatforms().addAll(platformsToInstall);
                         } else if ("include".equals(child.getNodeName())){
                             result = parseIncludeNode(result, serverDirectory, canonicalServerFile, bootstrapProperties, child, updatedParsedXmls);
                         }
@@ -598,7 +604,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
             } // else the parent already has some results (even if it's empty), so ignore the child
         } else {
             // anything else counts as "merge", even if the onConflict value is invalid
-            if (!fp.getFeatures().isEmpty() || !fp.getPlatforms().isEmpty()) {
+            if ((fp != null) && (!fp.getFeatures().isEmpty() || !fp.getPlatforms().isEmpty())) {
                 if (result.getFeatures().isEmpty() && result.getPlatforms().isEmpty()) {
                     result = fp;
                 } else {
