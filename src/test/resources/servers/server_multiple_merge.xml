@@ -2,6 +2,7 @@
 <server description="new server">
     <featureManager>
         <feature>orig</feature>
+        <platform>plat-1.0</platform>
     </featureManager>
     <include location="extraFeatures2.xml" onConflict="MERGE"/>
     <include location="extraFeatures3.xml" onConflict="MERGE"/>

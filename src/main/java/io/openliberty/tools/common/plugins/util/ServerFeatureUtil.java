@@ -53,6 +53,7 @@ import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
+
 import io.openliberty.tools.common.CommonLoggerI;
 
 /**
@@ -83,6 +84,59 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     private URLClassLoader installMapLoader = null;
     private Class<Map<String, Object>> installMapClass = null;
     protected Map<String, Object> mapBasedInstallKernel= null;
+    
+    public static class FeaturesPlatforms {
+
+        /**
+         * @param features
+         * @param platforms
+         */
+        public FeaturesPlatforms(Set<String> features, Set<String> platforms) {
+            super();
+            this.features = features;
+            this.platforms = platforms;
+        }
+        /**
+         * @param features
+         * @param platforms
+         */
+        public FeaturesPlatforms() {
+            super();
+            this.features = new HashSet<String>();
+            this.platforms = new HashSet<String>();
+        }
+
+        private Set<String> features;
+        private Set<String> platforms;
+
+        /**
+         * @return the features
+         */
+        public Set<String> getFeatures() {
+            return features;
+        }
+
+        /**
+         * @param features the features to set
+         */
+        public void setFeatures(Set<String> features) {
+            this.features = features;
+        }
+
+        /**
+         * @return the platforms
+         */
+        public Set<String> getPlatforms() {
+            return platforms;
+        }
+
+        /**
+         * @param platforms the platforms to set
+         */
+        public void setPlatforms(Set<String> platforms) {
+            this.platforms = platforms;
+        }
+    }
     
     /**
      * Log debug
@@ -154,17 +208,17 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      * @param serverXmlFile The server.xml file
      * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
      * @param dropinsFilesToIgnore A set of file names under configDropins/overrides or configDropins/defaults to ignore
-     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
+     * @return FeaturesPlatforms containing both features and platforms that should be installed from server.xml, or empty set if nothing should be installed
      *         or null if there are no valid xml files or they have no featureManager section
      */
-     public Set<String> getServerFeatures(File serverDirectory, File serverXmlFile, Map<String,File> libertyDirPropFiles, Set<String> dropinsFilesToIgnore) {
+     public FeaturesPlatforms getServerFeatures(File serverDirectory, File serverXmlFile, Map<String,File> libertyDirPropFiles, Set<String> dropinsFilesToIgnore) {
         if (libertyDirPropFiles != null) {
             setLibertyDirectoryPropertyFiles(libertyDirPropFiles);
         } else if (libertyDirectoryPropertyToFile == null) {
             warn("The properties for directories are null and could lead to server include files not being processed for server features.");
         }
         Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
-        Set<String> result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults", dropinsFilesToIgnore);
+        FeaturesPlatforms result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults", dropinsFilesToIgnore);
         if (serverXmlFile == null) {
             serverXmlFile = new File(serverDirectory, "server.xml");
         }
@@ -180,10 +234,10 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      * @param serverDirectory The server directory containing the server.xml
      * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
      * @param dropinsFilesToIgnore A set of file names under configDropins/overrides or configDropins/defaults to ignore
-     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
+     * @return FeaturesPlatforms containing both features and platforms that should be installed from server.xml, or empty set if nothing should be installed
      *         or null if there are no valid xml files or they have no featureManager section
      */
-    public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles, Set<String> dropinsFilesToIgnore) {
+    public FeaturesPlatforms getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles, Set<String> dropinsFilesToIgnore) {
         return getServerFeatures(serverDirectory, new File(serverDirectory, "server.xml"), libertyDirPropFiles, dropinsFilesToIgnore);
     }
 
@@ -191,10 +245,10 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      * Get the set of features defined in the server.xml
      * @param serverDirectory The server directory containing the server.xml
      * @param libertyDirPropFiles Map of Liberty directory properties to the actual File for each directory
-     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
+     * @return FeaturesPlatforms containing both features and platforms that should be installed from server.xml, or empty set if nothing should be installed
      *         or null if there are no valid xml files or they have no featureManager section
      */
-    public Set<String> getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles) {
+    public FeaturesPlatforms getServerFeatures(File serverDirectory, Map<String,File> libertyDirPropFiles) {
         return getServerFeatures(serverDirectory, libertyDirPropFiles, null);
     }
 
@@ -227,13 +281,13 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      *                             or "overrides"
      * @param dropinsFilesToIgnore A set of file names under the given folderName
      *                             that should be ignored
-     * @return The set of features to install, or empty set if the cumulatively
+     * @return The FeaturesPlatforms containing both features and platforms to install, or empty set if the cumulatively
      *         parsed xml files only have featureManager sections but no features to
      *         install, or null if there are no valid xml files or they have no
      *         featureManager section
      */
-    private Set<String> getConfigDropinsFeatures(Set<String> origResult, File serverDirectory, Properties bootstrapProperties, String folderName, final Set<String> dropinsFilesToIgnore) {
-        Set<String> result = origResult;
+    private FeaturesPlatforms getConfigDropinsFeatures(FeaturesPlatforms origResult, File serverDirectory, Properties bootstrapProperties, String folderName, final Set<String> dropinsFilesToIgnore) {
+    	FeaturesPlatforms result = origResult;
         File configDropinsFolder;
         try {
             configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName).getCanonicalFile();
@@ -262,9 +316,9 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         Collections.sort(Arrays.asList(configDropinsXmls), comparator);
 
         for (File xml : configDropinsXmls) {
-            Set<String> features = getServerXmlFeatures(result, serverDirectory, xml, bootstrapProperties,null);
-            if (features != null) {
-                result = features;
+        	FeaturesPlatforms fp = getServerXmlFeatures(result, serverDirectory, xml, bootstrapProperties,null);
+            if (fp!=null && (!fp.getFeatures().isEmpty() || !fp.getPlatforms().isEmpty())) {
+                result = fp;
             }
         }
         return result;
@@ -289,8 +343,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      *         features to install, or null if there are no valid xml files or
      *         they have no featureManager section
      */
-    public Set<String> getServerXmlFeatures(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
-        Set<String> result = origResult;
+    public FeaturesPlatforms getServerXmlFeatures(FeaturesPlatforms origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, List<File> parsedXmls) {
+    	FeaturesPlatforms result = origResult;
         List<File> updatedParsedXmls = parsedXmls != null ? parsedXmls : new ArrayList<File>();
         File canonicalServerFile;
         try {
@@ -339,9 +393,17 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                         Element child = (Element) nodes.item(i);
                         if ("featureManager".equals(child.getNodeName())) {
                             if (result == null) {
-                                result = new HashSet<String>();
+                                result = new FeaturesPlatforms();
                             }
-                            result.addAll(parseFeatureManagerNode(child));
+                            FeaturesPlatforms fp = parseFeatureManagerNode(child);
+                            Set<String> featuresToInstall = new HashSet<String>();
+                            Set<String> platformsToInstall = new HashSet<String>();
+                            if (fp != null) {
+                            	featuresToInstall = fp.getFeatures();
+                            	platformsToInstall = fp.getPlatforms();
+                            }
+                            result.getFeatures().addAll(featuresToInstall);
+                            result.getPlatforms().addAll(platformsToInstall);
                         } else if ("include".equals(child.getNodeName())){
                             result = parseIncludeNode(result, serverDirectory, canonicalServerFile, bootstrapProperties, child, updatedParsedXmls);
                         }
@@ -363,14 +425,15 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      * 
      * @param node
      *            The featureManager node
-     * @return Set of trimmed lowercase feature names
+     * @return FeaturesPlatforms holding both trimmed lowercase feature names and platform names
      */
-    private Set<String> parseFeatureManagerNode(Element node) {
-        Set<String> result = new HashSet<String>();
-        NodeList features = node.getElementsByTagName("feature");
-        if (features != null) {
-            for (int j = 0; j < features.getLength(); j++) {
-                String content = features.item(j).getTextContent();
+    private FeaturesPlatforms parseFeatureManagerNode(Element node) {
+        Set<String> features = new HashSet<String>();
+        Set<String> platforms = new HashSet<String>();
+        NodeList featureElements = node.getElementsByTagName("feature");
+        if (featureElements != null) {
+            for (int j = 0; j < featureElements.getLength(); j++) {
+                String content = featureElements.item(j).getTextContent();
                 if (content != null) {
                 	content = content.trim();
                 	if (content.contains(":")) {
@@ -378,7 +441,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                 		if (contentsplit.length > 2) {
                 			debug("The format of feature " + content + " in the server.xml is not valid and its installation will be skipped.");
                 		} else {
-                			result.add(contentsplit[0] + ":" + contentsplit[1].trim().toLowerCase());
+                			features.add(contentsplit[0] + ":" + contentsplit[1].trim().toLowerCase());
                 		}
                 	} else {
                         if (lowerCaseFeatures) {
@@ -390,19 +453,39 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                         if (content.isEmpty()) {
                             warn("An empty feature was specified in a server configuration file. Ensure that the features are valid.");
                         } else {
-                            result.add(content);
+                        	features.add(content);
                         }
                 	}
                 }
             }
         }
-        return result;
+        NodeList platformElements = node.getElementsByTagName("platform");
+        if (platformElements != null) {
+            for (int j = 0; j < platformElements.getLength(); j++) {
+                String content = platformElements.item(j).getTextContent();
+                if (content != null) {
+                	content = content.trim();
+                    if (lowerCaseFeatures) {
+                        content = content.trim().toLowerCase();
+                    } else {
+                        content = content.trim();
+                    }
+                    // Check for empty feature element, skip it and log warning.
+                    if (content.isEmpty()) {
+                        warn("An empty platform was specified in a server configuration file. Ensure that the platforms are valid.");
+                    } else {
+                    	platforms.add(content);
+                    }
+                }
+            }
+        }
+        return new FeaturesPlatforms(features, platforms);
     }
     
     /**
      * Parse features from an include node.
      * 
-     * @param origResult
+     * @param result2
      *            The features that have been parsed so far.
      * @param serverDirectory
      *            The server directory containing the server.xml.
@@ -418,9 +501,9 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
      *         they have no featureManager section
      * @throws IOException
      */
-    private Set<String> parseIncludeNode(Set<String> origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
+    private FeaturesPlatforms parseIncludeNode(FeaturesPlatforms origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
             List<File> updatedParsedXmls) {
-        Set<String> result = origResult;
+    	FeaturesPlatforms result = origResult;
         // Need to handle more variable substitution for include location.
         String nodeValue = node.getAttribute("location");
         String includeFileName = VariableUtility.resolveVariables(this, nodeValue, null, bootstrapProperties, new Properties(), getLibertyDirectoryPropertyFiles());
@@ -464,11 +547,11 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         for (File file : includeFiles) {
             if (!updatedParsedXmls.contains(file)) {
                 String onConflict = node.getAttribute("onConflict");
-                Set<String> features = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
-                if (features != null && !features.isEmpty()) {
+                FeaturesPlatforms fp = getServerXmlFeatures(null, serverDirectory, file, bootstrapProperties, updatedParsedXmls);
+                if (fp != null && !fp.getFeatures().isEmpty()) {
                     info("Features were included for file "+ file.toString());
                 }
-                result = handleOnConflict(result, onConflict, features);
+                result = handleOnConflict(result, onConflict, fp);
             }
         }
         return result;
@@ -507,25 +590,26 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         }
     }
     
-    private Set<String> handleOnConflict(Set<String> origResult, String onConflict, Set<String> features) {
-        Set<String> result = origResult;
+    private FeaturesPlatforms handleOnConflict(FeaturesPlatforms origResult, String onConflict, FeaturesPlatforms fp) {
+    	FeaturesPlatforms result = origResult;
         if ("replace".equalsIgnoreCase(onConflict)) {
-            if (features != null && !features.isEmpty()) {
-                // only replace if the child has features
-                result = features;
+            if (fp != null && (!fp.getFeatures().isEmpty() || !fp.getPlatforms().isEmpty())) {
+                // only replace if the child has features or platforms
+                result = fp;
             }
         } else if ("ignore".equalsIgnoreCase(onConflict)) {
             if (result == null) {
                 // parent has no results (i.e. no featureManager section), so use the child's results
-                result = features;
+                result = fp;
             } // else the parent already has some results (even if it's empty), so ignore the child
         } else {
             // anything else counts as "merge", even if the onConflict value is invalid
-            if (features != null) {
-                if (result == null) {
-                    result = features;
+            if ((fp != null) && (!fp.getFeatures().isEmpty() || !fp.getPlatforms().isEmpty())) {
+                if (result.getFeatures().isEmpty() && result.getPlatforms().isEmpty()) {
+                    result = fp;
                 } else {
-                    result.addAll(features);
+                    result.getFeatures().addAll(fp.getFeatures());
+                    result.getPlatforms().addAll(fp.getPlatforms());
                 }
             }
         }

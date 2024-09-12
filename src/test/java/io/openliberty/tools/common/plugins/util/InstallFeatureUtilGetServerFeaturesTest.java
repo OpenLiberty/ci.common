@@ -34,6 +34,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
+
 public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureUtilTest {
     private static File serverDirectory = null;
     private static File src = null;
@@ -68,18 +70,41 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
     
     private void verifyServerFeatures(Set<String> expected) throws Exception {
-        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+    	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
+    	Set<String> featuresToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, featuresToInstall);
+    }
+    private void verifyServerFeaturesAndPlatforms(Set<String> expectedFeatures,Set<String> expectedPlatforms) throws Exception {
+    	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
+    	Set<String> featuresToInstall = new HashSet<String>();
+        Set<String> platformsToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        	platformsToInstall = getServerResult.getPlatforms();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expectedFeatures, featuresToInstall);
+        assertEquals("The platforms returned from getServerFeatures do not equal the expected platforms.", expectedPlatforms, platformsToInstall);
     }
     private void verifyServerFeatures(Set<String> expected, Set<String> ignoreFiles) throws Exception {
-        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null, ignoreFiles);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+    	FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null, ignoreFiles);
+    	Set<String> featuresToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, featuresToInstall);
     }
     
     private void verifyServerFeaturesPreserveCase(Set<String> expected) throws Exception {
         util.setLowerCaseFeatures(false);
-        Set<String> getServerResult = util.getServerFeatures(serverDirectory, null);
-        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, getServerResult);
+        FeaturesPlatforms getServerResult = util.getServerFeatures(serverDirectory, null);
+        Set<String> featuresToInstall = new HashSet<String>();
+        if (getServerResult != null) {
+        	featuresToInstall = getServerResult.getFeatures();
+        }
+        assertEquals("The features returned from getServerFeatures do not equal the expected features.", expected, featuresToInstall);
         util.setLowerCaseFeatures(true); // restore default
     }
     
@@ -249,6 +274,30 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
     
     /**
+     * Tests server.xml with both config dropins overrides and defaults
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testOverridesAndDefaultsWithPlatforms() throws Exception{
+        copy("server.xml");
+        copyAsName("config_overrides.xml", "configDropins/overrides/config_overrides.xml");
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
+        
+        Set<String> expectedFeatures = new HashSet<String>();
+        expectedFeatures.add("orig");
+        expectedFeatures.add("overrides");
+        expectedFeatures.add("defaults");
+        
+        Set<String> expectedPlatforms = new HashSet<String>();
+        expectedPlatforms.add("plat-1.0");
+        expectedPlatforms.add("plat-overrides");
+        expectedPlatforms.add("plat-defaults");
+
+        verifyServerFeaturesAndPlatforms(expectedFeatures,expectedPlatforms);
+    }
+    
+    /**
      * Tests server.xml with multiple MERGE functions
      * 
      * @throws Exception
@@ -265,6 +314,29 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
         expected.add("extra3");
 
         verifyServerFeatures(expected);
+    }
+    
+    /**
+     * Tests server.xml with multiple MERGE functions
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testMultipleMergeWithPlatforms() throws Exception{
+        copyAsName("server_multiple_merge.xml", "server.xml");
+        copy("extraFeatures2.xml");
+        copy("extraFeatures3.xml");
+
+        Set<String> expectedFeatures = new HashSet<String>();
+        expectedFeatures.add("orig");
+        expectedFeatures.add("extra2");
+        expectedFeatures.add("extra3");
+        
+        Set<String> expectedPlatforms = new HashSet<String>();
+        expectedPlatforms.add("plat-1.0");
+        expectedPlatforms.add("plat-2.0");
+
+        verifyServerFeaturesAndPlatforms(expectedFeatures,expectedPlatforms);
     }
     
     /**

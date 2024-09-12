@@ -2,5 +2,6 @@
 <server description="new server">
 	<featureManager>
         <feature>extra2</feature>
+        <platform>plat-2.0</platform>
     </featureManager>
 </server>

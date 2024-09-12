@@ -81,6 +81,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import io.openliberty.tools.ant.ServerTask;
+import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -5749,22 +5750,28 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         if (generateFeatures) {
             // generateFeatures scenario: check if a generated feature has been manually added to other config files
-            generatedFeatureSet = servUtil.getServerXmlFeatures(null, serverDirectory,
-            generatedFeaturesFile, null, null);
+        	FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), serverDirectory,
+                    generatedFeaturesFile, null, null);
+        	if (fp != null)
+        		generatedFeatureSet = fp.getFeatures();
             Set<String> generatedFiles = new HashSet<String>();
             generatedFiles.add(generatedFeaturesFile.getName());
             // if serverXmlFile is null, getServerFeatures will use the default server.xml
             // in the configDirectory
-            featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+            fp = servUtil.getServerFeatures(configDirectory, serverXmlFile,
                     new HashMap<String, File>(), generatedFiles);
+            if (fp != null)
+            	featuresExcludingGenerated = fp.getFeatures();
             if (featuresExcludingGenerated != null && generatedFeatureSet != null
                     && !Collections.disjoint(featuresExcludingGenerated, generatedFeatureSet)) {
                 // indicates a generated feature has been manually added to other config files
                 return true;
             }
         } else {
-            featuresExcludingGenerated = servUtil.getServerFeatures(configDirectory, serverXmlFile,
+        	FeaturesPlatforms fp = servUtil.getServerFeatures(configDirectory, serverXmlFile,
                     new HashMap<String, File>(), null);
+        	if (fp != null)
+        		featuresExcludingGenerated = fp.getFeatures();
         }
         
         // compare current feature list to existing feature list
@@ -5790,10 +5797,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     // returns the features specified in the generated-features.xml file
     private Set<String> getGeneratedFeatures() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
-        Set<String> genFeatSet = new HashSet<String>();
-        servUtil.getServerXmlFeatures(genFeatSet, configDirectory,
+        FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), configDirectory,
                 generatedFeaturesFile, null, null);
-        return genFeatSet;
+        return fp!=null ? fp.getFeatures() : new HashSet<String>(); 
     }
 
     /**
