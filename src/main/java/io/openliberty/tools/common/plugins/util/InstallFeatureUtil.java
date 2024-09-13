@@ -113,6 +113,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String TO_USER = "usr";
     private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
     private static final String MIN_VERIFY_FEATURE_VERSION = "23.0.0.9";
+    private static final String MIN_VERSIONLESS_FEATURE_VERSION = "24.0.0.8";
 
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
@@ -680,9 +681,8 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     		    featuresToInstall.addAll(pluginListedEsas);
             }
     	}
-    	
-        	
     		   	
+        boolean containsVersionlessFeature = false;
     	for (String feature: featuresList) {
     		if (feature.contains(":")) {
     			String[] userFeatureSplit = feature.split(":");
@@ -693,10 +693,25 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     				featuresToInstall.add(userFeatureName);
     			}
     		} else {
+                if (!feature.contains("-")) {
+                    containsVersionlessFeature = true;
+                }
     			featureToExtMap.put(feature, "");
     			featuresToInstall.add(feature);
     		}
     	}
+
+        if ((openLibertyVersion != null) && (!platformsList.isEmpty() || containsVersionlessFeature)) {
+            if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_VERSIONLESS_FEATURE_VERSION, true) < 0) {
+                if (!platformsList.isEmpty()) {
+                    String message = "Detected versionless feature(s) for installation. The minimum required Liberty version for versionless feature support is " + MIN_VERSIONLESS_FEATURE_VERSION;
+                    error(message);
+                    throw new PluginExecutionException(message);
+                } else {
+                    warn("Detected possible versionless feature(s) for installation. The minimum required Liberty version for versionless feature support is " + MIN_VERSIONLESS_FEATURE_VERSION);
+                }
+            }
+        }
     	    		
     	if(featuresToInstall.isEmpty()) {
     	    debug("featuresToInstall is empty");
@@ -818,45 +833,50 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      */
     private Collection<?> resolveFeatures(List<String> featuresToInstall,List<String> platforms, List<File> jsonRepos,
 	    boolean acceptLicenseMapValue, Set<String> localESA) throws PluginExecutionException {
-	info("Resolving features... " );
-	
-	mapBasedInstallKernel.put("install.local.esa", true);
-	mapBasedInstallKernel.put("single.json.file", jsonRepos);
-	mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
-	mapBasedInstallKernel.put("platforms", platforms);
-	mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
-	mapBasedInstallKernel.put("is.install.server.feature", true);
-	if(!localESA.isEmpty()) {
-	    mapBasedInstallKernel.put("install.individual.esas", true);
-	    mapBasedInstallKernel.put("individual.esas", localESA.stream().map(File::new).collect(Collectors.toList()));
-	}
 
-	Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
-	if (resolvedFeatures == null) {
-	    debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
-	    String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
-	    throw new PluginExecutionException(exceptionMessage);
-	} else if (resolvedFeatures.isEmpty()) {
-	    debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
-	    String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
-	    if (exceptionMessage == null) {
-	        debug("resolvedFeatures was empty but the install kernel did not issue any messages");
-	        info("The features are already installed, so no action is needed.");
-	        return resolvedFeatures;
-	    } else if (exceptionMessage.contains("CWWKF1250I")) {
-	        info(exceptionMessage);
-	        info("The features are already installed, so no action is needed.");
-	        return resolvedFeatures;
-	    } else {
-	        if (isFeatureConflict(exceptionMessage)) {
-	            throw new PluginExecutionException(
-	                   CONFLICT_MESSAGE + featuresToInstall
-	                            + ": " + exceptionMessage);
-	        }
-	        throw new PluginExecutionException(exceptionMessage);
-	    }
-	}
-	return resolvedFeatures;
+        if (!platforms.isEmpty()) {
+            info("Resolving features: " + featuresToInstall + " using platforms: " + platforms);
+        } else {
+            info("Resolving features: " + featuresToInstall);
+        }
+
+        mapBasedInstallKernel.put("install.local.esa", true);
+        mapBasedInstallKernel.put("single.json.file", jsonRepos);
+        mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
+        mapBasedInstallKernel.put("platforms", platforms);
+        mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
+        mapBasedInstallKernel.put("is.install.server.feature", true);
+        if(!localESA.isEmpty()) {
+            mapBasedInstallKernel.put("install.individual.esas", true);
+            mapBasedInstallKernel.put("individual.esas", localESA.stream().map(File::new).collect(Collectors.toList()));
+        }
+
+        Collection<?> resolvedFeatures = (Collection<?>) mapBasedInstallKernel.get("action.result");
+        if (resolvedFeatures == null) {
+            debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
+            String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
+            throw new PluginExecutionException(exceptionMessage);
+        } else if (resolvedFeatures.isEmpty()) {
+            debug("action.exception.stacktrace: " + mapBasedInstallKernel.get("action.exception.stacktrace"));
+            String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
+            if (exceptionMessage == null) {
+                debug("resolvedFeatures was empty but the install kernel did not issue any messages");
+                info("The features are already installed, so no action is needed.");
+                return resolvedFeatures;
+            } else if (exceptionMessage.contains("CWWKF1250I")) {
+                info(exceptionMessage);
+                info("The features are already installed, so no action is needed.");
+                return resolvedFeatures;
+            } else {
+                if (isFeatureConflict(exceptionMessage)) {
+                    throw new PluginExecutionException(
+                        CONFLICT_MESSAGE + featuresToInstall
+                                    + ": " + exceptionMessage);
+                }
+                throw new PluginExecutionException(exceptionMessage);
+            }
+        }
+        return resolvedFeatures;
     }
 
     // Attempt to disable connection caching in the URLClassLoader so that the jar files will
