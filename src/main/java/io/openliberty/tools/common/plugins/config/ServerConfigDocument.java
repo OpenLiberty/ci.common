@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.Map;
 import java.util.Properties;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -71,6 +72,7 @@ public class ServerConfigDocument {
     private static final XPathExpression XPATH_SERVER_ENTERPRISE_APPLICATION;
     private static final XPathExpression XPATH_SERVER_INCLUDE;
     private static final XPathExpression XPATH_SERVER_VARIABLE;
+    private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
 
     static {
         try {
@@ -80,6 +82,7 @@ public class ServerConfigDocument {
             XPATH_SERVER_ENTERPRISE_APPLICATION = xPath.compile("/server/enterpriseApplication");
             XPATH_SERVER_INCLUDE = xPath.compile("/server/include");
             XPATH_SERVER_VARIABLE = xPath.compile("/server/variable");
+            XPATH_ALL_SERVER_APPLICATIONS = xPath.compile("/server/application | /server/webApplication | /server/enterpriseApplication");
         } catch (XPathExpressionException ex) {
             // These XPath expressions should all compile statically.
             // Compilation failures mean the expressions are not syntactically
@@ -141,7 +144,14 @@ public class ServerConfigDocument {
         docBuilderFactory.setValidating(false);
         try {
             docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            docBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            docBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            docBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            docBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            docBuilderFactory.setXIncludeAware(false);
+            docBuilderFactory.setNamespaceAware(true);
+            docBuilderFactory.setExpandEntityReferences(false);
             docBuilder = docBuilderFactory.newDocumentBuilder();
         } catch (ParserConfigurationException e) {
             // fail catastrophically if we can't create a document builder
@@ -229,20 +239,20 @@ public class ServerConfigDocument {
             parseApplication(doc, XPATH_SERVER_APPLICATION);
             parseApplication(doc, XPATH_SERVER_WEB_APPLICATION);
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
-            parseNames(doc, "/server/application | /server/webApplication | /server/enterpriseApplication");
+            parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
             parseInclude(doc);
             parseConfigDropinsDir();
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Exception while initializing app location " + e.getMessage());
         }
     }
 
     //Checks for application names in the document. Will add locations without names to a Set
-    private void parseNames(Document doc, String expression) throws XPathExpressionException, IOException, SAXException {
+    private void parseNames(Document doc, XPathExpression expression) throws XPathExpressionException, IOException, SAXException {
         // parse input document
-        XPath xPath = XPathFactory.newInstance().newXPath();
-        NodeList nodeList = (NodeList) xPath.compile(expression).evaluate(doc, XPathConstants.NODESET);
+        NodeList nodeList = (NodeList) expression
+                .evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
             if (nodeList.item(i).getAttributes().getNamedItem("name") != null) {
@@ -511,8 +521,14 @@ public class ServerConfigDocument {
     }
 
     private Document parseDocument(InputStream in) throws SAXException, IOException {
-        try (InputStream ins = in) { // ins will be auto-closed
+        InputStream ins = null;
+        try { // ins will be auto-closed
+            ins = in;
             return getDocumentBuilder().parse(ins);
+        } finally {
+            if (ins != null) {
+                ins.close();
+            }
         }
     }
 

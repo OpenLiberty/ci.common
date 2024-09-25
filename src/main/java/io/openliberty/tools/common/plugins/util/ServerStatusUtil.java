@@ -53,7 +53,7 @@ public class ServerStatusUtil {
                         return false;
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println("exception while reading pidfile " + e.getMessage());
                 }
             }
             if (!sLock.exists() || !sCommand.exists()) {
@@ -68,7 +68,7 @@ public class ServerStatusUtil {
                         return false;
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println("exception while executing server status command " + e.getMessage());
                 }
             }
         }

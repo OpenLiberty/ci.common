@@ -74,6 +74,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -947,7 +948,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // Parse hostname, http, https ports for integration tests to use
             parseHostNameAndPorts(serverTask, messagesLogFile);
         } catch (IOException e) {
-            throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+            throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage());
         }
     }
 
@@ -963,7 +964,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             containerfileLines = Files.readAllLines(containerfile.toPath());
         } catch (IOException e) {
             error("Failed to read Containerfile located at " + containerfile);
-            throw new PluginExecutionException("Could not read Containerfile " + containerfile + ": " + e.getMessage(), e);
+            throw new PluginExecutionException("Could not read Containerfile " + containerfile + ": " + e.getMessage());
         }
         return containerfileLines;
     }
@@ -1263,7 +1264,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             Files.write(tempContainerfile.toPath(), containerfileLines, StandardCharsets.UTF_8);
         } catch (IOException e) {
             error("Failed to create temp Containerfile");
-            throw new PluginExecutionException("Could not create temp Containerfile: " + e.getMessage(), e);
+            throw new PluginExecutionException("Could not create temp Containerfile: " + e.getMessage());
         }
         return tempContainerfile;
     }
@@ -1311,7 +1312,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 "add files not needed in the container to the .containerignore file", e);
         } catch (IOException e) {
             error("Input or output error building container image: " + e.getMessage());
-            throw new RuntimeException(e);
+            throw new RuntimeException("Input or output error building container image: "+ e.getMessage());
         } catch (InterruptedException e) {
             debug("Thread InterruptedException while building the container image: " + e.getMessage());
             throw new PluginExecutionException("Could not build container image using Containerfile: " +
@@ -1361,7 +1362,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             execContainerCmdAndLog(containerRunProcess, 0, true);
         } catch (IOException e) {
             error("Error starting container: " + e.getMessage());
-            throw new RuntimeException(e);
+            throw new RuntimeException("Error starting container: " + e.getMessage());
         } catch (InterruptedException e) {
             error("Thread was interrupted while starting the container: " + e.getMessage());
         } catch (RuntimeException r) {
@@ -2361,7 +2362,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             ++portToTry;
                         }
                     } else {
-                        throw new IOException("Could not create a server socket.", e);
+                        throw new IOException("Could not create a server socket. " + e.getMessage());
                     }
                 } finally {
                     if (serverSocket != null) {
@@ -3535,9 +3536,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Collection<File> omitFiles = new ArrayList<File>();
         try {
             if (looseAppFile != null && looseAppFile.exists()) {
-                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+                DocumentBuilderFactory dbf = getDocumentBuilderFactory();
                 DocumentBuilder db = dbf.newDocumentBuilder();
                 Document document = db.parse(looseAppFile);
                 NodeList archiveList = document.getElementsByTagName("archive");
@@ -3565,6 +3564,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             return null;
         }
         return omitFiles;
+    }
+
+    public static DocumentBuilderFactory getDocumentBuilderFactory() throws ParserConfigurationException {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+        dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        dbf.setXIncludeAware(false);
+        dbf.setNamespaceAware(true);
+        dbf.setExpandEntityReferences(false);
+        return dbf;
     }
 
     private boolean processUpstreamJavaCompilation(List<ProjectModule> upstreamProjects, final ThreadPoolExecutor executor)

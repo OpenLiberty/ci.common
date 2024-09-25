@@ -40,6 +40,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -61,13 +62,11 @@ import io.openliberty.tools.common.CommonLoggerI;
  */
 public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil implements CommonLoggerI {
     
-    public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
-    public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
-    public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
+    public static final String REPOSITORY_RESOLVER_ARTIFACT_IDENTIFIER = "repository-resolver";
     private static final int COPY_FILE_TIMEOUT_MILLIS = 5 * 60 * 1000;
 
     public static final String WLP_INSTALL_DIR = "wlp.install.dir";
-    public static final String WLP_USER_DIR = "wlp.user.dir";
+    public static final String WLP_USR_DIR = "wlp.user.dir";
     public static final String USR_EXTENSION_DIR = "usr.extension.dir";
     public static final String SHARED_APP_DIR = "shared.app.dir";
     public static final String SHARED_CONFIG_DIR = "shared.config.dir";
@@ -365,8 +364,15 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         } else {
             try {
                 DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+                dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+                dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+                dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+                dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+                dbf.setXIncludeAware(false);
+                dbf.setNamespaceAware(true);
+                dbf.setExpandEntityReferences(false);
                 DocumentBuilder db = dbf.newDocumentBuilder();
                 db.setErrorHandler(new ErrorHandler() {
                     @Override
