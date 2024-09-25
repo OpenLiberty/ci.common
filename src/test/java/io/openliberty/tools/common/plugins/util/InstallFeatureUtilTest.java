@@ -179,7 +179,7 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
             @Override
             public File downloadArtifact(String groupId, String artifactId, String type, String version)
                     throws PluginExecutionException {
-                if (artifactId.equals(InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_IDENTIFIER)) {
+                if (artifactId.equals(InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_ID)) {
                     assertEquals("[18.0.0.2, 18.0.0.3)", version);
                     String downloadVersion = "18.0.0.2";
 
@@ -196,8 +196,8 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
                 }
             }
         };
-        String result = util.getOverrideBundleDescriptor(InstallFeatureUtil.OPEN_LIBERTY_GROUP_IDENTIFIER,
-                InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_IDENTIFIER);
+        String result = util.getOverrideBundleDescriptor(InstallFeatureUtil.OPEN_LIBERTY_GROUP_ID,
+                InstallFeatureUtil.REPOSITORY_RESOLVER_ARTIFACT_ID);
         String expectedEndsWith = RESOLVER_JAR_PATH + ";" + RESOLVER_SYMBOLIC_NAME;
         String expectedEndsWithWindows = expectedEndsWith.replaceAll("/", "\\\\");
         assertTrue(

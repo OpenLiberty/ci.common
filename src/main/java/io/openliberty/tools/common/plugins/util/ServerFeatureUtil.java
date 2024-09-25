@@ -61,12 +61,14 @@ import io.openliberty.tools.common.CommonLoggerI;
  * Utility class to determine server features
  */
 public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil implements CommonLoggerI {
-    
-    public static final String REPOSITORY_RESOLVER_ARTIFACT_IDENTIFIER = "repository-resolver";
+
+    public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
+    public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
+    public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     private static final int COPY_FILE_TIMEOUT_MILLIS = 5 * 60 * 1000;
 
     public static final String WLP_INSTALL_DIR = "wlp.install.dir";
-    public static final String WLP_USR_DIR = "wlp.user.dir";
+    public static final String WLP_USER_DIR = "wlp.user.dir";
     public static final String USR_EXTENSION_DIR = "usr.extension.dir";
     public static final String SHARED_APP_DIR = "shared.app.dir";
     public static final String SHARED_CONFIG_DIR = "shared.config.dir";

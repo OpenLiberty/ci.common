@@ -27,8 +27,8 @@ import java.util.Set;
 
 public abstract class BinaryScannerUtil {
 
-    public static final String BINARY_SCANNER_MAVEN_GROUP_IDENTIFIER = "com.ibm.websphere.appmod.tools";
-    public static final String BINARY_SCANNER_MAVEN_ARTIFACT_IDENTIFIER = "binary-app-scanner";
+    public static final String BINARY_SCANNER_MAVEN_GROUP_ID = "com.ibm.websphere.appmod.tools";
+    public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "binary-app-scanner";
     public static final String BINARY_SCANNER_MAVEN_TYPE = "jar";
     public static final String BINARY_SCANNER_MAVEN_VERSION = "[21.0.0.5-SNAPSHOT,)";
 
@@ -52,8 +52,8 @@ public abstract class BinaryScannerUtil {
             "in the application’s API usage: %s. Review and update your application to ensure it is not using conflicting APIs " +
             "from different levels of MicroProfile, Java EE, or Jakarta EE.";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE4 = "[None available]"; // format should match JVM Set.toString()
-    public static final String BINARY_SCANNER_CONFLICT_MESSAGE5 = "A working set of features could not be generated due to conflicts " + 
-            "in the required features: %s and required levels of MicroProfile: %s, Java EE or Jakarta EE: %s. Review and update your application to ensure it " + 
+    public static final String BINARY_SCANNER_CONFLICT_MESSAGE5 = "A working set of features could not be generated due to conflicts " +
+            "in the required features: %s and required levels of MicroProfile: %s, Java EE or Jakarta EE: %s. Review and update your application to ensure it " +
             "is using the correct levels of MicroProfile, Java EE, or Jakarta EE, or consider removing the following set of features: %s.";
     public static final String BINARY_SCANNER_INVALID_MP_MESSAGE = "The MicroProfile version number %s specified in the build file " +
             "is not supported for feature generation.";
@@ -94,7 +94,7 @@ public abstract class BinaryScannerUtil {
      * optimize parameter. The currentFeatureSet parameter indicates the starting list of features and all the
      * generated features will be compatible. The generated features will also be compatible with the indicated
      * versions of Java EE or Jakarta EE and MicroProfile.
-     * 
+     *
      * @param currentFeatureSet - the features already specified in the server configuration
      * @param classFiles - a set of class files for the scanner to handle. Should be a subset of allClassesDirectories
      * @param allClassesDirectories - the directories containing all the class files of the application
@@ -109,7 +109,7 @@ public abstract class BinaryScannerUtil {
      * @throws NoRecommendationException - indicates a problem and there are no recommended features
      * @throws RecommendationSetException - indicates a problem but the scanner was able to generate a set of
      *                                      features that should work to run the application
-     * @throws FeatureModifiedException - indicates a problem but the scanner was able to generate a set of features 
+     * @throws FeatureModifiedException - indicates a problem but the scanner was able to generate a set of features
      *                                      that should work if certain features are modified
      * @throws FeatureUnavailableException - indicates a problem between required features and required MP/EE levels but
      *                                      the scanner was able to generate a set of features that should be removed
@@ -118,7 +118,7 @@ public abstract class BinaryScannerUtil {
      *                                       scanner when used in combination with each other. E.g. EE 7 and MP 2.1
      */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
-            String logLocation, String targetJavaEE, String targetMicroProfile, boolean optimize)
+                                        String logLocation, String targetJavaEE, String targetMicroProfile, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
             FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException {
         Set<String> featureList = null;
@@ -189,7 +189,7 @@ public abstract class BinaryScannerUtil {
                     Set<String> modifications = getFeatures(scannerException);
                     //  rerun binary scanner with all class files and without the current feature set
                     Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile) : null;
-                    throw new FeatureModifiedException(modifications, 
+                    throw new FeatureModifiedException(modifications,
                             (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, scannerException.getLocalizedMessage());
                 } else if (scannerException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
                     // The list of features required by app or passed to binary scanner do not exist
@@ -241,10 +241,10 @@ public abstract class BinaryScannerUtil {
     /**
      * The method is intended to call the binary scanner to generate a list of the optimal features for an
      * application. This optimal list can be reported to the user as a suggested list of features.
-     * 
+     *
      * In order to generate the optimal list we must scan all classes in the application and we do not consider
      * the features already specified in the server configuration (server.xml).
-     * 
+     *
      * @param allClassesDirectories - the scanner will find all the class files in this set of directories
      * @param logLocation - directory name relative to project or absolute path passed to binary scanner
      * @param targetJavaEE - generate features valid for the indicated version of EE
@@ -267,13 +267,13 @@ public abstract class BinaryScannerUtil {
                 logLocation = null;
             }
             debug("Recalling binary scanner with the following inputs...\n" +
-                  "  binaryInputs: " + binaryInputs + "\n" +
-                  "  targetJavaEE: " + targetJavaEE + "\n" +
-                  "  targetMicroP: " + targetMicroProfile + "\n" +
-                  "  currentFeatures: " + currentFeaturesSet + "\n" +
-                  "  logLocation: " + logLocation + "\n" +
-                  "  logLevel: " + logLevel + "\n" +
-                  "  locale: " + java.util.Locale.getDefault());
+                    "  binaryInputs: " + binaryInputs + "\n" +
+                    "  targetJavaEE: " + targetJavaEE + "\n" +
+                    "  targetMicroP: " + targetMicroProfile + "\n" +
+                    "  currentFeatures: " + currentFeaturesSet + "\n" +
+                    "  logLocation: " + logLocation + "\n" +
+                    "  logLevel: " + logLevel + "\n" +
+                    "  locale: " + java.util.Locale.getDefault());
             featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                     currentFeaturesSet, logLocation, logLevel, java.util.Locale.getDefault());
             for (String s : featureList) {debug(s);};
@@ -446,12 +446,12 @@ public abstract class BinaryScannerUtil {
 
     /**
      * Convenience method to build the string reported to the user when the exception is detected.
-     * 
+     *
      * This is used after the caller has analyzed the Java or Jakarta EE version number and the MicroProfile
      * version number and generated argument values to pass to the binary scanner. If the binary scanner
      * detects a problem and throws an exception it reports the invalid arguments. We must map the invalid
      * arguments back to the user specified version number in order to fix the problem.
-     * 
+     *
      * @param invalidEEArg - the argument passed to the binary scanner which may be returned as invalid.
      * @param invalidMPArg - the argument passed to the binary scanner which may be returned as invalid.
      * @param eeVersion - the user specified version string from the build file used to generate the arg.

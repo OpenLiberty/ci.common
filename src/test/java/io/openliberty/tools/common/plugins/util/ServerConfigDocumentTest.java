@@ -111,7 +111,7 @@ public class ServerConfigDocumentTest {
                 libertyDirectoryPropertyToFile.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverDirectory.getCanonicalFile());
 
                 File wlpUserDir = serverDirectory.getParentFile().getParentFile();
-                libertyDirectoryPropertyToFile.put(ServerFeatureUtil.WLP_USR_DIR, wlpUserDir.getCanonicalFile());
+                libertyDirectoryPropertyToFile.put(ServerFeatureUtil.WLP_USER_DIR, wlpUserDir.getCanonicalFile());
 
                 File wlpInstallDir = wlpUserDir.getParentFile();
                 libertyDirectoryPropertyToFile.put(ServerFeatureUtil.WLP_INSTALL_DIR, wlpInstallDir.getCanonicalFile());

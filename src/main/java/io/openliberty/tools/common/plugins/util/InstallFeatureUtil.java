@@ -57,9 +57,9 @@ import org.apache.commons.io.FileUtils;
  */
 public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
-    public static final String OPEN_LIBERTY_GROUP_IDENTIFIER = "io.openliberty.features";
-    public static final String REPOSITORY_RESOLVER_ARTIFACT_IDENTIFIER = "repository-resolver";
-    public static final String INSTALL_MAP_ARTIFACT_IDENTIFIER = "install-map";
+    public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
+    public static final String REPOSITORY_RESOLVER_ARTIFACT_ID = "repository-resolver";
+    public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
     public static final String CONFLICT = "CWWKF0033E.*", INCOMPATIBLE_SINGLETON = "CWWKF1405E.*",
             MISSING_MULTIPLE_DEPENDENT = "CWWKF1385E.*", SAME_MODEL_CONFLICT = "CWWKF0043E.*",
             DIFF_MODEL_CONFLICT = "CWWKF0044E.*", SAME_INDIRECT_MODEL_CONFLICT = "CWWKF0047E.*",
@@ -101,10 +101,12 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
     private static final String JAR_EXT = ".jar";
-    private static final String OPEN_LIBERTY_PRODUCT_IDENTIFIER = "io.openliberty";
-    private static final String CLOSED_LIBERTY_PRODUCT_IDENTIFIER = "com.ibm.websphere.appserver";
-    private static final String TO_USR = "usr";
-    private static final String MIN_FEATURE_VERSION = "21.0.0.11";
+    private static final String OPEN_LIBERTY_PRODUCT_ID = "io.openliberty";
+    private static final String CLOSED_LIBERTY_PRODUCT_ID = "com.ibm.websphere.appserver";
+    private static final String FEATURES_BOM_ARTIFACT_ID = "features-bom";
+    private static final String FEATURES_JSON_ARTIFACT_ID = "features";
+    private static final String TO_USER = "usr";
+    private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
     private static final String MIN_VERIFY_FEATURE_VERSION = "23.0.0.9";
     private static final String MIN_VERSIONLESS_FEATURE_VERSION = "24.0.0.9";
 
@@ -166,7 +168,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             
             //check if the openliberty kernel meets min required version 21.0.0.11      	        		
             if (additionalJsons != null && !additionalJsons.isEmpty() && openLibertyVersion != null) {
-                if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_FEATURE_VERSION, true) >= 0) {
+                if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) >= 0) {
             		Set<File> groupIDJsons = getAdditionalJsons();
                     if (groupIDJsons != null) {
                         downloadedJsons.addAll(groupIDJsons);
@@ -449,7 +451,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     public static String getOpenLibertyVersion(List<ProductProperties> propList) {
         for (ProductProperties properties : propList) {
-            if (properties.getId().equals(OPEN_LIBERTY_PRODUCT_IDENTIFIER)) {
+            if (properties.getId().equals(OPEN_LIBERTY_PRODUCT_ID)) {
                 return properties.getVersion();
             }
         }
@@ -458,7 +460,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     
     public static boolean isClosedLiberty(List<ProductProperties> propList) {
     	for (ProductProperties properties : propList) {
-            if (properties.getId().equals(CLOSED_LIBERTY_PRODUCT_IDENTIFIER)) {
+            if (properties.getId().equals(CLOSED_LIBERTY_PRODUCT_ID)) {
                 return true;
             }
         }
@@ -540,7 +542,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 s = new Scanner(file);
                 // scan Maven coordinates for artifactIds that belong to the Open Liberty
                 // groupId
-                while (s.findWithinHorizon(OPEN_LIBERTY_GROUP_IDENTIFIER + ":([^:]*):", 0) != null) {
+                while (s.findWithinHorizon(OPEN_LIBERTY_GROUP_ID + ":([^:]*):", 0) != null) {
                     MatchResult match = s.match();
                     if (match.groupCount() >= 1) {
                         libertyFeatures.add(match.group(1));
@@ -663,11 +665,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     	
     	if(openLibertyVersion != null) {
     		info("plugin listed esa: " + pluginListedEsas.toString());
-            if ((VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_FEATURE_VERSION, true) < 0) && !pluginListedEsas.isEmpty()) {
+            if ((VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) < 0) && !pluginListedEsas.isEmpty()) {
     			//manually install user feature esas
     			info("Neither InstallUtility nor FeatureUtility is available to install user feature esa.");
     			info("Attempting to manually install the user feature esa without resolving its dependencies.");
-    			info("Recommended user action: upgrade to OpenLiberty version " + MIN_FEATURE_VERSION + " or higher and provide features-bom file for the user feature esa.");
+    			info("Recommended user action: upgrade to OpenLiberty version " + MIN_USER_FEATURE_VERSION + " or higher and provide features-bom file for the user feature esa.");
     			
     			copyUserFeature(pluginListedEsas, installDirectory);
             } else {
@@ -731,7 +733,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
         disableCacheInURLClassLoader();
         try {
-            String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_IDENTIFIER, REPOSITORY_RESOLVER_ARTIFACT_IDENTIFIER);
+            String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID);
 	        mapBasedInstallKernel = createMapBasedInstallKernelInstance(bundle, installDirectory);
 	    
 	    
@@ -756,7 +758,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
                 mapBasedInstallKernel.put("license.accept", acceptLicenseMapValue);
                 mapBasedInstallKernel.put("action.install", esaFile);
                 String ext = artifactsToExt.get(esaFile);
-                mapBasedInstallKernel.put("to.extension", TO_USR);
+                mapBasedInstallKernel.put("to.extension", TO_USER);
                 
                 if (ext!= null && !ext.equals("") && to != null) {
                 	warn("The product extension location \""+ext+"\" specified in the server.xml file overrides the to extension \""+to+"\" specified in the build file.");
@@ -923,7 +925,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private File loadInstallJarFile(File installDirectory) {
 	if(installJarFile == null) {
 	    if (openLibertyVersion != null) {
-		File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_IDENTIFIER, INSTALL_MAP_ARTIFACT_IDENTIFIER);
+		File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
 		if (installJarOverride != null && installJarOverride.exists()) {
 		    installJarFile = installJarOverride;
 		} else {

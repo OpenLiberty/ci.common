@@ -49,10 +49,10 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	private String openLibertyVersion;
 
-	public static final String OPEN_LIBERTY_GROUP_IDENTIFIER = "io.openliberty.features";
-	public static final String INSTALL_MAP_ARTIFACT_IDENTIFIER = "install-map";
-	public static final String FEATURES_JSON_ARTIFACT_IDENTIFIER = "features";
-	private static final String MIN_FEATURE_VERSION = "21.0.0.11";
+	public static final String OPEN_LIBERTY_GROUP_ID = "io.openliberty.features";
+	public static final String INSTALL_MAP_ARTIFACT_ID = "install-map";
+	public static final String FEATURES_JSON_ARTIFACT_ID = "features";
+	private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
 	private static final String INSTALL_MAP_PREFIX = "com.ibm.ws.install.map";
 	private static final String JAR_EXT = ".jar";
 
@@ -67,9 +67,9 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		installJarFile = loadInstallJarFile(installDirectory);
 
 		// check if the openliberty kernel meets min required version 21.0.0.11
-		if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_FEATURE_VERSION, true) < 0) {
+		if (VersionUtility.compareArtifactVersion(openLibertyVersion, MIN_USER_FEATURE_VERSION, true) < 0) {
 			throw new PluginScenarioException(
-					"Installing user features on Liberty version "+openLibertyVersion+" is not supported. The minimum required version of Liberty for installing user features is "+ MIN_FEATURE_VERSION +".");
+					"Installing user features on Liberty version "+openLibertyVersion+" is not supported. The minimum required version of Liberty for installing user features is "+ MIN_USER_FEATURE_VERSION +".");
 		}
 		if (installJarFile == null) {
 			throw new PluginScenarioException("Install map jar not found.");
@@ -116,7 +116,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	private void prepareFeature(String groupId, String artifactId, String version, File additionalBOM, Map<File, String> esaMap) {
 	    try {
             String repoLocation = parseRepositoryLocation(additionalBOM, groupId, artifactId, "pom", version);
-            String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_IDENTIFIER, "json",
+            String targetJsonFile = createArtifactFilePath(repoLocation, groupId, FEATURES_JSON_ARTIFACT_ID, "json",
                 version);
             File generatedJson = generateJson(targetJsonFile, esaMap);
             if (generatedJson.exists()) {
@@ -298,7 +298,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 
 	private File loadInstallJarFile(File installDirectory) {
 		if (openLibertyVersion != null) {
-			File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_IDENTIFIER, INSTALL_MAP_ARTIFACT_IDENTIFIER);
+			File installJarOverride = downloadOverrideJar(OPEN_LIBERTY_GROUP_ID, INSTALL_MAP_ARTIFACT_ID);
 			if (installJarOverride != null && installJarOverride.exists()) {
 				return installJarOverride;
 			}
@@ -335,7 +335,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 		}
 
 		// Init
-		String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_IDENTIFIER, REPOSITORY_RESOLVER_ARTIFACT_IDENTIFIER);
+		String bundle = getOverrideBundleDescriptor(OPEN_LIBERTY_GROUP_ID, REPOSITORY_RESOLVER_ARTIFACT_ID);
 		if (bundle != null) {
 			List<String> bundles = new ArrayList<String>();
 			bundles.add(bundle);
