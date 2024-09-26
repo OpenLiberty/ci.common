@@ -18,14 +18,18 @@ package io.openliberty.tools.common.plugins.config;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
@@ -55,9 +59,16 @@ public abstract class XmlDocument {
         builderFactory.setCoalescing(true);
         builderFactory.setIgnoringElementContentWhitespace(true);
         builderFactory.setValidating(false);
-        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
-    DocumentBuilder builder = builderFactory.newDocumentBuilder();
+        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        builderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        builderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        builderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        builderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        builderFactory.setXIncludeAware(false);
+        builderFactory.setNamespaceAware(true);
+        builderFactory.setExpandEntityReferences(false);
+        DocumentBuilder builder = builderFactory.newDocumentBuilder();
         doc = builder.parse(xmlFile);
     }
 
@@ -70,12 +81,12 @@ public abstract class XmlDocument {
         if (!f.getParentFile().exists()) {
             f.getParentFile().mkdirs();
         }
-        FileOutputStream outFile = new FileOutputStream(f);
+        OutputStream outFile = Files.newOutputStream(f.toPath());
         
         DOMSource source = new DOMSource(doc);
-        StreamResult result = new StreamResult(outFile);
+        StreamResult result = new StreamResult(new OutputStreamWriter(outFile, StandardCharsets.UTF_8));
         
-        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        TransformerFactory transformerFactory = getTransformerFactory();
         Transformer transformer = transformerFactory.newTransformer();
         transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
         transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, "yes");
@@ -108,5 +119,15 @@ public abstract class XmlDocument {
         String xmlContents = new String(contents, StandardCharsets.UTF_8);
         xmlContents = xmlContents.replace("?><", "?>"+System.getProperty("line.separator")+"<");
         Files.write(f.toPath(), xmlContents.getBytes());
+    }
+
+    private static TransformerFactory getTransformerFactory() throws TransformerConfigurationException {
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, Boolean.TRUE);
+        // XMLConstants.ACCESS_EXTERNAL_DTD uses an empty string to deny all access to external references;
+        transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        // XMLConstants.ACCESS_EXTERNAL_STYLESHEET uses an empty string to deny all access to external references;
+        transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+        return transformerFactory;
     }
 }
