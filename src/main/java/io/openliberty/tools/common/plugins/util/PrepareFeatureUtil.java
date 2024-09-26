@@ -146,7 +146,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	    ArrayList<String> missing_tags = new ArrayList<>();
 	    try {
 			DocumentBuilder db = getDocumentBuilder();
-            Document doc = db.parse(additionalBOM);
+			Document doc = db.parse(additionalBOM);
             doc.getDocumentElement().normalize();
             NodeList dependencyList = doc.getElementsByTagName("dependency");
             for (int itr = 0; itr < dependencyList.getLength(); itr++) {
