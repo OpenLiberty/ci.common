@@ -3544,7 +3544,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
                 dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
                 dbf.setXIncludeAware(false);
-                dbf.setNamespaceAware(true);
                 dbf.setExpandEntityReferences(false);
                 DocumentBuilder db = dbf.newDocumentBuilder();
                 Document document = db.parse(looseAppFile);

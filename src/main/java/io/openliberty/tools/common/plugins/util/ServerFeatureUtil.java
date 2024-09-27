@@ -373,7 +373,6 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                 dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
                 dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
                 dbf.setXIncludeAware(false);
-                dbf.setNamespaceAware(true);
                 dbf.setExpandEntityReferences(false);
                 DocumentBuilder db = dbf.newDocumentBuilder();
                 db.setErrorHandler(new ErrorHandler() {

@@ -37,6 +37,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+import com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
@@ -147,8 +148,13 @@ public class HttpPortUtil {
         if (configVariableXML == null || configVariableXML.length() == 0) {
             return null;
         }
-
-        DocumentBuilder inputBuilder = getBuilderFactory().newDocumentBuilder();
+        DocumentBuilderFactory inputBuilderFactory = getBuilderFactory();
+        inputBuilderFactory.setNamespaceAware(false);
+        inputBuilderFactory.setIgnoringComments(true);
+        inputBuilderFactory.setCoalescing(true);
+        inputBuilderFactory.setIgnoringElementContentWhitespace(true);
+        inputBuilderFactory.setValidating(false);
+        DocumentBuilder inputBuilder = inputBuilderFactory.newDocumentBuilder();
         Document inputDoc = inputBuilder.parse(new ByteArrayInputStream(configVariableXML.getBytes()));
         
         // parse input XML Document

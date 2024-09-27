@@ -483,7 +483,6 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 			docBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
 			docBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
 			docBuilderFactory.setXIncludeAware(false);
-			docBuilderFactory.setNamespaceAware(true);
 			docBuilderFactory.setExpandEntityReferences(false);
 			docBuilder = docBuilderFactory.newDocumentBuilder();
 		} catch (ParserConfigurationException e) {

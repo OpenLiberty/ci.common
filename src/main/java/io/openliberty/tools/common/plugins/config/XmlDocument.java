@@ -66,7 +66,6 @@ public abstract class XmlDocument {
         builderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
         builderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         builderFactory.setXIncludeAware(false);
-        builderFactory.setNamespaceAware(true);
         builderFactory.setExpandEntityReferences(false);
         DocumentBuilder builder = builderFactory.newDocumentBuilder();
         doc = builder.parse(xmlFile);
