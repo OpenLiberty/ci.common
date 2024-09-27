@@ -74,6 +74,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -3537,7 +3538,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (looseAppFile != null && looseAppFile.exists()) {
                 DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
                 dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+                dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+                dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+                dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+                dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+                dbf.setXIncludeAware(false);
+                dbf.setExpandEntityReferences(false);
                 DocumentBuilder db = dbf.newDocumentBuilder();
                 Document document = db.parse(looseAppFile);
                 NodeList archiveList = document.getElementsByTagName("archive");
@@ -4608,7 +4615,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * If container mode, check if any of the files are within a directory specified in one of the Containerfile's
      * COPY commands.  If not container mode, does nothing.
      * 
-     * @param file The files to check, in the same order.
+     * @param files The files to check, in the same order.
      * @return true if container mode and any of the files are within a directory specified in one of the Containerfile's COPY commands.
      * @throws IOException if there was an error getting canonical paths
      */

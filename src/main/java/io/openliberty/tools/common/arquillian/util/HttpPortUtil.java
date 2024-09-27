@@ -27,6 +27,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -36,6 +37,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+import com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;
@@ -46,15 +48,22 @@ public class HttpPortUtil {
     public static final int DEFAULT_PORT = 9080;
     private static final XPath XPATH = XPathFactory.newInstance().newXPath();
 
-    private static final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    private static boolean factoryInitialized = false;
+    private static DocumentBuilderFactory factory ;
 
-    public static void initDocumentBuilderFactory() throws ParserConfigurationException {
-        if (!factoryInitialized) {
+    public static DocumentBuilderFactory getBuilderFactory() throws ParserConfigurationException {
+        if (factory == null) {
+            factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
             factory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
         }
+        return factory;
    }
 
     public static Integer getHttpPort(File serverXML, File bootstrapProperties)
@@ -89,8 +98,8 @@ public class HttpPortUtil {
 
     protected static Integer getHttpPortForServerXML(String serverXML, Properties bootstrapProperties, String configVariableXML) throws ParserConfigurationException, SAXException, IOException, XPathExpressionException,
             ArquillianConfigurationException {
-        initDocumentBuilderFactory();
-        DocumentBuilder builder = factory.newDocumentBuilder();
+
+        DocumentBuilder builder = getBuilderFactory().newDocumentBuilder();
         Document doc = builder.parse(new ByteArrayInputStream(serverXML.getBytes()));
 
         XPathExpression httpEndpointExpr = XPATH.compile("/server/httpEndpoint");
@@ -139,9 +148,8 @@ public class HttpPortUtil {
         if (configVariableXML == null || configVariableXML.length() == 0) {
             return null;
         }
-
-        // get input XML Document
-        DocumentBuilderFactory inputBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilderFactory inputBuilderFactory = getBuilderFactory();
+        inputBuilderFactory.setNamespaceAware(false);
         inputBuilderFactory.setIgnoringComments(true);
         inputBuilderFactory.setCoalescing(true);
         inputBuilderFactory.setIgnoringElementContentWhitespace(true);

@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -144,11 +145,8 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	    Map<File, String> result = new HashMap<File, String>();
 	    ArrayList<String> missing_tags = new ArrayList<>();
 	    try {
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
-            DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(additionalBOM);
+			DocumentBuilder db = getDocumentBuilder();
+			Document doc = db.parse(additionalBOM);
             doc.getDocumentElement().normalize();
             NodeList dependencyList = doc.getElementsByTagName("dependency");
             for (int itr = 0; itr < dependencyList.getLength(); itr++) {
@@ -182,7 +180,7 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
                 result.put(artifactFile, groupId);
                 }
             }
-		} catch (ParserConfigurationException | SAXException | IOException e) {
+		} catch (SAXException | IOException e) {
 		    throw new PluginExecutionException("Cannot read the features-bom file " + additionalBOM.getAbsolutePath() + ". " + e.getMessage());
 		    
 		} 
@@ -467,7 +465,32 @@ public abstract class PrepareFeatureUtil extends ServerFeatureUtil {
 	 */
 	public abstract File downloadArtifact(String groupId, String artifactId, String type, String version)
 			throws PluginExecutionException;
-	
 
+	private DocumentBuilder getDocumentBuilder() throws PluginExecutionException {
+		DocumentBuilder docBuilder;
+
+
+		try {
+			DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+			docBuilderFactory.setIgnoringComments(true);
+			docBuilderFactory.setCoalescing(true);
+			docBuilderFactory.setIgnoringElementContentWhitespace(true);
+			docBuilderFactory.setValidating(false);
+			docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+			docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+			docBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			docBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			docBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+			docBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+			docBuilderFactory.setXIncludeAware(false);
+			docBuilderFactory.setExpandEntityReferences(false);
+			docBuilder = docBuilderFactory.newDocumentBuilder();
+		} catch (ParserConfigurationException e) {
+			// fail catastrophically if we can't create a document builder
+			throw new PluginExecutionException("Cannot read the features-bom file " + e.getMessage());
+		}
+
+		return docBuilder;
+	}
 
 }

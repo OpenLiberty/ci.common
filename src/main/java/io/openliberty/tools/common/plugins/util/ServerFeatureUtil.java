@@ -40,6 +40,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -366,7 +367,13 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
             try {
                 DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
                 dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);    
+                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+                dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+                dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+                dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+                dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+                dbf.setXIncludeAware(false);
+                dbf.setExpandEntityReferences(false);
                 DocumentBuilder db = dbf.newDocumentBuilder();
                 db.setErrorHandler(new ErrorHandler() {
                     @Override
