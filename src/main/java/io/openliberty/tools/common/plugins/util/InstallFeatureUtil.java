@@ -113,7 +113,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     private static final String TO_USER = "usr";
     private static final String MIN_USER_FEATURE_VERSION = "21.0.0.11";
     private static final String MIN_VERIFY_FEATURE_VERSION = "23.0.0.9";
-    private static final String MIN_VERSIONLESS_FEATURE_VERSION = "24.0.0.9";
+    private static final String MIN_VERSIONLESS_FEATURE_VERSION = "24.0.0.10";
 
     private String openLibertyVersion;
     private static Boolean saveURLCacheStatus = null;
