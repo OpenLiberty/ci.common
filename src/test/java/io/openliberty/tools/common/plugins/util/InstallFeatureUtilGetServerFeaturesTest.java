@@ -157,6 +157,24 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
     }
     
     /**
+     * Tests server.xml with MERGE function with nested include files, one of which contains no featureManager
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testNestedMergeServerXML() throws Exception{
+        copyAsName("server_merge_nested.xml", "server.xml");
+        copy("extraFeatures.xml");
+        copy("noList_nested_features.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+
+        verifyServerFeatures(expected);
+    }
+
+    /**
      * Tests server.xml with REPLACE function
      * 
      * @throws Exception
