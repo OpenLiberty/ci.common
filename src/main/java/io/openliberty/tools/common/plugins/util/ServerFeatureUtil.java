@@ -612,7 +612,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         } else {
             // anything else counts as "merge", even if the onConflict value is invalid
             if ((fp != null) && (!fp.getFeatures().isEmpty() || !fp.getPlatforms().isEmpty())) {
-                if (result.getFeatures().isEmpty() && result.getPlatforms().isEmpty()) {
+                if ((result == null) || (result.getFeatures().isEmpty() && result.getPlatforms().isEmpty())) {
                     result = fp;
                 } else {
                     result.getFeatures().addAll(fp.getFeatures());
