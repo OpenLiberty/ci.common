@@ -71,7 +71,7 @@ public class HttpPortUtilTest {
 			"</server>";
 	
 	private static final String BOOTSTRAP_PROPERTIES_PORTS = 
-			"	<httpEndpoint httpPort=\"${default.http.port}\" httpsPort=\"${default.https.port}\"" +
+			"	<httpEndpoint httpPort=\"${default.httpPort}\" httpsPort=\"${default.https.port}\"" +
 			"		id=\"defaultHttpEndpoint\" />";
 	
 	private static final String INTEGER_PORTS = 
@@ -79,13 +79,13 @@ public class HttpPortUtilTest {
 			"		id=\"defaultHttpEndpoint\" />";
 	
 	private static final String CONFIG_VARIABLE_XML = 
-                        "<server><variable name=\"default.http.port\" value=\"9084\"/></server>";
+                        "<server><variable name=\"default.httpPort\" value=\"9084\"/></server>";
 	
 	private static final String CONFIG_VARIABLE_DEFAULT_XML = 
-                        "<server><variable name=\"default.http.port\" defaultValue=\"9084\"/></server>";
+                        "<server><variable name=\"default.httpPort\" defaultValue=\"9084\"/></server>";
 		
 	private static final String CONFIG_VARIABLE_INVALID_XML = 
-                        "<server><variable name=\"default.http.port\" value=\"invalid\"/></server>";
+                        "<server><variable name=\"default.httpPort\" value=\"invalid\"/></server>";
 	
 	private static final String CONFIG_VARIABLE_NO_MATCH_XML = 
                         "<server><variable name=\"random\" value=\"random\"/></server>";
@@ -106,7 +106,7 @@ public class HttpPortUtilTest {
 	public void testHttpPortSetFromBootstrapProperties() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
 		Properties bootstrapProperties = new Properties();
-		bootstrapProperties.setProperty("default.http.port", "9082");
+		bootstrapProperties.setProperty("default.httpPort", "9082");
 		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, null) == 9082);
 	}
 	
@@ -114,7 +114,7 @@ public class HttpPortUtilTest {
 	public void testHttpPortSetFromConfigVariableXML() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
 		Properties bootstrapProperties = new Properties();
-		bootstrapProperties.setProperty("default.http.port", "9082");
+		bootstrapProperties.setProperty("default.httpPort", "9082");
 		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, CONFIG_VARIABLE_DEFAULT_XML) == 9084);
 	}
 	
@@ -122,7 +122,7 @@ public class HttpPortUtilTest {
 	public void testHttpPortSetFromConfigVariableXMLNoMatch() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
 		Properties bootstrapProperties = new Properties();
-		bootstrapProperties.setProperty("default.http.port", "9082");
+		bootstrapProperties.setProperty("default.httpPort", "9082");
 		assertTrue(HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, CONFIG_VARIABLE_NO_MATCH_XML) == 9082);
 	}
 	
@@ -142,7 +142,7 @@ public class HttpPortUtilTest {
 	public void testHttpPortSetInvalidFromBootstrapProperties() throws Exception {
 		String serverXML = SERVER_XML_BEGIN + BOOTSTRAP_PROPERTIES_PORTS +  SERVER_XML_END;
 		Properties bootstrapProperties = new Properties();
-		bootstrapProperties.setProperty("default.http.port", "invalid");
+		bootstrapProperties.setProperty("default.httpPort", "invalid");
 		HttpPortUtil.getHttpPortForServerXML(serverXML, bootstrapProperties, null);
 	}
 	
