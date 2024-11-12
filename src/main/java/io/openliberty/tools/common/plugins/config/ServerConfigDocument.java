@@ -62,6 +62,7 @@ public class ServerConfigDocument {
 
     private File configDirectory;
     private File serverXMLFile;
+    private File originalServerXMLFile;
 
     private Set<String> names;
     private Set<String> namelessLocations;
@@ -126,47 +127,15 @@ public class ServerConfigDocument {
         return serverXMLFile;
     }
 
-    /**
-     * Deprecated. Migrate to the simpler constructor.
-     * @param log
-     * @param serverXML
-     * @param configDir
-     * @param bootstrapFile
-     * @param bootstrapProp
-     * @param serverEnvFile
-     * @param giveConfigDirPrecedence
-     * @param libertyDirPropertyFiles - Contains a property to file mapping of directory locations
-     */
-    public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-                                Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
-        this.log = log;
-        serverXMLFile = serverXML;
-        configDirectory = configDir;
-        if (libertyDirPropertyFiles != null) {
-            libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
-            if (libertyDirPropertyFiles.containsKey(ServerFeatureUtil.SERVER_CONFIG_DIR)) {
-                configDirectory = libertyDirPropertyFiles.get(ServerFeatureUtil.SERVER_CONFIG_DIR);
-            }
-        } else {
-            log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
-            libertyDirectoryPropertyToFile = new HashMap<String,File>();
-        }
-        locations = new HashSet<String>();
-        names = new HashSet<String>();
-        namelessLocations = new HashSet<String>();
-        locationsAndNames = new HashMap<String, String>();
-        props = new Properties();
-        defaultProps = new Properties();
-
-        initializeAppsLocation();
-    }
 
     /**
      * Adapt when ready. Expects the libertyDirPropertyFiles to be populated
+     *
      * @param log
+     * @param originalServerXMLFile
      * @param libertyDirPropertyFiles
      */
-    public ServerConfigDocument(CommonLoggerI log, Map<String, File> libertyDirPropertyFiles) {
+    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, Map<String, File> libertyDirPropertyFiles) {
         this.log = log;
         if (libertyDirPropertyFiles != null) {
             libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
@@ -182,18 +151,20 @@ public class ServerConfigDocument {
         locationsAndNames = new HashMap<String, String>();
         props = new Properties();
         defaultProps = new Properties();
-
+        if (originalServerXMLFile != null) {
+           this.originalServerXMLFile = originalServerXMLFile;
+        }
         initializeAppsLocation();
     }
 
     // LCLS constructor
     // TODO: populate libertyDirectoryPropertyToFile with workspace information
     public ServerConfigDocument(CommonLoggerI log) {
-        this(log, null);
+        this(log, null, null);
     }
 
     // test constructor that takes in initial properties to be called modularly
-    public ServerConfigDocument(CommonLoggerI log, Map<String, File> libertyDirPropertyFiles, Properties initProperties) {
+    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, Map<String, File> libertyDirPropertyFiles, Properties initProperties) {
         this.log = log;
         libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
         configDirectory = libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR);
@@ -205,6 +176,9 @@ public class ServerConfigDocument {
         props = new Properties();
         if (initProperties != null) props.putAll(initProperties);
         defaultProps = new Properties();
+        if (originalServerXMLFile != null) {
+            this.originalServerXMLFile = originalServerXMLFile;
+        }
     }
 
     private DocumentBuilder getDocumentBuilder() {
@@ -927,5 +901,13 @@ public class ServerConfigDocument {
         }
         log.debug(filename + " was not found in: " + configDirectory.getAbsolutePath());
         return null;
+    }
+
+    public File getOriginalServerXMLFile() {
+        return originalServerXMLFile;
+    }
+
+    public void setOriginalServerXMLFile(File originalServerXMLFile) {
+        this.originalServerXMLFile = originalServerXMLFile;
     }
 }
