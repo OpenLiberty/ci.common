@@ -151,9 +151,7 @@ public class ServerConfigDocument {
         locationsAndNames = new HashMap<String, String>();
         props = new Properties();
         defaultProps = new Properties();
-        if (originalServerXMLFile != null) {
-           this.originalServerXMLFile = originalServerXMLFile;
-        }
+        this.originalServerXMLFile = originalServerXMLFile;
         initializeAppsLocation();
     }
 
@@ -176,9 +174,7 @@ public class ServerConfigDocument {
         props = new Properties();
         if (initProperties != null) props.putAll(initProperties);
         defaultProps = new Properties();
-        if (originalServerXMLFile != null) {
-            this.originalServerXMLFile = originalServerXMLFile;
-        }
+        this.originalServerXMLFile = originalServerXMLFile;
     }
 
     private DocumentBuilder getDocumentBuilder() {
