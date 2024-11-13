@@ -22,6 +22,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -49,6 +52,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.xml.sax.SAXException;
 
 import io.openliberty.tools.common.CommonLoggerI;
+import io.openliberty.tools.common.plugins.util.ServerFeatureUtil;
 import io.openliberty.tools.common.plugins.util.VariableUtility;
 
 // Moved from ci.maven/liberty-maven-plugin/src/main/java/net/wasdev/wlp/maven/plugins/ServerConfigDocument.java
@@ -58,6 +62,7 @@ public class ServerConfigDocument {
 
     private File configDirectory;
     private File serverXMLFile;
+    private File originalServerXMLFile;
 
     private Set<String> names;
     private Set<String> namelessLocations;
@@ -69,20 +74,23 @@ public class ServerConfigDocument {
 
     private static final XPathExpression XPATH_SERVER_APPLICATION;
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
+    private static final XPathExpression XPATH_SERVER_SPRINGBOOT_APPLICATION;
     private static final XPathExpression XPATH_SERVER_ENTERPRISE_APPLICATION;
     private static final XPathExpression XPATH_SERVER_INCLUDE;
     private static final XPathExpression XPATH_SERVER_VARIABLE;
     private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
+
 
     static {
         try {
             XPath xPath = XPathFactory.newInstance().newXPath();
             XPATH_SERVER_APPLICATION = xPath.compile("/server/application");
             XPATH_SERVER_WEB_APPLICATION = xPath.compile("/server/webApplication");
+            XPATH_SERVER_SPRINGBOOT_APPLICATION = xPath.compile("/server/springBootApplication");
             XPATH_SERVER_ENTERPRISE_APPLICATION = xPath.compile("/server/enterpriseApplication");
             XPATH_SERVER_INCLUDE = xPath.compile("/server/include");
             XPATH_SERVER_VARIABLE = xPath.compile("/server/variable");
-            XPATH_ALL_SERVER_APPLICATIONS = xPath.compile("/server/application | /server/webApplication | /server/enterpriseApplication");
+            XPATH_ALL_SERVER_APPLICATIONS = xPath.compile("/server/application | /server/webApplication | /server/enterpriseApplication | /server/springBootApplication");
         } catch (XPathExpressionException ex) {
             // These XPath expressions should all compile statically.
             // Compilation failures mean the expressions are not syntactically
@@ -119,19 +127,54 @@ public class ServerConfigDocument {
         return serverXMLFile;
     }
 
-    public ServerConfigDocument(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
-        initializeAppsLocation(log, serverXML, configDir, bootstrapFile, bootstrapProp, serverEnvFile, giveConfigDirPrecedence, libertyDirPropertyFiles);
+
+    /**
+     * Adapt when ready. Expects the libertyDirPropertyFiles to be populated
+     *
+     * @param log
+     * @param originalServerXMLFile
+     * @param libertyDirPropertyFiles
+     */
+    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, Map<String, File> libertyDirPropertyFiles) {
+        this.log = log;
+        if (libertyDirPropertyFiles != null) {
+            libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
+            configDirectory = libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR);
+            serverXMLFile = getFileFromConfigDirectory("server.xml");
+        } else {
+            log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
+            libertyDirectoryPropertyToFile = new HashMap<String,File>();
+        }
+        locations = new HashSet<String>();
+        names = new HashSet<String>();
+        namelessLocations = new HashSet<String>();
+        locationsAndNames = new HashMap<String, String>();
+        props = new Properties();
+        defaultProps = new Properties();
+        this.originalServerXMLFile = originalServerXMLFile;
+        initializeAppsLocation();
     }
 
     // LCLS constructor
+    // TODO: populate libertyDirectoryPropertyToFile with workspace information
     public ServerConfigDocument(CommonLoggerI log) {
-        this.log = log;
-        props = new Properties();
-        defaultProps = new Properties();
+        this(log, null, null);
+    }
 
-       // TODO: populate with workspace information
-        libertyDirectoryPropertyToFile = new HashMap<String, File>();   
+    // test constructor that takes in initial properties to be called modularly
+    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, Map<String, File> libertyDirPropertyFiles, Properties initProperties) {
+        this.log = log;
+        libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
+        configDirectory = libertyDirectoryPropertyToFile.get(ServerFeatureUtil.SERVER_CONFIG_DIR);
+        serverXMLFile = getFileFromConfigDirectory("server.xml");
+        locations = new HashSet<String>();
+        names = new HashSet<String>();
+        namelessLocations = new HashSet<String>();
+        locationsAndNames = new HashMap<String, String>();
+        props = new Properties();
+        if (initProperties != null) props.putAll(initProperties);
+        defaultProps = new Properties();
+        this.originalServerXMLFile = originalServerXMLFile;
     }
 
     private DocumentBuilder getDocumentBuilder() {
@@ -143,7 +186,7 @@ public class ServerConfigDocument {
         docBuilderFactory.setIgnoringElementContentWhitespace(true);
         docBuilderFactory.setValidating(false);
         try {
-            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
             docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
             docBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             docBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
@@ -160,84 +203,63 @@ public class ServerConfigDocument {
         return docBuilder;
     }
 
-    private void initializeAppsLocation(CommonLoggerI log, File serverXML, File configDir, File bootstrapFile,
-            Map<String, String> bootstrapProp, File serverEnvFile, boolean giveConfigDirPrecedence, Map<String, File> libertyDirPropertyFiles) {
+    /**
+     //  Server variable precedence in ascending order if defined in multiple locations.
+     //  1. variable default values in the server.xml file
+     //  2. environment variables
+     //     server.env
+     //       a. ${wlp.install.dir}/etc/
+     //       b. ${wlp.user.dir}/shared/
+     //       c. ${server.config.dir}/
+     //     jvm.options
+     //       a. ${wlp.user.dir}/shared/jvm.options
+     //       b. ${server.config.dir}/configDropins/defaults/
+     //       c. ${server.config.dir}/
+     //       d. ${server.config.dir}/configDropins/overrides/
+     //  3. bootstrap.properties
+     //       a. additional references by bootstrap.include
+     //  4. Java system properties
+     //  5. Variables loaded from files in the ${server.config.dir}/variables directory or
+     //     other directories as specified by the VARIABLE_SOURCE_DIRS environment variable
+     //  6. variable values declared in the server.xml file
+     //       a. ${server.config.dir}/configDropins/defaults/
+     //       b. ${server.config.dir}/server.xml
+     //       c. ${server.config.dir}/configDropins/overrides/
+     //  7. variables declared on the command line
+     */
+    public void initializeAppsLocation() {
         try {
-            this.log = log;
-            serverXMLFile = serverXML;
-            configDirectory = configDir;
-            if (libertyDirPropertyFiles != null) {
-                libertyDirectoryPropertyToFile = new HashMap(libertyDirPropertyFiles);
-            } else {
-                log.warn("The properties for directories are null and could lead to application locations not being resolved correctly.");
-                libertyDirectoryPropertyToFile = new HashMap<String,File>();
-            }
-    
-            locations = new HashSet<String>();
-            names = new HashSet<String>();
-            namelessLocations = new HashSet<String>();
-            locationsAndNames = new HashMap<String, String>();
-            props = new Properties();
-            defaultProps = new Properties();
-
+            // 1. Need to parse variables in the server.xml for default values before trying to
+            //    find the include files in case one of the variables is used in the location.
             Document doc = parseDocument(serverXMLFile);
-
-            // Server variable precedence in ascending order if defined in
-            // multiple locations.
-            //
-            // 1. defaultValue from variables defined in server.xml or defined in <include/> files
-            // e.g. <variable name="myVarName" defaultValue="myVarValue" />
-            // 2. variables from 'server.env'
-            // 3. variables from 'bootstrap.properties'
-            // 4. variables defined in <include/> files
-            // 5. variables from configDropins/defaults/<file_name>
-            // 6. variables defined in server.xml
-            // e.g. <variable name="myVarName" value="myVarValue" />
-            // 7. variables from configDropins/overrides/<file_name>
-
-            // 1. Need to parse variables in the server.xml for default values before trying to find the include files in case one of the variables is used
-            // in the location.
             parseVariablesForDefaultValues(doc);
 
             // 2. get variables from server.env
-            File cfgFile = findConfigFile("server.env", serverEnvFile, giveConfigDirPrecedence);
+            processServerEnv();
 
-            if (cfgFile != null) {
-                parseProperties(new FileInputStream(cfgFile));
-            }
+            // 3. get variables from jvm.options. Incomplete uncommon usecase. Uncomment when ready.
+            // processJvmOptions();
 
             // 3. get variables from bootstrap.properties
-            File cfgDirFile = getFileFromConfigDirectory("bootstrap.properties");
+            processBootstrapProperties();
 
-            if (giveConfigDirPrecedence && cfgDirFile != null) {
-                parseProperties(new FileInputStream(cfgDirFile));
-            } else if (bootstrapProp != null && !bootstrapProp.isEmpty()) {
-                for (Map.Entry<String,String> entry : bootstrapProp.entrySet()) {
-                    if (entry.getValue() != null) {
-                        props.setProperty(entry.getKey(),entry.getValue());  
-                    } 
-                }
-            } else if (bootstrapFile != null && bootstrapFile.exists()) {
-                parseProperties(new FileInputStream(bootstrapFile));
-            } else if (cfgDirFile != null) {
-                parseProperties(new FileInputStream(cfgDirFile));
-            }
+            // 4. Java system properties
+            processSystemProperties();
 
-            // 4. parse variables from include files (both default and non-default values - which we store separately)
-            parseIncludeVariables(doc);
+            // 5. Variables loaded from 'variables' directory
+            processVariablesDirectory();
 
-            // 5. variables from configDropins/defaults/<file_name>
-            parseConfigDropinsDirVariables("defaults");
+            // 6. variable values declared in server.xml(s)
+            processServerXml(doc);
 
-            // 6. variables defined in server.xml - non-default values
-            parseVariablesForValues(doc);
-
-            // 7. variables from configDropins/overrides/<file_name>
-            parseConfigDropinsDirVariables("overrides");
+            // 7. variables declared on the command line
+            // Maven: https://github.com/OpenLiberty/ci.maven/blob/main/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties
+            // Gradle: https://github.com/dshimo/ci.gradle/blob/main/docs/libertyExtensions.md
 
             parseApplication(doc, XPATH_SERVER_APPLICATION);
             parseApplication(doc, XPATH_SERVER_WEB_APPLICATION);
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
+            parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
             parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
             parseInclude(doc);
             parseConfigDropinsDir();
@@ -245,6 +267,164 @@ public class ServerConfigDocument {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * server.env file read order
+     *   1. {wlp.install.dir}/etc/
+     *   2. {wlp.user.dir}/shared/
+     *   3. {server.config.dir}/
+     * @throws Exception
+     * @throws FileNotFoundException
+     */
+    public void processServerEnv() throws Exception, FileNotFoundException {
+        final String serverEnvString = "server.env";
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_INSTALL_DIR),
+                "etc" + File.separator + serverEnvString));
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
+                "shared" + File.separator + serverEnvString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(serverEnvString));
+    }
+
+    /**
+     * Likely not needed to be processed by the LMP/LGP tools. These properties benefit the JVM
+     * System properties would need to process out -D. jvm.options do not support variable substitution
+     *   1. ${wlp.user.dir}/shared/jvm.options
+     *   2. ${server.config.dir}/configDropins/defaults/
+     *   3. ${server.config.dir}/
+     *   4. ${server.config.dir}/configDropins/overrides/
+     * @throws FileNotFoundException
+     * @throws Exception
+     */
+    public void processJvmOptions() throws FileNotFoundException, Exception {
+        final String jvmOptionsString = "jvm.options";
+        parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
+                "shared" + File.separator + jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory("configDropins/default/" + jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory(jvmOptionsString));
+        parsePropertiesFromFile(getFileFromConfigDirectory("configDropins/overrides/" + jvmOptionsString));
+    }
+
+    /**
+     * Process bootstrap.properties and boostrap.include
+     * @throws Exception
+     * @throws FileNotFoundException
+     */
+    public void processBootstrapProperties() throws Exception, FileNotFoundException {
+        File bootstrapFile = getFileFromConfigDirectory("bootstrap.properties");
+        if (bootstrapFile == null) {
+            return;
+        }
+
+        parsePropertiesFromFile(bootstrapFile);
+        if (props.containsKey("bootstrap.include")) {
+            Set<String> visited = new HashSet<String>();
+            visited.add(bootstrapFile.getAbsolutePath());
+            processBootstrapInclude(visited);
+        }
+    }
+
+    /**
+     * Recursive processing for a series of bootstrap.include that terminates upon revisit
+     * @param processedBootstrapIncludes
+     * @throws Exception
+     * @throws FileNotFoundException
+     */
+    private void processBootstrapInclude(Set<String> processedBootstrapIncludes) throws FileNotFoundException, Exception {
+        String bootstrapIncludeLocationString = props.getProperty("bootstrap.include");
+        Path bootstrapIncludePath = Paths.get(bootstrapIncludeLocationString);
+        File bootstrapIncludeFile = bootstrapIncludePath.isAbsolute() ?
+                new File(bootstrapIncludePath.toString()) : new File(configDirectory, bootstrapIncludePath.toString());
+
+        if (processedBootstrapIncludes.contains(bootstrapIncludeFile.getAbsolutePath())) {
+            return;
+        }
+
+        if (bootstrapIncludeFile.exists()) {
+            parsePropertiesFromFile(bootstrapIncludeFile);
+            processedBootstrapIncludes.add(bootstrapIncludeFile.getAbsolutePath());
+            processBootstrapInclude(processedBootstrapIncludes);
+        }
+    }
+
+    private void processSystemProperties() {
+        props.putAll(System.getProperties());
+    }
+
+    /**
+     * By default, ${server.config.directory}/variables is processed.
+     * If VARIABLE_SOURCE_DIRS is defined, those directories are processed instead.
+     * A list of directories are delimited by ';' on Windows, and ':' on Unix
+     * @throws Exception
+     * @throws FileNotFoundException
+     */
+    public void processVariablesDirectory() throws FileNotFoundException, Exception {
+        final String variableDirectoryProperty = "VARIABLE_SOURCE_DIRS";
+
+        ArrayList<File> toProcess = new ArrayList<File>();
+        if (!props.containsKey(variableDirectoryProperty)) {
+            toProcess.add(getFileFromConfigDirectory("variables"));
+        } else {
+            String delimiter = (File.separator.equals("/")) ? ":" : ";";    // OS heuristic
+            String[] directories = props.get(variableDirectoryProperty).toString().split(delimiter);
+            for (String directory : directories) {
+                Path directoryPath = Paths.get(directory);
+                File directoryFile = directoryPath.toFile();
+                if (directoryFile.exists()) {
+                    toProcess.add(directoryFile);
+                }
+            }
+        }
+
+        for (File directory : toProcess) {
+            if (directory == null || !directory.isDirectory()) {
+                continue;
+            }
+            processVariablesDirectory(directory, "");
+        }
+    }
+
+    /**
+     * The file name defines the variable name and its contents define the value.
+     * If a directory is nested within a directory, it is recurisvely processed.
+     * A nested file will have its parent dir prepended for the property name e.g. {parent directory}/{file name}
+     * If the file name ends with *.properties, then it's processed as a properties file.
+     * @param directory      - The directory being processed
+     * @param propertyPrefix - Tracks the nested directories to prepend
+     * @throws FileNotFoundException
+     * @throws Exception
+     */
+    private void processVariablesDirectory(File directory, String propertyPrefix)
+            throws FileNotFoundException, Exception {
+        for (File child : directory.listFiles()) {
+            if (child.isDirectory()) {
+                processVariablesDirectory(child, child.getName() + File.separator);
+                continue;
+            }
+
+            if (child.getName().endsWith(".properties")) {
+                parsePropertiesFromFile(child);
+                continue;
+            }
+
+            String propertyName = propertyPrefix + child.getName();
+            String propertyValue = new String(Files.readAllBytes(child.toPath()));
+            props.setProperty(propertyName, propertyValue);
+        }
+    }
+
+    /**
+     *
+     * @param doc
+     * @throws XPathExpressionException
+     * @throws IOException
+     * @throws SAXException
+     */
+    public void processServerXml(Document doc) throws XPathExpressionException, IOException, SAXException {
+        parseIncludeVariables(doc);
+        parseConfigDropinsDirVariables("defaults");
+        parseVariablesForValues(doc);
+        parseConfigDropinsDirVariables("overrides");
     }
 
     //Checks for application names in the document. Will add locations without names to a Set
@@ -349,7 +529,9 @@ public class ServerConfigDocument {
                 for (Document inclDoc : inclDocs) {
                     parseApplication(inclDoc, XPATH_SERVER_APPLICATION);
                     parseApplication(inclDoc, XPATH_SERVER_WEB_APPLICATION);
+                    parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
                     parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
+                    parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
                     // handle nested include elements
                     parseInclude(inclDoc);
                 }
@@ -390,7 +572,9 @@ public class ServerConfigDocument {
         if (doc != null) {
             parseApplication(doc, XPATH_SERVER_APPLICATION);
             parseApplication(doc, XPATH_SERVER_WEB_APPLICATION);
+            parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
+            parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
             parseInclude(doc);
         }
     }
@@ -449,7 +633,7 @@ public class ServerConfigDocument {
     private void parseDocumentFromFileOrDirectory(File f, String locationString, ArrayList<Document> docs) throws FileNotFoundException, IOException, SAXException {
         Document doc = null;
         // Earlier call to VariableUtility.resolveVariables() already converts all \ to /
-        boolean isLibertyDirectory = locationString.endsWith("/");  // Liberty uses this to determine if directory. 
+        boolean isLibertyDirectory = locationString.endsWith("/");  // Liberty uses this to determine if directory.
 
         if (f == null || !f.exists()) {
             log.warn("Unable to parse from file: " + f.getCanonicalPath());
@@ -524,6 +708,13 @@ public class ServerConfigDocument {
         }
     }
 
+    public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
+        if (propertiesFile != null && propertiesFile.exists()) {
+            parseProperties(new FileInputStream(propertiesFile));
+            log.debug("Processed properties from file: " + propertiesFile.getAbsolutePath());
+        }
+    }
+
     private void parseProperties(InputStream ins) throws Exception {
         try {
             props.load(ins);
@@ -547,7 +738,7 @@ public class ServerConfigDocument {
     }
 
 
-    private void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
+    public void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
         parseVariables(doc, true, false, false);
     }
 
@@ -598,24 +789,26 @@ public class ServerConfigDocument {
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
         for (int i = 0; i < nodeList.getLength(); i++) {
-            if (nodeList.item(i) instanceof Element) {
-                Element child = (Element) nodeList.item(i);
-                // Need to handle more variable substitution for include location.
-                String nodeValue = child.getAttribute("location");
-                String includeFileName = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
+            if (!(nodeList.item(i) instanceof Element)) {
+                continue;
+            }
 
-                if (includeFileName == null || includeFileName.trim().isEmpty()) {
-                    log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
-                    continue;
-                }
+            Element child = (Element) nodeList.item(i);
+            // Need to handle more variable substitution for include location.
+            String nodeValue = child.getAttribute("location");
+            String includeFileName = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
 
-                ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
+            if (includeFileName == null || includeFileName.trim().isEmpty()) {
+                log.warn("Unable to resolve include file location "+nodeValue+". Skipping the included file during application location processing.");
+                continue;
+            }
 
-                for (Document inclDoc : inclDocs) {
-                    parseVariablesForBothValues(inclDoc);
-                    // handle nested include elements
-                    parseIncludeVariables(inclDoc);
-                }
+            ArrayList<Document> inclDocs = getIncludeDocs(includeFileName);
+
+            for (Document inclDoc : inclDocs) {
+                parseVariablesForBothValues(inclDoc);
+                // handle nested include elements
+                parseIncludeVariables(inclDoc);
             }
         }
     }
@@ -697,11 +890,20 @@ public class ServerConfigDocument {
     /*
      * Get the file from configDrectory if it exists, or null if not
      */
-    private File getFileFromConfigDirectory(String file) {
-        File f = new File(configDirectory, file);
+    private File getFileFromConfigDirectory(String filename) {
+        File f = new File(configDirectory, filename);
         if (configDirectory != null && f.exists()) {
             return f;
         }
+        log.debug(filename + " was not found in: " + configDirectory.getAbsolutePath());
         return null;
+    }
+
+    public File getOriginalServerXMLFile() {
+        return originalServerXMLFile;
+    }
+
+    public void setOriginalServerXMLFile(File originalServerXMLFile) {
+        this.originalServerXMLFile = originalServerXMLFile;
     }
 }

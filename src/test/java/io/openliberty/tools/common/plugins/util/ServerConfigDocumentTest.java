@@ -52,7 +52,7 @@ public class ServerConfigDocumentTest {
 
 		File serverXML = new File(serverDirectory, "server.xml");
 
-		ServerConfigDocument scd = new ServerConfigDocument(log, serverXML, serverDirectory, null, null, null, true, libertyDirectoryPropertyToFile);
+		ServerConfigDocument scd = new ServerConfigDocument(log, serverXML, libertyDirectoryPropertyToFile);
 		Set<String> locations = scd.getLocations();
 		assertTrue("Expected six app locations", locations.size() == 6);
 

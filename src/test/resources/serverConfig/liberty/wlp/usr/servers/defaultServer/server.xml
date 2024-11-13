@@ -21,4 +21,9 @@
     <webApplication location="${project.artifactId.five}.war"/>
     <webApplication location="${project.artifactId.six}.war"/>
 
+    <variable name="overriden_value" value="new_value"/>
+    <variable name="server.env.defined" defaultValue="${this.value}"/>
+    <variable name="server.env.defined" value="${this.value}"/>
+    <variable name="bootstrap.property.defined" value="${that.value}"/>
+    <variable name="config.dropins.server" value="2"/>
 </server>
