@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Map;
 import java.util.Properties;
@@ -43,6 +44,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -71,6 +73,8 @@ public class ServerConfigDocument {
     private Properties props;
     private Properties defaultProps;
     private Map<String, File> libertyDirectoryPropertyToFile = null;
+
+    Optional<String> springBootAppNodeLocation=Optional.empty();
 
     private static final XPathExpression XPATH_SERVER_APPLICATION;
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
@@ -135,7 +139,7 @@ public class ServerConfigDocument {
      * @param originalServerXMLFile
      * @param libertyDirPropertyFiles
      */
-    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, Map<String, File> libertyDirPropertyFiles) {
+    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, Map<String, File> libertyDirPropertyFiles) throws PluginExecutionException {
         this.log = log;
         if (libertyDirPropertyFiles != null) {
             libertyDirectoryPropertyToFile = new HashMap<String, File>(libertyDirPropertyFiles);
@@ -157,7 +161,7 @@ public class ServerConfigDocument {
 
     // LCLS constructor
     // TODO: populate libertyDirectoryPropertyToFile with workspace information
-    public ServerConfigDocument(CommonLoggerI log) {
+    public ServerConfigDocument(CommonLoggerI log) throws PluginExecutionException {
         this(log, null, null);
     }
 
@@ -227,7 +231,7 @@ public class ServerConfigDocument {
      //       c. ${server.config.dir}/configDropins/overrides/
      //  7. variables declared on the command line
      */
-    public void initializeAppsLocation() {
+    public void initializeAppsLocation() throws PluginExecutionException {
         try {
             // 1. Need to parse variables in the server.xml for default values before trying to
             //    find the include files in case one of the variables is used in the location.
@@ -265,6 +269,9 @@ public class ServerConfigDocument {
             parseConfigDropinsDir();
 
         } catch (Exception e) {
+            if(e instanceof  PluginExecutionException){
+                throw (PluginExecutionException)e;
+            }
             e.printStackTrace();
         }
     }
@@ -484,15 +491,19 @@ public class ServerConfigDocument {
         return appName;
     }
 
-    private void parseApplication(Document doc, XPathExpression expression) throws XPathExpressionException {
+    private void parseApplication(Document doc, XPathExpression expression) throws XPathExpressionException, PluginExecutionException {
 
         NodeList nodeList = (NodeList) expression.evaluate(doc, XPathConstants.NODESET);
-
+        if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION) && nodeList.getLength()>1){
+            throw new PluginExecutionException("Multiple <springBootApplication/> nodes found in Liberty Config server.xml. Please specify only one");
+        }
         for (int i = 0; i < nodeList.getLength(); i++) {
             String nodeValue = nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue();
-
             // add unique values only
             if (!nodeValue.isEmpty()) {
+                if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION)){
+                    springBootAppNodeLocation = Optional.of(nodeValue);
+                }
                 String resolved = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
                 if (resolved == null) {
                     // location could not be resolved, log message and add location as is
@@ -508,7 +519,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private void parseInclude(Document doc) throws XPathExpressionException, IOException, SAXException {
+    private void parseInclude(Document doc) throws XPathExpressionException, IOException, SAXException, PluginExecutionException {
         // parse include document in source server xml
         NodeList nodeList = (NodeList) XPATH_SERVER_INCLUDE.evaluate(doc, XPathConstants.NODESET);
 
@@ -539,7 +550,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private void parseConfigDropinsDir() throws XPathExpressionException, IOException, SAXException {
+    private void parseConfigDropinsDir() throws XPathExpressionException, IOException, SAXException, PluginExecutionException {
         File configDropins = getConfigDropinsDir();
 
         if (configDropins == null || !configDropins.exists()) {
@@ -557,7 +568,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private void parseDropinsFiles(File[] files) throws XPathExpressionException, IOException, SAXException {
+    private void parseDropinsFiles(File[] files) throws XPathExpressionException, IOException, SAXException, PluginExecutionException {
         Arrays.sort(files, NameFileComparator.NAME_INSENSITIVE_COMPARATOR);
         for (File file : files) {
             if (file.isFile()) {
@@ -566,7 +577,7 @@ public class ServerConfigDocument {
         }
     }
 
-    private void parseDropinsFile(File file) throws IOException, XPathExpressionException, SAXException {
+    private void parseDropinsFile(File file) throws IOException, XPathExpressionException, SAXException, PluginExecutionException {
         // get input XML Document
         Document doc = parseDocument(file);
         if (doc != null) {
@@ -906,4 +917,13 @@ public class ServerConfigDocument {
     public void setOriginalServerXMLFile(File originalServerXMLFile) {
         this.originalServerXMLFile = originalServerXMLFile;
     }
+
+    public Optional<String> getSpringBootAppNodeLocation() {
+        return springBootAppNodeLocation;
+    }
+
+    public void setSpringBootAppNodeLocation(Optional<String> springBootAppNodeLocation) {
+        this.springBootAppNodeLocation = springBootAppNodeLocation;
+    }
+
 }
