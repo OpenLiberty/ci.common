@@ -495,7 +495,7 @@ public class ServerConfigDocument {
 
         NodeList nodeList = (NodeList) expression.evaluate(doc, XPathConstants.NODESET);
         if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION) && nodeList.getLength()>1){
-            throw new PluginExecutionException("Multiple <springBootApplication/> nodes found in Liberty Config server.xml. Please specify only one");
+            throw new PluginExecutionException("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.");
         }
         for (int i = 0; i < nodeList.getLength(); i++) {
             String nodeValue = nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue();

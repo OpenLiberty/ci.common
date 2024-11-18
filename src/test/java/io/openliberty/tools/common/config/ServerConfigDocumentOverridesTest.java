@@ -261,10 +261,11 @@ public class ServerConfigDocumentOverridesTest {
         File serversResourceDir = SERVERS_RESOURCES_DIR.toFile();
         File springBootServerXmlDir = new File(serversResourceDir, "springBootApplicationTest");
         File serverXml = new File(springBootServerXmlDir, "invalid_server.xml");
-        File newServerXml=new File(springBootServerXmlDir, "server.xml");
-        Files.copy(serverXml.toPath(),newServerXml.toPath(),StandardCopyOption.REPLACE_EXISTING);
+        File newServerXml = new File(springBootServerXmlDir, "server.xml");
+        Files.copy(serverXml.toPath(), newServerXml.toPath(), StandardCopyOption.REPLACE_EXISTING);
         Map<String, File> libertyDirPropMap = new HashMap<>();
         libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, springBootServerXmlDir);
-        assertThrows(PluginExecutionException.class, ()->new ServerConfigDocument(new TestLogger(), null, libertyDirPropMap));
+        assertThrows("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.",
+                PluginExecutionException.class, () -> new ServerConfigDocument(new TestLogger(), null, libertyDirPropMap));
     }
 }
