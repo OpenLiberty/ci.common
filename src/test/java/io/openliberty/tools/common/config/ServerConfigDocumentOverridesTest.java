@@ -1,5 +1,7 @@
 package io.openliberty.tools.common.config;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -7,14 +9,17 @@ import static org.junit.Assert.assertFalse;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
 import javax.xml.xpath.XPathExpressionException;
 
+import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.junit.Test;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
@@ -206,7 +211,7 @@ public class ServerConfigDocumentOverridesTest {
 
     // Run the method
     @Test
-    public void initializeAppsLocationTest() {
+    public void initializeAppsLocationTest() throws PluginExecutionException {
         File serverConfigDir = SERVER_CONFIG_DIR.toFile();
         Map<String, File> libertyDirPropMap = new HashMap<String, File>();
         libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
@@ -235,5 +240,32 @@ public class ServerConfigDocumentOverridesTest {
         assertEquals("The value is expected to be overriden from false to true","true", properties.get("variables.override"));
         // configDropins, overrides variable dir
         assertEquals("The value is expected to be overriden from 9080 to 7777","7777", properties.get("httpPort"));
+    }
+
+   @Test
+    public void testProcessServerXmlWithSpringBootApplicationNode() throws IOException, PluginExecutionException {
+        File serversResourceDir = SERVERS_RESOURCES_DIR.toFile();
+        File springBootServerXmlDir = new File(serversResourceDir, "springBootApplicationTest");
+        File serverXml = new File(springBootServerXmlDir, "valid_server.xml");
+        File newServerXml=new File(springBootServerXmlDir, "server.xml");
+        Files.copy(serverXml.toPath(),newServerXml.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Map<String, File> libertyDirPropMap = new HashMap<>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, springBootServerXmlDir);
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), null, libertyDirPropMap);
+        assertTrue("ServerConfigDocument getSpringBootAppNodeLocation should not be empty  ",configDocument.getSpringBootAppNodeLocation().isPresent());
+        assertEquals("ServerConfigDocument locations does not contain expected  ", "guide-spring-boot-0.1.0.jar", configDocument.getSpringBootAppNodeLocation().get());
+    }
+
+    @Test
+    public void testProcessServerXmlWithMultipleSpringBootNodes() throws IOException {
+        File serversResourceDir = SERVERS_RESOURCES_DIR.toFile();
+        File springBootServerXmlDir = new File(serversResourceDir, "springBootApplicationTest");
+        File serverXml = new File(springBootServerXmlDir, "invalid_server.xml");
+        File newServerXml = new File(springBootServerXmlDir, "server.xml");
+        Files.copy(serverXml.toPath(), newServerXml.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Map<String, File> libertyDirPropMap = new HashMap<>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, springBootServerXmlDir);
+        assertThrows("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.",
+                PluginExecutionException.class, () -> new ServerConfigDocument(new TestLogger(), null, libertyDirPropMap));
     }
 }
