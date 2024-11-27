@@ -44,6 +44,7 @@ import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
+import io.openliberty.tools.common.plugins.util.LibertyPropFilesUtility;
 import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
@@ -159,10 +160,18 @@ public class ServerConfigDocument {
         initializeAppsLocation();
     }
 
-    // LCLS constructor
-    // TODO: populate libertyDirectoryPropertyToFile with workspace information
-    public ServerConfigDocument(CommonLoggerI log) throws PluginExecutionException {
-        this(log, null, null);
+
+    /**
+     * Constructor for LCLS usage
+     * @param log logger instance
+     * @param installDirectory install directory file
+     * @param userDirectory user directory file
+     * @param serverDirectory server directory file
+     * @throws PluginExecutionException
+     * @throws IOException
+     */
+    public ServerConfigDocument(CommonLoggerI log,File installDirectory, File userDirectory,File serverDirectory) throws PluginExecutionException, IOException {
+        this(log, null, LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(installDirectory,userDirectory,serverDirectory));
     }
 
     // test constructor that takes in initial properties to be called modularly
