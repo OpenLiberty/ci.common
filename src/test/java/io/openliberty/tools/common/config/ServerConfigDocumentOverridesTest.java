@@ -268,4 +268,13 @@ public class ServerConfigDocumentOverridesTest {
         assertThrows("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.",
                 PluginExecutionException.class, () -> new ServerConfigDocument(new TestLogger(), null, libertyDirPropMap));
     }
+
+    @Test
+    public void testServerConfigDocumentForLCLS() throws IOException, PluginExecutionException {
+        ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), null,
+                WLP_DIR.toFile(),WLP_USER_DIR.toFile(),SERVER_CONFIG_DIR.toFile());
+        assertEquals("ServerConfigDocument Liberty Property file map is not created properly ", 8, configDocument.getLibertyDirPropertyFiles().size());
+        assertEquals("ServerConfigDocument http.port variable is not assigned properly ", "1111", configDocument.getProperties().getProperty("http.port"));
+        assertEquals("ServerConfigDocument includeLocation default property is not assigned properly ", "includes", configDocument.getDefaultProperties().getProperty("includeLocation"));
+    }
 }

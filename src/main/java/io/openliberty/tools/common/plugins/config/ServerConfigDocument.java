@@ -164,14 +164,15 @@ public class ServerConfigDocument {
     /**
      * Constructor for LCLS usage
      * @param log logger instance
+     * @param originalServerXMLFile  original xml file
      * @param installDirectory install directory file
      * @param userDirectory user directory file
      * @param serverDirectory server directory file
      * @throws PluginExecutionException
      * @throws IOException
      */
-    public ServerConfigDocument(CommonLoggerI log,File installDirectory, File userDirectory,File serverDirectory) throws PluginExecutionException, IOException {
-        this(log, null, LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(installDirectory,userDirectory,serverDirectory));
+    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, File installDirectory, File userDirectory, File serverDirectory) throws PluginExecutionException, IOException {
+        this(log, originalServerXMLFile, LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(installDirectory, userDirectory, serverDirectory));
     }
 
     // test constructor that takes in initial properties to be called modularly
