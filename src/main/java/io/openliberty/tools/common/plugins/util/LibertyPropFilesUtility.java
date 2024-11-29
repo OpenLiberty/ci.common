@@ -26,7 +26,7 @@ import java.util.Map;
 public class LibertyPropFilesUtility {
 
 
-    public static Map<String, File> getLibertyDirectoryPropertyFiles(CommonLoggerI log, File installDir, File userDir, File serverDir) throws IOException {
+    public static Map<String, File> getLibertyDirectoryPropertyFiles(CommonLoggerI log, File installDir, File userDir, File serverDir) {
         Map<String, File> libertyDirectoryPropertyToFile = new HashMap<>();
 
         if (serverDir.exists()) {
