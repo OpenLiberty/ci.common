@@ -15,6 +15,7 @@
  */
 package io.openliberty.tools.common.plugins.util;
 
+import io.openliberty.tools.common.TestLogger;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -52,7 +53,7 @@ public class LibertyPropFilesUtilityTest {
     @Test
     public void testGetLibertyDirectoryPropertyFiles() throws Exception {
 
-        Map<String, File> libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(installDir, userDir, serverDir);
+        Map<String, File> libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, userDir, serverDir);
         // verify the libPropFiles
         assertFalse("Liberty Directory Property files map should not be empty", libProperties.isEmpty());
         assertEquals(libProperties.get(ServerFeatureUtil.WLP_INSTALL_DIR).getCanonicalPath(), installDir.getCanonicalPath());
@@ -69,10 +70,16 @@ public class LibertyPropFilesUtilityTest {
     @Test
     public void testGetLibertyDirectoryPropertyFilesEmptyResult() throws Exception {
 
-        Map<String, File> libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(installDir, userDir,
+        Map<String, File> libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, userDir,
                 new File("src/test/resources/invalidPath"));
         // should be empty because serverDir does not exist
         assertTrue("Liberty Directory Property files map should be empty since invalid serverDirectory is specified",
+                libProperties.isEmpty());
+
+        libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, new File("src/test/resources/invalidPath\u0000"), serverDir);
+
+        // verify the libPropFiles
+        assertTrue("Liberty Directory Property files map should be empty since invalid userDirectory is specified",
                 libProperties.isEmpty());
     }
 }

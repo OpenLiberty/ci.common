@@ -172,7 +172,7 @@ public class ServerConfigDocument {
      * @throws IOException
      */
     public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, File installDirectory, File userDirectory, File serverDirectory) throws PluginExecutionException, IOException {
-        this(log, originalServerXMLFile, LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(installDirectory, userDirectory, serverDirectory));
+        this(log, originalServerXMLFile, LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(log,installDirectory, userDirectory, serverDirectory));
     }
 
     // test constructor that takes in initial properties to be called modularly
