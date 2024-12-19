@@ -40,13 +40,13 @@ public class BaseDevUtilTest {
                 List<File> resourceDirs, List<Path> webResourceDirs, boolean hotTests, boolean skipTests) throws IOException {
             super(temp.newFolder(), serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, null,
                     resourceDirs, false, hotTests, skipTests, false, false, false, null, 30, 30, 5, 500, true, false, false, false,
-                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null, webResourceDirs);
+                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null, webResourceDirs,true);
         }
 
         public DevTestUtil(File serverDirectory, File buildDir) {
             super(buildDir, serverDirectory, null, null, null, null, null,
                     null, false, false, false, false, false, false, null, 30, 30, 5, 500, true, false, false, false,
-                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null, null);
+                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, null, null, null,true);
         }
 
         @Override

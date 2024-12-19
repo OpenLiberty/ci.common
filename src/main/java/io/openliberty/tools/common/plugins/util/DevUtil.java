@@ -441,6 +441,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
+    boolean compileMojoError;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
@@ -451,7 +452,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
             String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
-            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs) {
+            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs,
+                   boolean compileMojoError) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -491,6 +493,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.containerfile = containerfile;
         this.containerBuildContext = containerBuildContext;
         this.containerRunOpts = containerRunOpts;
+        this.compileMojoError=compileMojoError;
         if (projectDirectory != null) {
             //Use Containerfile if it exists, but default to Dockerfile if both present or neither exist
             File defaultDockerFile = new File(projectDirectory, "Dockerfile");
@@ -4021,15 +4024,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
             for (ProjectModule project : upstreamProjects) {
-                triggerUpstreamModuleCompile(project, false);
+                if (compileMojoError) {
+                    info("Recompile "+project.getProjectName()+ " due to an earlier compilation error");
+                    triggerUpstreamModuleCompile(project, false);
+                } else {
+                    info("Recompile skipped for "+project.getProjectName()+ " since earlier compilation is successful");
+                }
                 // build file tracking of upstream projects
                 lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
             }
         }
 
         // initial source and test compile
-        triggerMainModuleCompile(false);
-        // build file tracking of main project
+        if (compileMojoError) {
+            info("Recompile "+getProjectName()+ " due to an earlier compilation error");
+            triggerMainModuleCompile(false);
+            // build file tracking of main project
+        } else {
+            info("Recompile skipped for "+getProjectName()+ " since earlier compilation is successful");
+        }
         lastBuildFileChange.put(buildFile, System.currentTimeMillis());
     }
 
