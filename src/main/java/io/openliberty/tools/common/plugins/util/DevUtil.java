@@ -4025,10 +4025,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (isMultiModuleProject()) {
             for (ProjectModule project : upstreamProjects) {
                 if (compileMojoError) {
-                    info("Recompile "+project.getProjectName()+ " due to an earlier compilation error");
+                    info("Recompile " + project.getProjectName() + " due to an earlier compilation error");
                     triggerUpstreamModuleCompile(project, false);
                 } else {
-                    info("Recompile skipped for "+project.getProjectName()+ " since earlier compilation is successful");
+                    info("Recompile skipped for " + project.getProjectName() + " since earlier compilation is successful");
                 }
                 // build file tracking of upstream projects
                 lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
@@ -4037,11 +4037,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         // initial source and test compile
         if (compileMojoError) {
-            info("Recompile "+getProjectName()+ " due to an earlier compilation error");
+            info("Recompile " + getProjectName() + " due to an earlier compilation error");
             triggerMainModuleCompile(false);
             // build file tracking of main project
         } else {
-            info("Recompile skipped for "+getProjectName()+ " since earlier compilation is successful");
+            info("Recompile skipped for " + getProjectName() + " since earlier compilation is successful");
         }
         lastBuildFileChange.put(buildFile, System.currentTimeMillis());
     }
