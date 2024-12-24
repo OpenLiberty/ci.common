@@ -512,6 +512,9 @@ public class ServerConfigDocument {
             // add unique values only
             if (!nodeValue.isEmpty()) {
                 if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION)){
+                    if(springBootAppNodeLocation.isPresent()){
+                        throw new PluginExecutionException("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.");
+                    }
                     springBootAppNodeLocation = Optional.of(nodeValue);
                 }
                 String resolved = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
@@ -550,9 +553,9 @@ public class ServerConfigDocument {
                 for (Document inclDoc : inclDocs) {
                     parseApplication(inclDoc, XPATH_SERVER_APPLICATION);
                     parseApplication(inclDoc, XPATH_SERVER_WEB_APPLICATION);
-                    parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
+                    parseApplication(inclDoc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
                     parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
-                    parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
+                    parseNames(inclDoc, XPATH_ALL_SERVER_APPLICATIONS);
                     // handle nested include elements
                     parseInclude(inclDoc);
                 }

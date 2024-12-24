@@ -38,6 +38,7 @@ public class ServerConfigDocumentOverridesTest {
     private final static Path SERVER_CONFIG_DIR = WLP_USER_DIR.resolve("servers/defaultServer");
     private final static Path SHARED_CONFIG_DIR = WLP_USER_DIR.resolve("shared");
     private final static Path SERVERS_RESOURCES_DIR = RESOURCES_DIR.resolve("servers/");
+    private final static Path SERVER_CONFIG_INCLUDE_DIR = SERVER_CONFIG_DIR.resolve("includes");
 
     // 1. variable default values in server.xml file
     // 6. variable values declared in the server.xml file
@@ -276,5 +277,29 @@ public class ServerConfigDocumentOverridesTest {
         assertEquals("ServerConfigDocument Liberty Property file map is not created properly ", 8, configDocument.getLibertyDirPropertyFiles().size());
         assertEquals("ServerConfigDocument http.port variable is not assigned properly ", "1111", configDocument.getProperties().getProperty("http.port"));
         assertEquals("ServerConfigDocument includeLocation default property is not assigned properly ", "includes", configDocument.getDefaultProperties().getProperty("includeLocation"));
+    }
+
+    @Test
+    public void testProcessServerXmlWithMultipleSpringBootNodesInMultipleConfigFiles() throws IOException{
+        // we have added <springbootapplication> in valid_server.xml and included_server.xml
+        File serverConfigDir = SERVER_CONFIG_DIR.toFile();
+        Map<String, File> libertyDirPropMap = new HashMap<String, File>();
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
+        libertyDirPropMap.put(ServerFeatureUtil.WLP_INSTALL_DIR, WLP_DIR.toFile());
+        libertyDirPropMap.put(ServerFeatureUtil.WLP_USER_DIR, WLP_USER_DIR.toFile());
+        libertyDirPropMap.put(ServerFeatureUtil.SHARED_CONFIG_DIR, SHARED_CONFIG_DIR.toFile());
+        File serversResourceDir = SERVERS_RESOURCES_DIR.toFile();
+        File springBootServerXmlDir = new File(serversResourceDir, "springBootApplicationTest");
+
+        File includedServerXml = new File(springBootServerXmlDir, "included_server.xml");
+        File newIncludedServerXml = new File(SERVER_CONFIG_INCLUDE_DIR.toFile(), "included_server.xml");
+        Files.copy(includedServerXml.toPath(), newIncludedServerXml.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        File validServerXml = new File(springBootServerXmlDir, "valid_server.xml");
+        File newValidServerXml = new File(SERVER_CONFIG_INCLUDE_DIR.toFile(), "valid_server.xml");
+        Files.copy(validServerXml.toPath(), newValidServerXml.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        assertThrows("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.",
+                PluginExecutionException.class, () -> new ServerConfigDocument(new TestLogger(), null, libertyDirPropMap));
+        Files.delete(newIncludedServerXml.toPath());
+        Files.delete(newValidServerXml.toPath());
     }
 }
