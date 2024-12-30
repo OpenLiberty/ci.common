@@ -441,19 +441,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
-    boolean compileMojoError;
+    // for gradle, this map will be kept as empty map
+    protected Map<String,Boolean> projectRecompileMap;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
-            File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
-            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
-            long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
-            boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
-            File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
-            boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
-            String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
-            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
-            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs,
-                   boolean compileMojoError) {
+                   File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
+                   boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
+                   long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
+                   boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
+                   File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
+                   boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
+                   String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
+                   String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
+                   Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs,
+                   Map<String, Boolean> projectRecompileMap) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -493,7 +494,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.containerfile = containerfile;
         this.containerBuildContext = containerBuildContext;
         this.containerRunOpts = containerRunOpts;
-        this.compileMojoError=compileMojoError;
+        this.projectRecompileMap = projectRecompileMap;
         if (projectDirectory != null) {
             //Use Containerfile if it exists, but default to Dockerfile if both present or neither exist
             File defaultDockerFile = new File(projectDirectory, "Dockerfile");
@@ -4024,7 +4025,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
             for (ProjectModule project : upstreamProjects) {
-                if (compileMojoError) {
+                // if map is empty, should trigger compile
+                if (projectRecompileMap.isEmpty() || Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName())) ) {
                     info("Recompile " + project.getProjectName() + " due to an earlier compilation error");
                     triggerUpstreamModuleCompile(project, false);
                 } else {
@@ -4036,7 +4038,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
 
         // initial source and test compile
-        if (compileMojoError) {
+        // if map is empty, should trigger compile
+        if (projectRecompileMap.isEmpty()|| Boolean.TRUE.equals(projectRecompileMap.get(getProjectName())) ) {
             info("Recompile " + getProjectName() + " due to an earlier compilation error");
             triggerMainModuleCompile(false);
             // build file tracking of main project
