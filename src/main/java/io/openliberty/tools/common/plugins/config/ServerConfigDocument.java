@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2024.
+ * (C) Copyright IBM Corporation 2017, 2025.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -512,6 +512,7 @@ public class ServerConfigDocument {
             // add unique values only
             if (!nodeValue.isEmpty()) {
                 if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION)){
+                    // checking whether any springBootAppNodeLocation already configured from other server configuration files
                     if(springBootAppNodeLocation.isPresent()){
                         throw new PluginExecutionException("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.");
                     }
