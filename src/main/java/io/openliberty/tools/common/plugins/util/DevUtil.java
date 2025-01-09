@@ -442,8 +442,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     protected boolean skipInstallFeature;
     // for gradle, this map will be kept as empty map
-    protected Map<String,Boolean> projectRecompileMap;
+    protected Map<String, Boolean> projectRecompileMap = new HashMap<>();
 
+    // constructor for maven
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
                    File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
                    boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
@@ -453,8 +454,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                    boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
                    String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
                    String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
-                   Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs,
-                   Map<String, Boolean> projectRecompileMap) {
+                   Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs, Map<String, Boolean> projectRecompileMap) {
+        this(buildDirectory, serverDirectory, sourceDirectory, testSourceDirectory,
+                configDirectory, projectDirectory, multiModuleProjectDirectory, resourceDirs, changeOnDemandTestsAction,
+                hotTests, skipTests, skipUTs, skipITs, skipInstallFeature, applicationId,
+                serverStartTimeout, appStartupTimeout, appUpdateTimeout, compileWaitMillis,
+                libertyDebug, useBuildRecompile, gradle, pollingTest, container,
+                containerfile, containerBuildContext, containerRunOpts, containerBuildTimeout,
+                skipDefaultPorts, compilerOptions, keepTempContainerfile,
+                mavenCacheLocation, upstreamProjects, recompileDependencies,
+                packagingType, buildFile, parentBuildFiles, generateFeatures,
+                compileArtifactPaths, testArtifactPaths, monitoredWebResourceDirs);
+        this.projectRecompileMap = projectRecompileMap;
+    }
+
+    // constructor for gradle
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
+            File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
+            boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
+            long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
+            boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
+            File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
+            boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
+            String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
+            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
+            Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -494,7 +518,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.containerfile = containerfile;
         this.containerBuildContext = containerBuildContext;
         this.containerRunOpts = containerRunOpts;
-        this.projectRecompileMap = projectRecompileMap;
+
         if (projectDirectory != null) {
             //Use Containerfile if it exists, but default to Dockerfile if both present or neither exist
             File defaultDockerFile = new File(projectDirectory, "Dockerfile");
