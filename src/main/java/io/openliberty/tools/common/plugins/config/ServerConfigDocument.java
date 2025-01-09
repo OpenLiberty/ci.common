@@ -75,7 +75,8 @@ public class ServerConfigDocument {
     private Properties defaultProps;
     private Map<String, File> libertyDirectoryPropertyToFile = null;
 
-    Optional<String> springBootAppNodeLocation=Optional.empty();
+    Optional<String> springBootAppNodeLocation = Optional.empty();
+    Optional<String> springBootAppNodeDocumentURI = Optional.empty();
 
     private static final XPathExpression XPATH_SERVER_APPLICATION;
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
@@ -505,19 +506,13 @@ public class ServerConfigDocument {
 
         NodeList nodeList = (NodeList) expression.evaluate(doc, XPathConstants.NODESET);
         if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION) && nodeList.getLength()>1){
-            throw new PluginExecutionException("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.");
+            throw new PluginExecutionException(String.format("Found multiple springBootApplication elements specified in the server configuration file %s. Only one springBootApplication can be configured per Liberty server.", doc.getDocumentURI()));
         }
         for (int i = 0; i < nodeList.getLength(); i++) {
             String nodeValue = nodeList.item(i).getAttributes().getNamedItem("location").getNodeValue();
             // add unique values only
             if (!nodeValue.isEmpty()) {
-                if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION)){
-                    // checking whether any springBootAppNodeLocation already configured from other server configuration files
-                    if(springBootAppNodeLocation.isPresent()){
-                        throw new PluginExecutionException("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.");
-                    }
-                    springBootAppNodeLocation = Optional.of(nodeValue);
-                }
+                checkForSpringBootApplicationNode(doc, expression, nodeValue);
                 String resolved = VariableUtility.resolveVariables(log, nodeValue, null, getProperties(), getDefaultProperties(), getLibertyDirPropertyFiles());
                 if (resolved == null) {
                     // location could not be resolved, log message and add location as is
@@ -529,6 +524,20 @@ public class ServerConfigDocument {
                     log.debug("Adding resolved app location: "+resolved+" for specified location: "+nodeValue);
                     locations.add(resolved);
                 }
+            }
+        }
+    }
+
+    private void checkForSpringBootApplicationNode(Document doc, XPathExpression expression, String nodeValue) throws PluginExecutionException {
+        if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION)){
+            // checking whether any springBootAppNodeLocation already configured from other server configuration files
+            if(springBootAppNodeLocation.isPresent() && springBootAppNodeDocumentURI.isPresent()){
+                throw new PluginExecutionException(String.format("SpringBootApplication elements are specified in multiple server configuration files [%s, %s]. Only one springBootApplication can be configured per Liberty server.", springBootAppNodeDocumentURI.get(), doc.getDocumentURI()));
+            }
+            else {
+                log.debug("Setting springBootApplication location as "+ nodeValue);
+                springBootAppNodeLocation = Optional.of(nodeValue);
+                springBootAppNodeDocumentURI = Optional.of(doc.getDocumentURI());
             }
         }
     }
@@ -711,7 +720,9 @@ public class ServerConfigDocument {
      */
     public Document parseDocument(File file) throws FileNotFoundException, IOException {
         try (FileInputStream is = new FileInputStream(file)) {
-            return parseDocument(is);
+            Document document= parseDocument(is);
+            document.setDocumentURI(file.getCanonicalPath());
+            return document;
         } catch (SAXException ex) {
             // If the file was not valid XML, assume it was some other non XML
             // file in dropins.

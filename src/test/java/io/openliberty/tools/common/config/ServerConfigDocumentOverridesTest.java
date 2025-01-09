@@ -297,7 +297,7 @@ public class ServerConfigDocumentOverridesTest {
         File validServerXml = new File(springBootServerXmlDir, "valid_server.xml");
         File newValidServerXml = new File(SERVER_CONFIG_INCLUDE_DIR.toFile(), "valid_server.xml");
         Files.copy(validServerXml.toPath(), newValidServerXml.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        assertThrows("Found multiple springBootApplication elements specified in the server configuration. Only one springBootApplication can be configured per Liberty server.",
+        assertThrows("Expected multiple springBootApplication elements specified in the server configuration. Only one springBootApplication node is found.",
                 PluginExecutionException.class, () -> new ServerConfigDocument(new TestLogger(), null, libertyDirPropMap));
         Files.delete(newIncludedServerXml.toPath());
         Files.delete(newValidServerXml.toPath());
