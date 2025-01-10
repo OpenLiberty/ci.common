@@ -532,7 +532,7 @@ public class ServerConfigDocument {
         if(expression.equals(XPATH_SERVER_SPRINGBOOT_APPLICATION)){
             // checking whether any springBootAppNodeLocation already configured from other server configuration files
             if(springBootAppNodeLocation.isPresent() && springBootAppNodeDocumentURI.isPresent()){
-                throw new PluginExecutionException(String.format("Found multiple springBootApplication elements are specified in multiple server configuration files [%s, %s]. Only one springBootApplication can be configured per Liberty server.", springBootAppNodeDocumentURI.get(), doc.getDocumentURI()));
+                throw new PluginExecutionException(String.format("Found multiple springBootApplication elements specified in the server configuration in files [%s, %s]. Only one springBootApplication can be configured per Liberty server.", springBootAppNodeDocumentURI.get(), doc.getDocumentURI()));
             }
             else {
                 log.debug("Setting springBootApplication location as "+ nodeValue);
