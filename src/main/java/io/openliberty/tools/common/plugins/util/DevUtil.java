@@ -441,8 +441,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
-    // for gradle, this map will be kept as empty map
-    protected Map<String, Boolean> projectRecompileMap = new HashMap<>();
+    // for gradle, this map will be kept as null
+    protected Map<String, Boolean> projectRecompileMap;
 
     // constructor for maven
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
@@ -465,7 +465,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 mavenCacheLocation, upstreamProjects, recompileDependencies,
                 packagingType, buildFile, parentBuildFiles, generateFeatures,
                 compileArtifactPaths, testArtifactPaths, monitoredWebResourceDirs);
-        this.projectRecompileMap = projectRecompileMap;
+        // setting projectRecompileMap as empty if input is null from ci.maven
+        this.projectRecompileMap = projectRecompileMap != null ? projectRecompileMap : new HashMap<>();
     }
 
     // constructor for gradle
@@ -4049,8 +4050,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
             for (ProjectModule project : upstreamProjects) {
-                // if map is empty, should trigger compile
-                if (projectRecompileMap.isEmpty() || Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName())) ) {
+                // for ci.gradle, map will be null always
+                // we can always trigger recompile for gradle, as we gradle is using gradle task state to recompile
+                if (projectRecompileMap == null || Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName())) ) {
                     info("Recompile " + project.getProjectName() + " due to an earlier compilation error");
                     triggerUpstreamModuleCompile(project, false);
                 } else {
@@ -4061,9 +4063,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         }
 
-        // initial source and test compile
-        // if map is empty, should trigger compile
-        if (projectRecompileMap.isEmpty()|| Boolean.TRUE.equals(projectRecompileMap.get(getProjectName())) ) {
+        // for ci.gradle, map will be null always
+        // we can always trigger recompile for gradle, as we gradle is using gradle task state to recompile
+        if (projectRecompileMap == null || Boolean.TRUE.equals(projectRecompileMap.get(getProjectName())) ) {
             info("Recompile " + getProjectName() + " due to an earlier compilation error");
             triggerMainModuleCompile(false);
             // build file tracking of main project
