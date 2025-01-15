@@ -4052,7 +4052,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             for (ProjectModule project : upstreamProjects) {
                 // for ci.gradle, map will be null always
                 // we can always trigger recompile for gradle, as we gradle is using gradle task state to recompile
-                if (projectRecompileMap == null || Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName())) ) {
+                if (projectRecompileMap == null) {
+                    triggerMainModuleCompile(false);
+                } else if (Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName()))) {
                     info("Recompile " + project.getProjectName() + " due to an earlier compilation error");
                     triggerUpstreamModuleCompile(project, false);
                 } else {
@@ -4065,7 +4067,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         // for ci.gradle, map will be null always
         // we can always trigger recompile for gradle, as we gradle is using gradle task state to recompile
-        if (projectRecompileMap == null || Boolean.TRUE.equals(projectRecompileMap.get(getProjectName())) ) {
+        if (projectRecompileMap == null) {
+            triggerMainModuleCompile(false);
+        } else if (Boolean.TRUE.equals(projectRecompileMap.get(getProjectName()))) {
             info("Recompile " + getProjectName() + " due to an earlier compilation error");
             triggerMainModuleCompile(false);
             // build file tracking of main project
