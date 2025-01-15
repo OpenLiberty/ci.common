@@ -26,4 +26,7 @@
     <variable name="server.env.defined" value="${this.value}"/>
     <variable name="bootstrap.property.defined" value="${that.value}"/>
     <variable name="config.dropins.server" value="2"/>
+
+    <include location="${includeLocationNonDefault}/included_server.xml"/>
+    <include location="${includeLocationNonDefault}/valid_server.xml"/>
 </server>
