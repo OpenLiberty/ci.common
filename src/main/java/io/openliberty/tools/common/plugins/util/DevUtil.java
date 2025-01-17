@@ -4055,16 +4055,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (projectRecompileMap == null) {
                     info("Recompile " + project.getProjectName());
                     triggerUpstreamModuleCompile(project, false);
-                    // build file tracking of upstream projects
-                    lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                 } else if (Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName()))) {
                     info("Recompile " + project.getProjectName() + " due to an earlier compilation error");
                     triggerUpstreamModuleCompile(project, false);
-                    // build file tracking of upstream projects
-                    lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                 } else {
                     info("Recompile skipped for " + project.getProjectName() + " since earlier compilation is successful");
                 }
+                // build file tracking of upstream projects, this update is needed for auto test invocation
+                lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
             }
         }
 
@@ -4073,16 +4071,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (projectRecompileMap == null) {
             info("Recompile " + getProjectName());
             triggerMainModuleCompile(false);
-            // build file tracking of main project
-            lastBuildFileChange.put(buildFile, System.currentTimeMillis());
         } else if (Boolean.TRUE.equals(projectRecompileMap.get(getProjectName()))) {
             info("Recompile " + getProjectName() + " due to an earlier compilation error");
             triggerMainModuleCompile(false);
-            // build file tracking of main project
-            lastBuildFileChange.put(buildFile, System.currentTimeMillis());
         } else {
             info("Recompile skipped for " + getProjectName() + " since earlier compilation is successful");
         }
+        // build file tracking of upstream projects, this update is needed for auto test invocation
+        lastBuildFileChange.put(buildFile, System.currentTimeMillis());
     }
 
     private void processFileChanges(
