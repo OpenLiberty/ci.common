@@ -3627,7 +3627,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean compileDownstreamSrc = false;
                 boolean compileDownstreamTest = false;
 
-                boolean pastBuildFileWaitPeriod = System
+                boolean pastBuildFileWaitPeriod = lastBuildFileChange.get(project.getBuildFile()) != null && System
                         .currentTimeMillis() > lastBuildFileChange.get(project.getBuildFile()) + compileWaitMillis;
                 if (!pastBuildFileWaitPeriod) {
                     continue;
@@ -3885,7 +3885,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
-        boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
+        boolean pastBuildFileWaitPeriod = lastBuildFileChange.get(buildFile) != null && System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
         if (processSources && pastBuildFileWaitPeriod) {
             // Count the messages before the compile.
             int numApplicationUpdatedMessages = 0;
