@@ -3626,9 +3626,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean successfulCompilation = true;
                 boolean compileDownstreamSrc = false;
                 boolean compileDownstreamTest = false;
-
-                boolean pastBuildFileWaitPeriod = lastBuildFileChange.get(project.getBuildFile()) != null && System
-                        .currentTimeMillis() > lastBuildFileChange.get(project.getBuildFile()) + compileWaitMillis;
+                boolean pastBuildFileWaitPeriod = true;
+                if (lastBuildFileChange.get(project.getBuildFile()) != null) {
+                    pastBuildFileWaitPeriod = System
+                            .currentTimeMillis() > lastBuildFileChange.get(project.getBuildFile()) + compileWaitMillis;
+                }
                 if (!pastBuildFileWaitPeriod) {
                     continue;
                 }
@@ -3885,7 +3887,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
-        boolean pastBuildFileWaitPeriod = lastBuildFileChange.get(buildFile) != null && System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
+        boolean pastBuildFileWaitPeriod = true;
+        if (lastBuildFileChange.get(buildFile) != null) {
+            pastBuildFileWaitPeriod = System
+                    .currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
+        }
+
         if (processSources && pastBuildFileWaitPeriod) {
             // Count the messages before the compile.
             int numApplicationUpdatedMessages = 0;
@@ -4055,14 +4062,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (projectRecompileMap == null) {
                     info("Recompile " + project.getProjectName());
                     triggerUpstreamModuleCompile(project, false);
+                    // build file tracking of upstream projects, this update is needed for auto test invocation
+                    lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                 } else if (Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName()))) {
                     info("Recompile " + project.getProjectName() + " due to an earlier compilation error");
                     triggerUpstreamModuleCompile(project, false);
+                    // build file tracking of upstream projects, this update is needed for auto test invocation
+                    lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
                 } else {
                     info("Recompile skipped for " + project.getProjectName() + " since earlier compilation is successful");
                 }
-                // build file tracking of upstream projects, this update is needed for auto test invocation
-                lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
             }
         }
 
@@ -4071,14 +4080,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (projectRecompileMap == null) {
             info("Recompile " + getProjectName());
             triggerMainModuleCompile(false);
+            // build file tracking of upstream projects, this update is needed for auto test invocation
+            lastBuildFileChange.put(buildFile, System.currentTimeMillis());
         } else if (Boolean.TRUE.equals(projectRecompileMap.get(getProjectName()))) {
             info("Recompile " + getProjectName() + " due to an earlier compilation error");
             triggerMainModuleCompile(false);
+            // build file tracking of upstream projects, this update is needed for auto test invocation
+            lastBuildFileChange.put(buildFile, System.currentTimeMillis());
         } else {
             info("Recompile skipped for " + getProjectName() + " since earlier compilation is successful");
         }
-        // build file tracking of upstream projects, this update is needed for auto test invocation
-        lastBuildFileChange.put(buildFile, System.currentTimeMillis());
+
     }
 
     private void processFileChanges(
