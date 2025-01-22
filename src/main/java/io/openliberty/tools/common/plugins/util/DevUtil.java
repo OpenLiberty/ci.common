@@ -441,7 +441,35 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
+    // for gradle, this map will be kept as null
+    protected Map<String, Boolean> projectRecompileMap;
 
+    // constructor for maven
+    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
+                   File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
+                   boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
+                   long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout, long compileWaitMillis,
+                   boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest, boolean container,
+                   File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
+                   boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
+                   String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
+                   String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
+                   Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs, Map<String, Boolean> projectRecompileMap) {
+        this(buildDirectory, serverDirectory, sourceDirectory, testSourceDirectory,
+                configDirectory, projectDirectory, multiModuleProjectDirectory, resourceDirs, changeOnDemandTestsAction,
+                hotTests, skipTests, skipUTs, skipITs, skipInstallFeature, applicationId,
+                serverStartTimeout, appStartupTimeout, appUpdateTimeout, compileWaitMillis,
+                libertyDebug, useBuildRecompile, gradle, pollingTest, container,
+                containerfile, containerBuildContext, containerRunOpts, containerBuildTimeout,
+                skipDefaultPorts, compilerOptions, keepTempContainerfile,
+                mavenCacheLocation, upstreamProjects, recompileDependencies,
+                packagingType, buildFile, parentBuildFiles, generateFeatures,
+                compileArtifactPaths, testArtifactPaths, monitoredWebResourceDirs);
+        // setting projectRecompileMap as empty if input is null from ci.maven
+        this.projectRecompileMap = projectRecompileMap != null ? projectRecompileMap : new HashMap<>();
+    }
+
+    // constructor for gradle
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
             File configDirectory, File projectDirectory, File multiModuleProjectDirectory, List<File> resourceDirs, boolean changeOnDemandTestsAction,
             boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs, boolean skipInstallFeature, String applicationId,
@@ -491,6 +519,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.containerfile = containerfile;
         this.containerBuildContext = containerBuildContext;
         this.containerRunOpts = containerRunOpts;
+
         if (projectDirectory != null) {
             //Use Containerfile if it exists, but default to Dockerfile if both present or neither exist
             File defaultDockerFile = new File(projectDirectory, "Dockerfile");
@@ -3597,9 +3626,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 boolean successfulCompilation = true;
                 boolean compileDownstreamSrc = false;
                 boolean compileDownstreamTest = false;
-
-                boolean pastBuildFileWaitPeriod = System
-                        .currentTimeMillis() > lastBuildFileChange.get(project.getBuildFile()) + compileWaitMillis;
+                boolean pastBuildFileWaitPeriod = true;
+                if (lastBuildFileChange.get(project.getBuildFile()) != null) {
+                    pastBuildFileWaitPeriod = System
+                            .currentTimeMillis() > lastBuildFileChange.get(project.getBuildFile()) + compileWaitMillis;
+                }
                 if (!pastBuildFileWaitPeriod) {
                     continue;
                 }
@@ -3856,7 +3887,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
         boolean processTests = System.currentTimeMillis() > lastJavaTestChange + compileWaitMillis;
-        boolean pastBuildFileWaitPeriod = System.currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
+        boolean pastBuildFileWaitPeriod = true;
+        if (lastBuildFileChange.get(buildFile) != null) {
+            pastBuildFileWaitPeriod = System
+                    .currentTimeMillis() > lastBuildFileChange.get(buildFile) + compileWaitMillis;
+        }
+
         if (processSources && pastBuildFileWaitPeriod) {
             // Count the messages before the compile.
             int numApplicationUpdatedMessages = 0;
@@ -4021,16 +4057,40 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         // initial source and test compile of upstream projects
         if (isMultiModuleProject()) {
             for (ProjectModule project : upstreamProjects) {
-                triggerUpstreamModuleCompile(project, false);
-                // build file tracking of upstream projects
-                lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
+                // for ci.gradle, map will be null always
+                // we can always trigger recompile for gradle, as we gradle is using gradle task state to recompile
+                if (projectRecompileMap == null) {
+                    info("Recompile " + project.getProjectName());
+                    triggerUpstreamModuleCompile(project, false);
+                    // build file tracking of upstream projects, this update is needed for auto test invocation
+                    lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
+                } else if (Boolean.TRUE.equals(projectRecompileMap.get(project.getProjectName()))) {
+                    info("Recompile " + project.getProjectName() + " due to an earlier compilation error");
+                    triggerUpstreamModuleCompile(project, false);
+                    // build file tracking of upstream projects, this update is needed for auto test invocation
+                    lastBuildFileChange.put(project.getBuildFile(), System.currentTimeMillis());
+                } else {
+                    info("Recompile skipped for " + project.getProjectName() + " since earlier compilation is successful");
+                }
             }
         }
 
-        // initial source and test compile
-        triggerMainModuleCompile(false);
-        // build file tracking of main project
-        lastBuildFileChange.put(buildFile, System.currentTimeMillis());
+        // for ci.gradle, map will be null always
+        // we can always trigger recompile for gradle, as we gradle is using gradle task state to recompile
+        if (projectRecompileMap == null) {
+            info("Recompile " + getProjectName());
+            triggerMainModuleCompile(false);
+            // build file tracking of upstream projects, this update is needed for auto test invocation
+            lastBuildFileChange.put(buildFile, System.currentTimeMillis());
+        } else if (Boolean.TRUE.equals(projectRecompileMap.get(getProjectName()))) {
+            info("Recompile " + getProjectName() + " due to an earlier compilation error");
+            triggerMainModuleCompile(false);
+            // build file tracking of upstream projects, this update is needed for auto test invocation
+            lastBuildFileChange.put(buildFile, System.currentTimeMillis());
+        } else {
+            info("Recompile skipped for " + getProjectName() + " since earlier compilation is successful");
+        }
+
     }
 
     private void processFileChanges(
