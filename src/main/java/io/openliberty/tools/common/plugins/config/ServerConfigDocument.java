@@ -83,7 +83,7 @@ public class ServerConfigDocument {
     private static final XPathExpression XPATH_SERVER_SPRINGBOOT_APPLICATION;
     private static final XPathExpression XPATH_SERVER_ENTERPRISE_APPLICATION;
     private static final XPathExpression XPATH_SERVER_INCLUDE;
-    private static final XPathExpression XPATH_SERVER_VARIABLE;
+    public static final XPathExpression XPATH_SERVER_VARIABLE;
     private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
 
 
