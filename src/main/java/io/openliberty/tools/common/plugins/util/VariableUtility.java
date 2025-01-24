@@ -158,11 +158,20 @@ public class VariableUtility {
         return null;
     }
 
-    public static List<Properties> parseVariablesForXml(Document doc, boolean defaultValues, boolean values, boolean both) throws XPathExpressionException {
+    /**
+     * <p>Parse variables for an xml document</p>
+     * @param doc xml doc
+     * @param defaultValues populate only default values property object
+     * @param values populate only actual values property object
+     * @param both both values property object will be populated
+     * @return list of properties, including actual and default values
+     * @throws XPathExpressionException
+     */
+    public static List<Properties> parseVariables(Document doc, boolean defaultValues, boolean values, boolean both) throws XPathExpressionException {
         // parse input document
         NodeList nodeList = (NodeList) XPATH_SERVER_VARIABLE.evaluate(doc, XPathConstants.NODESET);
         Properties props = new Properties();
-        Properties defaultProps=new Properties();
+        Properties defaultProps = new Properties();
 
         for (int i = 0; i < nodeList.getLength(); i++) {
             NamedNodeMap attr = nodeList.item(i).getAttributes();
@@ -189,7 +198,7 @@ public class VariableUtility {
         return result;
     }
 
-    public static String getValue(NamedNodeMap attr, String nodeName) {
+    private static String getValue(NamedNodeMap attr, String nodeName) {
         String value = null;
         Node valueNode = attr.getNamedItem(nodeName);
         if (valueNode != null) {

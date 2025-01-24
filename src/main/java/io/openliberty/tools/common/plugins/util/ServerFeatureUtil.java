@@ -512,13 +512,13 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         // currently we are only checking for server.xml, bootstrap.properties and server.env
         String nodeValue = node.getAttribute("location");
         Properties props = new Properties();
-        props.putAll(bootstrapProperties);
         Properties serverEnvProps = getPropertiesFromFile(new File(serverDirectory, "server.env"));
         props.putAll(serverEnvProps);
+        props.putAll(bootstrapProperties);
         Properties defaultProps = new Properties();
 
         try {
-            List<Properties> resultMap = VariableUtility.parseVariablesForXml(doc, true, true, true);
+            List<Properties> resultMap = VariableUtility.parseVariables(doc, true, true, true);
             props.putAll(resultMap.get(0));
             defaultProps.putAll(resultMap.get(1));
         } catch (XPathExpressionException e) {
