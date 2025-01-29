@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Map;
@@ -58,6 +59,8 @@ import io.openliberty.tools.common.CommonLoggerI;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil;
 import io.openliberty.tools.common.plugins.util.VariableUtility;
 
+import static io.openliberty.tools.common.plugins.util.VariableUtility.parseVariables;
+
 // Moved from ci.maven/liberty-maven-plugin/src/main/java/net/wasdev/wlp/maven/plugins/ServerConfigDocument.java
 public class ServerConfigDocument {
 
@@ -83,7 +86,7 @@ public class ServerConfigDocument {
     private static final XPathExpression XPATH_SERVER_SPRINGBOOT_APPLICATION;
     private static final XPathExpression XPATH_SERVER_ENTERPRISE_APPLICATION;
     private static final XPathExpression XPATH_SERVER_INCLUDE;
-    private static final XPathExpression XPATH_SERVER_VARIABLE;
+    public static final XPathExpression XPATH_SERVER_VARIABLE;
     private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
 
 
@@ -775,49 +778,19 @@ public class ServerConfigDocument {
 
 
     public void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
-        parseVariables(doc, true, false, false);
+        List<Properties> propsList = parseVariables(doc, true, false, false);
+        defaultProps.putAll(propsList.get(1));
     }
 
     private void parseVariablesForValues(Document doc) throws XPathExpressionException {
-        parseVariables(doc, false, true, false);
+        List<Properties> propsList = parseVariables(doc, false, true, false);
+        props.putAll(propsList.get(0));
     }
 
     public void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
-        parseVariables(doc, false, false, true);
-    }
-
-    private void parseVariables(Document doc, boolean defaultValues, boolean values, boolean both) throws XPathExpressionException {
-            // parse input document
-        NodeList nodeList = (NodeList) XPATH_SERVER_VARIABLE.evaluate(doc, XPathConstants.NODESET);
-
-        for (int i = 0; i < nodeList.getLength(); i++) {
-            NamedNodeMap attr = nodeList.item(i).getAttributes();
-
-            String varName = attr.getNamedItem("name").getNodeValue();
-
-            if (!varName.isEmpty()) {
-                // A variable can have either a value attribute OR a defaultValue attribute.
-                String varValue = getValue(attr, "value");
-                String varDefaultValue = getValue(attr, "defaultValue");
-
-                if ((values || both) && (varValue != null && !varValue.isEmpty())) {
-                    props.setProperty(varName, varValue);
-                }
-
-                if ((defaultValues || both) && (varDefaultValue != null && ! varDefaultValue.isEmpty())) {
-                        defaultProps.setProperty(varName, varDefaultValue);
-                }
-            }
-        }
-    }
-
-    private String getValue(NamedNodeMap attr, String nodeName) {
-        String value = null;
-        Node valueNode = attr.getNamedItem(nodeName);
-        if (valueNode != null) {
-            value = valueNode.getNodeValue();
-        }
-        return value;
+        List<Properties> propsList = parseVariables(doc, false, false, true);
+        props.putAll(propsList.get(0));
+        defaultProps.putAll(propsList.get(1));
     }
 
     public void parseIncludeVariables(Document doc) throws XPathExpressionException, IOException, SAXException {

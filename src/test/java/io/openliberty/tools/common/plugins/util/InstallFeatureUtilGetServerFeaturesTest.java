@@ -759,5 +759,41 @@ public class InstallFeatureUtilGetServerFeaturesTest extends BaseInstallFeatureU
 
         verifyServerFeatures(expected);
     }
-    
+
+    @Test
+    public void testIncludeUrlFromVariableServerXMLDefaultValue() throws Exception{
+        copyAsName("server_include_variable_default_value.xml", "server.xml");
+        copy("extraFeatures.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+
+        verifyServerFeatures(expected);
+    }
+
+    @Test
+    public void testIncludeUrlFromVariableServerXML() throws Exception{
+        copyAsName("server_include_variable.xml", "server.xml");
+        copy("extraFeatures.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+
+        verifyServerFeatures(expected);
+    }
+
+    @Test
+    public void testIncludeUrlFromVariableServerEnv() throws Exception{
+        replaceIncludeLocation(src.toURI().toURL() + "\\$\\{extras.filename\\}");
+        copy("server.env");
+        copy("extraFeatures.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("orig");
+        expected.add("extra");
+
+        verifyServerFeatures(expected);
+    }
 }

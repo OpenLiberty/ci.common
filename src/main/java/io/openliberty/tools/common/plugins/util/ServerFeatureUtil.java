@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2024.
+ * (C) Copyright IBM Corporation 2019, 2025.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathExpressionException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.comparator.NameFileComparator;
@@ -218,7 +219,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         } else if (libertyDirectoryPropertyToFile == null) {
             warn("The properties for directories are null and could lead to server include files not being processed for server features.");
         }
-        Properties bootstrapProperties = getBootstrapProperties(new File(serverDirectory, "bootstrap.properties"));
+        Properties bootstrapProperties = getPropertiesFromFile(new File(serverDirectory, "bootstrap.properties"));
         FeaturesPlatforms result = getConfigDropinsFeatures(null, serverDirectory, bootstrapProperties, "defaults", dropinsFilesToIgnore);
         if (serverXmlFile == null) {
             serverXmlFile = new File(serverDirectory, "server.xml");
@@ -412,7 +413,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
                             result.getFeatures().addAll(featuresToInstall);
                             result.getPlatforms().addAll(platformsToInstall);
                         } else if ("include".equals(child.getNodeName())){
-                            result = parseIncludeNode(result, serverDirectory, canonicalServerFile, bootstrapProperties, child, updatedParsedXmls);
+                            result = parseIncludeNode(result, serverDirectory, canonicalServerFile, bootstrapProperties, child, updatedParsedXmls, doc);
                         }
                     }
                 }
@@ -491,29 +492,41 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     
     /**
      * Parse features from an include node.
-     * 
-     * @param result2
-     *            The features that have been parsed so far.
-     * @param serverDirectory
-     *            The server directory containing the server.xml.
-     * @param serverFile
-     *            The parent server XML file containing the include node.
-     * @param node
-     *            The include node.
-     * @param updatedParsedXmls
-     *            The list of XML files that have been parsed so far.
+     *
+     * @param origResult        The features that have been parsed so far.
+     * @param serverDirectory   The server directory containing the server.xml.
+     * @param serverFile        The parent server XML file containing the include node.
+     * @param node              The include node.
+     * @param updatedParsedXmls The list of XML files that have been parsed so far.
+     * @param doc               XML Documemy
      * @return The set of features to install, or empty set if the cumulatively
-     *         parsed xml files only have featureManager sections but no
-     *         features to install, or null if there are no valid xml files or
-     *         they have no featureManager section
+     * parsed xml files only have featureManager sections but no
+     * features to install, or null if there are no valid xml files or
+     * they have no featureManager section
      * @throws IOException
      */
     private FeaturesPlatforms parseIncludeNode(FeaturesPlatforms origResult, File serverDirectory, File serverFile, Properties bootstrapProperties, Element node,
-            List<File> updatedParsedXmls) {
+                                               List<File> updatedParsedXmls, Document doc) {
     	FeaturesPlatforms result = origResult;
         // Need to handle more variable substitution for include location.
+        // currently we are only checking for server.xml, bootstrap.properties and server.env
         String nodeValue = node.getAttribute("location");
-        String includeFileName = VariableUtility.resolveVariables(this, nodeValue, null, bootstrapProperties, new Properties(), getLibertyDirectoryPropertyFiles());
+        Properties props = new Properties();
+        Properties serverEnvProps = getPropertiesFromFile(new File(serverDirectory, "server.env"));
+        props.putAll(serverEnvProps);
+        props.putAll(bootstrapProperties);
+        Properties defaultProps = new Properties();
+
+        try {
+            List<Properties> resultMap = VariableUtility.parseVariables(doc, true, true, true);
+            props.putAll(resultMap.get(0));
+            defaultProps.putAll(resultMap.get(1));
+        } catch (XPathExpressionException e) {
+            warn("The server file " + serverFile + " cannot be parsed. Skipping the included features variable resolution for this file");
+            debug("Exception received: " + e.getMessage(), e);
+        }
+
+        String includeFileName = VariableUtility.resolveVariables(this, nodeValue, null, props, defaultProps, getLibertyDirectoryPropertyFiles());
 
         if (includeFileName == null || includeFileName.trim().isEmpty()) {
             warn("Unable to parse include file "+nodeValue+". Skipping the included features.");
@@ -623,23 +636,28 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
         return result;
     }
 
-    private Properties getBootstrapProperties(File bootstrapProperties) {
+    /**
+     *
+     * @param propertiesFile properties file
+     * @return
+     */
+    private Properties getPropertiesFromFile(File propertiesFile) {
         Properties prop = new Properties();
-        if (bootstrapProperties != null && bootstrapProperties.exists()) {
+        if (propertiesFile != null && propertiesFile.exists()) {
             FileInputStream stream = null;
             try {
-                stream = new FileInputStream(bootstrapProperties);
+                stream = new FileInputStream(propertiesFile);
                 prop.load(stream);
             } catch (IOException e) {
-                warn("The bootstrap.properties file " + bootstrapProperties.getAbsolutePath()
-                        + " could not be loaded. Skipping the bootstrap.properties file.");
+                warn("Properties from the file " + propertiesFile.getAbsolutePath()
+                        + " could not be loaded. Skipping the properties file.");
                 debug("Exception received: "+e.getMessage(), e);
             } finally {
                 if (stream != null) {
                     try {
                         stream.close();
                     } catch (IOException e) {
-                        debug("Could not close input stream for file " + bootstrapProperties.getAbsolutePath(), e);
+                        debug("Could not close input stream for file " + propertiesFile.getAbsolutePath(), e);
                     }
                 }
             }
