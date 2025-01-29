@@ -192,7 +192,7 @@ public class VariableUtility {
                 }
             }
         }
-        List<Properties>result=new ArrayList<>();
+        List<Properties> result = new ArrayList<>();
         result.add(props);
         result.add(defaultProps);
         return result;

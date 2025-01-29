@@ -779,14 +779,12 @@ public class ServerConfigDocument {
 
     public void parseVariablesForDefaultValues(Document doc) throws XPathExpressionException {
         List<Properties> propsList = parseVariables(doc, true, false, false);
-        props.putAll(propsList.get(0));
         defaultProps.putAll(propsList.get(1));
     }
 
     private void parseVariablesForValues(Document doc) throws XPathExpressionException {
         List<Properties> propsList = parseVariables(doc, false, true, false);
         props.putAll(propsList.get(0));
-        defaultProps.putAll(propsList.get(1));
     }
 
     public void parseVariablesForBothValues(Document doc) throws XPathExpressionException {
