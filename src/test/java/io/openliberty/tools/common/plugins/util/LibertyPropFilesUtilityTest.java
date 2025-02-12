@@ -37,6 +37,7 @@ public class LibertyPropFilesUtilityTest {
     File sharedStackGroupDir;
     File sharedAppDir;
     File sharedConfigDir;
+    File serverOutputDir;
 
     @Before
     public void setUp() throws IOException {
@@ -48,12 +49,13 @@ public class LibertyPropFilesUtilityTest {
         sharedStackGroupDir = new File("src/test/resources/serverConfig/liberty/wlp/usr/shared/stackGroups");
         sharedAppDir = new File("src/test/resources/serverConfig/liberty/wlp/usr/shared/app");
         sharedConfigDir = new File("src/test/resources/serverConfig/liberty/wlp/usr/shared/config");
+        serverOutputDir = new File("src/test/resources/serverConfig/liberty/wlp/usr/servers/defaultServer");
     }
 
     @Test
     public void testGetLibertyDirectoryPropertyFiles() throws Exception {
 
-        Map<String, File> libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, userDir, serverDir);
+        Map<String, File> libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, userDir, serverDir, serverOutputDir);
         // verify the libPropFiles
         assertFalse("Liberty Directory Property files map should not be empty", libProperties.isEmpty());
         assertEquals(libProperties.get(ServerFeatureUtil.WLP_INSTALL_DIR).getCanonicalPath(), installDir.getCanonicalPath());
@@ -71,12 +73,12 @@ public class LibertyPropFilesUtilityTest {
     public void testGetLibertyDirectoryPropertyFilesEmptyResult() throws Exception {
 
         Map<String, File> libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, userDir,
-                new File("src/test/resources/invalidPath"));
+                new File("src/test/resources/invalidPath"), serverOutputDir);
         // should be empty because serverDir does not exist
         assertTrue("Liberty Directory Property files map should be empty since invalid serverDirectory is specified",
                 libProperties.isEmpty());
 
-        libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, new File("src/test/resources/invalidPath\u0000"), serverDir);
+        libProperties = LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(new TestLogger(), installDir, new File("src/test/resources/invalidPath\u0000"), serverDir, serverOutputDir);
 
         // verify the libPropFiles
         assertTrue("Liberty Directory Property files map should be empty since invalid userDirectory is specified",

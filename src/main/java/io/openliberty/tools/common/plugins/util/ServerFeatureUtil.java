@@ -76,6 +76,7 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
     public static final String SHARED_RESOURCES_DIR = "shared.resource.dir";
     public static final String SHARED_STACKGROUP_DIR = "shared.stackgroup.dir";
     public static final String SERVER_CONFIG_DIR = "server.config.dir";
+    public static final String SERVER_OUTPUT_DIR = "server.output.dir";
 
     private Map<String, File> libertyDirectoryPropertyToFile = null;
     private boolean lowerCaseFeatures = true;

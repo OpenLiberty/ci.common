@@ -133,6 +133,7 @@ public class ServerConfigDocumentOverridesTest {
         libertyDirectoryPropertyToFileMap.put(ServerFeatureUtil.WLP_INSTALL_DIR, wlpInstallDir);
         libertyDirectoryPropertyToFileMap.put(ServerFeatureUtil.WLP_USER_DIR, wlpUserDir);
         libertyDirectoryPropertyToFileMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverDir);
+        libertyDirectoryPropertyToFileMap.put(ServerFeatureUtil.SERVER_OUTPUT_DIR, serverDir);
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), null, libertyDirectoryPropertyToFileMap);
         configDocument.processServerEnv();
         Properties props = configDocument.getProperties();
@@ -148,6 +149,12 @@ public class ServerConfigDocumentOverridesTest {
         // 3. {server.config.dir}
         assertEquals("old_value", props.get("overriden_value"));
         assertEquals("This value is expected to be overriden from 9081 to 1111", "1111", props.get("http.port"));
+
+        //4. validate predefined variables
+        assertEquals(serverDir.getCanonicalPath(), props.get(ServerFeatureUtil.SERVER_CONFIG_DIR));
+        assertEquals(wlpUserDir.getCanonicalPath(), props.get(ServerFeatureUtil.WLP_USER_DIR));
+        assertEquals(wlpInstallDir.getCanonicalPath(), props.get(ServerFeatureUtil.WLP_INSTALL_DIR));
+        assertEquals(serverDir.getCanonicalPath(), props.get(ServerFeatureUtil.SERVER_OUTPUT_DIR));
     }
 
     // 3. bootstrap.properties
@@ -216,6 +223,7 @@ public class ServerConfigDocumentOverridesTest {
         File serverConfigDir = SERVER_CONFIG_DIR.toFile();
         Map<String, File> libertyDirPropMap = new HashMap<String, File>();
         libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_OUTPUT_DIR, serverConfigDir);
         libertyDirPropMap.put(ServerFeatureUtil.WLP_INSTALL_DIR, WLP_DIR.toFile());
         libertyDirPropMap.put(ServerFeatureUtil.WLP_USER_DIR, WLP_USER_DIR.toFile());
         libertyDirPropMap.put(ServerFeatureUtil.SHARED_CONFIG_DIR, SHARED_CONFIG_DIR.toFile());
@@ -273,10 +281,11 @@ public class ServerConfigDocumentOverridesTest {
     @Test
     public void testServerConfigDocumentForLCLS() throws IOException, PluginExecutionException {
         ServerConfigDocument configDocument = new ServerConfigDocument(new TestLogger(), null,
-                WLP_DIR.toFile(),WLP_USER_DIR.toFile(),SERVER_CONFIG_DIR.toFile());
-        assertEquals("ServerConfigDocument Liberty Property file map is not created properly ", 8, configDocument.getLibertyDirPropertyFiles().size());
+                WLP_DIR.toFile(), WLP_USER_DIR.toFile(), SERVER_CONFIG_DIR.toFile(), SERVER_CONFIG_DIR.toFile());
+        assertEquals("ServerConfigDocument Liberty Property file map is not created properly ", 9, configDocument.getLibertyDirPropertyFiles().size());
         assertEquals("ServerConfigDocument http.port variable is not assigned properly ", "1111", configDocument.getProperties().getProperty("http.port"));
         assertEquals("ServerConfigDocument includeLocation default property is not assigned properly ", "includes", configDocument.getDefaultProperties().getProperty("includeLocation"));
+        assertEquals("ServerConfigDocument ${server.config.dir} property is not assigned properly ", SERVER_CONFIG_DIR.toFile().getCanonicalPath(), configDocument.getProperties().getProperty(ServerFeatureUtil.SERVER_CONFIG_DIR));
     }
 
     @Test
@@ -285,6 +294,7 @@ public class ServerConfigDocumentOverridesTest {
         File serverConfigDir = SERVER_CONFIG_DIR.toFile();
         Map<String, File> libertyDirPropMap = new HashMap<String, File>();
         libertyDirPropMap.put(ServerFeatureUtil.SERVER_CONFIG_DIR, serverConfigDir);
+        libertyDirPropMap.put(ServerFeatureUtil.SERVER_OUTPUT_DIR, serverConfigDir);
         libertyDirPropMap.put(ServerFeatureUtil.WLP_INSTALL_DIR, WLP_DIR.toFile());
         libertyDirPropMap.put(ServerFeatureUtil.WLP_USER_DIR, WLP_USER_DIR.toFile());
         libertyDirPropMap.put(ServerFeatureUtil.SHARED_CONFIG_DIR, SHARED_CONFIG_DIR.toFile());
