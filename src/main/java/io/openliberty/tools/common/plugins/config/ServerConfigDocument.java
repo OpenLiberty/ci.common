@@ -175,8 +175,8 @@ public class ServerConfigDocument {
      * @throws PluginExecutionException
      * @throws IOException
      */
-    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, File installDirectory, File userDirectory, File serverDirectory) throws PluginExecutionException, IOException {
-        this(log, originalServerXMLFile, LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(log,installDirectory, userDirectory, serverDirectory));
+    public ServerConfigDocument(CommonLoggerI log, File originalServerXMLFile, File installDirectory, File userDirectory, File serverDirectory, File serverOutputDirectory) throws PluginExecutionException, IOException {
+        this(log, originalServerXMLFile, LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles(log, installDirectory, userDirectory, serverDirectory, serverOutputDirectory));
     }
 
     // test constructor that takes in initial properties to be called modularly
@@ -244,6 +244,7 @@ public class ServerConfigDocument {
      //       b. ${server.config.dir}/server.xml
      //       c. ${server.config.dir}/configDropins/overrides/
      //  7. variables declared on the command line
+     //  8. add liberty predefined variables to variable map
      */
     public void initializeAppsLocation() throws PluginExecutionException {
         try {
@@ -274,6 +275,9 @@ public class ServerConfigDocument {
             // Maven: https://github.com/OpenLiberty/ci.maven/blob/main/docs/common-server-parameters.md#setting-liberty-configuration-with-maven-project-properties
             // Gradle: https://github.com/dshimo/ci.gradle/blob/main/docs/libertyExtensions.md
 
+            // 8. liberty pre defined variables
+            processPredefinedVariables();
+
             parseApplication(doc, XPATH_SERVER_APPLICATION);
             parseApplication(doc, XPATH_SERVER_WEB_APPLICATION);
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
@@ -283,10 +287,22 @@ public class ServerConfigDocument {
             parseConfigDropinsDir();
 
         } catch (Exception e) {
-            if(e instanceof  PluginExecutionException){
+            if(e instanceof PluginExecutionException){
                 throw (PluginExecutionException)e;
             }
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * Add predefined variables into variable map
+     * uses liberty property files map and take all predefined properties
+     * LibertyPropFilesUtility.getLibertyDirectoryPropertyFiles() takes care of adding all predefined properties into libertyDirPropertyFiles
+     * @throws IOException
+     */
+    private void processPredefinedVariables() throws IOException{
+        for (Map.Entry<String, File> stringFileEntry : getLibertyDirPropertyFiles().entrySet()) {
+            props.put(stringFileEntry.getKey(), stringFileEntry.getValue().getCanonicalPath());
         }
     }
 

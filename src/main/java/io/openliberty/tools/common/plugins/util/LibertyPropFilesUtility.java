@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2024
+ * (C) Copyright IBM Corporation 2024, 2025
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package io.openliberty.tools.common.plugins.util;
 import io.openliberty.tools.common.CommonLoggerI;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,7 +25,7 @@ import java.util.Map;
 public class LibertyPropFilesUtility {
 
 
-    public static Map<String, File> getLibertyDirectoryPropertyFiles(CommonLoggerI log, File installDir, File userDir, File serverDir) {
+    public static Map<String, File> getLibertyDirectoryPropertyFiles(CommonLoggerI log, File installDir, File userDir, File serverDir, File serverOutputDirectory) {
         Map<String, File> libertyDirectoryPropertyToFile = new HashMap<>();
 
         if (serverDir.exists()) {
@@ -50,6 +49,7 @@ public class LibertyPropFilesUtility {
                 libertyDirectoryPropertyToFile.put(ServerFeatureUtil.SHARED_CONFIG_DIR, userSharedConfigDir.getCanonicalFile());
                 libertyDirectoryPropertyToFile.put(ServerFeatureUtil.SHARED_RESOURCES_DIR, userSharedResourcesDir.getCanonicalFile());
                 libertyDirectoryPropertyToFile.put(ServerFeatureUtil.SHARED_STACKGROUP_DIR, userSharedStackGroupsDir.getCanonicalFile());
+                libertyDirectoryPropertyToFile.put(ServerFeatureUtil.SERVER_OUTPUT_DIR, serverOutputDirectory.getCanonicalFile());
 
                 return libertyDirectoryPropertyToFile;
             } catch (Exception e) {
