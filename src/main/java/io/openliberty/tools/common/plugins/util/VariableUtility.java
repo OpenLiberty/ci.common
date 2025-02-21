@@ -68,7 +68,7 @@ public class VariableUtility {
         for (String nextVariable : variablesToResolve) {
             String value = getPropertyValue(nextVariable, props, defaultProps, libDirPropFiles);
 
-            if (value == null || value.isEmpty()) {
+            if (value == null) {
                 // Variable could not be resolved. Log message and return null.
                 log.debug("Variable " + nextVariable + " cannot be resolved.");
                 return null;
@@ -183,11 +183,11 @@ public class VariableUtility {
                 String varValue = getValue(attr, "value");
                 String varDefaultValue = getValue(attr, "defaultValue");
 
-                if ((values || both) && (varValue != null && !varValue.isEmpty())) {
+                if ((values || both) && varValue != null) {
                     props.setProperty(varName, varValue);
                 }
 
-                if ((defaultValues || both) && (varDefaultValue != null && ! varDefaultValue.isEmpty())) {
+                if ((defaultValues || both) && varDefaultValue != null) {
                     defaultProps.setProperty(varName, varDefaultValue);
                 }
             }
