@@ -3536,6 +3536,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             debug("Setting file track mode to FILE_WATCHER.");
                             trackingMode = FileTrackMode.FILE_WATCHER;
                             disablePolling();
+                            Watchable watchable = wk.watchable(); // for debug msg below
+                            boolean valid = wk.reset();
+                            if (!valid) {
+                                debug("WatchService key has been unregistered for " + watchable);
+                            }
                         }
                     } catch (Exception e) {
                         error("An error occurred attempting to retrieve the watch key or close the file watcher. " + e.getMessage(), e);
