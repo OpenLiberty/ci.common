@@ -433,6 +433,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /** Map of parent build files (parent build file, list of children build files) */
     protected Map<String, List<String>> parentBuildFiles;
     private boolean generateFeatures;
+    private boolean generateToSrc;
     private Set<String> generatedFeaturesSet; // set of features in generated-features.xml file
     private boolean generatedFeaturesModified;
     private Set<String> compileArtifactPaths;
@@ -453,7 +454,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                    File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
                    boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
                    String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
-                   String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
+                   String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures, boolean generateToSrc,
                    Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs, Map<String, Boolean> projectRecompileMap) {
         this(buildDirectory, serverDirectory, sourceDirectory, testSourceDirectory,
                 configDirectory, projectDirectory, multiModuleProjectDirectory, resourceDirs, changeOnDemandTestsAction,
@@ -463,7 +464,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 containerfile, containerBuildContext, containerRunOpts, containerBuildTimeout,
                 skipDefaultPorts, compilerOptions, keepTempContainerfile,
                 mavenCacheLocation, upstreamProjects, recompileDependencies,
-                packagingType, buildFile, parentBuildFiles, generateFeatures,
+                packagingType, buildFile, parentBuildFiles, generateFeatures, generateToSrc,
                 compileArtifactPaths, testArtifactPaths, monitoredWebResourceDirs);
         // setting projectRecompileMap as empty if input is null from ci.maven
         this.projectRecompileMap = projectRecompileMap != null ? projectRecompileMap : new HashMap<>();
@@ -478,7 +479,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
-            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
+            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures, boolean generateToSrc,
             Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
@@ -553,6 +554,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             this.parentBuildFiles = parentBuildFiles;
         }
         this.generateFeatures = generateFeatures;
+        this.generateToSrc = generateToSrc;
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.monitoredWebResourceDirs = monitoredWebResourceDirs;
@@ -5817,10 +5819,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         if (generateFeatures) {
             // generateFeatures scenario: check if a generated feature has been manually added to other config files
+            // Here we pass generated-features.xml instead of server.xml to calculate the generated ones
         	FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), serverDirectory,
                     generatedFeaturesFile, null, null);
         	if (fp != null)
         		generatedFeatureSet = fp.getFeatures();
+
+            // Calculate the features specified in the config excluding those in generated-features
             Set<String> generatedFiles = new HashSet<String>();
             generatedFiles.add(generatedFeaturesFile.getName());
             // if serverXmlFile is null, getServerFeatures will use the default server.xml
