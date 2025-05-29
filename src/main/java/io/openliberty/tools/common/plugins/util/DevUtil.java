@@ -438,7 +438,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean generatedFeaturesModified;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
-    protected final File generatedFeaturesFile;
+    protected File generatedFeaturesFile;
+    protected File genContextDir;
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
@@ -555,10 +556,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         this.generateFeatures = generateFeatures;
         this.generateToSrc = generateToSrc;
+        initGenerationContext();
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.monitoredWebResourceDirs = monitoredWebResourceDirs;
-        this.generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
         this.generatedFeaturesModified = false;
         if (this.generateFeatures) {
             this.generatedFeaturesSet = getGeneratedFeatures();
@@ -568,6 +569,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.modifiedSrcBuildFile = null;
     }
 
+    private void initGenerationContext() {
+        this.genContextDir = generateToSrc ? configDirectory : serverDirectory;
+        this.generatedFeaturesFile = new File(genContextDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+    }
     /**
      * Run unit and/or integration tests
      * 
@@ -2593,6 +2598,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void printFeatureGenerationStatus() {
         info(formatAttentionMessage("Automatic generation of features: " + getFormattedBooleanString(generateFeatures)));
+        info(formatAttentionMessage("Generation of features to src directory: " + getFormattedBooleanString(generateToSrc)));
     }
 
     private void printFeatureGenerationHotkeys() {
@@ -2600,6 +2606,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 "g - toggle the automatic generation of features, type 'g' and press Enter."));
         info(formatAttentionMessage(
                 "    A new server configuration file will be generated in the SOURCE configDropins/overrides configuration directory."));
+        info(formatAttentionMessage("s - generate features to src directory, type 's' and press Enter."));
         if (generateFeatures) {
             // If generateFeatures is enabled, then also describe the optimize hotkey
             info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter."));
@@ -2628,13 +2635,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         generateFeatures = !generateFeatures;
         logFeatureGenerationStatus();
         if (generateFeatures) {
-            String generatedFileCanonicalPath;
-            try {
-                generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).getCanonicalPath();
-            } catch (IOException e) {
-                generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).toString();
+            if (generateToSrc) {
+                warnSrcDirModified();
             }
-            warn("The source configuration directory will be modified. Features will automatically be generated in a new file: " + generatedFileCanonicalPath);
             // If hotkey is toggled to “true”, generate features right away.
             optimizeGenerateFeatures();
         }
@@ -2644,6 +2647,42 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
     }
 
+    private void toggleGenerateToSrc() {
+        generateToSrc = !generateToSrc;
+        logGenerateToSrcStatus();
+        initGenerationContext();
+        if (!generateToSrc) { // when you toggle off generate to src, delete the generated file in src
+            File srcGenFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+            if (srcGenFeaturesFile.exists()) {
+                if (!srcGenFeaturesFile.delete()) {
+                    debug("Error trying to delete the generated features file:"+srcGenFeaturesFile.getAbsolutePath());
+                }
+            }
+        }
+        if (generateFeatures) {
+            if (generateToSrc) {
+                warnSrcDirModified();
+            }
+            // If this option is toggled, generate features right away.
+            optimizeGenerateFeatures();
+        }
+    }
+
+    private void logGenerateToSrcStatus() {
+        info("Setting generation of features in src directory to: " + getFormattedBooleanString(generateToSrc));
+    }
+
+    private void warnSrcDirModified() {
+        String generatedFileCanonicalPath;
+        try {
+            generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).getCanonicalPath();
+        } catch (IOException e) {
+            generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).toString();
+        }
+        warn("The source configuration directory will be modified. Features will automatically be generated in a new file: " + generatedFileCanonicalPath);
+    }
+
+    // called by Liberty plugins
     protected void setFeatureGeneration(boolean generateFeatures) {
         this.generateFeatures = generateFeatures;
         logFeatureGenerationStatus();
@@ -2721,6 +2760,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey h = new HotKey("h", "help");
             HotKey r = new HotKey("r");
             HotKey g = new HotKey("g");
+            HotKey s = new HotKey("s");
             HotKey o = new HotKey("o");
             HotKey t = new HotKey("t");
             HotKey enter = new HotKey("");
@@ -2753,6 +2793,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         info(formatAttentionBarrier());
                     } else if (g.isPressed(line)) {
                         toggleFeatureGeneration();
+                    } else if (s.isPressed(line)) {
+                        toggleGenerateToSrc();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
                             optimizeGenerateFeatures();
@@ -4701,8 +4743,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Determines if the corresponding target config file was generated by a Liberty
-     * plugin
+     * Determines if the specified config file in target dir was generated by a Liberty
+     * plugin: bootstrap.properties or jvm.options
      * 
      * @param fileChanged the file that was changed
      * @param srcDir      the directory of the file changed
