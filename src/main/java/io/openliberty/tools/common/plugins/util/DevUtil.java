@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2024.
+ * (C) Copyright IBM Corporation 2019, 2025.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -439,6 +439,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
     protected File generatedFeaturesFile;
+    protected File generatedFeaturesFileTemp;
     protected File genContextDir;
     private File modifiedSrcBuildFile;
 
@@ -572,6 +573,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void initGenerationContext() {
         this.genContextDir = generateToSrc ? configDirectory : serverDirectory;
         this.generatedFeaturesFile = new File(genContextDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+        this.generatedFeaturesFileTemp = new File(buildDirectory, BinaryScannerUtil.GENERATED_FEATURES_TEMP_PATH);
+    }
+
+    public void copyTempFeatureFileToServer() throws IOException {
+        File generatedFeaturesFileTempParentDir = generatedFeaturesFileTemp.getParentFile();
+        copyFile(generatedFeaturesFileTemp, generatedFeaturesFileTempParentDir, serverDirectory, null);
     }
     /**
      * Run unit and/or integration tests
@@ -1915,8 +1922,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    /**
+     * Create a Liberty server using the default name "defaultServer" or the server
+     * specified by the common parameter "serverName" in pom.xml.
+     * 
+     * @throws PluginExecutionException
+     */
     public abstract void libertyCreate() throws PluginExecutionException;
 
+    /**
+     * Deploy the default apps on the Liberty server or deploy the apps
+     * specified in the configuration of the deploy goal in pom.xml.
+     * 
+     * @throws PluginExecutionException
+     */
     public abstract void libertyDeploy() throws PluginExecutionException;
 
     /**
@@ -1924,9 +1943,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param classes class file paths features should be generated for (can be null if no modified classes)
      * @param optimize if true, generate optimized feature list
+     * @param useTmpDir if true, generate feature file in a hidden directory named in BinaryScannerUtil
      * @return true if feature generation was successful
      */
-    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize);
+    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean useTmpDir);
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -2639,7 +2659,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 warnSrcDirModified();
             }
             // If hotkey is toggled to “true”, generate features right away.
-            optimizeGenerateFeatures();
+            optimizeGenerateFeatures(false);
         }
     }
 
@@ -2664,7 +2684,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 warnSrcDirModified();
             }
             // If this option is toggled, generate features right away.
-            optimizeGenerateFeatures();
+            optimizeGenerateFeatures(false);
         }
     }
 
@@ -2691,10 +2711,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Generate features using all classes and only user specified features.
      */
-    private boolean optimizeGenerateFeatures() {
+    private boolean optimizeGenerateFeatures(boolean useTmpDir) {
         debug("Generating optimized features list...");
         // scan all class files and provide only user specified features
-        boolean generatedFeatures = libertyGenerateFeatures(null, true);
+        boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDir);
         if (generatedFeatures) {
             modifiedClasses.clear();
             failedToGenerateClasses.clear();
@@ -2713,7 +2733,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean generatedFeatures = false;
         try {
             Collection<String> classPaths = getClassPaths(modifiedClasses);
-            generatedFeatures = libertyGenerateFeatures(classPaths, false);
+            generatedFeatures = libertyGenerateFeatures(classPaths, false, false);
             if (generatedFeatures) {
                 modifiedClasses.clear();
                 failedToGenerateClasses.clear();
@@ -2797,7 +2817,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         toggleGenerateToSrc();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
-                            optimizeGenerateFeatures();
+                            optimizeGenerateFeatures(false);
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
@@ -4563,14 +4583,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             // generate features whenever features have changed and an XML file is modified,
             // excluding the generated features file
+            // if generateToSrc is false then we must copy generated file to serverDir after install to temp
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !isGeneratedFeaturesFile)
                     && serverFeaturesModified) {
-                generateFeaturesSuccess = optimizeGenerateFeatures();
+                generateFeaturesSuccess = optimizeGenerateFeatures(!generateToSrc);
             }
             if (serverFeaturesModified) {
-                // suppress install feature warning - property must be set before calling
-                // installFeaturesToTempDir
+                // suppress install feature warning - property must be set before installing using temp dir
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 installFeaturesToTempDir(fileChanged, fileChangedParentDir, targetFileName, generateFeaturesSuccess);
             }
@@ -4582,7 +4602,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
                 // this logic is not entered if the fileChanged is the generated features file
                 // copy generated features file to server dir
-                copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                if (generateToSrc) { // copy generated-features.xml file from src dir
+                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                } else { // copy generated-features.xml file from the temp dir. used by generate features
+                    File tempParent = generatedFeaturesFileTemp.getParentFile();
+                    copyFile(generatedFeaturesFileTemp, tempParent, serverDirectory, null);
+                }
                 generatedFeaturesModified = false;
             }
             if (serverFeaturesModified) {
@@ -4625,7 +4650,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !fileChanged.equals(generatedFeaturesFile))
                     && serverFeaturesModified()) {
-                optimizeGenerateFeatures();
+                optimizeGenerateFeatures(false);
             }
             // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
             if (isContainerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4820,7 +4845,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generatedFeaturesFile)) {
             // copy generated-features.xml file
-            copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
+            if (generateToSrc) { // copy generated-features.xml file from src dir
+                copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
+            } else { // copy generated-features.xml file from the temp dir. used by generate features
+                File tempParent = generatedFeaturesFileTemp.getParentFile();
+                copyFile(generatedFeaturesFileTemp, tempParent, tempConfig, generatedFeaturesFile.getName());
+            }
         }
         installFeatures(fileChanged, tempConfig, generateFeatures);
         cleanUpTempConfig();
