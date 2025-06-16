@@ -2712,7 +2712,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Generate features using all classes and only user specified features.
      */
     private boolean optimizeGenerateFeatures(boolean useTmpDir) {
-        debug("Generating optimized features list...");
+        debug("Generating optimized features list...use temp directory=" + useTmpDir);
         // scan all class files and provide only user specified features
         boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDir);
         if (generatedFeatures) {
@@ -2728,12 +2728,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Generate features using updated classes and all existing features.
      * Returns true if successful
      */
-    private boolean incrementGenerateFeatures() {
-        debug("Generating feature list from incremental changes...");
+    private boolean incrementGenerateFeatures(boolean useTmpDir) {
+        debug("Generating feature list from incremental changes...use temp directory=" + useTmpDir);
         boolean generatedFeatures = false;
         try {
             Collection<String> classPaths = getClassPaths(modifiedClasses);
-            generatedFeatures = libertyGenerateFeatures(classPaths, false, false);
+            generatedFeatures = libertyGenerateFeatures(classPaths, false, useTmpDir);
             if (generatedFeatures) {
                 modifiedClasses.clear();
                 failedToGenerateClasses.clear();
@@ -3132,7 +3132,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         modifiedSrcBuildFile = null; // only needed when recompileDependencies is true
                         long generatedTime = generatedFeaturesFile.lastModified();
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        incrementGenerateFeatures();
+                        boolean generateFeaturesSuccess = incrementGenerateFeatures(!generateToSrc);
+                        if (generateFeaturesSuccess && !generateToSrc) {
+                            // generated features to file in temp directory. Install then copy to server dir
+                            File tempParentDir = generatedFeaturesFileTemp.getParentFile();
+                            installFeaturesToTempDir(generatedFeaturesFileTemp, tempParentDir, null, generateFeaturesSuccess);
+                            copyGFTemp(serverDirectory);
+                        }
                         if (!generatedFeaturesFile.exists()) {
                             // run tests if generated-features.xml does not exist as there are no new features to install
                             // (typically tests run after generate features & install when hotTests=true)
@@ -4842,18 +4848,29 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return !skip;
             }
         }, true);
-        copyFile(fileChanged, srcDir, tempConfig, targetFileName);
-        if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generatedFeaturesFile)) {
+        if (fileChanged.equals(generatedFeaturesFileTemp)) {
+            copyGFTemp(tempConfig);
+        } else {
+            copyFile(fileChanged, srcDir, tempConfig, targetFileName);
+        }
+        if (generateFeatures && generateFeaturesSuccess &&
+                !fileChanged.equals(generatedFeaturesFile) &&
+                !fileChanged.equals(generatedFeaturesFileTemp)) {
             // copy generated-features.xml file
             if (generateToSrc) { // copy generated-features.xml file from src dir
                 copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
             } else { // copy generated-features.xml file from the temp dir. used by generate features
-                File tempParent = generatedFeaturesFileTemp.getParentFile();
-                copyFile(generatedFeaturesFileTemp, tempParent, tempConfig, generatedFeaturesFile.getName());
+                copyGFTemp(tempConfig);
             }
         }
         installFeatures(fileChanged, tempConfig, generateFeatures);
         cleanUpTempConfig();
+    }
+
+    private void copyGFTemp(File tempConfig) throws IOException {
+        File tempParent = generatedFeaturesFileTemp.getParentFile();
+        File overrides = new File(tempConfig, BinaryScannerUtil.GENERATED_FEATURES_DIR_PATH);
+        copyFile(generatedFeaturesFileTemp, tempParent, overrides, null);
     }
 
     /**
