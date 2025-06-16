@@ -5939,6 +5939,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     // returns the features specified in the generated-features.xml file
+    // generated-features.xml has a <server> element so it is also a "serverFile"
     private Set<String> getGeneratedFeatures() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
         FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), configDirectory,
