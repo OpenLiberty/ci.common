@@ -2814,7 +2814,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         toggleGenerateToSrc();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
-                            optimizeGenerateFeatures(false);
+                            optimizeGenerateFeatures(!generateToSrc);
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
