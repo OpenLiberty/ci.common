@@ -439,8 +439,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
     protected File generatedFeaturesFile;
-    protected File generatedFeaturesFileTemp;
-    protected File genContextDir;
+    protected File generatedFeaturesFileParent;
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
@@ -571,15 +570,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void initGenerationContext() {
-        this.genContextDir = generateToSrc ? configDirectory : serverDirectory;
-        this.generatedFeaturesFile = new File(genContextDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
-        this.generatedFeaturesFileTemp = new File(buildDirectory, BinaryScannerUtil.GENERATED_FEATURES_TEMP_PATH);
+        this.generatedFeaturesFileParent = generateToSrc ? configDirectory : new File(buildDirectory, BinaryScannerUtil.GENERATED_FEATURES_TEMP_DIR);
+        this.generatedFeaturesFile = new File(generatedFeaturesFileParent, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
     }
 
-    public void copyTempFeatureFileToServer(File tempConfig) throws IOException {
-        File generatedFeaturesFileTempParentDir = generatedFeaturesFileTemp.getParentFile();
-        File overrides = new File(tempConfig, BinaryScannerUtil.GENERATED_FEATURES_DIR_PATH);
-        copyFile(generatedFeaturesFileTemp, generatedFeaturesFileTempParentDir, overrides, null);
+    public void copyTempFeatureFileToServer(File to) throws IOException {
+        copyFile(generatedFeaturesFile, generatedFeaturesFileParent, to, null);
     }
     /**
      * Run unit and/or integration tests
@@ -2660,7 +2656,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 warnSrcDirModified();
             }
             // If hotkey is toggled to “true”, generate features right away.
-            optimizeGenerateFeatures(false);
+            optimizeGenerateFeatures(!generateToSrc);
         }
     }
 
@@ -2684,8 +2680,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateToSrc) {
                 warnSrcDirModified();
             }
-            // If this option is toggled, generate features right away.
-            optimizeGenerateFeatures(false);
+            // If hotkey is toggled, generate features right away.
+            optimizeGenerateFeatures(!generateToSrc);
         }
     }
 
@@ -3136,8 +3132,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         boolean generateFeaturesSuccess = incrementGenerateFeatures(!generateToSrc);
                         if (generateFeaturesSuccess && !generateToSrc) {
                             // generated features to file in temp directory. Install then copy to server dir
-                            File tempParentDir = generatedFeaturesFileTemp.getParentFile();
-                            installFeaturesToTempDir(generatedFeaturesFileTemp, tempParentDir, null, generateFeaturesSuccess);
+                            installFeaturesToTempDir(generatedFeaturesFile, generatedFeaturesFileParent, null, generateFeaturesSuccess);
                             copyTempFeatureFileToServer(serverDirectory);
                         }
                         if (!generatedFeaturesFile.exists()) {
@@ -4581,7 +4576,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             throws IOException, PluginExecutionException {
         boolean isGeneratedFeaturesFile = configuredServerXml ? false : fileChanged.equals(generatedFeaturesFile);
         String targetFileName = configuredServerXml ? "server.xml" : null; // if null file will retain the same name when copied
-        File fileChangedParentDir = configuredServerXml ? serverXmlFileParent : configDirectory;
+        // three possible values for the parent directory
+        File fileChangedParentDir = configuredServerXml ? serverXmlFileParent :
+            isGeneratedFeaturesFile ? generatedFeaturesFileParent : configDirectory;
 
         if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
             debug("Config file modified: " + fileChanged);
@@ -4609,12 +4606,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
                 // this logic is not entered if the fileChanged is the generated features file
                 // copy generated features file to server dir
-                if (generateToSrc) { // copy generated-features.xml file from src dir
-                    copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
-                } else { // copy generated-features.xml file from the temp dir. used by generate features
-                    File tempParent = generatedFeaturesFileTemp.getParentFile();
-                    copyFile(generatedFeaturesFileTemp, tempParent, serverDirectory, null);
-                }
+                copyTempFeatureFileToServer(serverDirectory);
                 generatedFeaturesModified = false;
             }
             if (serverFeaturesModified) {
@@ -4849,20 +4841,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return !skip;
             }
         }, true);
-        if (fileChanged.equals(generatedFeaturesFileTemp)) {
+        File parentDir = fileChanged.equals(generatedFeaturesFile) ? generatedFeaturesFileParent : srcDir;
+        copyFile(fileChanged, parentDir, tempConfig, targetFileName);
+        if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generatedFeaturesFile)) {
             copyTempFeatureFileToServer(tempConfig);
-        } else {
-            copyFile(fileChanged, srcDir, tempConfig, targetFileName);
-        }
-        if (generateFeatures && generateFeaturesSuccess &&
-                !fileChanged.equals(generatedFeaturesFile) &&
-                !fileChanged.equals(generatedFeaturesFileTemp)) {
-            // copy generated-features.xml file
-            if (generateToSrc) { // copy generated-features.xml file from src dir
-                copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
-            } else { // copy generated-features.xml file from the temp dir. used by generate features
-                copyTempFeatureFileToServer(tempConfig);
-            }
         }
         installFeatures(fileChanged, tempConfig, generateFeatures);
         cleanUpTempConfig();
@@ -5904,6 +5886,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (generateFeatures) {
             // generateFeatures scenario: check if a generated feature has been manually added to other config files
             // Here we pass generated-features.xml instead of server.xml to calculate the generated ones
+            // The second parameter will not be used for generated-features.xml.
         	FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), serverDirectory,
                     generatedFeaturesFile, null, null);
         	if (fp != null)
@@ -5952,6 +5935,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     // returns the features specified in the generated-features.xml file
     // generated-features.xml has a <server> element so it is also a "serverFile"
+    // The second parameter will not be used for generated-features.xml.
     private Set<String> getGeneratedFeatures() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
         FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), configDirectory,
