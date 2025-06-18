@@ -440,6 +440,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> testArtifactPaths;
     protected File generatedFeaturesFile;
     protected File generatedFeaturesFileParent;
+    protected File generatedFeaturesTmpDir;
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
@@ -556,6 +557,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         this.generateFeatures = generateFeatures;
         this.generateToSrc = generateToSrc;
+        this.generatedFeaturesTmpDir = new File(buildDirectory, BinaryScannerUtil.GENERATED_FEATURES_TEMP_DIR);
         initGenerationContext();
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
@@ -570,7 +572,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void initGenerationContext() {
-        this.generatedFeaturesFileParent = generateToSrc ? configDirectory : new File(buildDirectory, BinaryScannerUtil.GENERATED_FEATURES_TEMP_DIR);
+        this.generatedFeaturesFileParent = generateToSrc ? configDirectory : generatedFeaturesTmpDir;
         this.generatedFeaturesFile = new File(generatedFeaturesFileParent, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
     }
 
@@ -3024,6 +3026,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 registerSingleFile(containerfileUsed, executor);
             }
 
+            // Always register this hidden temp directory even if not used
+            generatedFeaturesTmpDir.mkdirs();
+            registerSingleFile(new File(generatedFeaturesTmpDir, "dummy"), executor);
+
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
             for (File resourceDir : resourceDirs) {
                 resourceMap.put(resourceDir, false);
@@ -4174,6 +4180,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
         Path outputPath = this.outputDirectory.getCanonicalFile().toPath();
+        Path gfTmpDirPath = this.generatedFeaturesTmpDir.getCanonicalFile().toPath();
 
         Path directory = fileChanged.getParentFile().getCanonicalFile().toPath();
 
@@ -4449,9 +4456,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // This is for server.xml specified by the configuration parameter
             // server will load new properties
             processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, true);
-        } else if (directory.startsWith(configPath)
+        } else if ((directory.startsWith(configPath)
+                || directory.startsWith(gfTmpDirPath))
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) {
-            // configuration file
+            // configuration file or generate-features.xml in temp directory
             processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, false);
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
