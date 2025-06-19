@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2024.
+ * (C) Copyright IBM Corporation 2019, 2025.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -433,11 +433,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /** Map of parent build files (parent build file, list of children build files) */
     protected Map<String, List<String>> parentBuildFiles;
     private boolean generateFeatures;
+    private boolean generateToSrc;
     private Set<String> generatedFeaturesSet; // set of features in generated-features.xml file
     private boolean generatedFeaturesModified;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
-    protected final File generatedFeaturesFile;
+    protected File generatedFeaturesFile;
+    protected File generatedFeaturesFileParent;
+    protected File generatedFeaturesTmpDir;
     private File modifiedSrcBuildFile;
 
     protected boolean skipInstallFeature;
@@ -453,7 +456,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                    File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
                    boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
                    String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
-                   String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
+                   String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures, boolean generateToSrc,
                    Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs, Map<String, Boolean> projectRecompileMap) {
         this(buildDirectory, serverDirectory, sourceDirectory, testSourceDirectory,
                 configDirectory, projectDirectory, multiModuleProjectDirectory, resourceDirs, changeOnDemandTestsAction,
@@ -463,7 +466,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 containerfile, containerBuildContext, containerRunOpts, containerBuildTimeout,
                 skipDefaultPorts, compilerOptions, keepTempContainerfile,
                 mavenCacheLocation, upstreamProjects, recompileDependencies,
-                packagingType, buildFile, parentBuildFiles, generateFeatures,
+                packagingType, buildFile, parentBuildFiles, generateFeatures, generateToSrc,
                 compileArtifactPaths, testArtifactPaths, monitoredWebResourceDirs);
         // setting projectRecompileMap as empty if input is null from ci.maven
         this.projectRecompileMap = projectRecompileMap != null ? projectRecompileMap : new HashMap<>();
@@ -478,7 +481,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             File containerfile, File containerBuildContext, String containerRunOpts, int containerBuildTimeout,
             boolean skipDefaultPorts, JavaCompilerOptions compilerOptions, boolean keepTempContainerfile,
             String mavenCacheLocation, List<ProjectModule> upstreamProjects, boolean recompileDependencies,
-            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures,
+            String packagingType, File buildFile, Map<String, List<String>> parentBuildFiles, boolean generateFeatures, boolean generateToSrc,
             Set<String> compileArtifactPaths, Set<String> testArtifactPaths, List<Path> monitoredWebResourceDirs) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
@@ -553,10 +556,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             this.parentBuildFiles = parentBuildFiles;
         }
         this.generateFeatures = generateFeatures;
+        this.generateToSrc = generateToSrc;
+        this.generatedFeaturesTmpDir = new File(buildDirectory, BinaryScannerUtil.GENERATED_FEATURES_TEMP_DIR);
+        initGenerationContext();
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
         this.monitoredWebResourceDirs = monitoredWebResourceDirs;
-        this.generatedFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
         this.generatedFeaturesModified = false;
         if (this.generateFeatures) {
             this.generatedFeaturesSet = getGeneratedFeatures();
@@ -566,6 +571,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.modifiedSrcBuildFile = null;
     }
 
+    private void initGenerationContext() {
+        this.generatedFeaturesFileParent = generateToSrc ? configDirectory : generatedFeaturesTmpDir;
+        this.generatedFeaturesFile = new File(generatedFeaturesFileParent, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+    }
+
+    public void copyTempFeatureFileToServer(File to) throws IOException {
+        copyFile(generatedFeaturesFile, generatedFeaturesFileParent, to, null);
+    }
     /**
      * Run unit and/or integration tests
      * 
@@ -1908,8 +1921,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    /**
+     * Create a Liberty server using the default name "defaultServer" or the server
+     * specified by the common parameter "serverName" in pom.xml.
+     * 
+     * @throws PluginExecutionException
+     */
     public abstract void libertyCreate() throws PluginExecutionException;
 
+    /**
+     * Deploy the default apps on the Liberty server or deploy the apps
+     * specified in the configuration of the deploy goal in pom.xml.
+     * 
+     * @throws PluginExecutionException
+     */
     public abstract void libertyDeploy() throws PluginExecutionException;
 
     /**
@@ -1917,9 +1942,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param classes class file paths features should be generated for (can be null if no modified classes)
      * @param optimize if true, generate optimized feature list
+     * @param useTmpDir if true, generate feature file in a hidden directory named in BinaryScannerUtil
      * @return true if feature generation was successful
      */
-    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize);
+    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean useTmpDir);
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -2591,6 +2617,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void printFeatureGenerationStatus() {
         info(formatAttentionMessage("Automatic generation of features: " + getFormattedBooleanString(generateFeatures)));
+        info(formatAttentionMessage("Generation of features to src directory: " + getFormattedBooleanString(generateToSrc)));
     }
 
     private void printFeatureGenerationHotkeys() {
@@ -2598,6 +2625,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 "g - toggle the automatic generation of features, type 'g' and press Enter."));
         info(formatAttentionMessage(
                 "    A new server configuration file will be generated in the SOURCE configDropins/overrides configuration directory."));
+        info(formatAttentionMessage("s - generate features to src directory, type 's' and press Enter."));
         if (generateFeatures) {
             // If generateFeatures is enabled, then also describe the optimize hotkey
             info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter."));
@@ -2626,15 +2654,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         generateFeatures = !generateFeatures;
         logFeatureGenerationStatus();
         if (generateFeatures) {
-            String generatedFileCanonicalPath;
-            try {
-                generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).getCanonicalPath();
-            } catch (IOException e) {
-                generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).toString();
+            if (generateToSrc) {
+                warnSrcDirModified();
             }
-            warn("The source configuration directory will be modified. Features will automatically be generated in a new file: " + generatedFileCanonicalPath);
             // If hotkey is toggled to “true”, generate features right away.
-            optimizeGenerateFeatures();
+            optimizeGenerateFeatures(!generateToSrc);
         }
     }
 
@@ -2642,6 +2666,42 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
     }
 
+    private void toggleGenerateToSrc() {
+        generateToSrc = !generateToSrc;
+        logGenerateToSrcStatus();
+        initGenerationContext();
+        if (!generateToSrc) { // when you toggle off generate to src, delete the generated file in src
+            File srcGenFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+            if (srcGenFeaturesFile.exists()) {
+                if (!srcGenFeaturesFile.delete()) {
+                    debug("Error trying to delete the generated features file:"+srcGenFeaturesFile.getAbsolutePath());
+                }
+            }
+        }
+        if (generateFeatures) {
+            if (generateToSrc) {
+                warnSrcDirModified();
+            }
+            // If hotkey is toggled, generate features right away.
+            optimizeGenerateFeatures(!generateToSrc);
+        }
+    }
+
+    private void logGenerateToSrcStatus() {
+        info("Setting generation of features in src directory to: " + getFormattedBooleanString(generateToSrc));
+    }
+
+    private void warnSrcDirModified() {
+        String generatedFileCanonicalPath;
+        try {
+            generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).getCanonicalPath();
+        } catch (IOException e) {
+            generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).toString();
+        }
+        warn("The source configuration directory will be modified. Features will automatically be generated in a new file: " + generatedFileCanonicalPath);
+    }
+
+    // called by Liberty plugins
     protected void setFeatureGeneration(boolean generateFeatures) {
         this.generateFeatures = generateFeatures;
         logFeatureGenerationStatus();
@@ -2650,10 +2710,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Generate features using all classes and only user specified features.
      */
-    private boolean optimizeGenerateFeatures() {
-        debug("Generating optimized features list...");
+    private boolean optimizeGenerateFeatures(boolean useTmpDir) {
+        debug("Generating optimized features list...use temp directory=" + useTmpDir);
         // scan all class files and provide only user specified features
-        boolean generatedFeatures = libertyGenerateFeatures(null, true);
+        boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDir);
         if (generatedFeatures) {
             modifiedClasses.clear();
             failedToGenerateClasses.clear();
@@ -2667,12 +2727,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Generate features using updated classes and all existing features.
      * Returns true if successful
      */
-    private boolean incrementGenerateFeatures() {
-        debug("Generating feature list from incremental changes...");
+    private boolean incrementGenerateFeatures(boolean useTmpDir) {
+        debug("Generating feature list from incremental changes...use temp directory=" + useTmpDir);
         boolean generatedFeatures = false;
         try {
             Collection<String> classPaths = getClassPaths(modifiedClasses);
-            generatedFeatures = libertyGenerateFeatures(classPaths, false);
+            generatedFeatures = libertyGenerateFeatures(classPaths, false, useTmpDir);
             if (generatedFeatures) {
                 modifiedClasses.clear();
                 failedToGenerateClasses.clear();
@@ -2719,6 +2779,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey h = new HotKey("h", "help");
             HotKey r = new HotKey("r");
             HotKey g = new HotKey("g");
+            HotKey s = new HotKey("s");
             HotKey o = new HotKey("o");
             HotKey t = new HotKey("t");
             HotKey enter = new HotKey("");
@@ -2751,9 +2812,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         info(formatAttentionBarrier());
                     } else if (g.isPressed(line)) {
                         toggleFeatureGeneration();
+                    } else if (s.isPressed(line)) {
+                        toggleGenerateToSrc();
                     } else if (o.isPressed(line)) {
                         if (generateFeatures) {
-                            optimizeGenerateFeatures();
+                            optimizeGenerateFeatures(!generateToSrc);
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
@@ -2963,6 +3026,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 registerSingleFile(containerfileUsed, executor);
             }
 
+            // Always register this hidden temp directory even if not used
+            generatedFeaturesTmpDir.mkdirs();
+            registerSingleFile(new File(generatedFeaturesTmpDir, "dummy"), executor);
+
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
             for (File resourceDir : resourceDirs) {
                 resourceMap.put(resourceDir, false);
@@ -3068,7 +3135,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         modifiedSrcBuildFile = null; // only needed when recompileDependencies is true
                         long generatedTime = generatedFeaturesFile.lastModified();
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        incrementGenerateFeatures();
+                        incrementGenerateFeatures(!generateToSrc);
                         if (!generatedFeaturesFile.exists()) {
                             // run tests if generated-features.xml does not exist as there are no new features to install
                             // (typically tests run after generate features & install when hotTests=true)
@@ -4108,6 +4175,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Path testSrcPath = this.testSourceDirectory.getCanonicalFile().toPath();
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
         Path outputPath = this.outputDirectory.getCanonicalFile().toPath();
+        Path gfTmpDirPath = this.generatedFeaturesTmpDir.getCanonicalFile().toPath();
 
         Path directory = fileChanged.getParentFile().getCanonicalFile().toPath();
 
@@ -4383,9 +4451,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // This is for server.xml specified by the configuration parameter
             // server will load new properties
             processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, true);
-        } else if (directory.startsWith(configPath)
+        } else if ((directory.startsWith(configPath)
+                || directory.startsWith(gfTmpDirPath))
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) {
-            // configuration file
+            // configuration file or generate-features.xml in temp directory
             processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, false);
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
@@ -4510,7 +4579,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             throws IOException, PluginExecutionException {
         boolean isGeneratedFeaturesFile = configuredServerXml ? false : fileChanged.equals(generatedFeaturesFile);
         String targetFileName = configuredServerXml ? "server.xml" : null; // if null file will retain the same name when copied
-        File fileChangedParentDir = configuredServerXml ? serverXmlFileParent : configDirectory;
+        // three possible values for the parent directory
+        File fileChangedParentDir = configuredServerXml ? serverXmlFileParent :
+            isGeneratedFeaturesFile ? generatedFeaturesFileParent : configDirectory;
 
         if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
             debug("Config file modified: " + fileChanged);
@@ -4519,14 +4590,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             // generate features whenever features have changed and an XML file is modified,
             // excluding the generated features file
+            // if generateToSrc is false then we must copy generated file to serverDir after install to temp
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !isGeneratedFeaturesFile)
                     && serverFeaturesModified) {
-                generateFeaturesSuccess = optimizeGenerateFeatures();
+                generateFeaturesSuccess = optimizeGenerateFeatures(!generateToSrc);
             }
             if (serverFeaturesModified) {
-                // suppress install feature warning - property must be set before calling
-                // installFeaturesToTempDir
+                // suppress install feature warning - property must be set before installing using temp dir
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 installFeaturesToTempDir(fileChanged, fileChangedParentDir, targetFileName, generateFeaturesSuccess);
             }
@@ -4538,7 +4609,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
                 // this logic is not entered if the fileChanged is the generated features file
                 // copy generated features file to server dir
-                copyFile(generatedFeaturesFile, configDirectory, serverDirectory, null);
+                copyTempFeatureFileToServer(serverDirectory);
                 generatedFeaturesModified = false;
             }
             if (serverFeaturesModified) {
@@ -4581,7 +4652,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !fileChanged.equals(generatedFeaturesFile))
                     && serverFeaturesModified()) {
-                optimizeGenerateFeatures();
+                optimizeGenerateFeatures(false);
             }
             // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
             if (isContainerfileDirectoryChanged(serverDirectory, fileChanged)) {
@@ -4699,8 +4770,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     /**
-     * Determines if the corresponding target config file was generated by a Liberty
-     * plugin
+     * Determines if the specified config file in target dir was generated by a Liberty
+     * plugin: bootstrap.properties or jvm.options
      * 
      * @param fileChanged the file that was changed
      * @param srcDir      the directory of the file changed
@@ -4773,10 +4844,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return !skip;
             }
         }, true);
-        copyFile(fileChanged, srcDir, tempConfig, targetFileName);
+        File parentDir = fileChanged.equals(generatedFeaturesFile) ? generatedFeaturesFileParent : srcDir;
+        copyFile(fileChanged, parentDir, tempConfig, targetFileName);
         if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generatedFeaturesFile)) {
-            // copy generated-features.xml file
-            copyFile(generatedFeaturesFile, srcDir, tempConfig, generatedFeaturesFile.getName());
+            copyTempFeatureFileToServer(tempConfig);
         }
         installFeatures(fileChanged, tempConfig, generateFeatures);
         cleanUpTempConfig();
@@ -5817,10 +5888,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
         if (generateFeatures) {
             // generateFeatures scenario: check if a generated feature has been manually added to other config files
+            // Here we pass generated-features.xml instead of server.xml to calculate the generated ones
+            // The second parameter will not be used for generated-features.xml.
         	FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), serverDirectory,
                     generatedFeaturesFile, null, null);
         	if (fp != null)
         		generatedFeatureSet = fp.getFeatures();
+
+            // Calculate the features specified in the config excluding those in generated-features
             Set<String> generatedFiles = new HashSet<String>();
             generatedFiles.add(generatedFeaturesFile.getName());
             // if serverXmlFile is null, getServerFeatures will use the default server.xml
@@ -5862,6 +5937,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     // returns the features specified in the generated-features.xml file
+    // generated-features.xml has a <server> element so it is also a "serverFile"
+    // The second parameter will not be used for generated-features.xml.
     private Set<String> getGeneratedFeatures() {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
         FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), configDirectory,
