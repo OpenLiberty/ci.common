@@ -3135,12 +3135,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         modifiedSrcBuildFile = null; // only needed when recompileDependencies is true
                         long generatedTime = generatedFeaturesFile.lastModified();
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        boolean generateFeaturesSuccess = incrementGenerateFeatures(!generateToSrc);
-                        if (generateFeaturesSuccess && !generateToSrc) {
-                            // generated features to file in temp directory. Install then copy to server dir
-                            installFeaturesToTempDir(generatedFeaturesFile, generatedFeaturesFileParent, null, generateFeaturesSuccess);
-                            copyTempFeatureFileToServer(serverDirectory);
-                        }
+                        incrementGenerateFeatures(!generateToSrc);
                         if (!generatedFeaturesFile.exists()) {
                             // run tests if generated-features.xml does not exist as there are no new features to install
                             // (typically tests run after generate features & install when hotTests=true)
