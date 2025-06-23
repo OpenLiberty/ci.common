@@ -4652,7 +4652,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !fileChanged.equals(generatedFeaturesFile))
                     && serverFeaturesModified()) {
-                optimizeGenerateFeatures(false);
+                optimizeGenerateFeatures(!generateToSrc);
             }
             // Let this restart if needed for container mode.  Otherwise, nothing else needs to be done for config file delete.
             if (isContainerfileDirectoryChanged(serverDirectory, fileChanged)) {
