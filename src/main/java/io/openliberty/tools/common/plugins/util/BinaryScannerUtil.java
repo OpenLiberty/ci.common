@@ -34,6 +34,7 @@ public abstract class BinaryScannerUtil {
 
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
     public static final String GENERATED_FEATURES_FILE_PATH = "configDropins/overrides/" + GENERATED_FEATURES_FILE_NAME;
+    public static final String GENERATED_FEATURES_TEMP_PATH = ".libertyFeatures/" + GENERATED_FEATURES_FILE_NAME;
     private static final String FEATURE_MODIFIED_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException";
     private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
     private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
