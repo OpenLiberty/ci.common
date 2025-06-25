@@ -3026,9 +3026,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 registerSingleFile(containerfileUsed, executor);
             }
 
-            // Always register this hidden temp directory even if not used
-            generatedFeaturesTmpDir.mkdirs();
-            registerSingleFile(new File(generatedFeaturesTmpDir, "dummy"), executor);
+            // Always register this hidden temp directory because generateToSrc can be turned on in dev mode
+            File hiddenTempGenerateFeaturesFile = new File(generatedFeaturesTmpDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+            hiddenTempGenerateFeaturesFile.getParentFile().mkdirs(); // must only mkdir on the directories
+            registerSingleFile(hiddenTempGenerateFeaturesFile, executor);
 
             HashMap<File, Boolean> resourceMap = new HashMap<File, Boolean>();
             for (File resourceDir : resourceDirs) {
