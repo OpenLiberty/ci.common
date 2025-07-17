@@ -117,7 +117,7 @@ public abstract class GenerateFeaturesUtil {
         Set<String> generatedFiles = new HashSet<String>();
         generatedFiles.add(GENERATED_FEATURES_FILE_NAME);
 
-        Set<String> existingFeatures = getServerFeatures(servUtil, generatedFiles, optimize);
+        Set<String> existingFeatures = getServerFeatures(servUtil, generationContextDir, generatedFiles, optimize);
         Set<String> nonCustomFeatures = new HashSet<String>(); // binary scanner only handles actual Liberty features
         for (String feature : existingFeatures) { // custom features are "usr:feature-1.0" or "myExt:feature-2.0"
             if (!feature.contains(":")) nonCustomFeatures.add(feature);
@@ -145,7 +145,7 @@ public abstract class GenerateFeaturesUtil {
             throw new GenerateFeaturesException(String.format(BinaryScannerUtil.BINARY_SCANNER_CONFLICT_MESSAGE3, noRecommendation.getConflicts()));
         } catch (BinaryScannerUtil.FeatureModifiedException featuresModified) {
             Set<String> userFeatures = (optimize) ? existingFeatures :
-                getServerFeatures(servUtil, generatedFiles, true); // user features excludes generatedFiles
+                getServerFeatures(servUtil, generationContextDir, generatedFiles, true); // user features excludes generatedFiles
             Set<String> modifiedSet = featuresModified.getFeatures(); // a set that works after being modified by the scanner
             if (modifiedSet.containsAll(userFeatures)) {
                 // none of the user features were modified, only features which were generated earlier.
@@ -269,7 +269,7 @@ public abstract class GenerateFeaturesUtil {
     };
 
     public abstract ServerFeatureUtil getServerFeatureUtil(boolean suppress, Map files);
-    public abstract Set<String> getServerFeatures(ServerFeatureUtil servUtil, Set<String> generatedFiles, boolean excludeGenerated);
+    public abstract Set<String> getServerFeatures(ServerFeatureUtil servUtil, File generationContextDir, Set<String> generatedFiles, boolean excludeGenerated);
     public abstract Set<String> getClassesDirectories(List projects) throws GenerateFeaturesException;
     public abstract List<Object> getProjectList(Object project);
     public abstract String getEEVersion(List projects);
