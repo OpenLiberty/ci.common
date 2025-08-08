@@ -2792,6 +2792,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (q.isPressed(line)) {
                     debug("Detected exit command");
                     runShutdownHook(executor);
+                    Utils.closeTerminal();
                 } else if (r.isPressed(line)) {
                     debug("Detected restart command");
                     try {

@@ -28,6 +28,7 @@ import org.jline.terminal.TerminalBuilder;
 public class Utils {
 
     public static LineReader reader;
+    public static Terminal terminal;
 
     public static boolean isEmptyPath(String path) {
         String children[] = new File(path).list();
@@ -50,7 +51,6 @@ public class Utils {
 
     public static LineReader getReader() {
         if (reader == null) {
-            Terminal terminal;
 			try {
 				terminal = TerminalBuilder.builder().system(true).build();
 	            reader = LineReaderBuilder.builder().terminal(terminal).build();
@@ -59,6 +59,17 @@ public class Utils {
 			}
         }
         return reader;
+    }
+
+    public static void closeTerminal() {
+        if (terminal != null) {
+            try {
+				terminal.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+            terminal = null;
+        }
     }
 
     public static boolean confirm(String message) {
