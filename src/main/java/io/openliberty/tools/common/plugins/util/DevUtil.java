@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2024.
+ * (C) Copyright IBM Corporation 2019, 2025.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 
 package io.openliberty.tools.common.plugins.util;
+
+import static org.fusesource.jansi.Ansi.ansi;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -82,6 +84,9 @@ import javax.xml.parsers.ParserConfigurationException;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import io.openliberty.tools.ant.ServerTask;
+import io.openliberty.tools.common.ai.ChatAgent;
+import io.openliberty.tools.common.ai.util.LoadingThread;
+import io.openliberty.tools.common.ai.util.Utils;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
 
 import javax.xml.stream.XMLOutputFactory;
@@ -95,6 +100,13 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListener;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
+import org.fusesource.jansi.Ansi;
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.UserInterruptException;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -139,6 +151,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
+
+    private static String cyan(String text) {
+        return ansi().fg(Ansi.Color.CYAN).bold().a(text).reset().toString();
+    }
 
     /**
      * Log debug
@@ -443,6 +459,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected boolean skipInstallFeature;
     // for gradle, this map will be kept as null
     protected Map<String, Boolean> projectRecompileMap;
+
+    ChatAgent chatAgent = null;
 
     // constructor for maven
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
@@ -2555,9 +2573,29 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
                 }
             }
+
+            printAIStatus();
+
             // print barrier footer
             info(formatAttentionBarrier());
         }
+    }
+
+    private void printAIStatus() {
+        info(formatAttentionMessage(""));
+        try {
+	        info(formatAttentionTitle("AI information:"));
+	        info(formatAttentionMessage("provider: " + getChatAgent().getProvider()));
+	        info(formatAttentionMessage("model: " + getChatAgent().getModelName()));
+	        info(formatAttentionMessage("tools: " + getChatAgent().getToolsEnabled()));
+	        info(formatAttentionMessage(""));
+	        info(formatAttentionMessage("Post a message to AI - type in " + cyan("@ai your message") + " and press Enter."));
+	        info(formatAttentionMessage("    To start a multi-line message, type in " + cyan("@ai [") + " and press Enter."));
+	        info(formatAttentionMessage("    To end the multi-line message, type in " + cyan("@ai ]") + " and press Enter."));
+	        info(formatAttentionMessage("Reset chat session - type in " + cyan("@ai reset") + " and press Enter."));
+		} catch (Exception e) {
+            info(formatAttentionTitle("AI is not avaliable."));
+		}
     }
 
     private void printTestsMessage(boolean formatForAttention) {
@@ -2587,7 +2625,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
         info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+        printAIStatus();
     }
+
 
     private void printFeatureGenerationStatus() {
         info(formatAttentionMessage("Automatic generation of features: " + getFormattedBooleanString(generateFeatures)));
@@ -2690,8 +2730,33 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return generatedFeatures;
     }
 
+    private ChatAgent getChatAgent() throws Exception {
+        if (chatAgent == null) {
+            chatAgent = new ChatAgent(1);
+        }
+        return chatAgent;
+    }
+
+    private void chat(String message) {
+        String response = null;
+        try {
+            LoadingThread.show();
+			response = getChatAgent().chat(message);
+		} catch (Exception e) {
+	        LoadingThread.hide();
+	        LoadingThread.resetElapsed();
+            System.err.println("Chat Assistant failed due to: " + e.getMessage());
+            return;
+		}
+        LoadingThread.hide();
+        LoadingThread.resetElapsed();
+        System.out.println("");
+        System.out.println(response);
+        System.out.println("");
+    }
+
     private class HotkeyReader implements Runnable {
-        private Scanner scanner;
+        // private Scanner scanner;
         private ThreadPoolExecutor executor;
         private boolean shutdown = false;
 
@@ -2702,19 +2767,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         @Override
         public void run() {
             debug("Running hotkey reader thread");
-            scanner = new Scanner(new CloseShieldInputStream(System.in)); // shield allows us to close the scanner without closing System.in.
             try {
-                readInput();
-            } finally {
-                scanner.close();
-            }
+				readInput();
+			} catch (Exception e) {
+			    debug(e.getMessage());
+			}
         }
 
         public void shutdown() {
             shutdown = true;
         }
 
-        private void readInput() {
+        private void readInput() throws Exception {
             HotKey q = new HotKey("q", "quit", "exit");
             HotKey h = new HotKey("h", "help");
             HotKey r = new HotKey("r");
@@ -2722,60 +2786,64 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey o = new HotKey("o");
             HotKey t = new HotKey("t");
             HotKey enter = new HotKey("");
-            if (scanner.hasNextLine()) {
-                synchronized (inputUnavailable) {
-                    inputUnavailable.notify();
-                }
-                while (!shutdown) {
-                    debug("Waiting for action key");
-                    
-                    if (!scanner.hasNextLine()) {
-                        break;
-                    }
-                    String line = scanner.nextLine();
-                    if (q.isPressed(line)) {
-                        debug("Detected exit command");
+            while (!shutdown) {
+                debug("Waiting for action key");
+                String line = Utils.getReader().readLine();
+                if (q.isPressed(line)) {
+                    debug("Detected exit command");
+                    runShutdownHook(executor);
+                } else if (r.isPressed(line)) {
+                    debug("Detected restart command");
+                    try {
+                        restartServer(true);
+                    } catch (PluginExecutionException e) {
+                        debug("Exiting dev mode due to server restart failure");
+                        error("Could not restart the server.", e);
                         runShutdownHook(executor);
-                    } else if (r.isPressed(line)) {
-                        debug("Detected restart command");
-                        try {
-                            restartServer(true);
-                        } catch (PluginExecutionException e) {
-                            debug("Exiting dev mode due to server restart failure");
-                            error("Could not restart the server.", e);
-                            runShutdownHook(executor);
+                    }
+                } else if (h.isPressed(line)) {
+                    info(formatAttentionBarrier());
+                    printHelpMessages();
+                    info(formatAttentionBarrier());
+                } else if (g.isPressed(line)) {
+                    toggleFeatureGeneration();
+                } else if (o.isPressed(line)) {
+                    if (generateFeatures) {
+                        optimizeGenerateFeatures();
+                    } else {
+                        warn("Cannot optimize features because automatic generation of features is off.");
+                        warn("To toggle the automatic generation of features, type 'g' and press Enter.");
+                    }
+                } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
+                    debug("Detected test command. Running tests... ");
+                    if (isMultiModuleProject()) {
+                        // force run tests across all modules in multi module scenario
+                        runTestThread(false, executor, -1, true, getAllBuildFiles());
+                    } else {
+                        runTestThread(false, executor, -1, true, buildFile);
+                    }
+                } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
+                    warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
+                } else {
+                    if (line.startsWith("@ai")) {
+                        line = line.substring("@ai".length());
+                        if (line.trim().equals("[")) {
+                            // Accept multiline input between @ai[ and @ai]
+                            StringBuilder builder = new StringBuilder();
+                            while (true) {
+                                String more = Utils.getReader().readLine();
+                                if (more.startsWith("@ai") && more.substring("@ai".length()).trim().equals("]")) {
+                                    break;
+                                }
+                                builder.append(more);
+                                builder.append("\n");
+                            }
+                            line = builder.toString();
                         }
-                    } else if (h.isPressed(line)) {
-                        info(formatAttentionBarrier());
-                        printHelpMessages();
-                        info(formatAttentionBarrier());
-                    } else if (g.isPressed(line)) {
-                        toggleFeatureGeneration();
-                    } else if (o.isPressed(line)) {
-                        if (generateFeatures) {
-                            optimizeGenerateFeatures();
-                        } else {
-                            warn("Cannot optimize features because automatic generation of features is off.");
-                            warn("To toggle the automatic generation of features, type 'g' and press Enter.");
-                        }
-                    } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
-                        debug("Detected test command. Running tests... ");
-                        if (isMultiModuleProject()) {
-                            // force run tests across all modules in multi module scenario
-                            runTestThread(false, executor, -1, true, getAllBuildFiles());
-                        } else {
-                            runTestThread(false, executor, -1, true, buildFile);
-                        }
-                    } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
-                        warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
+                        chat(line.trim());
                     } else {
                         warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
                     }
-                }
-            } else {
-                synchronized (inputUnavailable) {
-                    inputUnavailable.set(true);
-                    inputUnavailable.notify();
                 }
             }
         }
