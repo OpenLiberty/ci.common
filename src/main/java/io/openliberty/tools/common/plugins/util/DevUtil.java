@@ -2479,6 +2479,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void printDevModeMessages(boolean inputUnavailable, boolean startup) throws PluginExecutionException {
         // the following will be printed only on startup or restart
         if (startup) {
+            getChatAgent();
+
             // print barrier header
             info(formatAttentionBarrier());
 
@@ -2582,6 +2584,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printAIStatus() {
+        if (getChatAgent() == null) {
+            return;
+        }
         info(formatAttentionMessage(""));
         try {
 	        info(formatAttentionTitle("AI information:"));
@@ -2730,14 +2735,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return generatedFeatures;
     }
 
-    private ChatAgent getChatAgent() throws Exception {
+    private ChatAgent getChatAgent() {
         if (chatAgent == null) {
-            chatAgent = new ChatAgent(1);
+            try {
+                chatAgent = new ChatAgent(1);
+            } catch (Exception e) {
+                debug(e.getMessage());
+            }
         }
         return chatAgent;
     }
 
     private void chat(String message) {
+        if (getChatAgent() == null) {
+            return;
+        }
         String response = null;
         try {
             LoadingThread.show();
@@ -2826,7 +2838,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
                     warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
                 } else {
-                    if (line.startsWith("@ai")) {
+                    if (getChatAgent() != null && line.startsWith("@ai")) {
                         line = line.substring("@ai".length());
                         if (line.trim().equals("[")) {
                             // Accept multiline input between @ai[ and @ai]

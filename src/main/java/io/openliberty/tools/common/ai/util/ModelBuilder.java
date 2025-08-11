@@ -110,9 +110,11 @@ public class ModelBuilder {
                 }
             }
         } else {
-            System.err.println("Failed to create a model. " +
-                "Make sure to set either the OLLAMA_BASE_URL, GITHUB_API_KEY, or MISTRAL_AI_API_KEY " +
+            /*
+            System.err.println("If use AI assistant, " +
+                "make sure to set either the OLLAMA_BASE_URL, GITHUB_API_KEY, or MISTRAL_AI_API_KEY " +
                 "environment variable with a valid URL or API key?\n");
+            */
         }
     }
 
