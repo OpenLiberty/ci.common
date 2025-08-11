@@ -23,6 +23,7 @@ import java.util.List;
 
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.embedding.onnx.allminilml6v2q.AllMiniLmL6V2QuantizedEmbeddingModel;
 import dev.langchain4j.model.input.PromptTemplate;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
@@ -37,7 +38,7 @@ import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 public class RagCreator {
 
     private static final String[] MD_FILES = {
-        "mp-health-1.md"
+        "logs-1.md", "mp-health-1.md", "security-1.md"
     };
 
     private static final String PROMPT_TEMPLATE = """
@@ -46,8 +47,8 @@ public class RagCreator {
         Use relevent information from the stored documents:
         {{contents}}.""";
 
-	private static Double MIN_SCORE = null;
-	private static Integer MAX_RESULTS = null;
+    private static Double MIN_SCORE = null;
+    private static Integer MAX_RESULTS = null;
 
     private Double getMinScore() {
         if (MIN_SCORE == null) {
@@ -63,6 +64,12 @@ public class RagCreator {
         return MAX_RESULTS;
     }
 
+    private void addTextToStore(String text, EmbeddingModel model, EmbeddingStore<TextSegment> store) {
+        TextSegment segment = TextSegment.from(text);
+        Embedding embedding = model.embed(segment).content();
+        store.add(embedding, segment);
+    }
+
     public RetrievalAugmentor getRetrievalAugmentor() throws Exception {
         EmbeddingStore<TextSegment> embeddingStore = new InMemoryEmbeddingStore<>();
         AllMiniLmL6V2QuantizedEmbeddingModel embeddingModel = new AllMiniLmL6V2QuantizedEmbeddingModel();
@@ -75,15 +82,16 @@ public class RagCreator {
                 StringBuffer docSB = new StringBuffer();
                 String line;
                 while ((line = br.readLine()) != null) {
-                    if (line.startsWith(":summary:")) {
+                    if (line.startsWith(":summary:") || line.startsWith(":question:") || line.startsWith(":problem:")) {
                         if (!docSB.isEmpty()) {
-                            TextSegment segment = TextSegment.from(docSB.toString());
-                            Embedding embedding = embeddingModel.embed(segment).content();
-                            embeddingStore.add(embedding, segment);
+                            addTextToStore(docSB.toString(), embeddingModel, embeddingStore);
                             docSB = new StringBuffer();
                         }
                     }
                     docSB.append(line).append("\n");
+                }
+                if (!docSB.isEmpty()) {
+                    addTextToStore(docSB.toString(), embeddingModel, embeddingStore);
                 }
                 br.close();
                 reader.close();
@@ -98,15 +106,18 @@ public class RagCreator {
                 .maxResults(getMaxResults())
                 .minScore(getMinScore())
                 .build();
+
         ContentInjector contentInjector =
             DefaultContentInjector.builder()
                 .promptTemplate(PromptTemplate.from(PROMPT_TEMPLATE))
                 .metadataKeysToInclude(List.of("file_name"))
                 .build();
+
         return DefaultRetrievalAugmentor.builder()
                    .contentRetriever(contentRetriever)
                    .contentInjector(contentInjector)
                    .build();
+
     }
 
 }
