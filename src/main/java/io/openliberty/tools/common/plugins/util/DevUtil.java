@@ -2831,13 +2831,23 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 } else {
                     if (getChatAgent() != null && line.startsWith("@ai")) {
                         line = line.substring("@ai".length());
-                        if (line.trim().equals("[")) {
+                        if (line.trim().startsWith("[")) {
                             // Accept multiline input between @ai[ and @ai]
                             StringBuilder builder = new StringBuilder();
+                            builder.append(line.trim().substring("[".length()));
+                            builder.append("\n");
                             while (true) {
                                 String more = Utils.getReader().readLine();
-                                if (more.startsWith("@ai") && more.substring("@ai".length()).trim().equals("]")) {
-                                    break;
+                                if (more.startsWith("@ai")) {
+                                    if (more.substring("@ai".length()).trim().equals("]")) {
+                                        break;
+                                    }
+                                    more = more.substring("@ai".length());
+                                    if (more.trim().startsWith("[")) {
+                                        more = more.trim().substring("[".length());
+                                    }
+                                    builder = new StringBuilder();
+                                    System.out.println("Restarted the " + cyan("@ai [") + " multi-line message");
                                 }
                                 builder.append(more);
                                 builder.append("\n");
