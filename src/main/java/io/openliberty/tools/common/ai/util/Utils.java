@@ -19,6 +19,8 @@ import static org.fusesource.jansi.Ansi.ansi;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
@@ -26,6 +28,8 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 public class Utils {
+
+    private static Map <String, FilePermission> filePermissions = new HashMap<String, FilePermission>();
 
     public static LineReader reader;
     public static Terminal terminal;
@@ -82,4 +86,36 @@ public class Utils {
         return answer.equalsIgnoreCase("yes");
     }
 
+    public static boolean readFile(File file) throws Exception {
+        String filePath = getAbsolutePath(file);
+        if (filePermissions.containsKey(filePath)) {
+            // File either contains write or read permissions
+            return true;
+        } else {
+            if (confirm("\nAllow AI to read the " + filePath + " file?")) {
+                filePermissions.put(filePath, FilePermission.READ);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean writeFile(File file) throws Exception {
+        String filePath = getAbsolutePath(file);
+
+        if (filePermissions.containsKey(filePath) && filePermissions.get(filePath) == FilePermission.WRITE) {
+            return true;
+        } else {
+            if (confirm("\nAllow AI to write to the " + filePath + " file?")) {
+                filePermissions.put(filePath, FilePermission.WRITE);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void clearPermissions() {
+        filePermissions.clear();
+    }
+    
 }

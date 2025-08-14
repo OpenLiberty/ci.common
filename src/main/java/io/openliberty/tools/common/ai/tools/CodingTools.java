@@ -46,14 +46,12 @@ public class CodingTools {
         }
     }
   
-    protected boolean confirmReadFile(File file) {
-        return Utils.confirm("\nAllow AI to read the "
-            + Utils.getAbsolutePath(file) + " file?");
+    protected boolean confirmReadFile(File file) throws Exception {
+        return Utils.readFile(file);
     }
 
-    protected boolean confirmModifyFile(File file) {
-        return Utils.confirm("\nAllow AI to read/write the "
-            + Utils.getAbsolutePath(file) + " file?");
+    protected boolean confirmWriteFile(File file) throws Exception {
+        return Utils.writeFile(file);
     }
 
     private File findFile(String name) throws Exception {
@@ -102,7 +100,7 @@ public class CodingTools {
                           + packageName.replace(".", File.separator) + File.separator + className + ".java";
         File file = new File(pathName);
         if (!file.exists()) {
-            if (confirmModifyFile(file)) {
+            if (confirmWriteFile(file)) {
                 Path path = Paths.get(file.getAbsolutePath());
                 Files.createDirectories(path.getParent());
                 Files.write(path, data.getBytes(StandardCharsets.UTF_8));

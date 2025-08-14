@@ -27,6 +27,7 @@ import io.openliberty.tools.common.ai.util.Assistant;
 import io.openliberty.tools.common.ai.util.MarkdownConsoleFormatter;
 import io.openliberty.tools.common.ai.util.ModelBuilder;
 import io.openliberty.tools.common.ai.util.RagCreator;
+import io.openliberty.tools.common.ai.util.Utils;
 
 public class ChatAgent {
     private ModelBuilder modelBuilder = new ModelBuilder();
@@ -107,6 +108,7 @@ public class ChatAgent {
 
     public void resetChat() {
         assistant.evictChatMemory(memoryId);
+        Utils.clearPermissions();
     }
 
     public String getModelName() {
