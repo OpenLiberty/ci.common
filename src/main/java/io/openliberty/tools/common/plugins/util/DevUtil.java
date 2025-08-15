@@ -2589,6 +2589,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 	        info(formatAttentionMessage("    To start a multi-line message, type in " + cyan("@ai [") + " and press Enter."));
 	        info(formatAttentionMessage("    To end the multi-line message, type in " + cyan("@ai ]") + " and press Enter."));
 	        info(formatAttentionMessage("Reset chat session - type in " + cyan("@ai reset") + " and press Enter."));
+            info(formatAttentionMessage("View a previous message - press Up/Down arrow key."));
 		} catch (Exception e) {
             info(formatAttentionTitle("AI is not avaliable."));
 		}
