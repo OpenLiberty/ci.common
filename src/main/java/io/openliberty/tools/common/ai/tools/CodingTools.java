@@ -23,10 +23,13 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.github.javaparser.ParseProblemException;
+import com.github.javaparser.Position;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.stmt.BlockStmt;
 
@@ -158,6 +161,80 @@ public class CodingTools {
         } else {
             throw new Exception("Method '" + method + "' not found.");
         }
+    }
+
+    @Tool("Save java docs to method")
+    public void saveJavaDocToMethod(
+        @P("Name of the java class file (example: HelloWorld.java)") String fileName,
+        @P("Function signature without variable names, it must have matchin datatypes" +
+           "[example: Main(Integer, String) or add(int, int) ]") String signature,
+        @P("raw java doc content without any formatting (Example:" +
+           "\"This method does something\\n" +
+           "\\n" +
+           "@param argument Description of argument\\n" +
+           "@return Description of return value\")") String docs) throws Exception {
+
+        File file = findFile(fileName);
+        if (!confirmWriteFile(file))
+            throw new Exception("User did not give permissions to edit the file: " + file.getAbsolutePath());
+
+        CompilationUnit cu;
+        cu = StaticJavaParser.parse(file);
+        List<MethodDeclaration> signatures = cu.findAll(MethodDeclaration.class)
+                                            .stream()
+                                            .filter(m -> m.getSignature().toString().equalsIgnoreCase(signature))
+                                            .toList();
+        
+        if (signatures.isEmpty())
+            throw new Exception("Could not find the signature: " + signature);
+
+        List<String> fileContent = Files.readAllLines(file.toPath());
+        for (int i = signatures.size() - 1; i>=0; --i) {
+            Position pos = signatures.get(i).getBegin().get();
+            String indent = " ".repeat(pos.column - 1);
+            String javaDocs = docs.lines()
+                                .map(line -> indent+" * "+line+"\n")
+                                    .collect(Collectors.joining("", indent+"/**\n", indent+" */"));
+            fileContent.add(pos.line - 1, javaDocs);
+        }
+        Files.write(file.toPath(), fileContent);
+    }
+
+    @Tool("Save java docs to class or interface")
+    public void saveJavaDocToClassOrInterface(
+        @P("Name of the java class file (example: HelloWorld.java)") String fileName,
+        @P("The name of class or interface (Example: main)") String name,
+        @P("raw java doc content without any formatting (Example:" +
+           "\"This method does something\\n" +
+           "\\n" +
+           "@param argument Description of argument\\n" +
+           "@return Description of return value\")") String docs) throws Exception {
+
+        File file = findFile(fileName);
+
+        if (!confirmWriteFile(file))
+            throw new Exception("User did not give permissions to edit the file: " + file.getAbsolutePath());
+
+        CompilationUnit cu;
+        cu = StaticJavaParser.parse(file);
+        List<ClassOrInterfaceDeclaration> classOrInterfaces = cu.findAll(ClassOrInterfaceDeclaration.class)
+                                                                .stream()
+                                                                .filter(m -> m.getNameAsString().equalsIgnoreCase(name))
+                                                                .toList();
+
+        if (classOrInterfaces.isEmpty())
+            throw new Exception("Could not find a class or interface with name: " + name);
+
+        List<String> fileContent = Files.readAllLines(file.toPath());
+        for (int i = classOrInterfaces.size() - 1; i>=0; --i) {
+            Position pos = classOrInterfaces.get(i).getBegin().get();
+            String indent = " ".repeat(pos.column - 1);
+            String javaDocs = docs.lines()
+                                  .map(line -> indent+" * "+line+"\n")
+                                  .collect(Collectors.joining("", indent+"/**\n", indent+" */"));
+            fileContent.add(pos.line - 1, javaDocs);
+        }
+        Files.write(file.toPath(), fileContent);
     }
 
 }
