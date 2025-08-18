@@ -48,12 +48,12 @@ public class CodingTools {
             matchingFiles.add(file);
         }
     }
-  
-    protected boolean confirmReadFile(File file) throws Exception {
+
+    public boolean confirmReadFile(File file) throws Exception {
         return Utils.readFile(file);
     }
 
-    protected boolean confirmWriteFile(File file) throws Exception {
+    public boolean confirmWriteFile(File file) throws Exception {
         return Utils.writeFile(file);
     }
 
