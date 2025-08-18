@@ -89,18 +89,7 @@ public class CodingTools {
         return file;
     }
 
-    @Tool("Return current working directory")
-    public String getWorkingDirectory() {
-        return workingDirectory;
-    }
-
-    @Tool("Save a Java file given the package name, class name, and source code")
-    public void saveFile(@P("Package name, ask user if unsure (example: com.example.project)") String packageName,
-                         @P("Class name (example: Thing)") String className,
-                         @P("Source code") String data) throws Exception {
-        
-        String pathName = "src/main/java/".replace("/", File.separator)
-                          + packageName.replace(".", File.separator) + File.separator + className + ".java";
+    private void saveFile(String pathName, String data) throws Exception {
         File file = new File(pathName);
         if (!file.exists()) {
             if (confirmWriteFile(file)) {
@@ -113,6 +102,31 @@ public class CodingTools {
         } else {
             throw new Exception("File already exists");
         }
+    }
+
+    @Tool("Return current working directory")
+    public String getWorkingDirectory() {
+        return workingDirectory;
+    }
+
+    @Tool("Save a Java file in main directory given the package name, class name, and source code")
+    public void saveJavaFile(
+        @P("Package name, ask user if unsure (example: com.example.project)") String packageName,
+        @P("Class name (example: Thing)") String className,
+        @P("Source code") String data) throws Exception {
+        String pathName = "src/main/java/".replace("/", File.separator)
+                          + packageName.replace(".", File.separator) + File.separator + className + ".java";
+        saveFile(pathName, data);
+    }
+
+    @Tool("Save a Java Test file in test directory given the package name, class name, and source code")
+    public void saveJavaTestFile(
+        @P("Package name, ask user if unsure (example: com.example.project)") String packageName,
+        @P("Class name, must end with Test (example: ThingTest)") String className,
+        @P("Source code") String data) throws Exception {
+        String pathName = "src/test/java/".replace("/", File.separator)
+                          + packageName.replace(".", File.separator) + File.separator + className + ".java";
+        saveFile(pathName, data);
     }
 
     @Tool("Read a file/class")
