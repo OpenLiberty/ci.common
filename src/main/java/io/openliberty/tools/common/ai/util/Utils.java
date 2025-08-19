@@ -117,21 +117,21 @@ public class Utils {
     }
 
     public static void printReplyTop() {
-        System.out.print("\n┌");
+        System.out.print("\n\u250C");
         for (int i = 0; i < CONSOLE_WIDTH; i++) {
-            System.out.print("─");
+            System.out.print("\u2500");
         }
         System.out.println("\n");
-        // System.out.println("┐\n");
+        // System.out.println("\u2510\n");
     }
 
     public static void printReplyBottom() {
-        System.out.print("└");
+        System.out.print("\u2514");
         for (int i = 0; i < CONSOLE_WIDTH; i++) {
-            System.out.print("─");
+            System.out.print("\u2500");
         }
         System.out.println("\n");
-        // System.out.println("┘\n");
+        // System.out.println("\u2518\n");
     }
 
     public static void clearPermissions() {
