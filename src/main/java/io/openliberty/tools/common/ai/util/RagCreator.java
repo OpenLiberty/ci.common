@@ -70,6 +70,7 @@ public class RagCreator {
     }
 
     public RetrievalAugmentor getRetrievalAugmentor(EmbeddingModel embeddingModel) throws Exception {
+
         EmbeddingStore<TextSegment> embeddingStore = new InMemoryEmbeddingStore<>();
         ClassLoader classLoader = RetrievalAugmentor.class.getClassLoader();
         for (String mdFile: MD_FILES) {
