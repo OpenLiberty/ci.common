@@ -24,7 +24,6 @@ import java.util.List;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.embedding.onnx.allminilml6v2q.AllMiniLmL6V2QuantizedEmbeddingModel;
 import dev.langchain4j.model.input.PromptTemplate;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.RetrievalAugmentor;
@@ -70,9 +69,8 @@ public class RagCreator {
         store.add(embedding, segment);
     }
 
-    public RetrievalAugmentor getRetrievalAugmentor() throws Exception {
+    public RetrievalAugmentor getRetrievalAugmentor(EmbeddingModel embeddingModel) throws Exception {
         EmbeddingStore<TextSegment> embeddingStore = new InMemoryEmbeddingStore<>();
-        AllMiniLmL6V2QuantizedEmbeddingModel embeddingModel = new AllMiniLmL6V2QuantizedEmbeddingModel();
         ClassLoader classLoader = RetrievalAugmentor.class.getClassLoader();
         for (String mdFile: MD_FILES) {
             InputStream inStream = classLoader.getResourceAsStream("documents/" + mdFile);

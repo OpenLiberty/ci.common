@@ -62,7 +62,7 @@ public class ChatAgent {
                     .chatMemoryProvider(
                          sessionId -> MessageWindowChatMemory.withMaxMessages(modelBuilder.getMaxMessages()));
             RagCreator creator = new RagCreator();
-            RetrievalAugmentor retrivalAugmentator = creator.getRetrievalAugmentor();
+            RetrievalAugmentor retrivalAugmentator = creator.getRetrievalAugmentor(modelBuilder.getEmbeddingModel());
             if (retrivalAugmentator == null) {
                 System.out.println("[WARNING] RAG is not set up successfully. Continuing without RAG.");
             } else {

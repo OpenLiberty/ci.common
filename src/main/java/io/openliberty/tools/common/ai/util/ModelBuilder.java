@@ -15,16 +15,23 @@
  */
 package io.openliberty.tools.common.ai.util;
 
+import static dev.langchain4j.model.github.GitHubModelsEmbeddingModelName.TEXT_EMBEDDING_3_SMALL;
+import static dev.langchain4j.model.mistralai.MistralAiEmbeddingModelName.MISTRAL_EMBED;
 import static java.time.Duration.ofSeconds;
 
 import java.util.List;
 
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.github.GitHubModelsChatModel;
 import dev.langchain4j.model.github.GitHubModelsChatModel.Builder;
+import dev.langchain4j.model.github.GitHubModelsEmbeddingModel;
+import dev.langchain4j.model.googleai.GoogleAiEmbeddingModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.model.mistralai.MistralAiChatModel;
+import dev.langchain4j.model.mistralai.MistralAiEmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
+import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
 import io.github.ollama4j.OllamaAPI;
 import io.github.ollama4j.models.response.Model;
 
@@ -51,6 +58,7 @@ public class ModelBuilder {
     private Double TEMPERATURE;
 
     private ChatModel chatModel = null;
+    private EmbeddingModel embeddingModel = null;
 
     public void findModel() {
         if (OLLAMA_BASE_URL != null && OLLAMA_BASE_URL.startsWith("http")) {
@@ -159,6 +167,38 @@ public class ModelBuilder {
             }
         }
         return chatModel;
+    }
+
+
+    public EmbeddingModel getEmbeddingModel() {
+        if (embeddingModel == null) {
+            if (provider.equals(GITHUB)) {
+                embeddingModel = GitHubModelsEmbeddingModel.builder()
+                    .gitHubToken(GITHUB_API_KEY)
+                    .modelName(TEXT_EMBEDDING_3_SMALL)
+                    .timeout(ofSeconds(getTimeOut()))
+                    .build();
+            } else if (provider.equals(OLLAMA)) {
+                embeddingModel = OllamaEmbeddingModel.builder()
+                    .baseUrl(OLLAMA_BASE_URL)
+                    .modelName("all-minilm")
+                    .timeout(ofSeconds(getTimeOut()))
+                    .build();
+            } else if (provider.equals(MISTRAL_AI)) {
+                embeddingModel = MistralAiEmbeddingModel.builder()
+                    .apiKey(MISTRAL_AI_API_KEY)
+                    .modelName(MISTRAL_EMBED)
+                    .timeout(ofSeconds(getTimeOut()))
+                    .build();
+            } else if (provider.equals(GEMINI)) {
+                embeddingModel = GoogleAiEmbeddingModel.builder()
+                    .apiKey(GEMINI_API_KEY)
+                    .modelName("embedding-001")
+                    .timeout(ofSeconds(getTimeOut()))
+                    .build();
+            }
+        }
+        return embeddingModel;
     }
 
     public String getModelName() {

@@ -29,6 +29,8 @@ import org.jline.terminal.TerminalBuilder;
 
 public class Utils {
 
+    private static final int CONSOLE_WIDTH = 78;
+
     private static Map <String, FilePermission> filePermissions = new HashMap<String, FilePermission>();
 
     public static LineReader reader;
@@ -55,12 +57,12 @@ public class Utils {
 
     public static LineReader getReader() {
         if (reader == null) {
-			try {
-				terminal = TerminalBuilder.builder().system(true).build();
-	            reader = LineReaderBuilder.builder().terminal(terminal).build();
-			} catch (IOException e) {
-				// do nothing
-			}
+            try {
+                terminal = TerminalBuilder.builder().system(true).build();
+                reader = LineReaderBuilder.builder().terminal(terminal).build();
+            } catch (IOException e) {
+                // do nothing
+            }
         }
         return reader;
     }
@@ -68,10 +70,10 @@ public class Utils {
     public static void closeTerminal() {
         if (terminal != null) {
             try {
-				terminal.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+                terminal.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             terminal = null;
         }
     }
@@ -112,6 +114,22 @@ public class Utils {
             }
         }
         return false;
+    }
+
+    public static void printReplyTop() {
+        System.out.print("\n┌");
+        for (int i = 0; i < CONSOLE_WIDTH; i++) {
+            System.out.print("─");
+        }
+        System.out.println("┐\n");
+    }
+
+    public static void printReplyBottom() {
+        System.out.print("└");
+        for (int i = 0; i < CONSOLE_WIDTH; i++) {
+            System.out.print("─");
+        }
+        System.out.println("┘\n");
     }
 
     public static void clearPermissions() {
