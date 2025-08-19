@@ -29,7 +29,7 @@ import org.jline.terminal.TerminalBuilder;
 
 public class Utils {
 
-    private static final int CONSOLE_WIDTH = 78;
+    private static final int CONSOLE_WIDTH = 79;
 
     private static Map <String, FilePermission> filePermissions = new HashMap<String, FilePermission>();
 
@@ -121,7 +121,8 @@ public class Utils {
         for (int i = 0; i < CONSOLE_WIDTH; i++) {
             System.out.print("─");
         }
-        System.out.println("┐\n");
+        System.out.println("\n");
+        // System.out.println("┐\n");
     }
 
     public static void printReplyBottom() {
@@ -129,7 +130,8 @@ public class Utils {
         for (int i = 0; i < CONSOLE_WIDTH; i++) {
             System.out.print("─");
         }
-        System.out.println("┘\n");
+        System.out.println("\n");
+        // System.out.println("┘\n");
     }
 
     public static void clearPermissions() {
