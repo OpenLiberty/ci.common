@@ -29,6 +29,7 @@ import org.jline.terminal.TerminalBuilder;
 
 public class Utils {
 
+    private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("win");
     private static final int CONSOLE_WIDTH = 79;
 
     private static Map <String, FilePermission> filePermissions = new HashMap<String, FilePermission>();
@@ -117,18 +118,18 @@ public class Utils {
     }
 
     public static void printReplyTop() {
-        System.out.print("\n\u250C");
+        System.out.print(IS_WINDOWS ? "\n+" : "\n\u250C");
         for (int i = 0; i < CONSOLE_WIDTH; i++) {
-            System.out.print("\u2500");
+            System.out.print(IS_WINDOWS ? "-" : "\u2500");
         }
         System.out.println("\n");
         // System.out.println("\u2510\n");
     }
 
     public static void printReplyBottom() {
-        System.out.print("\u2514");
+        System.out.print(IS_WINDOWS ? "+" : "\u2514");
         for (int i = 0; i < CONSOLE_WIDTH; i++) {
-            System.out.print("\u2500");
+            System.out.print(IS_WINDOWS ? "-" : "\u2500");
         }
         System.out.println("\n");
         // System.out.println("\u2518\n");
