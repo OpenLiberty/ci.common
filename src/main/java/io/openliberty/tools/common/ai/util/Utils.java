@@ -60,7 +60,11 @@ public class Utils {
         if (reader == null) {
             try {
                 terminal = TerminalBuilder.builder().system(true).build();
-                reader = LineReaderBuilder.builder().terminal(terminal).build();
+                reader = LineReaderBuilder.builder()
+                             .terminal(terminal)
+                             .parser(new MultiLineParser())
+                             .variable(LineReader.SECONDARY_PROMPT_PATTERN, "")
+                             .build();
             } catch (IOException e) {
                 // do nothing
             }

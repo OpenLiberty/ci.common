@@ -2588,6 +2588,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 	        info(formatAttentionMessage("Post a message to AI - type in " + cyan("@ai your message") + " and press Enter."));
 	        info(formatAttentionMessage("    To start a multi-line message, type in " + cyan("@ai [") + " and press Enter."));
 	        info(formatAttentionMessage("    To end the multi-line message, type in " + cyan("@ai ]") + " and press Enter."));
+	        info(formatAttentionMessage("    To clear the multi-line message, press Ctrl+X followed by Ctrl+K."));
 	        info(formatAttentionMessage("Reset chat session - type in " + cyan("@ai reset") + " and press Enter."));
             info(formatAttentionMessage("View a previous message - press Up/Down arrow key."));
 		} catch (Exception e) {
@@ -2834,26 +2835,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         line = line.substring("@ai".length());
                         if (line.trim().startsWith("[")) {
                             // Accept multiline input between @ai[ and @ai]
-                            StringBuilder builder = new StringBuilder();
-                            builder.append(line.trim().substring("[".length()));
-                            builder.append("\n");
-                            while (true) {
-                                String more = Utils.getReader().readLine();
-                                if (more.startsWith("@ai")) {
-                                    if (more.substring("@ai".length()).trim().equals("]")) {
-                                        break;
-                                    }
-                                    more = more.substring("@ai".length());
-                                    if (more.trim().startsWith("[")) {
-                                        more = more.trim().substring("[".length());
-                                    }
-                                    builder = new StringBuilder();
-                                    System.out.println("Restarted the " + cyan("@ai [") + " multi-line message");
-                                }
-                                builder.append(more);
-                                builder.append("\n");
+                            line = line.trim().substring("[".length());
+                            if (line.substring(line.lastIndexOf('\n')).matches("^@ai\\s*\\]\\s*$")) {
+                                line = line.substring(0, line.lastIndexOf("\n")).trim();
                             }
-                            line = builder.toString();
                         }
                         chat(line.trim());
                     } else {
