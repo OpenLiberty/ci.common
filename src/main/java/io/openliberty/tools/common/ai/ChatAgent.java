@@ -99,7 +99,7 @@ public class ChatAgent {
     public String chat(String message) throws Exception {
         if (message.equalsIgnoreCase("reset")) {
             resetChat();
-            return "The current chat session is reset.";
+            return "The current chat session is reset.\n";
         } else {
             String response = getAssistant().chat(memoryId, message).content().trim();
             return mdFormatter.rerender(response);
