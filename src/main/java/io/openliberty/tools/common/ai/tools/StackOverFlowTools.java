@@ -77,7 +77,7 @@ public class StackOverFlowTools {
         return questionAnswer;
     }
 
-    @Tool("Search")
+    @Tool("Search a question online")
     public ArrayList <String> search(@P("Question you are searching") String question) throws Exception {
         String targetUrl = stackOverflowMethod + "&q=" + question;
         try {

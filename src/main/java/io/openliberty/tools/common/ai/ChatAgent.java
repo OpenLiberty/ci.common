@@ -32,8 +32,8 @@ import io.openliberty.tools.common.ai.util.Utils;
 public class ChatAgent {
     private ModelBuilder modelBuilder = new ModelBuilder();
 
+    private CodingTools codingTools;
     private StackOverFlowTools stackOverFlowTools = new StackOverFlowTools();
-    private CodingTools codingTools = new CodingTools();
     private OpenLibertyTools openLibertyTools = new OpenLibertyTools();
 
     private MarkdownConsoleFormatter mdFormatter = new MarkdownConsoleFormatter();
@@ -45,8 +45,13 @@ public class ChatAgent {
     private boolean toolsEnabled = false;
 
     public ChatAgent(int memoryId) throws Exception {
-        getAssistant();
+        this(memoryId, new CodingTools());
+    }
+
+    public ChatAgent(int memoryId, CodingTools codingTools) throws Exception {
         this.memoryId = memoryId;
+        this.codingTools = codingTools;
+        getAssistant();
     }
 
     public Assistant getAssistant() throws Exception {
