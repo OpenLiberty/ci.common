@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2024.
+ * (C) Copyright IBM Corporation 2019, 2025.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,6 +95,8 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListener;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -2058,10 +2060,37 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    /**
+     * Extracts the "message" field value from a JSON string.
+     *
+     * @param jsonString The JSON string to parse
+     * @return The value of the "message" field if present, null otherwise
+     */
+    private static String getMessageKeyFromJson(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return null;
+        }
+        try {
+            JSONObject jsonObject = new JSONObject(jsonString);
+            return jsonObject.optString("message", null);
+        } catch (JSONException e) {
+            // If parsing fails, it's not a valid JSON object
+            return null;
+        }
+    }
+
     protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
         for (String message : messages) {
             debug("Looking for https port in message: " + message);
-            String httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            String httpsMessageContents;
+            // check message format. if message is a json, only extract "message" node
+            String messageFromJson = getMessageKeyFromJson(message);
+            if (messageFromJson != null) {
+                debug("Message is in json format");
+                httpsMessageContents = messageFromJson.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            } else {
+                httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            }
             String[] messageTokens = httpsMessageContents.split(" ");
             // Look for endpoint with name containing "-ssl"
             for (String token : messageTokens) {
