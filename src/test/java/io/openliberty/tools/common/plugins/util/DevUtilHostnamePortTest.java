@@ -41,6 +41,16 @@ public class DevUtilHostnamePortTest extends BaseDevUtilTest {
     }
 
     @Test
+    public void testParseHostnameHttpPortWithEscaped() throws Exception {
+        testHostnameAndHttpPort("Web application available (default_host):http:\\/\\/myhostname:9085");
+    }
+
+    @Test
+    public void testParseHostnameHttpPortWithEscaped2() throws Exception {
+        testHostnameAndHttpPort("Web application available (default_host): http:\\/\\/myhostname:9085\\/ifix\\/");
+    }
+
+    @Test
     public void testParseHostnameHttpPortFromHttps() throws Exception {
         String message = "Web application available (default_host): https://myhostname:9085/myapp/";
 
@@ -60,6 +70,9 @@ public class DevUtilHostnamePortTest extends BaseDevUtilTest {
     }
 
     private final String[] tcpChannelTranslations = {
+        "{\"type\":\"liberty_message\",\"host\":\"46410dbe01bd\",\"ibm_userDir\":\"\\/opt\\/ol\\/wlp\\/usr\\/\",\"ibm_serverName\":\"defaultServer\",\"message\":\"CWWKO0219I: TCP Channel {0} has been started and is now listening for requests on host {1}  (IPv6) port {2}.\",\"ibm_threadId\":\"00000033\",\"ibm_datetime\":\"2025-08-25T03:59:03.002+0000\",\"ibm_messageId\":\"CWWKO0219I\",\"module\":\"com.ibm.ws.tcpchannel.internal.TCPPort\",\"loglevel\":\"INFO\",\"ibm_sequence\":\"1756094343002_0000000000023\",\"ext_thread\":\"Default Executor-thread-1\"}",
+        "[8/25/25, 13:29:17:236 UTC] 00000033 com.ibm.ws.tcpchannel.internal.TCPPort                       I CWWKO0219I: TCP Channel {0} has been started and is now listening for requests on host *  (IPv6) port {2}.",
+        "[8/25/25, 13:36:19:701 UTC] 00000033 TCPPort       I   CWWKO0219I: TCP Channel {0} has been started and is now listening for requests on host *  (IPv6) port {2}.",
         "CWWKO0219I: TCP Channel {0} has been started and is now listening for requests on host {1} port {2}.",
         "CWWKO0219I: Kan\u00e1l TCP {0} byl spu\u0161t\u011bn a nyn\u00ed naslouch\u00e1 po\u017eadavk\u016fm na hostiteli {1} na portu {2}.",
         "CWWKO0219I: Der TCP-Kanal {0} wurde gestartet und ist jetzt f\u00fcr Anforderungen auf dem Host {1} an Port {2} empfangsbereit.",
