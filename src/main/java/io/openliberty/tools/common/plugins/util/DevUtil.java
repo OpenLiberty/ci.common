@@ -100,6 +100,7 @@ import com.sun.nio.file.SensitivityWatchEventModifier;
 import io.openliberty.tools.ant.ServerTask;
 import io.openliberty.tools.common.ai.ChatAgent;
 import io.openliberty.tools.common.ai.util.LoadingThread;
+import io.openliberty.tools.common.ai.util.ModelBuilder;
 import io.openliberty.tools.common.ai.util.Utils;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
 
@@ -2827,15 +2828,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         warn("To toggle the automatic generation of features, type 'g' and press Enter.");
                     }
                 } else if (a.isPressed(line)) {
-                    // Reverse the mode
                     if (AIMode) {
                         info("AI mode has been turned off.");
                         AIMode = false;
                     } else {
                         if (getChatAgent() == null) {
-                            warn("AI could not be started, ensure the API/URL and model is correct");
-                            AIMode = false;
-                            continue;
+                            ModelBuilder.promptInputProvider();
+                            System.out.print("\rsetting up...");
+                            if (getChatAgent() == null) {
+                                AIMode = false;
+                                ModelBuilder.cleanInputProvider();
+                                System.out.print("\r              \r");
+                                System.out.println("Failed to enable AI mode.");
+                                continue;
+                            }
+                            System.out.print("\r              \r");
                         }
                         AIMode = true;
                         info(formatAttentionBarrier());

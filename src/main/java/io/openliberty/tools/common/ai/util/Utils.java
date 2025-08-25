@@ -37,6 +37,10 @@ public class Utils {
     public static LineReader reader;
     public static Terminal terminal;
 
+    public static String bold(String text) {
+        return ansi().bold().fgBrightDefault().a(text).reset().toString();
+    }
+
     public static boolean isEmptyPath(String path) {
         String children[] = new File(path).list();
         return children == null || children.length == 0;
@@ -53,7 +57,7 @@ public class Utils {
         } catch (IOException e) {
             absolutePath = p.getAbsolutePath();
         }
-        return ansi().bold().fgBrightDefault().a(absolutePath).reset().toString();
+        return bold(absolutePath);
     }
 
     public static LineReader getReader() {

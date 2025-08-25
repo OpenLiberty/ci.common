@@ -20,6 +20,7 @@ import static dev.langchain4j.model.mistralai.MistralAiEmbeddingModelName.MISTRA
 import static java.time.Duration.ofSeconds;
 
 import java.util.List;
+import java.util.Scanner;
 
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -47,10 +48,8 @@ public class ModelBuilder {
     private static String MISTRAL_AI_API_KEY = System.getenv("MISTRAL_AI_API_KEY");
     private static String GEMINI_API_KEY = System.getenv("GEMINI_API_KEY");
 
-    private String model;
-    private String provider;
-
-    private String GITHUB_ENDPOINT;
+    private static String model;
+    private static String provider;
 
     private Integer TIMEOUT;
     private Integer MAX_NEW_TOKEN;
@@ -60,8 +59,86 @@ public class ModelBuilder {
     private ChatModel chatModel = null;
     private EmbeddingModel embeddingModel = null;
 
-    public void findModel() {
-        if (OLLAMA_BASE_URL != null && OLLAMA_BASE_URL.startsWith("http")) {
+    private static Scanner scan = new Scanner(System.in);
+
+    private static void modelSelection() {
+        System.out.print("\nPress enter to use the default model " + Utils.bold(model) + " or type in a model name: ");
+        String modelName = scan.nextLine().trim();
+        if (!modelName.isBlank()) {
+             model = modelName;
+        }
+    }
+
+    public static void cleanInputProvider() {
+        OLLAMA_BASE_URL = null;
+        GITHUB_API_KEY = null;
+        MISTRAL_AI_API_KEY = null;
+        GEMINI_API_KEY = null;
+        model = null;
+        provider = null;
+    }
+
+    public static void promptInputProvider() {
+        String provider = "";
+        while (!(("ollama".equals(provider) || "1".equals(provider)) || ("github".equals(provider)|| "2".equals(provider)) ||
+                 ("mistral".equals(provider) || "3".equals(provider)) || ("gemini".equals(provider) || "4".equals(provider)))) {
+            System.out.print("\n\nSelect a provider (1:Ollama, 2:Github, 3:Mistral, or press Enter to quit): ");
+            provider = scan.nextLine().toLowerCase().trim();
+            if (provider.isEmpty()) {
+                System.out.println("Skipped to enable AI mode.");
+                return;
+            }
+        }
+
+        Boolean validResponse = false;
+        while (!validResponse) {
+
+            String apiKeyOrUrl;
+            if ("ollama".equals(provider)|| "1".equals(provider)) {
+                System.out.print("\nEnter a valid Ollama URL: ");
+                apiKeyOrUrl = scan.nextLine().trim();
+            } else {
+                apiKeyOrUrl = Utils.getReader().readLine("\nEnter a valid API key or press Enter to quit: ", '*').trim();
+            }
+
+            if (apiKeyOrUrl.isEmpty()) {
+                System.out.println("Skipped to enable AI mode.");
+                return;
+            }
+
+            if (!provider.isEmpty()) {
+                if (("ollama".equals(provider) || "1".equals(provider)) && apiKeyOrUrl.toLowerCase().startsWith("http")) {
+                    OLLAMA_BASE_URL = apiKeyOrUrl;
+                    findModel();
+                    modelSelection();
+                    validResponse = true;
+                } else if (("github".equals(provider) || "2".equals(provider)) &&
+                    (apiKeyOrUrl.startsWith("ghp_") || apiKeyOrUrl.startsWith("github_pat_"))) {
+                    GITHUB_API_KEY = apiKeyOrUrl;
+                    findModel();
+                    modelSelection();
+                    validResponse = true;
+                } else if (("mistral".equals(provider) || "3".equals(provider)) &&
+                    apiKeyOrUrl.length() > 30) {
+                    MISTRAL_AI_API_KEY = apiKeyOrUrl;
+                    findModel();
+                    modelSelection();
+                    validResponse = true;
+                } else if (("gemini".equals(provider) || "4".equals(provider)) &&
+                    apiKeyOrUrl.length() > 30) {
+                    GEMINI_API_KEY = apiKeyOrUrl;
+                    findModel();
+                    modelSelection();
+                    validResponse = true;
+                } else {
+                    System.out.println("[ERROR] Enter a valid combination of provider and API key.");
+                }
+            }
+        }
+    }
+
+    public static void findModel() {
+        if (OLLAMA_BASE_URL != null && OLLAMA_BASE_URL.toLowerCase().startsWith("http")) {
             provider = OLLAMA;
             if (model == null) {
                 model = System.getProperty("chat.model.id");
@@ -94,11 +171,6 @@ public class ModelBuilder {
                 model = System.getProperty("chat.model.id");
                 if (model == null || model.isBlank()) {
                     model = "Codestral-2501";
-                } else {
-                    String endpoint = System.getProperty("github.chat.endpoint");
-                    if (endpoint != null && !endpoint.isEmpty() && !endpoint.isBlank()) {
-                        GITHUB_ENDPOINT = endpoint;
-                    }
                 }
             }
         } else if (MISTRAL_AI_API_KEY != null && MISTRAL_AI_API_KEY.length() > 30) {
@@ -117,12 +189,6 @@ public class ModelBuilder {
                     model = "gemini-2.5-flash";
                 }
             }
-        } else {
-            /*
-            System.err.println("If use AI assistant, " +
-                "make sure to set either the OLLAMA_BASE_URL, GITHUB_API_KEY, or MISTRAL_AI_API_KEY " +
-                "environment variable with a valid URL or API key?\n");
-            */
         }
     }
 
@@ -136,9 +202,6 @@ public class ModelBuilder {
                             .timeout(ofSeconds(getTimeOut()))
                             .temperature(getTemperature())
                             .maxTokens(getMaxNewToken());
-                if (GITHUB_ENDPOINT != null) {
-                    g.endpoint(GITHUB_ENDPOINT);
-                }
                 chatModel = g.build();
             } else if (provider.equals(OLLAMA)) {
                 chatModel = OllamaChatModel.builder()
