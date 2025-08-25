@@ -2040,7 +2040,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected void parseHttpPort(String webAppMessage, int portPrefixIndex) throws PluginExecutionException {
-        if (!webAppMessage.contains(HTTP_PREFIX)) {
+        if (!webAppMessage.contains(HTTP_PREFIX) && !webAppMessage.contains(HTTP_PREFIX_ESCAPED)) {
             return;
         }
         int portIndex = portPrefixIndex + 1;
@@ -2049,7 +2049,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // if no ending slash, the port ends at the end of the message
             portEndIndex = webAppMessage.length();
         }
-        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex);
+        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex).replaceAll("/","").replace("\\","");
         debug("Parsed http port: " + parsedHttpPort);
         if (container) {
             httpPort = findLocalPort(parsedHttpPort);
@@ -2091,25 +2091,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } else {
                 httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
             }
-            String[] messageTokens = httpsMessageContents.split(" ");
             // Look for endpoint with name containing "-ssl"
-            for (String token : messageTokens) {
-                if (token.contains("-ssl")) {
-                    String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
-                    if (parsedHttpsPort != null) {
-                        debug("Parsed https port: " + parsedHttpsPort);
-                        if (container) {
-                            httpsPort = findLocalPort(parsedHttpsPort);
-                            containerHttpsPort = parsedHttpsPort;
-                        }
-                        else {
-                            httpsPort = parsedHttpsPort;
-                        }
-                        return;
+            if (httpsMessageContents.contains("-ssl")) {
+                String[] messageTokens = httpsMessageContents.split(" ");
+                String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
+                if (parsedHttpsPort != null) {
+                    debug("Parsed https port: " + parsedHttpsPort);
+                    if (container) {
+                        httpsPort = findLocalPort(parsedHttpsPort);
+                        containerHttpsPort = parsedHttpsPort;
                     } else {
-                        throw new PluginExecutionException(
-                                "Could not parse the https port number from the log message: " + message);
+                        httpsPort = parsedHttpsPort;
                     }
+                    return;
+                } else {
+                    throw new PluginExecutionException(
+                            "Could not parse the https port number from the log message: " + message);
                 }
             }
         }
