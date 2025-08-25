@@ -2833,7 +2833,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         AIMode = false;
                     } else {
                         if (getChatAgent() == null) {
-                            ModelBuilder.promptInputProvider();
+                            if (!ModelBuilder.promptInputProvider()) {
+                                continue;
+                            }
                             System.out.print("\rsetting up...");
                             if (getChatAgent() == null) {
                                 AIMode = false;

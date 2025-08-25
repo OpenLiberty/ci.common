@@ -78,7 +78,7 @@ public class ModelBuilder {
         provider = null;
     }
 
-    public static void promptInputProvider() {
+    public static boolean promptInputProvider() {
         String provider = "";
         while (!(("ollama".equals(provider) || "1".equals(provider)) || ("github".equals(provider)|| "2".equals(provider)) ||
                  ("mistral".equals(provider) || "3".equals(provider)) || ("gemini".equals(provider) || "4".equals(provider)))) {
@@ -86,7 +86,7 @@ public class ModelBuilder {
             provider = scan.nextLine().toLowerCase().trim();
             if (provider.isEmpty()) {
                 System.out.println("Skipped to enable AI mode.");
-                return;
+                return false;
             }
         }
 
@@ -103,7 +103,7 @@ public class ModelBuilder {
 
             if (apiKeyOrUrl.isEmpty()) {
                 System.out.println("Skipped to enable AI mode.");
-                return;
+                return false;
             }
 
             if (!provider.isEmpty()) {
@@ -135,6 +135,7 @@ public class ModelBuilder {
                 }
             }
         }
+        return true;
     }
 
     public static void findModel() {
