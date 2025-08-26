@@ -2049,7 +2049,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // if no ending slash, the port ends at the end of the message
             portEndIndex = webAppMessage.length();
         }
-        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex).replaceAll("/","").replace("\\","");
+        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex).replace("/","").replace("\\","");
         debug("Parsed http port: " + parsedHttpPort);
         if (container) {
             httpPort = findLocalPort(parsedHttpPort);
