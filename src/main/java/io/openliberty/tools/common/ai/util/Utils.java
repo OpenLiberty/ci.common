@@ -20,7 +20,9 @@ import static org.fusesource.jansi.Ansi.ansi;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
@@ -123,6 +125,21 @@ public class Utils {
             }
         }
         return false;
+    }
+
+    public static <T> T promptSelection(List<T> objects, Function<T, String> toString, String prefix) {
+        StringBuilder message = new StringBuilder();
+        message.append(prefix);
+        message.append("\n");
+        for (int i = 0; i < objects.size(); i++) {
+            message.append((i + 1) + ": " + toString.apply(objects.get(i)) + "\n");
+        }
+        message.append("Input a selection [1-" + objects.size() + "]: ");
+        LoadingThread.hide();
+        String answer = getReader().readLine(message.toString()).trim();
+        T object = objects.get(Integer.parseInt(answer) - 1);
+        LoadingThread.show();
+        return object;
     }
 
     public static void printReplyTop() {

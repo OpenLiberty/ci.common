@@ -23,6 +23,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.github.javaparser.ParseProblemException;
@@ -57,22 +58,28 @@ public class CodingTools {
         return Utils.writeFile(file);
     }
 
+    public File promptSelection(List<File> files, Function<File, String> toString, String prompt) {
+        return Utils.promptSelection(files, toString, prompt);
+    }
+
     private File findFile(String name) throws Exception {
         Path dir = Paths.get(workingDirectory);
         matchingFiles = new ArrayList<>();
-        Files.walk(dir).forEach(file -> fileMatch(file.toFile(), name));
+        Files.walk(dir).forEach(path -> {
+            if (!dir.relativize(path).startsWith("target")) {
+                fileMatch(path.toFile(), name);
+            }
+        });
         if (matchingFiles.size() == 0) {
             throw new Exception("Could not find the file, did the user forget the extension");
         } else if (matchingFiles.size() == 1) {
             return matchingFiles.get(0);
         } else {
-            StringBuilder matches = new StringBuilder();
-            for (File file : matchingFiles) {
-                matches.append(file.getAbsolutePath() + '\n');
-            }
-            throw new Exception("There are multiple files with the name " +
-                name + ". Ask the user to return the absolute path of one of the following: " +
-                matches);
+            return promptSelection(
+                matchingFiles,
+                file -> file.getAbsolutePath(),
+                "There are multiple files with the name " + name + ". Which one did you mean?"
+            );
         }
     }
 
