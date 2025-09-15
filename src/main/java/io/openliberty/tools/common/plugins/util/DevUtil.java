@@ -90,6 +90,8 @@ import org.apache.commons.io.monitor.FileAlterationListener;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.fusesource.jansi.Ansi;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -2049,7 +2051,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected void parseHttpPort(String webAppMessage, int portPrefixIndex) throws PluginExecutionException {
-        if (!webAppMessage.contains(HTTP_PREFIX)) {
+        if (!webAppMessage.contains(HTTP_PREFIX) && !webAppMessage.contains(HTTP_PREFIX_ESCAPED)) {
             return;
         }
         int portIndex = portPrefixIndex + 1;
@@ -2058,7 +2060,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // if no ending slash, the port ends at the end of the message
             portEndIndex = webAppMessage.length();
         }
-        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex);
+        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex).replace("/","").replace("\\","");
         debug("Parsed http port: " + parsedHttpPort);
         if (container) {
             httpPort = findLocalPort(parsedHttpPort);
@@ -2069,29 +2071,53 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    /**
+     * Extracts the "message" field value from a JSON string.
+     *
+     * @param jsonString The JSON string to parse
+     * @return The value of the "message" field if present, null otherwise
+     */
+    private static String getMessageKeyFromJson(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return null;
+        }
+        try {
+            JSONObject jsonObject = new JSONObject(jsonString);
+            return jsonObject.optString("message", null);
+        } catch (JSONException e) {
+            // If parsing fails, it's not a valid JSON object
+            return null;
+        }
+    }
+
     protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
         for (String message : messages) {
             debug("Looking for https port in message: " + message);
-            String httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
-            String[] messageTokens = httpsMessageContents.split(" ");
+            String httpsMessageContents;
+            // check message format. if message is a json, only extract "message" node
+            String messageFromJson = getMessageKeyFromJson(message);
+            if (messageFromJson != null) {
+                debug("Message is in json format");
+                httpsMessageContents = messageFromJson.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            } else {
+                httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            }
             // Look for endpoint with name containing "-ssl"
-            for (String token : messageTokens) {
-                if (token.contains("-ssl")) {
-                    String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
-                    if (parsedHttpsPort != null) {
-                        debug("Parsed https port: " + parsedHttpsPort);
-                        if (container) {
-                            httpsPort = findLocalPort(parsedHttpsPort);
-                            containerHttpsPort = parsedHttpsPort;
-                        }
-                        else {
-                            httpsPort = parsedHttpsPort;
-                        }
-                        return;
+            if (httpsMessageContents.contains("-ssl")) {
+                String[] messageTokens = httpsMessageContents.split(" ");
+                String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
+                if (parsedHttpsPort != null) {
+                    debug("Parsed https port: " + parsedHttpsPort);
+                    if (container) {
+                        httpsPort = findLocalPort(parsedHttpsPort);
+                        containerHttpsPort = parsedHttpsPort;
                     } else {
-                        throw new PluginExecutionException(
-                                "Could not parse the https port number from the log message: " + message);
+                        httpsPort = parsedHttpsPort;
                     }
+                    return;
+                } else {
+                    throw new PluginExecutionException(
+                            "Could not parse the https port number from the log message: " + message);
                 }
             }
         }
