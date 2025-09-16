@@ -226,7 +226,7 @@ public class LibertyFeatureUtil {
         return libertyPlatforms;    
     }
 
-    public static void printLibertyInstalledFeatures() throws Exception {
+    public static void printLibertyInstalledFeatures() {
         for (String f : getLibertyInstalledFeatures()) {
             LibertyFeature libertyFeature = getLibertyFeature(f);
             System.out.println(libertyFeature);
@@ -248,7 +248,7 @@ public class LibertyFeatureUtil {
         }
     }
 
-    public static void printLibertyFeatures() throws Exception {
+    public static void printLibertyFeatures() {
         for (LibertyFeature f : getLibertyFeatures()) {
             System.out.println(f);
             if (!f.getPlatforms().isEmpty()) {
