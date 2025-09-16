@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -140,10 +141,8 @@ public class LibertyFeatureUtil {
             libertyFeatures = new ArrayList<LibertyFeature>();
             try {
                 Class<?> installKernelImplClass = getClassLoader().loadClass("com.ibm.ws.install.internal.InstallKernelImpl");
-                File installDir = new File("/Users/gkwan/tasks/CNAI/guides/working/sample-langchain4j/format-message-encoder/sample-langchain4j/tools/target/liberty/wlp");
-                Object installKernel = installKernelImplClass.getDeclaredConstructor(File.class).newInstance(installDir);
+                Object installKernel = installKernelImplClass.getDeclaredConstructor(File.class).newInstance(wlpFile);
                 Method queryFeaturesMethod = installKernelImplClass.getMethod("queryFeatures", String.class);
-
                 List<Object> esaList = (List<Object>) queryFeaturesMethod.invoke(installKernel, "");
                 for (Object esa : esaList) {
                     LibertyFeature feature = new LibertyFeature();
@@ -160,6 +159,7 @@ public class LibertyFeatureUtil {
                     }
                     libertyFeatures.add(feature);
                 }
+                Collections.sort(libertyFeatures, (f1, f2) -> f1.getShortName().compareTo(f2.getShortName()));
             } catch (Exception e) {
             }
         }
@@ -193,6 +193,7 @@ public class LibertyFeatureUtil {
                         libertyInstalledFeatures.add(shortName);
                     }
                 }
+                Collections.sort(libertyInstalledFeatures);
                 if (isVersionless == null) {
                     isVersionless = Boolean.FALSE;
                 }
