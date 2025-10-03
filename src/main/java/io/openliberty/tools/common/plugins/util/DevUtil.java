@@ -2485,78 +2485,82 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             hotTests = true;
         }
         if (startup) {
-            if (container) {
-                boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
-                boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
-                boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
-                if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
-                    info(formatAttentionMessage(""));
-                    info(formatAttentionTitle("Liberty container port information:"));
-                }
-                if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
-                        || (containerHttpsPort != null && httpsPort != null && nonDefaultHttpsPortUsed)
-                        || (libertyDebug && nonDefaultDebugPortUsed)) {
-                    warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
-                }
-                if (containerHttpPort != null) {
-                    if (httpPort != null) {
-                        if (!nonDefaultHttpPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ]"));
-                        } else {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
-                        }
-                    } else {
-                        info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
-                    }
-                }
-                if (containerHttpsPort != null) {
-                    if (httpsPort != null) {
-                        if (!nonDefaultHttpsPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ]"));
-                        } else {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
-                        }
-                    } else {
-                        info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
-                    }
-                }
-                if (libertyDebug) {
-                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    if (!nonDefaultDebugPortUsed) {
-                        info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ]"));
-                    } else {
-                        info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ] <"));
-                    }
-                }
-                info(formatAttentionMessage(""));
-                info(formatAttentionTitle("Container network information:"));
-                info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
-
-                String[] networks = getContainerNetworks(containerName);
-                if (networks != null) {
-                    for (String network : networks) {
-                        info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on container network [ " + network + " ]"));
-                    }
-                }
-            }
-            else {
-                if (httpPort != null || httpsPort != null || libertyDebug) {
-                    info(formatAttentionMessage(""));
-                    info(formatAttentionTitle("Liberty server port information:"));
-                }
-                if (httpPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
-                }
-                if (httpsPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
-                }
-                if (libertyDebug) {
-                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
-                }
-            }
+            printPortInfo();
             // print barrier footer
             info(formatAttentionBarrier());
+        }
+    }
+
+    private void printPortInfo() throws PluginExecutionException {
+        if (container) {
+            boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
+            boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
+            boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
+            if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
+                info(formatAttentionMessage(""));
+                info(formatAttentionTitle("Liberty container port information:"));
+            }
+            if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
+                    || (containerHttpsPort != null && httpsPort != null && nonDefaultHttpsPortUsed)
+                    || (libertyDebug && nonDefaultDebugPortUsed)) {
+                warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
+            }
+            if (containerHttpPort != null) {
+                if (httpPort != null) {
+                    if (!nonDefaultHttpPortUsed) {
+                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
+                    }
+                } else {
+                    info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
+                }
+            }
+            if (containerHttpsPort != null) {
+                if (httpsPort != null) {
+                    if (!nonDefaultHttpsPortUsed) {
+                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
+                    }
+                } else {
+                    info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
+                }
+            }
+            if (libertyDebug) {
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                if (!nonDefaultDebugPortUsed) {
+                    info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ]"));
+                } else {
+                    info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ] <"));
+                }
+            }
+            info(formatAttentionMessage(""));
+            info(formatAttentionTitle("Container network information:"));
+            info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
+
+            String[] networks = getContainerNetworks(containerName);
+            if (networks != null) {
+                for (String network : networks) {
+                    info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on container network [ " + network + " ]"));
+                }
+            }
+        }
+        else {
+            if (httpPort != null || httpsPort != null || libertyDebug) {
+                info(formatAttentionMessage(""));
+                info(formatAttentionTitle("Liberty server port information:"));
+            }
+            if (httpPort != null) {
+                info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
+            }
+            if (httpsPort != null) {
+                info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
+            }
+            if (libertyDebug) {
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
+            }
         }
     }
 
@@ -2580,6 +2584,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         printFeatureGenerationStatus();
         printFeatureGenerationHotkeys();
         printTestsMessage(true);
+        try {
+            printPortInfo();
+        } catch (PluginExecutionException ignored) {
+            // ignoring for help
+        }
         if (container) {
             info(formatAttentionMessage("r - rebuild the container image and restart the container, type 'r' and press Enter."));
         } else {
