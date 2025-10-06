@@ -33,7 +33,7 @@ import dev.langchain4j.model.mistralai.MistralAiChatModel;
 import dev.langchain4j.model.mistralai.MistralAiEmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
-import io.github.ollama4j.OllamaAPI;
+import io.github.ollama4j.Ollama;
 import io.github.ollama4j.models.response.Model;
 
 public class ModelBuilder {
@@ -144,7 +144,7 @@ public class ModelBuilder {
             if (model == null) {
                 model = System.getProperty("chat.model.id");
                 if (model == null || model.isBlank()) {
-                    OllamaAPI ollamaAPI = new OllamaAPI(OLLAMA_BASE_URL);
+                    Ollama ollamaAPI = new Ollama(OLLAMA_BASE_URL);
                     List<Model> models;
                     try {
                         models = ollamaAPI.listModels();
