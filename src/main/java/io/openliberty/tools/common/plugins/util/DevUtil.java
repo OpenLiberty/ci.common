@@ -2485,19 +2485,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             hotTests = true;
         }
         if (startup) {
-            printPortInfo();
+            printPortInfo(true);
             // print barrier footer
             info(formatAttentionBarrier());
         }
     }
 
-    private void printPortInfo() throws PluginExecutionException {
+    private void printPortInfo(boolean pKeyPressed) throws PluginExecutionException {
         if (container) {
             boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
             boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
             boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
             if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
-                info(formatAttentionMessage(""));
+                if (!pKeyPressed) {
+                    //this line not needed when showing port info on keypress of "p"
+                    info(formatAttentionMessage(""));
+                }
                 info(formatAttentionTitle("Liberty container port information:"));
             }
             if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
@@ -2548,7 +2551,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         else {
             if (httpPort != null || httpsPort != null || libertyDebug) {
-                info(formatAttentionMessage(""));
+                if (!pKeyPressed) {
+                    //this line not needed when showing port info on keypress of "p"
+                    info(formatAttentionMessage(""));
+                }
                 info(formatAttentionTitle("Liberty server port information:"));
             }
             if (httpPort != null) {
@@ -2584,17 +2590,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         printFeatureGenerationStatus();
         printFeatureGenerationHotkeys();
         printTestsMessage(true);
-        try {
-            printPortInfo();
-        } catch (PluginExecutionException ignored) {
-            // ignoring for help
-        }
         if (container) {
             info(formatAttentionMessage("r - rebuild the container image and restart the container, type 'r' and press Enter."));
         } else {
             info(formatAttentionMessage("r - restart the server, type 'r' and press Enter."));
         }
         info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+        info(formatAttentionMessage("p - see the port information, type 'p' and press Enter."));
         info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
     }
 
@@ -2730,6 +2732,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey g = new HotKey("g");
             HotKey o = new HotKey("o");
             HotKey t = new HotKey("t");
+            HotKey p = new HotKey("p");
             HotKey enter = new HotKey("");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
@@ -2774,6 +2777,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             runTestThread(false, executor, -1, true, getAllBuildFiles());
                         } else {
                             runTestThread(false, executor, -1, true, buildFile);
+                        }
+                    }else if (p.isPressed(line) ) {
+                        try {
+                            info(formatAttentionBarrier());
+                            printPortInfo(true);
+                            info(formatAttentionBarrier());
+                        } catch (PluginExecutionException ignored) {
+                            // ignoring for help
                         }
                     } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
                         warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
