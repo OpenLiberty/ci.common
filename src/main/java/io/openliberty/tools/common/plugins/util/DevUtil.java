@@ -2770,6 +2770,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
                         }
+                    } else if (p.isPressed(line)) {
+                        try {
+                            info(formatAttentionBarrier());
+                            printPortInfo(true);
+                            info(formatAttentionBarrier());
+                        } catch (PluginExecutionException e) {
+                            error("Could not get port information.", e);
+                        }
                     } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
                         debug("Detected test command. Running tests... ");
                         if (isMultiModuleProject()) {
@@ -2777,14 +2785,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             runTestThread(false, executor, -1, true, getAllBuildFiles());
                         } else {
                             runTestThread(false, executor, -1, true, buildFile);
-                        }
-                    }else if (p.isPressed(line) ) {
-                        try {
-                            info(formatAttentionBarrier());
-                            printPortInfo(true);
-                            info(formatAttentionBarrier());
-                        } catch (PluginExecutionException ignored) {
-                            // ignoring for help
                         }
                     } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
                         warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
