@@ -2525,84 +2525,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             hotTests = true;
         }
         if (startup) {
-            if (container) {
-                boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
-                boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
-                boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
-                if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
-                    info(formatAttentionMessage(""));
-                    info(formatAttentionTitle("Liberty container port information:"));
-                }
-                if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
-                        || (containerHttpsPort != null && httpsPort != null && nonDefaultHttpsPortUsed)
-                        || (libertyDebug && nonDefaultDebugPortUsed)) {
-                    warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
-                }
-                if (containerHttpPort != null) {
-                    if (httpPort != null) {
-                        if (!nonDefaultHttpPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ]"));
-                        } else {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
-                        }
-                    } else {
-                        info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
-                    }
-                }
-                if (containerHttpsPort != null) {
-                    if (httpsPort != null) {
-                        if (!nonDefaultHttpsPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ]"));
-                        } else {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
-                        }
-                    } else {
-                        info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
-                    }
-                }
-                if (libertyDebug) {
-                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    if (!nonDefaultDebugPortUsed) {
-                        info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ]"));
-                    } else {
-                        info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ] <"));
-                    }
-                }
-                info(formatAttentionMessage(""));
-                info(formatAttentionTitle("Container network information:"));
-                info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
-
-                String[] networks = getContainerNetworks(containerName);
-                if (networks != null) {
-                    for (String network : networks) {
-                        info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on container network [ " + network + " ]"));
-                    }
-                }
-            }
-            else {
-                if (httpPort != null || httpsPort != null || libertyDebug) {
-                    info(formatAttentionMessage(""));
-                    info(formatAttentionTitle("Liberty server port information:"));
-                }
-                if (httpPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
-                }
-                if (httpsPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
-                }
-                if (libertyDebug) {
-                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
-                }
-            }
-
+            printPortInfo(true);
             if (getChatAgent() == null) {
                 AIMode = false;
             } else {
                 AIMode = true;
             }
             printAIStatus();
-
             // print barrier footer
             info(formatAttentionBarrier());
         }
@@ -2628,6 +2557,85 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 		} catch (Exception e) {
             info(formatAttentionTitle("AI is not available."));
 		}
+    }
+
+    private void printPortInfo(boolean pKeyPressed) throws PluginExecutionException {
+        if (container) {
+            boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
+            boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
+            boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
+            if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
+                if (!pKeyPressed) {
+                    //this line not needed when showing port info on keypress of "p"
+                    info(formatAttentionMessage(""));
+                }
+                info(formatAttentionTitle("Liberty container port information:"));
+            }
+            if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
+                    || (containerHttpsPort != null && httpsPort != null && nonDefaultHttpsPortUsed)
+                    || (libertyDebug && nonDefaultDebugPortUsed)) {
+                warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
+            }
+            if (containerHttpPort != null) {
+                if (httpPort != null) {
+                    if (!nonDefaultHttpPortUsed) {
+                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
+                    }
+                } else {
+                    info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
+                }
+            }
+            if (containerHttpsPort != null) {
+                if (httpsPort != null) {
+                    if (!nonDefaultHttpsPortUsed) {
+                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
+                    }
+                } else {
+                    info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
+                }
+            }
+            if (libertyDebug) {
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                if (!nonDefaultDebugPortUsed) {
+                    info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ]"));
+                } else {
+                    info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ] <"));
+                }
+            }
+            info(formatAttentionMessage(""));
+            info(formatAttentionTitle("Container network information:"));
+            info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
+
+            String[] networks = getContainerNetworks(containerName);
+            if (networks != null) {
+                for (String network : networks) {
+                    info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on container network [ " + network + " ]"));
+                }
+            }
+        }
+        else {
+            if (httpPort != null || httpsPort != null || libertyDebug) {
+                if (!pKeyPressed) {
+                    //this line not needed when showing port info on keypress of "p"
+                    info(formatAttentionMessage(""));
+                }
+                info(formatAttentionTitle("Liberty server port information:"));
+            }
+            if (httpPort != null) {
+                info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
+            }
+            if (httpsPort != null) {
+                info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
+            }
+            if (libertyDebug) {
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
+            }
+        }
     }
 
     private void printTestsMessage(boolean formatForAttention) {
@@ -2656,6 +2664,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info(formatAttentionMessage("r - restart the server, type 'r' and press Enter."));
         }
         info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+        info(formatAttentionMessage("p - see the port information, type 'p' and press Enter."));
         info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
         info(formatAttentionMessage("a - toggle the AI mode, type 'a' and press Enter."));
         printAIStatus();
@@ -2815,98 +2824,113 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             shutdown = true;
         }
 
-        private void readInput() throws Exception {
+        private void readInput() {
             HotKey q = new HotKey("q", "quit", "exit");
             HotKey h = new HotKey("h", "help");
             HotKey r = new HotKey("r");
             HotKey g = new HotKey("g");
             HotKey o = new HotKey("o");
             HotKey t = new HotKey("t");
+            HotKey p = new HotKey("p");
             HotKey a = new HotKey("a");
             HotKey enter = new HotKey("");
-            while (!shutdown) {
-                debug("Waiting for action key");
-                String line = Utils.getReader().readLine();
-                if (q.isPressed(line)) {
-                    debug("Detected exit command");
-                    runShutdownHook(executor);
-                    Utils.closeTerminal();
-                } else if (r.isPressed(line)) {
-                    debug("Detected restart command");
-                    try {
-                        restartServer(true);
-                    } catch (PluginExecutionException e) {
-                        debug("Exiting dev mode due to server restart failure");
-                        error("Could not restart the server.", e);
+            /*
+            if (scanner.hasNextLine()) {
+                synchronized (inputUnavailable) {
+                    inputUnavailable.notify();
+                }
+            */
+                while (!shutdown) {
+                    debug("Waiting for action key");
+                    /*
+                    if (!scanner.hasNextLine()) {
+                        break;
+                    }
+                    */
+                    String line = Utils.getReader().readLine();
+                    if (q.isPressed(line)) {
+                        debug("Detected exit command");
                         runShutdownHook(executor);
-                    }
-                } else if (h.isPressed(line)) {
-                    info(formatAttentionBarrier());
-                    printHelpMessages();
-                    info(formatAttentionBarrier());
-                } else if (g.isPressed(line)) {
-                    toggleFeatureGeneration();
-                } else if (o.isPressed(line)) {
-                    if (generateFeatures) {
-                        optimizeGenerateFeatures();
-                    } else {
-                        warn("Cannot optimize features because automatic generation of features is off.");
-                        warn("To toggle the automatic generation of features, type 'g' and press Enter.");
-                    }
-                } else if (a.isPressed(line)) {
-                    if (AIMode) {
-                        info("AI mode has been turned off.");
-                        AIMode = false;
-                    } else {
-                        if (getChatAgent() == null) {
-                            if (!ModelBuilder.promptInputProvider()) {
-                                continue;
-                            }
-                            System.out.print("\rsetting up...");
-                            if (getChatAgent() == null) {
-                                AIMode = false;
-                                ModelBuilder.cleanInputProvider();
-                                System.out.print("\r              \r");
-                                System.out.println("Failed to enable AI mode.");
-                                continue;
-                            }
-                            System.out.print("\r              \r");
+                    } else if (r.isPressed(line)) {
+                        debug("Detected restart command");
+                        try {
+                            restartServer(true);
+                        } catch (PluginExecutionException e) {
+                            debug("Exiting dev mode due to server restart failure");
+                            error("Could not restart the server.", e);
+                            runShutdownHook(executor);
                         }
-                        AIMode = true;
+                    } else if (h.isPressed(line)) {
                         info(formatAttentionBarrier());
-                        printAIStatus();
-                        info(formatAttentionMessage(""));
+                        printHelpMessages();
                         info(formatAttentionBarrier());
-                    }
-                } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
-                    debug("Detected test command. Running tests... ");
-                    if (isMultiModuleProject()) {
-                        // force run tests across all modules in multi module scenario
-                        runTestThread(false, executor, -1, true, getAllBuildFiles());
-                    } else {
-                        runTestThread(false, executor, -1, true, buildFile);
-                    }
-                } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
-                    warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
-                } else if (AIMode && line.startsWith("@ai")) {
-                    if (getChatAgent() == null) {
-                        warn("AI could not be started, ensure the API/URL and model is correct");
-                    }
-                    line = line.substring("@ai".length());
-                    if (line.trim().startsWith("[")) {
-                            // Accept multiline input between @ai[ and @ai]
-                            line = line.trim().substring("[".length());
-                            if (line.substring(line.lastIndexOf('\n')).matches("^@ai\\s*\\]\\s*$")) {
-                                line = line.substring(0, line.lastIndexOf("\n")).trim();
+                    } else if (g.isPressed(line)) {
+                        toggleFeatureGeneration();
+                    } else if (o.isPressed(line)) {
+                        if (generateFeatures) {
+                            optimizeGenerateFeatures();
+                        } else {
+                            warn("Cannot optimize features because automatic generation of features is off.");
+                            warn("To toggle the automatic generation of features, type 'g' and press Enter.");
+                        }
+                    } else if (p.isPressed(line)) {
+                        try {
+                            info(formatAttentionBarrier());
+                            printPortInfo(true);
+                            info(formatAttentionBarrier());
+                        } catch (PluginExecutionException e) {
+                            error("Could not get port information.", e);
+                        }
+                    } else if (a.isPressed(line)) {
+                        if (AIMode) {
+                            info("AI mode has been turned off.");
+                            AIMode = false;
+                        } else {
+                            if (getChatAgent() == null) {
+                                if (!ModelBuilder.promptInputProvider()) {
+                                    continue;
+                                }
+                                System.out.print("\rsetting up...");
+                                if (getChatAgent() == null) {
+                                    AIMode = false;
+                                    ModelBuilder.cleanInputProvider();
+                                    System.out.print("\r              \r");
+                                    System.out.println("Failed to enable AI mode.");
+                                    continue;
+                                }
+                                System.out.print("\r              \r");
                             }
+                            AIMode = true;
+                            info(formatAttentionBarrier());
+                            printAIStatus();
+                            info(formatAttentionMessage(""));
+                            info(formatAttentionBarrier());
+                        }
+                    } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
+                        debug("Detected test command. Running tests... ");
+                        if (isMultiModuleProject()) {
+                            // force run tests across all modules in multi module scenario
+                            runTestThread(false, executor, -1, true, getAllBuildFiles());
+                        } else {
+                            runTestThread(false, executor, -1, true, buildFile);
+                        }
+                    } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
+                        warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
+                    } else {
+                        warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
                     }
-                    chat(line.trim());
-                } else {
-                    warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
+                }
+            /*
+            } else {
+                synchronized (inputUnavailable) {
+                    inputUnavailable.set(true);
+                    inputUnavailable.notify();
                 }
             }
+            */
         }
     }
+
 
     Collection<File> recompileJavaSources;
     Collection<File> recompileJavaTests;
