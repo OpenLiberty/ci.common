@@ -2916,6 +2916,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
                         warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
+                    } else if (AIMode && line.startsWith("@ai")) {
+                        if (getChatAgent() == null) {
+                            warn("AI could not be started, ensure the API/URL and model is correct");
+                        }
+                        line = line.substring("@ai".length());
+                        if (line.trim().startsWith("[")) {
+                            // Accept multiline input between @ai[ and @ai]
+                            line = line.trim().substring("[".length());
+                            if (line.substring(line.lastIndexOf('\n')).matches("^@ai\\s*\\]\\s*$")) {
+                                line = line.substring(0, line.lastIndexOf("\n")).trim();
+                            }
+                        }
+                        chat(line.trim());
                     } else {
                         warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
                     }

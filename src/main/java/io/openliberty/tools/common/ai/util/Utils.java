@@ -96,7 +96,7 @@ public class Utils {
         LoadingThread.hide();
         String answer = getReader().readLine(question).trim();
         LoadingThread.show();
-        return answer.equalsIgnoreCase("yes");
+        return answer.equalsIgnoreCase("yes") || answer.equalsIgnoreCase("y");
     }
 
     public static boolean readFile(File file) throws Exception {
