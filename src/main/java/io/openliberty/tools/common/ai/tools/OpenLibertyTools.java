@@ -23,6 +23,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -33,6 +34,12 @@ import org.w3c.dom.NodeList;
 
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
+import dev.langchain4j.agentic.AgenticServices;
+import dev.langchain4j.agentic.UntypedAgent;
+import io.openliberty.tools.common.ai.agents.ConfigureServerXmlAgent;
+import io.openliberty.tools.common.ai.agents.ReadConfigrationTemplateAgent;
+import io.openliberty.tools.common.ai.agents.ReadFileAgent;
+import io.openliberty.tools.common.ai.util.ModelBuilder;
 import jakarta.json.JsonArray;
 import jakarta.json.JsonValue;
 import jakarta.json.bind.Jsonb;
@@ -140,4 +147,43 @@ public class OpenLibertyTools {
         return guides;
     }
 
+    @Tool("Add Liberty configuration")
+    public String addLibertyConfiguration(
+        @P("Configuration name") String configuration) {
+
+        if (configuration == null || configuration.isBlank()) {
+            return "No configuration name is specified";
+        } else {
+            configuration = configuration.contains("-") ?
+                configuration.substring(0, configuration.indexOf("-")) : configuration;
+        }
+
+        ConfigureServerXmlAgent configureServerXmlAgent = AgenticServices
+            .agentBuilder(ConfigureServerXmlAgent.class)
+            .chatModel(ModelBuilder.chatModel())
+            .outputName("configuredServerXml")
+            .build();
+        boolean isGood[] = new boolean[]{ false };
+        UntypedAgent addLibertyConfiguration = AgenticServices
+            .sequenceBuilder()
+            .subAgents(
+                new ReadFileAgent(),
+                new ReadConfigrationTemplateAgent(),
+                configureServerXmlAgent,
+                // this code is for debug
+                AgenticServices.agentAction(agenticScope -> {
+                    String configurationName = (String) agenticScope.readState("configurationName");
+                    String configuredServerXml = (String) agenticScope.readState("configuredServerXml");
+                    isGood[0] = configuredServerXml.contains("<" + configurationName + "\n");
+                })
+            )
+            .outputName("configuredServerXml")
+            .build();
+        Map<String, Object> arguments = Map.of(
+            "fileName", "server.xml",
+            "configurationName", configuration
+        );
+        String result = (String) addLibertyConfiguration.invoke(arguments);
+        return result;
+    }
 }

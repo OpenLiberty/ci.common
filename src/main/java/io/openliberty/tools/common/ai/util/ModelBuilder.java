@@ -50,13 +50,13 @@ public class ModelBuilder {
 
     private static String model;
     private static String provider;
+    private static ChatModel chatModel = null;
 
     private Integer TIMEOUT;
     private Integer MAX_NEW_TOKEN;
     private Integer MAX_MESSAGES;
     private Double TEMPERATURE;
 
-    private ChatModel chatModel = null;
     private EmbeddingModel embeddingModel = null;
 
     private static Scanner scan = new Scanner(System.in);
@@ -67,6 +67,10 @@ public class ModelBuilder {
         if (!modelName.isBlank()) {
              model = modelName;
         }
+    }
+
+    public static ChatModel chatModel() {
+        return chatModel;
     }
 
     public static void cleanInputProvider() {
