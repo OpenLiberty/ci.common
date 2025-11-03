@@ -15,43 +15,22 @@
  */
 package io.openliberty.tools.common.ai;
 
-import dev.langchain4j.data.message.ToolExecutionResultMessage;
-import dev.langchain4j.exception.InvalidRequestException;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
-import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
-import io.openliberty.tools.common.ai.tools.CodingTools;
-import io.openliberty.tools.common.ai.tools.OpenLibertyTools;
-import io.openliberty.tools.common.ai.tools.StackOverFlowTools;
 import io.openliberty.tools.common.ai.util.Assistant;
 import io.openliberty.tools.common.ai.util.MarkdownConsoleFormatter;
 import io.openliberty.tools.common.ai.util.ModelBuilder;
-import io.openliberty.tools.common.ai.util.RagCreator;
-import io.openliberty.tools.common.ai.util.Utils;
 
 public class ChatAgent {
-    private ModelBuilder modelBuilder = new ModelBuilder();
 
-    private CodingTools codingTools;
-    private StackOverFlowTools stackOverFlowTools = new StackOverFlowTools();
-    private OpenLibertyTools openLibertyTools = new OpenLibertyTools();
-
+	private ModelBuilder modelBuilder = new ModelBuilder();
     private MarkdownConsoleFormatter mdFormatter = new MarkdownConsoleFormatter();
-
     private Assistant assistant = null;
-
     private int memoryId;
 
-    private boolean toolsEnabled = false;
-
     public ChatAgent(int memoryId) throws Exception {
-        this(memoryId, new CodingTools());
-    }
-
-    public ChatAgent(int memoryId, CodingTools codingTools) throws Exception {
-        this.memoryId = memoryId;
-        this.codingTools = codingTools;
-        getAssistant();
+    	this.memoryId = memoryId;
+    	getAssistant();
     }
 
     public Assistant getAssistant() throws Exception {
@@ -59,44 +38,9 @@ public class ChatAgent {
             AiServices<Assistant> builder =
                 AiServices.builder(Assistant.class)
                     .chatModel(modelBuilder.getChatModel())
-                    .tools(stackOverFlowTools, codingTools, openLibertyTools)
-                    .hallucinatedToolNameStrategy(
-                        toolExecutionRequest -> ToolExecutionResultMessage.from(toolExecutionRequest,
-                            "Error: there is no tool with the following parameters called "
-                            + toolExecutionRequest.name()))
                     .chatMemoryProvider(
                          sessionId -> MessageWindowChatMemory.withMaxMessages(modelBuilder.getMaxMessages()));
-            RagCreator creator = new RagCreator();
-            RetrievalAugmentor retrivalAugmentator = creator.getRetrievalAugmentor(modelBuilder.getEmbeddingModel());
-            if (retrivalAugmentator == null) {
-                System.out.println("[WARNING] RAG is not set up successfully. Continuing without RAG.");
-            } else {
-                builder.retrievalAugmentor(retrivalAugmentator);
-            }
             assistant = builder.build();
-
-            try {
-                assistant.chat(memoryId, "test");
-                toolsEnabled = true;
-            } catch (InvalidRequestException e) {
-                toolsEnabled = false;
-                if (e.getMessage().contains("does not support tools")) {
-                    System.out.println("WARNING: AI model " +
-                        modelBuilder.getModelName() + " does not support tools");
-                    builder = AiServices.builder(Assistant.class)
-                        .chatModel(modelBuilder.getChatModel())
-                        .chatMemoryProvider(
-                            sessionId -> MessageWindowChatMemory.withMaxMessages(modelBuilder.getMaxMessages()));
-                    if (retrivalAugmentator != null) {
-                        builder.retrievalAugmentor(retrivalAugmentator);
-                    }
-                    assistant = builder.build();
-                } else {
-                    throw new Exception(e);
-                }
-            } finally {
-                resetChat();
-            }
         }
         return assistant;
     }
@@ -116,7 +60,6 @@ public class ChatAgent {
 
     public void resetChat() {
         assistant.evictChatMemory(memoryId);
-        Utils.clearPermissions();
     }
 
     public String getModelName() {
@@ -125,10 +68,6 @@ public class ChatAgent {
 
     public String getProvider() {
         return modelBuilder.getProvider();
-    }
-
-    public String getToolsEnabled() {
-        return toolsEnabled ? "enabled" : "unavailable";
     }
 
     public Integer getTimeOut() {
