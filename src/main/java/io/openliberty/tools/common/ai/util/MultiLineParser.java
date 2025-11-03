@@ -26,7 +26,7 @@ public class MultiLineParser implements Parser {
         switch (context) {
             case ACCEPT_LINE:
                 List<String> lines = line.lines().toList();
-                if (!lines.isEmpty() && lines.get(0).matches("@ai\\s*\\[.*") && !lines.get(lines.size()-1).matches("@ai\\s*\\]\\s*")) {
+                if (!lines.isEmpty() && lines.get(0).matches("\\[.*") && !lines.get(lines.size()-1).matches("\\]\\s*")) {
                     throw new EOFError(-1, -1, "incomplete multi-line message");
                 }
         }
