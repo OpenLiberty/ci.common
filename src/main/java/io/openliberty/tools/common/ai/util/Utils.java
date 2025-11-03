@@ -19,9 +19,7 @@ import static org.fusesource.jansi.Ansi.ansi;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 import org.jline.reader.LineReader;
@@ -33,8 +31,6 @@ public class Utils {
 
     private static final boolean IS_WINDOWS = System.getProperty("os.name").toLowerCase().contains("win");
     private static final int CONSOLE_WIDTH = 79;
-
-    private static Map <String, FilePermission> filePermissions = new HashMap<String, FilePermission>();
 
     public static LineReader reader;
     public static Terminal terminal;
@@ -99,34 +95,6 @@ public class Utils {
         return answer.equalsIgnoreCase("yes") || answer.equalsIgnoreCase("y");
     }
 
-    public static boolean readFile(File file) throws Exception {
-        String filePath = getAbsolutePath(file);
-        if (filePermissions.containsKey(filePath)) {
-            // File either contains write or read permissions
-            return true;
-        } else {
-            if (confirm("\nAllow AI to read the " + filePath + " file?")) {
-                filePermissions.put(filePath, FilePermission.READ);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public static boolean writeFile(File file) throws Exception {
-        String filePath = getAbsolutePath(file);
-
-        if (filePermissions.containsKey(filePath) && filePermissions.get(filePath) == FilePermission.WRITE) {
-            return true;
-        } else {
-            if (confirm("\nAllow AI to write to the " + filePath + " file?")) {
-                filePermissions.put(filePath, FilePermission.WRITE);
-                return true;
-            }
-        }
-        return false;
-    }
-
     public static <T> T promptSelection(List<T> objects, Function<T, String> toString, String prefix) {
         StringBuilder message = new StringBuilder();
         message.append(prefix);
@@ -148,7 +116,6 @@ public class Utils {
             System.out.print(IS_WINDOWS ? "-" : "\u2500");
         }
         System.out.println("\n");
-        // System.out.println("\u2510\n");
     }
 
     public static void printReplyBottom() {
@@ -157,11 +124,6 @@ public class Utils {
             System.out.print(IS_WINDOWS ? "-" : "\u2500");
         }
         System.out.println("\n");
-        // System.out.println("\u2518\n");
-    }
-
-    public static void clearPermissions() {
-        filePermissions.clear();
     }
 
 }

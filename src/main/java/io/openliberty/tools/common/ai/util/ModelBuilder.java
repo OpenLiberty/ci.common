@@ -15,38 +15,21 @@
  */
 package io.openliberty.tools.common.ai.util;
 
-import static dev.langchain4j.model.github.GitHubModelsEmbeddingModelName.TEXT_EMBEDDING_3_SMALL;
-import static dev.langchain4j.model.mistralai.MistralAiEmbeddingModelName.MISTRAL_EMBED;
 import static java.time.Duration.ofSeconds;
 
 import java.util.List;
 import java.util.Scanner;
 
 import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.github.GitHubModelsChatModel;
-import dev.langchain4j.model.github.GitHubModelsChatModel.Builder;
-import dev.langchain4j.model.github.GitHubModelsEmbeddingModel;
-import dev.langchain4j.model.googleai.GoogleAiEmbeddingModel;
-import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
-import dev.langchain4j.model.mistralai.MistralAiChatModel;
-import dev.langchain4j.model.mistralai.MistralAiEmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
-import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
 import io.github.ollama4j.Ollama;
 import io.github.ollama4j.models.response.Model;
 
 public class ModelBuilder {
 
     public static final String OLLAMA = "Ollama";
-    public static final String GITHUB = "Github";
-    public static final String MISTRAL_AI = "Mistral AI";
-    public static final String GEMINI = "Google Gemini";
 
     private static String OLLAMA_BASE_URL = System.getenv("OLLAMA_BASE_URL");
-    private static String GITHUB_API_KEY = System.getenv("GITHUB_API_KEY");
-    private static String MISTRAL_AI_API_KEY = System.getenv("MISTRAL_AI_API_KEY");
-    private static String GEMINI_API_KEY = System.getenv("GEMINI_API_KEY");
 
     private static String model;
     private static String provider;
@@ -56,8 +39,6 @@ public class ModelBuilder {
     private Integer MAX_NEW_TOKEN;
     private Integer MAX_MESSAGES;
     private Double TEMPERATURE;
-
-    private EmbeddingModel embeddingModel = null;
 
     private static Scanner scan = new Scanner(System.in);
 
@@ -75,9 +56,6 @@ public class ModelBuilder {
 
     public static void cleanInputProvider() {
         OLLAMA_BASE_URL = null;
-        GITHUB_API_KEY = null;
-        MISTRAL_AI_API_KEY = null;
-        GEMINI_API_KEY = null;
         model = null;
         provider = null;
     }
@@ -116,24 +94,6 @@ public class ModelBuilder {
                     findModel();
                     modelSelection();
                     validResponse = true;
-                } else if (("github".equals(provider) || "2".equals(provider)) &&
-                    (apiKeyOrUrl.startsWith("ghp_") || apiKeyOrUrl.startsWith("github_pat_"))) {
-                    GITHUB_API_KEY = apiKeyOrUrl;
-                    findModel();
-                    modelSelection();
-                    validResponse = true;
-                } else if (("mistral".equals(provider) || "3".equals(provider)) &&
-                    apiKeyOrUrl.length() > 30) {
-                    MISTRAL_AI_API_KEY = apiKeyOrUrl;
-                    findModel();
-                    modelSelection();
-                    validResponse = true;
-                } else if (("gemini".equals(provider) || "4".equals(provider)) &&
-                    apiKeyOrUrl.length() > 30) {
-                    GEMINI_API_KEY = apiKeyOrUrl;
-                    findModel();
-                    modelSelection();
-                    validResponse = true;
                 } else {
                     System.out.println("[ERROR] Enter a valid combination of provider and API key.");
                 }
@@ -154,7 +114,7 @@ public class ModelBuilder {
                         models = ollamaAPI.listModels();
                         for (Model m : models) {
                             String modelName = m.getModelName();
-                            if (modelName.equals("codestral") ||
+                            if (modelName.equals("gpt-oss") ||
                                 modelName.equals("devstral")) {
                                 model = modelName;
                                 break;
@@ -169,46 +129,13 @@ public class ModelBuilder {
                     }
                 }
             }
-        } else if (GITHUB_API_KEY != null &&
-            (GITHUB_API_KEY.startsWith("ghp_") || GITHUB_API_KEY.startsWith("github_pat_"))) {
-            provider = GITHUB;
-            if (model == null) {
-                model = System.getProperty("chat.model.id");
-                if (model == null || model.isBlank()) {
-                    model = "Codestral-2501";
-                }
-            }
-        } else if (MISTRAL_AI_API_KEY != null && MISTRAL_AI_API_KEY.length() > 30) {
-            provider = MISTRAL_AI;
-            if (model == null) {
-                model = System.getProperty("chat.model.id");
-                if (model == null || model.isBlank()) {
-                    model = "codestral-latest";
-                }
-            }
-        } else if (GEMINI_API_KEY != null && GEMINI_API_KEY.length() > 30) {
-            provider = GEMINI;
-            if (model == null) {
-                model = System.getProperty("chat.model.id");
-                if (model == null || model.isBlank()) {
-                    model = "gemini-2.5-flash";
-                }
-            }
         }
     }
 
     public ChatModel getChatModel() {
         if (chatModel == null) {
             findModel();
-            if (provider.equals(GITHUB)) {
-                Builder g = GitHubModelsChatModel.builder()
-                            .gitHubToken(GITHUB_API_KEY)
-                            .modelName(model)
-                            .timeout(ofSeconds(getTimeOut()))
-                            .temperature(getTemperature())
-                            .maxTokens(getMaxNewToken());
-                chatModel = g.build();
-            } else if (provider.equals(OLLAMA)) {
+            if (provider.equals(OLLAMA)) {
                 chatModel = OllamaChatModel.builder()
                             .baseUrl(OLLAMA_BASE_URL)
                             .modelName(model)
@@ -216,57 +143,9 @@ public class ModelBuilder {
                             .temperature(getTemperature())
                             .numPredict(getMaxNewToken())
                             .build();
-            } else if (provider.equals(MISTRAL_AI)) {
-                chatModel = MistralAiChatModel.builder()
-                            .apiKey(MISTRAL_AI_API_KEY)
-                            .modelName(model)
-                            .timeout(ofSeconds(getTimeOut()))
-                            .temperature(getTemperature())
-                            .maxTokens(getMaxNewToken())
-                            .build();
-            } else if (provider.equals(GEMINI)) {
-                chatModel = GoogleAiGeminiChatModel.builder()
-                            .apiKey(GEMINI_API_KEY)
-                            .modelName(model)
-                            .timeout(ofSeconds(getTimeOut()))
-                            .temperature(getTemperature())
-                            .maxOutputTokens(getMaxNewToken())
-                            .build();
             }
         }
         return chatModel;
-    }
-
-
-    public EmbeddingModel getEmbeddingModel() {
-        if (embeddingModel == null) {
-            if (provider.equals(GITHUB)) {
-                embeddingModel = GitHubModelsEmbeddingModel.builder()
-                    .gitHubToken(GITHUB_API_KEY)
-                    .modelName(TEXT_EMBEDDING_3_SMALL)
-                    .timeout(ofSeconds(getTimeOut()))
-                    .build();
-            } else if (provider.equals(OLLAMA)) {
-                embeddingModel = OllamaEmbeddingModel.builder()
-                    .baseUrl(OLLAMA_BASE_URL)
-                    .modelName("all-minilm")
-                    .timeout(ofSeconds(getTimeOut()))
-                    .build();
-            } else if (provider.equals(MISTRAL_AI)) {
-                embeddingModel = MistralAiEmbeddingModel.builder()
-                    .apiKey(MISTRAL_AI_API_KEY)
-                    .modelName(MISTRAL_EMBED)
-                    .timeout(ofSeconds(getTimeOut()))
-                    .build();
-            } else if (provider.equals(GEMINI)) {
-                embeddingModel = GoogleAiEmbeddingModel.builder()
-                    .apiKey(GEMINI_API_KEY)
-                    .modelName("embedding-001")
-                    .timeout(ofSeconds(getTimeOut()))
-                    .build();
-            }
-        }
-        return embeddingModel;
     }
 
     public String getModelName() {

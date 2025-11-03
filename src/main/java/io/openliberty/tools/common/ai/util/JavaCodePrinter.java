@@ -24,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class JavaCodePrinter {
+
     private static final Set<String> JAVAKEY = new HashSet<>();
 
     public static String keywordJansiColor(String token, Ansi.Color color) {
