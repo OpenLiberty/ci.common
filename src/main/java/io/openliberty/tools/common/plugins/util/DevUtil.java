@@ -16,6 +16,8 @@
 
 package io.openliberty.tools.common.plugins.util;
 
+import static org.fusesource.jansi.Ansi.ansi;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -82,6 +84,10 @@ import javax.xml.parsers.ParserConfigurationException;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import io.openliberty.tools.ant.ServerTask;
+import io.openliberty.tools.common.ai.ChatAgent;
+import io.openliberty.tools.common.ai.util.LoadingThread;
+import io.openliberty.tools.common.ai.util.ModelBuilder;
+import io.openliberty.tools.common.ai.util.Utils;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
 
 import javax.xml.stream.XMLOutputFactory;
@@ -95,6 +101,7 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListener;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
+import org.fusesource.jansi.Ansi;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.w3c.dom.Document;
@@ -141,6 +148,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private static final String[] DEFAULT_COMPILER_OPTIONS = new String[] { "-g", "-parameters" };
     private static final int LIBERTY_DEFAULT_HTTP_PORT = 9080;
     private static final int LIBERTY_DEFAULT_HTTPS_PORT = 9443;
+
+    private static String cyan(String text) {
+        return ansi().fg(Ansi.Color.CYAN).bold().a(text).reset().toString();
+    }
 
     /**
      * Log debug
@@ -445,6 +456,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected boolean skipInstallFeature;
     // for gradle, this map will be kept as null
     protected Map<String, Boolean> projectRecompileMap;
+
+    private ChatAgent chatAgent = null;
+    private boolean AIMode;
 
     // constructor for maven
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory,
@@ -2487,6 +2501,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void printDevModeMessages(boolean inputUnavailable, boolean startup) throws PluginExecutionException {
         // the following will be printed only on startup or restart
         if (startup) {
+            getChatAgent();
+
             // print barrier header
             info(formatAttentionBarrier());
 
@@ -2498,6 +2514,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (!inputUnavailable) {
             if (startup) {
                 // the following will be printed only on startup or restart
+                info(formatAttentionMessage("a - toggle the AI mode, type 'a' and press Enter."));
                 info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
                 info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
             } else {
@@ -2512,8 +2529,34 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         if (startup) {
             printPortInfo(true);
+            if (getChatAgent() == null) {
+                AIMode = false;
+            } else {
+                AIMode = true;
+            }
+            printAIStatus();
             // print barrier footer
             info(formatAttentionBarrier());
+        }
+    }
+
+    private void printAIStatus() {
+        if (AIMode == false || getChatAgent() == null) {
+            return;
+        }
+        info(formatAttentionMessage(""));
+        try {
+            info(formatAttentionTitle("AI information:"));
+            info(formatAttentionMessage("model: " + getChatAgent().getModelName()));
+            info(formatAttentionMessage(""));
+            //info(formatAttentionMessage("Post a message to AI - type in " + cyan("@ai your message") + " and press Enter."));
+            info(formatAttentionMessage("To start a multi-line message, type in " + cyan("[") + " and press Enter."));
+            info(formatAttentionMessage("    To end the multi-line message, type in " + cyan("]") + " and press Enter."));
+            info(formatAttentionMessage("    To clear the multi-line message, press Ctrl+X followed by Ctrl+K."));
+            info(formatAttentionMessage("Reset chat session - type in " + cyan("reset chat") + " and press Enter."));
+            info(formatAttentionMessage("View a previous message - press Up/Down arrow key."));
+        } catch (Exception e) {
+            info(formatAttentionTitle("AI is not available."));
         }
     }
 
@@ -2622,8 +2665,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info(formatAttentionMessage("r - restart the server, type 'r' and press Enter."));
         }
         info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+        info(formatAttentionMessage("a - toggle the AI mode, type 'a' and press Enter."));
         info(formatAttentionMessage("p - see the port information, type 'p' and press Enter."));
         info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
+        printAIStatus();
     }
 
     private void printFeatureGenerationStatus() {
@@ -2727,8 +2772,37 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return generatedFeatures;
     }
 
+    private ChatAgent getChatAgent() {
+        if (chatAgent == null) {
+            try {
+                chatAgent = new ChatAgent(1);
+            } catch (Exception e) {
+                debug(e.getMessage());
+            }
+        }
+        return chatAgent;
+    }
+
+    private void chat(String message) {
+        String response = null;
+        try {
+            LoadingThread.show();
+            response = getChatAgent().chat(message);
+        } catch (Exception e) {
+            LoadingThread.hide();
+            LoadingThread.resetElapsed();
+            System.err.println("Chat Assistant failed due to: " + e.getMessage());
+            return;
+        }
+        LoadingThread.hide();
+        LoadingThread.resetElapsed();
+        Utils.printReplyTop();
+        System.out.println(response);
+        Utils.printReplyBottom();
+    }
+
     private class HotkeyReader implements Runnable {
-        private Scanner scanner;
+        //private Scanner scanner;
         private ThreadPoolExecutor executor;
         private boolean shutdown = false;
 
@@ -2739,11 +2813,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         @Override
         public void run() {
             debug("Running hotkey reader thread");
-            scanner = new Scanner(new CloseShieldInputStream(System.in)); // shield allows us to close the scanner without closing System.in.
             try {
                 readInput();
-            } finally {
-                scanner.close();
+            } catch (Exception e) {
+                debug(e.getMessage());
             }
         }
 
@@ -2759,18 +2832,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey o = new HotKey("o");
             HotKey t = new HotKey("t");
             HotKey p = new HotKey("p");
+            HotKey a = new HotKey("a");
             HotKey enter = new HotKey("");
+            /*
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
                     inputUnavailable.notify();
                 }
+            */
                 while (!shutdown) {
                     debug("Waiting for action key");
-                    
+                    /*
                     if (!scanner.hasNextLine()) {
                         break;
                     }
-                    String line = scanner.nextLine();
+                    */
+                    String line = Utils.getReader().readLine();
                     if (q.isPressed(line)) {
                         debug("Detected exit command");
                         runShutdownHook(executor);
@@ -2804,6 +2881,31 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         } catch (PluginExecutionException e) {
                             error("Could not get port information.", e);
                         }
+                    } else if (a.isPressed(line)) {
+                        if (AIMode) {
+                            info("AI mode has been turned off.");
+                            AIMode = false;
+                        } else {
+                            if (getChatAgent() == null) {
+                                if (!ModelBuilder.promptInputProvider()) {
+                                    continue;
+                                }
+                                System.out.print("\rsetting up...");
+                                if (getChatAgent() == null) {
+                                    AIMode = false;
+                                    ModelBuilder.cleanInputProvider();
+                                    System.out.print("\r              \r");
+                                    System.out.println("Failed to enable AI mode.");
+                                    continue;
+                                }
+                                System.out.print("\r              \r");
+                            }
+                            AIMode = true;
+                            info(formatAttentionBarrier());
+                            printAIStatus();
+                            info(formatAttentionMessage(""));
+                            info(formatAttentionBarrier());
+                        }
                     } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
                         debug("Detected test command. Running tests... ");
                         if (isMultiModuleProject()) {
@@ -2814,16 +2916,30 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
                         warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
+                    } else if (AIMode && line.startsWith("[")) {
+                        if (getChatAgent() == null) {
+                            warn("AI could not be started, ensure the API/URL and model is correct");
+                        }
+                        if (line.trim().startsWith("[")) {
+                            // Accept multiline input between @ai[ and @ai]
+                            line = line.trim().substring("[".length());
+                            if (line.substring(line.lastIndexOf('\n')).matches("^\\]\\s*$")) {
+                                line = line.substring(0, line.lastIndexOf("\n")).trim();
+                            }
+                        }
+                        chat(line.trim());
                     } else {
                         warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
                     }
                 }
+            /*
             } else {
                 synchronized (inputUnavailable) {
                     inputUnavailable.set(true);
                     inputUnavailable.notify();
                 }
             }
+            */
         }
     }
 
