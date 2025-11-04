@@ -2533,8 +2533,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 AIMode = false;
             } else {
                 AIMode = true;
+                printAIStatus();
             }
-            printAIStatus();
             // print barrier footer
             info(formatAttentionBarrier());
         }
@@ -2548,6 +2548,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             info(formatAttentionTitle("AI information:"));
             info(formatAttentionMessage("model: " + getChatAgent().getModelName()));
+            info(formatAttentionMessage("Tools enabled: " + getChatAgent().getToolsEnabled()));
             info(formatAttentionMessage(""));
             //info(formatAttentionMessage("Post a message to AI - type in " + cyan("@ai your message") + " and press Enter."));
             info(formatAttentionMessage("To start a multi-line message, type in " + cyan("[") + " and press Enter."));
@@ -2772,15 +2773,29 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return generatedFeatures;
     }
 
-    private ChatAgent getChatAgent() {
+    private ChatAgent getChatAgent(){
         if (chatAgent == null) {
             try {
                 chatAgent = new ChatAgent(1);
             } catch (Exception e) {
-                debug(e.getMessage());
             }
         }
         return chatAgent;
+    }
+    
+    private boolean isChatAgentValid(){
+        if (chatAgent == null) {
+            try {
+                chatAgent = new ChatAgent(2);
+                String response = chatAgent.chat("Test message");
+                if (response != null && !response.isBlank()){
+                    return true;
+                }
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void chat(String message) {
@@ -2887,25 +2902,39 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             AIMode = false;
                         } else {
                             if (getChatAgent() == null) {
-                                if (!ModelBuilder.promptInputProvider()) {
-                                    continue;
+                                try{
+                                    if (ModelBuilder.selectInputProvider() && isChatAgentValid()){
+                                        AIMode = true;
+                                        if(getChatAgent().getToolsEnabled().equals("unavailable")){
+                                            warn("AI model " + getChatAgent().getModelName() + " does not support tools.");
+                                        }
+                                        info(formatAttentionBarrier());
+                                        printAIStatus();
+                                        info(formatAttentionMessage(""));
+                                        info(formatAttentionBarrier());
+                                        continue;
+                                    }else if (ModelBuilder.selectInputProvider() == false){
+                                        error("Could not find the gpt-oss model. Stop the server and ensure Ollama is installed. Execute: ollama pull gpt-oss.");
+                                    }else if (!isChatAgentValid()){
+                                        error("Please provide a valid ollama.base.url and chat.model.id.");
+                                    }
+                                }catch(Exception exception){
+                                    error("Error in AI mode setup. Check ollama.base.url. Please try again." );
+                                    return;
                                 }
+
                                 System.out.print("\rsetting up...");
                                 if (getChatAgent() == null) {
                                     AIMode = false;
                                     ModelBuilder.cleanInputProvider();
                                     System.out.print("\r              \r");
-                                    System.out.println("Failed to enable AI mode.");
+                                    warn("Failed to enable AI mode.");
                                     continue;
                                 }
                                 System.out.print("\r              \r");
                             }
-                            AIMode = true;
-                            info(formatAttentionBarrier());
-                            printAIStatus();
-                            info(formatAttentionMessage(""));
-                            info(formatAttentionBarrier());
                         }
+
                     } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
                         debug("Detected test command. Running tests... ");
                         if (isMultiModuleProject()) {

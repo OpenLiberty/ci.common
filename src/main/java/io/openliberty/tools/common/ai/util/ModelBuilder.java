@@ -24,12 +24,13 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import io.github.ollama4j.Ollama;
 import io.github.ollama4j.models.response.Model;
+import io.openliberty.tools.common.plugins.util.DevUtil;
 
 public class ModelBuilder {
 
     public static final String OLLAMA = "Ollama";
 
-    private static String OLLAMA_BASE_URL = System.getenv("OLLAMA_BASE_URL");
+    private static String OLLAMA_BASE_URL = null;
 
     private static String model;
     private static String provider;
@@ -46,7 +47,7 @@ public class ModelBuilder {
         System.out.print("\nPress enter to use the default model " + Utils.bold(model) + " or type in a model name: ");
         String modelName = scan.nextLine().trim();
         if (!modelName.isBlank()) {
-             model = modelName;
+            model = modelName;
         }
     }
 
@@ -60,43 +61,34 @@ public class ModelBuilder {
         provider = null;
     }
 
-    public static boolean promptInputProvider() {
-        String provider = "";
-        while (!(("ollama".equals(provider) || "1".equals(provider)) || ("github".equals(provider)|| "2".equals(provider)) ||
-                 ("mistral".equals(provider) || "3".equals(provider)) || ("gemini".equals(provider) || "4".equals(provider)))) {
-            System.out.print("\n\nSelect a provider (1:Ollama, 2:Github, 3:Mistral, or press Enter to quit): ");
-            provider = scan.nextLine().toLowerCase().trim();
-            if (provider.isEmpty()) {
-                System.out.println("Skipped to enable AI mode.");
-                return false;
-            }
+    public static boolean selectInputProvider() throws Exception{
+
+        provider = OLLAMA;
+        OLLAMA_BASE_URL = System.getProperty("ollama.base.url");
+        
+        if (OLLAMA_BASE_URL == null || OLLAMA_BASE_URL.isBlank()){
+            OLLAMA_BASE_URL = "http://localhost:11434";
         }
-
-        Boolean validResponse = false;
-        while (!validResponse) {
-
-            String apiKeyOrUrl;
-            if ("ollama".equals(provider)|| "1".equals(provider)) {
-                System.out.print("\nEnter a valid Ollama URL: ");
-                apiKeyOrUrl = scan.nextLine().trim();
-            } else {
-                apiKeyOrUrl = Utils.getReader().readLine("\nEnter a valid API key or press Enter to quit: ", '*').trim();
-            }
-
-            if (apiKeyOrUrl.isEmpty()) {
-                System.out.println("Skipped to enable AI mode.");
-                return false;
-            }
-
-            if (!provider.isEmpty()) {
-                if (("ollama".equals(provider) || "1".equals(provider)) && apiKeyOrUrl.toLowerCase().startsWith("http")) {
-                    OLLAMA_BASE_URL = apiKeyOrUrl;
-                    findModel();
-                    modelSelection();
-                    validResponse = true;
-                } else {
-                    System.out.println("[ERROR] Enter a valid combination of provider and API key.");
+        
+        model = System.getProperty("chat.model.id");
+        
+        if (model == null || model.isBlank()){
+            Ollama ollamaAPI = new Ollama(OLLAMA_BASE_URL);
+            List<Model> models;
+            try {
+                models = ollamaAPI.listModels();
+                for (Model installedModel : models) {
+                    String modelName = installedModel.getModelName();
+                    if (modelName.equals("gpt-oss")) {
+                        model = modelName;
+                        break;
+                    }
                 }
+                if (model == null || model.isBlank()){
+                    return false;
+                }
+            } catch (Exception exception) {
+                throw exception;
             }
         }
         return true;
@@ -134,7 +126,6 @@ public class ModelBuilder {
 
     public ChatModel getChatModel() {
         if (chatModel == null) {
-            findModel();
             if (provider.equals(OLLAMA)) {
                 chatModel = OllamaChatModel.builder()
                             .baseUrl(OLLAMA_BASE_URL)
