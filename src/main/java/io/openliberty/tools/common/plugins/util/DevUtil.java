@@ -2785,7 +2785,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean isChatAgentValid(){
         if (chatAgent == null) {
             try {
-                chatAgent = new ChatAgent(2);
+                int memoryIDTest = 2;
+                chatAgent = new ChatAgent(memoryIDTest);
                 String response = chatAgent.chat("Test message");
                 if (response != null && !response.isBlank()) {
                     return true;
