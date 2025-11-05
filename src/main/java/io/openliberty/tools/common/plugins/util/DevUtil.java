@@ -2548,7 +2548,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             info(formatAttentionTitle("AI information:"));
             info(formatAttentionMessage("model: " + getChatAgent().getModelName()));
-            info(formatAttentionMessage("Tools enabled: " + getChatAgent().getToolsEnabled()));
             info(formatAttentionMessage(""));
             //info(formatAttentionMessage("Post a message to AI - type in " + cyan("@ai your message") + " and press Enter."));
             info(formatAttentionMessage("To start a multi-line message, type in " + cyan("[") + " and press Enter."));
@@ -2773,7 +2772,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return generatedFeatures;
     }
 
-    private ChatAgent getChatAgent(){
+    private ChatAgent getChatAgent() {
         if (chatAgent == null) {
             try {
                 chatAgent = new ChatAgent(1);
@@ -2788,7 +2787,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             try {
                 chatAgent = new ChatAgent(2);
                 String response = chatAgent.chat("Test message");
-                if (response != null && !response.isBlank()){
+                if (response != null && !response.isBlank()) {
                     return true;
                 }
             } catch (Exception e) {
@@ -2913,12 +2912,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                         info(formatAttentionMessage(""));
                                         info(formatAttentionBarrier());
                                         continue;
-                                    }else if (ModelBuilder.selectInputProvider() == false){
+                                    } else if (ModelBuilder.selectInputProvider() == false){
                                         error("Could not find the gpt-oss model. Stop the server and ensure Ollama is installed. Execute: ollama pull gpt-oss.");
-                                    }else if (!isChatAgentValid()){
+                                    } else if (!isChatAgentValid()){
                                         error("Please provide a valid ollama.base.url and chat.model.id.");
                                     }
-                                }catch(Exception exception){
+                                } catch(Exception exception) {
                                     error("Error in AI mode setup. Check ollama.base.url. Please try again." );
                                     return;
                                 }
