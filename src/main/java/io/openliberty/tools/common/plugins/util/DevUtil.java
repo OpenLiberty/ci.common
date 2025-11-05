@@ -2928,6 +2928,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             }
                         }
                         chat(line.trim());
+                    } else if (AIMode) {
+                        chat(line);
                     } else {
                         warn("Unrecognized command: " + line + ". To see the help menu, type 'h' and press Enter.");
                     }
