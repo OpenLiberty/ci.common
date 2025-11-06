@@ -18,17 +18,22 @@ package io.openliberty.tools.common.plugins.util;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.jline.reader.LineReader;
+import org.jline.terminal.TerminalBuilder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+
+import io.openliberty.tools.common.ai.util.Utils;
 
 public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
 
@@ -110,20 +115,27 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
         assertEquals(1, util.counter);
     }
 
-    //@Test
+    @Test
     public void testRunHotkeyReaderThread() throws Exception {
         RunTestThreadUtil util = new RunTestThreadUtil(false);
         assertEquals(0, util.counter);
 
         final ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1, true));
 
-        InputStream previousSystemIn = System.in;
+        LineReader previousReader = Utils.reader;
         try {
-            // replace system input with a newline string
-            String enter = "\n";
-            System.setIn(new ByteArrayInputStream(enter.getBytes()));
+            // replace line reader using a terminal on piped input stream
+            PipedOutputStream out = new PipedOutputStream();
+            PipedInputStream in = new PipedInputStream(out);
+            Utils.reader = null;
+            Utils.getReader(
+                TerminalBuilder.builder()
+                        .streams(in, OutputStream.nullOutputStream())
+                        .build());
         
             // run test on newline input
+            String enter = "\n";
+            out.write(enter.getBytes());
             util.runHotkeyReaderThread(executor);
 
             // wait for executor to pickup test job
@@ -146,7 +158,7 @@ public class DevUtilRunTestThreadTest extends BaseDevUtilTest {
             // verify that runTests() was called once
             assertEquals(1, util.counter);
         } finally {
-            System.setIn(previousSystemIn);
+            Utils.reader = previousReader;
         }
 
     }

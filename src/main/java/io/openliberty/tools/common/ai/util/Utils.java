@@ -59,11 +59,21 @@ public class Utils {
     }
 
     public static LineReader getReader() {
+        return getReader(null);
+    }
+
+    public static LineReader getReader(Terminal overrideTerminal) {
         if (reader == null) {
             try {
-                terminal = TerminalBuilder.builder().system(true).build();
+                if (overrideTerminal == null) {
+                    if (terminal == null) {
+                        overrideTerminal = terminal = TerminalBuilder.builder().system(true).build();
+                    } else {
+                        overrideTerminal = terminal;
+                    }
+                }
                 reader = LineReaderBuilder.builder()
-                             .terminal(terminal)
+                             .terminal(overrideTerminal)
                              .parser(new MultiLineParser())
                              .variable(LineReader.SECONDARY_PROMPT_PATTERN, "")
                              .build();
