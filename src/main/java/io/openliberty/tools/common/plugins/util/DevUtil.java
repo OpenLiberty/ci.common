@@ -2655,7 +2655,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             File srcGenFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
             if (srcGenFeaturesFile.exists()) {
                 if (!srcGenFeaturesFile.delete()) {
-                    debug("Error trying to delete the generated features file:"+srcGenFeaturesFile.getAbsolutePath());
+                    debug("Error trying to delete the generated features file:" + srcGenFeaturesFile.getAbsolutePath());
                 }
             }
         }
