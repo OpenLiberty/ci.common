@@ -2925,7 +2925,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                     getChatAgent();
                                     boolean validSetModelProvider = ModelBuilder.selectInputProvider();
                                     boolean validConnectionToChatAgent = isChatAgentValid();
-                                    if (validSetModelProvider && validConnectionToChatAgent){
+                                    if (validSetModelProvider && validConnectionToChatAgent) {
                                         AIMode = true;
                                         if(checkChatAgentValue().getToolsEnabled().equals("unavailable")) {
                                             warn("AI model " + checkChatAgentValue().getModelName() + " does not support tools.");
