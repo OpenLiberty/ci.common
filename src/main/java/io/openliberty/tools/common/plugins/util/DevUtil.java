@@ -2803,9 +2803,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (response != null && !response.isBlank()) {
                     return true;
                 }
-            } catch (RuntimeException runtimeException){
+            } catch (RuntimeException runtimeException) {
                 return false;
-            } catch (ConnectException connectException){
+            } catch (ConnectException connectException) {
                 return false;
             } catch (Exception e) {
                 return false;
