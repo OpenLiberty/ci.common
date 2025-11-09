@@ -21,6 +21,7 @@ import dev.langchain4j.service.AiServices;
 import io.openliberty.tools.common.ai.util.Assistant;
 import io.openliberty.tools.common.ai.util.MarkdownConsoleFormatter;
 import io.openliberty.tools.common.ai.util.ModelBuilder;
+import java.net.ConnectException;
 
 public class ChatAgent {
 
@@ -35,9 +36,14 @@ public class ChatAgent {
     	getAssistant();
     }
 
+    public void clearAssistant(){
+        resetChat();
+        this.assistant = null;
+    }
+
     public Assistant getAssistant() throws Exception {
         if (assistant == null) {
-            //add tools as needed below
+            //add tools, as needed, to the builder below
             AiServices<Assistant> builder =
                 AiServices.builder(Assistant.class)
                     .chatModel(modelBuilder.getChatModel())
@@ -59,6 +65,10 @@ public class ChatAgent {
                 } else {
                     throw new Exception(e.getMessage());
                 }
+            } catch (RuntimeException runtimeException) {
+                throw new Exception(runtimeException);              
+            } catch (Exception e) {
+                throw new Exception(e.getMessage());
             } finally {
                 resetChat();
             }
