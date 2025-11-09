@@ -48,7 +48,6 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.Watchable;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.net.ConnectException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -2915,7 +2914,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else if (a.isPressed(line)) {
                         if (AIMode) {
-                            if(checkChatAgentValue() != null){
+                            if (checkChatAgentValue() != null) {
                                 resetChatAgent();
                             }
                             AIMode = false;
@@ -2924,13 +2923,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             if (checkChatAgentValue() == null) {
                                 try{
                                     getChatAgent();
-
                                     boolean validSetModelProvider = ModelBuilder.selectInputProvider();
                                     boolean validConnectionToChatAgent = isChatAgentValid();
-
                                     if (validSetModelProvider && validConnectionToChatAgent){
                                         AIMode = true;
-                                        if(checkChatAgentValue().getToolsEnabled().equals("unavailable")){
+                                        if(checkChatAgentValue().getToolsEnabled().equals("unavailable")) {
                                             warn("AI model " + checkChatAgentValue().getModelName() + " does not support tools.");
                                         }
                                         info(formatAttentionBarrier());
@@ -2938,9 +2935,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                         info(formatAttentionMessage(""));
                                         info(formatAttentionBarrier());
                                         continue;
-                                    } else if (validSetModelProvider == false){
+                                    } else if (validSetModelProvider == false) {
                                         error("Could not find the gpt-oss model. Stop the server and ensure Ollama is installed. Execute: ollama pull gpt-oss.");
-                                    } else if (!validConnectionToChatAgent){
+                                    } else if (!validConnectionToChatAgent) {
                                         error("Please provide a valid ollama.base.url and chat.model.id.");
                                     }
                                 } catch(Exception exception) {

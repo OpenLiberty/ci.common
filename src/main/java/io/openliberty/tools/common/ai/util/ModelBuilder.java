@@ -24,7 +24,6 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
 import io.github.ollama4j.Ollama;
 import io.github.ollama4j.models.response.Model;
-import io.openliberty.tools.common.plugins.util.DevUtil;
 
 public class ModelBuilder {
 
@@ -61,7 +60,7 @@ public class ModelBuilder {
         provider = null;
     }
 
-    public static boolean selectInputProvider() throws Exception{
+    public static boolean selectInputProvider() throws Exception {
 
         provider = OLLAMA;
         OLLAMA_BASE_URL = System.getProperty("ollama.base.url");
@@ -72,7 +71,7 @@ public class ModelBuilder {
         
         model = System.getProperty("chat.model.id");
         
-        if (model == null || model.isBlank()){
+        if (model == null || model.isBlank()) {
             Ollama ollamaAPI = new Ollama(OLLAMA_BASE_URL);
             List<Model> models;
             try {
@@ -84,7 +83,7 @@ public class ModelBuilder {
                         break;
                     }
                 }
-                if (model == null || model.isBlank()){
+                if (model == null || model.isBlank()) {
                     return false;
                 }
             } catch (Exception exception) {

@@ -21,7 +21,6 @@ import dev.langchain4j.service.AiServices;
 import io.openliberty.tools.common.ai.util.Assistant;
 import io.openliberty.tools.common.ai.util.MarkdownConsoleFormatter;
 import io.openliberty.tools.common.ai.util.ModelBuilder;
-import java.net.ConnectException;
 
 public class ChatAgent {
 
@@ -36,7 +35,7 @@ public class ChatAgent {
     	getAssistant();
     }
 
-    public void clearAssistant(){
+    public void clearAssistant() {
         resetChat();
         this.assistant = null;
     }
