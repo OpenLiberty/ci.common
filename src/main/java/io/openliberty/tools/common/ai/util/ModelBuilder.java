@@ -65,7 +65,7 @@ public class ModelBuilder {
         provider = OLLAMA;
         OLLAMA_BASE_URL = System.getProperty("ollama.base.url");
         
-        if (OLLAMA_BASE_URL == null || OLLAMA_BASE_URL.isBlank()){
+        if (OLLAMA_BASE_URL == null || OLLAMA_BASE_URL.isBlank()) {
             OLLAMA_BASE_URL = "http://localhost:11434";
         }
         

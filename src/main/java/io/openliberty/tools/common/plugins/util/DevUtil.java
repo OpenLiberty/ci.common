@@ -2940,7 +2940,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                     } else if (!validConnectionToChatAgent) {
                                         error("Please provide a valid ollama.base.url and chat.model.id.");
                                     }
-                                } catch(Exception exception) {
+                                } catch (Exception exception) {
                                     error("Error in AI mode setup. Check ollama.base.url. Please try again." );
                                 }
 
