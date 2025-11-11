@@ -33,6 +33,11 @@ public class ChatAgent {
     	getAssistant();
     }
 
+    public void clearAssistant() {
+        resetChat();
+        this.assistant = null;
+    }
+
     public Assistant getAssistant() throws Exception {
         if (assistant == null) {
             AiServices<Assistant> builder =
