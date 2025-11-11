@@ -29,6 +29,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -2501,8 +2502,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void printDevModeMessages(boolean inputUnavailable, boolean startup) throws PluginExecutionException {
         // the following will be printed only on startup or restart
         if (startup) {
-            getChatAgent();
-
             // print barrier header
             info(formatAttentionBarrier());
 
@@ -2529,19 +2528,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         if (startup) {
             printPortInfo(true);
-            if (getChatAgent() == null) {
-                AIMode = false;
-            } else {
+            if (isChatAgentAvailable()) {
                 AIMode = true;
+                printAIStatus();
+            } else {
+                AIMode = false;
             }
-            printAIStatus();
             // print barrier footer
             info(formatAttentionBarrier());
         }
     }
 
     private void printAIStatus() {
-        if (AIMode == false || getChatAgent() == null) {
+        if (AIMode == false || !isChatAgentAvailable()) {
             return;
         }
         info(formatAttentionMessage(""));
@@ -2775,12 +2774,42 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private ChatAgent getChatAgent() {
         if (chatAgent == null) {
             try {
-                chatAgent = new ChatAgent(1);
+                this.chatAgent = new ChatAgent(1);
             } catch (Exception e) {
-                debug(e.getMessage());
             }
         }
         return chatAgent;
+    }
+    
+    private boolean isChatAgentAvailable() {
+        return chatAgent != null;
+    }
+
+    private void resetChatAgent() {
+        if (chatAgent != null) {
+            chatAgent.clearAssistant();
+            this.chatAgent = null;
+        }
+    }
+
+    private boolean isChatAgentValid() {
+        if (chatAgent == null) {
+            try {
+                int memoryIDTest = 2;
+                chatAgent = new ChatAgent(memoryIDTest);
+                String response = chatAgent.chat("Test message");
+                if (response != null && !response.isBlank()) {
+                    return true;
+                }
+            } catch (RuntimeException runtimeException) {
+                return false;
+            } catch (ConnectException connectException) {
+                return false;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void chat(String message) {
@@ -2883,29 +2912,42 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else if (a.isPressed(line)) {
                         if (AIMode) {
-                            info("AI mode has been turned off.");
+                            if (isChatAgentAvailable()) {
+                                resetChatAgent();
+                            }
                             AIMode = false;
+                            info("AI mode has been turned off.");
                         } else {
-                            if (getChatAgent() == null) {
-                                if (!ModelBuilder.promptInputProvider()) {
-                                    continue;
+                            if (!isChatAgentAvailable()) {
+                                try {
+                                    getChatAgent();
+                                    boolean validSetModelProvider = ModelBuilder.selectInputProvider();
+                                    System.out.print("setting up...\n");
+                                    boolean validConnectionToChatAgent = isChatAgentValid();
+                                    if (validSetModelProvider && validConnectionToChatAgent) {
+                                        AIMode = true;
+                                        info(formatAttentionBarrier());
+                                        printAIStatus();
+                                        info(formatAttentionMessage(""));
+                                        info(formatAttentionBarrier());
+                                        continue;
+                                    } else if (validSetModelProvider == false) {
+                                        warn("Failed to enable AI mode.  Could not find the model. Ensure the model is available, or provide a valid model through the chat.model.id system property, when start the dev mode." );
+                                    } else if (!validConnectionToChatAgent) {
+                                        warn("Failed to enable AI mode. Ensure Ollama is installed and pull the gpt-oss model. Otherwise, provide a valid Ollama URL through the ollama.base.url and model through the chat.model.id system properties, when start the dev mode." );
+                                    }
+                                } catch (Exception exception) {
+                                    warn("Failed to enable AI mode. Ensure Ollama is installed and pull the gpt-oss model. Otherwise, provide a valid Ollama URL through the ollama.base.url and model through the chat.model.id system properties, when start the dev mode." );
                                 }
-                                System.out.print("\rsetting up...");
-                                if (getChatAgent() == null) {
+                                if (!isChatAgentAvailable()) {
                                     AIMode = false;
                                     ModelBuilder.cleanInputProvider();
-                                    System.out.print("\r              \r");
-                                    System.out.println("Failed to enable AI mode.");
                                     continue;
                                 }
                                 System.out.print("\r              \r");
                             }
-                            AIMode = true;
-                            info(formatAttentionBarrier());
-                            printAIStatus();
-                            info(formatAttentionMessage(""));
-                            info(formatAttentionBarrier());
                         }
+
                     } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
                         debug("Detected test command. Running tests... ");
                         if (isMultiModuleProject()) {
@@ -2917,7 +2959,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
                         warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
                     } else if (AIMode && line.startsWith("[")) {
-                        if (getChatAgent() == null) {
+                        if (!isChatAgentAvailable()) {
                             warn("AI could not be started, ensure the API/URL and model is correct");
                         }
                         if (line.trim().startsWith("[")) {
