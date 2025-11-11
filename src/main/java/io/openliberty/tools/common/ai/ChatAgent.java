@@ -76,13 +76,13 @@ public class ChatAgent {
     }
 
     public String chat(String message) throws Exception {
-        if (message.equalsIgnoreCase("reset")) {
+        if (message.equalsIgnoreCase("reset chat")) {
             resetChat();
             return "The current chat session is reset.\n";
         } else {
             String response = getAssistant().chat(memoryId, message).content();
             if (response == null || response.isBlank()) {
-                return "AI reponsonded with nothing. Try your message again or a new message.\n";
+                return "AI responded with nothing. Try your message again or a new message.\n";
             }
             return mdFormatter.rerender(response.trim());
         }
