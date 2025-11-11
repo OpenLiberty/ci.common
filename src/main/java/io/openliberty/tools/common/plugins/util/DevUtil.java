@@ -2502,8 +2502,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void printDevModeMessages(boolean inputUnavailable, boolean startup) throws PluginExecutionException {
         // the following will be printed only on startup or restart
         if (startup) {
-            checkChatAgentValue();
-
             // print barrier header
             info(formatAttentionBarrier());
 
@@ -2530,11 +2528,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         if (startup) {
             printPortInfo(true);
-            if (checkChatAgentValue() == null) {
-                AIMode = false;
-            } else {
+            if (isChatAgentAvailable()) {
                 AIMode = true;
                 printAIStatus();
+            } else {
+                AIMode = false;
             }
             // print barrier footer
             info(formatAttentionBarrier());
@@ -2542,13 +2540,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void printAIStatus() {
-        if (AIMode == false || checkChatAgentValue() == null) {
+        if (AIMode == false || !isChatAgentAvailable()) {
             return;
         }
         info(formatAttentionMessage(""));
         try {
             info(formatAttentionTitle("AI information:"));
-            info(formatAttentionMessage("model: " + checkChatAgentValue().getModelName()));
+            info(formatAttentionMessage("model: " + getChatAgent().getModelName()));
             info(formatAttentionMessage(""));
             //info(formatAttentionMessage("Post a message to AI - type in " + cyan("@ai your message") + " and press Enter."));
             info(formatAttentionMessage("To start a multi-line message, type in " + cyan("[") + " and press Enter."));
@@ -2783,8 +2781,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return chatAgent;
     }
     
-    private ChatAgent checkChatAgentValue() {
-        return chatAgent;
+    private boolean isChatAgentAvailable() {
+        return chatAgent != null;
     }
 
     private void resetChatAgent() {
@@ -2914,42 +2912,36 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         }
                     } else if (a.isPressed(line)) {
                         if (AIMode) {
-                            if (checkChatAgentValue() != null) {
+                            if (isChatAgentAvailable()) {
                                 resetChatAgent();
                             }
                             AIMode = false;
                             info("AI mode has been turned off.");
                         } else {
-                            if (checkChatAgentValue() == null) {
-                                try{
+                            if (!isChatAgentAvailable()) {
+                                try {
                                     getChatAgent();
                                     boolean validSetModelProvider = ModelBuilder.selectInputProvider();
+                                    System.out.print("setting up...\n");
                                     boolean validConnectionToChatAgent = isChatAgentValid();
                                     if (validSetModelProvider && validConnectionToChatAgent) {
                                         AIMode = true;
-                                        if(checkChatAgentValue().getToolsEnabled().equals("unavailable")) {
-                                            warn("AI model " + checkChatAgentValue().getModelName() + " does not support tools.");
-                                        }
                                         info(formatAttentionBarrier());
                                         printAIStatus();
                                         info(formatAttentionMessage(""));
                                         info(formatAttentionBarrier());
                                         continue;
                                     } else if (validSetModelProvider == false) {
-                                        error("Could not find the gpt-oss model. Stop the server and ensure Ollama is installed. Execute: ollama pull gpt-oss.");
+                                        warn("Failed to enable AI mode.  Could not find the model. Ensure the model is available, or provide a valid model through the chat.model.id system property, when start the dev mode." );
                                     } else if (!validConnectionToChatAgent) {
-                                        error("Please provide a valid ollama.base.url and chat.model.id.");
+                                        warn("Failed to enable AI mode. Ensure Ollama is installed and pull the gpt-oss model. Otherwise, provide a valid Ollama URL through the ollama.base.url and model through the chat.model.id system properties, when start the dev mode." );
                                     }
                                 } catch (Exception exception) {
-                                    error("Error in AI mode setup. Check ollama.base.url. Please try again." );
+                                    warn("Failed to enable AI mode. Ensure Ollama is installed and pull the gpt-oss model. Otherwise, provide a valid Ollama URL through the ollama.base.url and model through the chat.model.id system properties, when start the dev mode." );
                                 }
-
-                                System.out.print("\rsetting up...");
-                                if (checkChatAgentValue() == null) {
+                                if (!isChatAgentAvailable()) {
                                     AIMode = false;
                                     ModelBuilder.cleanInputProvider();
-                                    System.out.print("\r              \r");
-                                    warn("Failed to enable AI mode.");
                                     continue;
                                 }
                                 System.out.print("\r              \r");
@@ -2967,7 +2959,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else if (enter.isPressed(line) && isChangeOnDemandTestsAction()) {
                         warn("Unrecognized command: Enter. To see the help menu, type 'h' and press Enter.");
                     } else if (AIMode && line.startsWith("[")) {
-                        if (checkChatAgentValue() == null) {
+                        if (!isChatAgentAvailable()) {
                             warn("AI could not be started, ensure the API/URL and model is correct");
                         }
                         if (line.trim().startsWith("[")) {

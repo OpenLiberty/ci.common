@@ -15,7 +15,6 @@
  */
 package io.openliberty.tools.common.ai;
 
-import dev.langchain4j.exception.InvalidRequestException;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.service.AiServices;
 import io.openliberty.tools.common.ai.util.Assistant;
@@ -28,7 +27,6 @@ public class ChatAgent {
     private MarkdownConsoleFormatter mdFormatter = new MarkdownConsoleFormatter();
     private Assistant assistant = null;
     private int memoryId;
-    private boolean toolsEnabled = false;
 
     public ChatAgent(int memoryId) throws Exception {
     	this.memoryId = memoryId;
@@ -42,35 +40,12 @@ public class ChatAgent {
 
     public Assistant getAssistant() throws Exception {
         if (assistant == null) {
-            //add tools, as needed, to the builder below
             AiServices<Assistant> builder =
                 AiServices.builder(Assistant.class)
                     .chatModel(modelBuilder.getChatModel())
                     .chatMemoryProvider(
                          sessionId -> MessageWindowChatMemory.withMaxMessages(modelBuilder.getMaxMessages()));
             assistant = builder.build();
-
-            try {
-                assistant.chat(memoryId, "test");
-                toolsEnabled = true;
-            } catch (InvalidRequestException e) {
-                toolsEnabled = false;
-                if (e.getMessage().contains("does not support tools")) {
-                    builder = AiServices.builder(Assistant.class)
-                        .chatModel(modelBuilder.getChatModel())
-                        .chatMemoryProvider(
-                            sessionId -> MessageWindowChatMemory.withMaxMessages(modelBuilder.getMaxMessages()));
-                    assistant = builder.build();
-                } else {
-                    throw new Exception(e.getMessage());
-                }
-            } catch (RuntimeException runtimeException) {
-                throw new Exception(runtimeException);              
-            } catch (Exception e) {
-                throw new Exception(e.getMessage());
-            } finally {
-                resetChat();
-            }
         }
         return assistant;
     }
@@ -98,10 +73,6 @@ public class ChatAgent {
 
     public String getProvider() {
         return modelBuilder.getProvider();
-    }
-    
-    public String getToolsEnabled() {
-        return toolsEnabled ? "enabled" : "unavailable";
     }
 
     public Integer getTimeOut() {

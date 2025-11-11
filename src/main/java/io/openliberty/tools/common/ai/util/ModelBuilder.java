@@ -18,7 +18,6 @@ package io.openliberty.tools.common.ai.util;
 import static java.time.Duration.ofSeconds;
 
 import java.util.List;
-import java.util.Scanner;
 
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
@@ -39,16 +38,6 @@ public class ModelBuilder {
     private Integer MAX_NEW_TOKEN;
     private Integer MAX_MESSAGES;
     private Double TEMPERATURE;
-
-    private static Scanner scan = new Scanner(System.in);
-
-    private static void modelSelection() {
-        System.out.print("\nPress enter to use the default model " + Utils.bold(model) + " or type in a model name: ");
-        String modelName = scan.nextLine().trim();
-        if (!modelName.isBlank()) {
-            model = modelName;
-        }
-    }
 
     public static ChatModel chatModel() {
         return chatModel;
