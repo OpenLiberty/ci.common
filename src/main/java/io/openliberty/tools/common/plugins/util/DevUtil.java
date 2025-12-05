@@ -576,8 +576,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.generatedFeaturesFile = new File(generatedFeaturesFileParent, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
     }
 
-    public void copyTempFeatureFileToServer(File to) throws IOException {
-        copyFile(generatedFeaturesFile, generatedFeaturesFileParent, to, null);
+    public void copyGeneratedFeaturesFile(File destinationDir) throws IOException {
+        copyFile(generatedFeaturesFile, generatedFeaturesFileParent, destinationDir, null);
     }
     /**
      * Run unit and/or integration tests
@@ -4610,7 +4610,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
                 // this logic is not entered if the fileChanged is the generated features file
                 // copy generated features file to server dir
-                copyTempFeatureFileToServer(serverDirectory);
+                copyGeneratedFeaturesFile(serverDirectory);
                 generatedFeaturesModified = false;
             }
             if (serverFeaturesModified) {
@@ -4848,7 +4848,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         File parentDir = fileChanged.equals(generatedFeaturesFile) ? generatedFeaturesFileParent : srcDir;
         copyFile(fileChanged, parentDir, tempConfig, targetFileName);
         if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generatedFeaturesFile)) {
-            copyTempFeatureFileToServer(tempConfig);
+            copyGeneratedFeaturesFile(tempConfig);
         }
         installFeatures(fileChanged, tempConfig, generateFeatures);
         cleanUpTempConfig();
