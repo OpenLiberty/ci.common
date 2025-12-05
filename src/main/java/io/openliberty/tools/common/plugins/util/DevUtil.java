@@ -5890,7 +5890,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (generateFeatures) {
             // generateFeatures scenario: check if a generated feature has been manually added to other config files
             // Here we pass generated-features.xml instead of server.xml to calculate the generated ones
-            // The second parameter will not be used for generated-features.xml.
+            // The second parameter will only be used if generated-features.xml contains <include> element.
         	FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), serverDirectory,
                     generatedFeaturesFile, null, null);
         	if (fp != null)
