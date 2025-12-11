@@ -439,7 +439,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
     protected File generatedFeaturesFile;
-    protected File generatedFeaturesFileParent;
+    protected File generatedFeaturesContextDir;
     protected File generatedFeaturesTmpDir;
     private File modifiedSrcBuildFile;
 
@@ -572,12 +572,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void initGenerationContext() {
-        this.generatedFeaturesFileParent = generateToSrc ? configDirectory : generatedFeaturesTmpDir;
-        this.generatedFeaturesFile = new File(generatedFeaturesFileParent, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+        this.generatedFeaturesContextDir = generateToSrc ? configDirectory : generatedFeaturesTmpDir;
+        this.generatedFeaturesFile = new File(generatedFeaturesContextDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
     }
 
     public void copyGeneratedFeaturesFile(File destinationDir) throws IOException {
-        copyFile(generatedFeaturesFile, generatedFeaturesFileParent, destinationDir, null);
+        copyFile(generatedFeaturesFile, generatedFeaturesContextDir, destinationDir, null);
     }
     /**
      * Run unit and/or integration tests
@@ -3026,7 +3026,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 registerSingleFile(containerfileUsed, executor);
             }
 
-            // Always register this hidden temp directory because generateToSrc can be turned on in dev mode
+            // Always register the generated file in the temp dir. because generateToSrc can be toggled on and off in dev mode
             File hiddenTempGenerateFeaturesFile = new File(generatedFeaturesTmpDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
             hiddenTempGenerateFeaturesFile.getParentFile().mkdirs(); // must only mkdir on the directories
             registerSingleFile(hiddenTempGenerateFeaturesFile, executor);
@@ -4582,7 +4582,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         String targetFileName = configuredServerXml ? "server.xml" : null; // if null file will retain the same name when copied
         // three possible values for the parent directory
         File fileChangedParentDir = configuredServerXml ? serverXmlFileParent :
-            isGeneratedFeaturesFile ? generatedFeaturesFileParent : configDirectory;
+            isGeneratedFeaturesFile ? generatedFeaturesContextDir : configDirectory;
 
         if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
             debug("Config file modified: " + fileChanged);
@@ -4845,7 +4845,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 return !skip;
             }
         }, true);
-        File parentDir = fileChanged.equals(generatedFeaturesFile) ? generatedFeaturesFileParent : srcDir;
+        File parentDir = fileChanged.equals(generatedFeaturesFile) ? generatedFeaturesContextDir : srcDir;
         copyFile(fileChanged, parentDir, tempConfig, targetFileName);
         if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generatedFeaturesFile)) {
             copyGeneratedFeaturesFile(tempConfig);
@@ -5890,7 +5890,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (generateFeatures) {
             // generateFeatures scenario: check if a generated feature has been manually added to other config files
             // Here we pass generated-features.xml instead of server.xml to calculate the generated ones
-            // The second parameter will only be used if generated-features.xml contains <include> element.
+            // The second parameter will only be used if generated-features.xml contains an <include> element and 
+            // the current design does not allow this.
         	FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), serverDirectory,
                     generatedFeaturesFile, null, null);
         	if (fp != null)
