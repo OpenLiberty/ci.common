@@ -2624,13 +2624,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         info(formatAttentionMessage(
                 "g - toggle the automatic generation of features, type 'g' and press Enter."));
         info(formatAttentionMessage(
-                "    A new server configuration file will be generated in the SOURCE configDropins/overrides configuration directory."));
-        info(formatAttentionMessage("s - generate features to src directory, type 's' and press Enter."));
+                "    A new server configuration file will be generated in the configDropins/overrides configuration directory"));
+        info(formatAttentionMessage(
+                "    in either the build output directory or in the application source configuration directory."));
+        info(formatAttentionMessage("s - toggle the generation of features to src configuration directory, type 's' and press Enter."));
         if (generateFeatures) {
             // If generateFeatures is enabled, then also describe the optimize hotkey
             info(formatAttentionMessage("o - optimize the list of generated features, type 'o' and press Enter."));
-            info(formatAttentionMessage(
-                    "    A new server configuration file will be generated in the SOURCE configDropins/overrides configuration directory."));
+            if (generateToSrc) {
+                info(formatAttentionMessage(
+                        "    A new server configuration file will be generated in the SOURCE configDropins/overrides configuration directory."));
+            } else {
+                info(formatAttentionMessage(
+                        "    A new server configuration file will be generated in the build output configDropins/overrides configuration directory."));
+            }
         }
     }
 
