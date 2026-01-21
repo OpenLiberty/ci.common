@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2025.
+ * (C) Copyright IBM Corporation 2019, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1942,10 +1942,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param classes class file paths features should be generated for (can be null if no modified classes)
      * @param optimize if true, generate optimized feature list
-     * @param useTmpDir if true, generate feature file in a hidden directory named in BinaryScannerUtil
+     * @param useTmpDirOut if true, generate feature file in a hidden directory named in BinaryScannerUtil
+     * @param useTmpDirIn if true, the hidden directory named in BinaryScannerUtil will be used as the
+     *                    context or input values to generate features
      * @return true if feature generation was successful
      */
-    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean useTmpDir);
+    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean useTmpDirOut, boolean useTmpDirIn);
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -2176,9 +2178,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    public void cleanUpTempConfig() {
-        if (this.tempConfigPath != null) {
-            File tempConfig = this.tempConfigPath.toFile();
+    public void cleanUpTempConfig(Path myTempConfigPath) {
+        if (myTempConfigPath != null) {
+            File tempConfig = myTempConfigPath.toFile();
             if (tempConfig.exists()) {
                 try {
                     FileUtils.deleteDirectory(tempConfig);
@@ -2233,7 +2235,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 setDevStop(true);
-                cleanUpTempConfig();
+                cleanUpTempConfig(this.tempConfigPath);
                 cleanUpServerEnv();
 
                 if (hotkeyReader != null) {
@@ -2707,13 +2709,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         logFeatureGenerationStatus();
     }
 
+    private boolean optimizeGenerateFeatures(boolean useTmpDir) {
+        debug("Generating optimized features list...use temp directory (for output)=" + useTmpDir);
+        return optimizeGenerateFeatures(useTmpDir, false);
+    }
+
     /**
      * Generate features using all classes and only user specified features.
      */
-    private boolean optimizeGenerateFeatures(boolean useTmpDir) {
-        debug("Generating optimized features list...use temp directory=" + useTmpDir);
+    private boolean optimizeGenerateFeatures(boolean useTmpDirOut, boolean useTmpDirIn) {
+        debug("Generating optimized features list...use temp directory for output=" + useTmpDirOut + " use temp directory for input=" + useTmpDirIn);
         // scan all class files and provide only user specified features
-        boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDir);
+        boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDirOut, useTmpDirIn);
         if (generatedFeatures) {
             modifiedClasses.clear();
             failedToGenerateClasses.clear();
@@ -2732,7 +2739,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean generatedFeatures = false;
         try {
             Collection<String> classPaths = getClassPaths(modifiedClasses);
-            generatedFeatures = libertyGenerateFeatures(classPaths, false, useTmpDir);
+            generatedFeatures = libertyGenerateFeatures(classPaths, false, useTmpDir, false);
             if (generatedFeatures) {
                 modifiedClasses.clear();
                 failedToGenerateClasses.clear();
@@ -4595,7 +4602,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !isGeneratedFeaturesFile)
                     && serverFeaturesModified) {
-                generateFeaturesSuccess = optimizeGenerateFeatures(!generateToSrc);
+                // If generating to server dir we use the server dir config files and also the
+                // modified xml file in src dir. Copy them all to the gen. feat. temp dir to
+                // combine them for feature generation.
+                if (!generateToSrc) {
+                    cleanUpTempConfig(generateFeaturesTmpDir.toPath());
+                    // copy config files to temp dir
+                    copyToTempDir(serverDirectory, generateFeaturesTmpDir);
+                    // copy changed file to temp dir
+                    copyFile(fileChanged, fileChangedParentDir, generateFeaturesTmpDir, targetFileName);
+                }
+                generateFeaturesSuccess = optimizeGenerateFeatures(!generateToSrc, !generateToSrc);
             }
             if (serverFeaturesModified) {
                 // suppress install feature warning - property must be set before installing using temp dir
@@ -4831,27 +4848,41 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         File tempConfig = tempConfigPath.toFile();
         debug("Temporary configuration folder created: " + tempConfig);
 
-        FileUtils.copyDirectory(serverDirectory, tempConfig, new FileFilter() {
-            public boolean accept(File pathname) {
-                String name = pathname.getName();
-                String parent = pathname.getParentFile().getName();
-                String serverDirName = serverDirectory.getName();
-                // skip:
-                // - ignore list
-                // - workarea, messaging, and logs dirs from the server directory, since those can be
-                // changing
-                boolean skip = ignoreFileOrDir(pathname) || (pathname.isDirectory() && 
-                    (name.equals("workarea") || name.equals("logs") || (name.equals("messaging") && parent.equals(serverDirName))));
-                return !skip;
-            }
-        }, true);
+        copyToTempDir(serverDirectory, tempConfig);
         File parentDir = fileChanged.equals(generateFeaturesFile) ? generateFeaturesOutputDir : srcDir;
         copyFile(fileChanged, parentDir, tempConfig, targetFileName);
         if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generateFeaturesFile)) {
             copyGeneratedFeaturesFile(tempConfig);
         }
         installFeatures(fileChanged, tempConfig, generateFeatures);
-        cleanUpTempConfig();
+        cleanUpTempConfig(this.tempConfigPath);
+    }
+
+    /**
+     * Copy the liberty config in the sourceDir directory into the supplied temp directory.
+     * Filter out certain directories used in Liberty configuration: workarea, logs, messaging
+     * and also the files dev mode usually ignores e.g. .dir, .file, xxx.dmp etc
+     * 
+     * @param sourceDir  copy files from this directory
+     * @param tempDir    target directory to which files are copied
+     */
+    public File copyToTempDir(File sourceDir, File tempConfig) throws IOException {
+        FileUtils.copyDirectory(sourceDir, tempConfig, new FileFilter() {
+            public boolean accept(File pathname) {
+                String name = pathname.getName();
+                String parent = pathname.getParentFile().getName();
+                String sourceDirName = sourceDir.getName();
+                // skip:
+                // - ignore list
+                // - workarea, messaging, and logs dirs from the server directory, since those can be
+                // changing
+                boolean skip = ignoreFileOrDir(pathname) || (pathname.isDirectory() && 
+                    (name.equals("workarea") || name.equals("logs") || (name.equals("messaging") && parent.equals(sourceDirName))));
+                return !skip;
+            }
+        }, true);
+
+        return tempConfig;
     }
 
     /**
