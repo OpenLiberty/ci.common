@@ -1942,12 +1942,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param classes class file paths features should be generated for (can be null if no modified classes)
      * @param optimize if true, generate optimized feature list
+     * @param generateToSrc if true, generate feature list into file in src/main/liberty
      * @param useTmpDirOut if true, generate feature file in a hidden directory named in BinaryScannerUtil
      * @param useTmpDirIn if true, the hidden directory named in BinaryScannerUtil will be used as the
      *                    context or input values to generate features
      * @return true if feature generation was successful
      */
-    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean useTmpDirOut, boolean useTmpDirIn);
+    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean generateToSrc, boolean useTmpDirOut, boolean useTmpDirIn);
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -2672,13 +2673,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         generateToSrc = !generateToSrc;
         logGenerateToSrcStatus();
         initGenerationContext();
-        if (!generateToSrc) { // when you toggle off generate to src, delete the generated file in src
-            File srcGenFeaturesFile = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
-            if (srcGenFeaturesFile.exists()) {
-                if (!srcGenFeaturesFile.delete()) {
-                    debug("Error trying to delete the generated features file:" + srcGenFeaturesFile.getAbsolutePath());
-                }
-            }
+        // When you toggle generateToSrc delete the old file you no longer need
+        if (generateToSrc) {
+            deleteGenFeaturesFile(generateFeaturesTmpDir); // delete the old gen file in tmpdir
+        } else {
+            deleteGenFeaturesFile(configDirectory); // delete the old gen file in src/main/liberty/config
         }
         if (generateFeatures) {
             if (generateToSrc) {
@@ -2686,6 +2685,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             // If hotkey is toggled, generate features right away.
             optimizeGenerateFeatures(!generateToSrc);
+        }
+    }
+
+    private void deleteGenFeaturesFile(File dir) {
+        // processConfigFileChange() ignores deletion of generated features file
+        File srcGenFeaturesFile = new File(dir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+        if (srcGenFeaturesFile.exists()) {
+            if (!srcGenFeaturesFile.delete()) {
+                debug("Error trying to delete the generated features file:" + srcGenFeaturesFile.getAbsolutePath());
+            }
         }
     }
 
@@ -2720,7 +2729,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean optimizeGenerateFeatures(boolean useTmpDirOut, boolean useTmpDirIn) {
         debug("Generating optimized features list...use temp directory for output=" + useTmpDirOut + " use temp directory for input=" + useTmpDirIn);
         // scan all class files and provide only user specified features
-        boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDirOut, useTmpDirIn);
+        boolean generatedFeatures = libertyGenerateFeatures(null, true, generateToSrc, useTmpDirOut, useTmpDirIn);
         if (generatedFeatures) {
             modifiedClasses.clear();
             failedToGenerateClasses.clear();
@@ -2739,7 +2748,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean generatedFeatures = false;
         try {
             Collection<String> classPaths = getClassPaths(modifiedClasses);
-            generatedFeatures = libertyGenerateFeatures(classPaths, false, useTmpDir, false);
+            generatedFeatures = libertyGenerateFeatures(classPaths, false, generateToSrc, useTmpDir, false);
             if (generatedFeatures) {
                 modifiedClasses.clear();
                 failedToGenerateClasses.clear();
@@ -4674,7 +4683,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // Deleting that directory could cause generated-features.xml to be deleted and we
             // need to be careful how to handle that event e.g. don't call optimizeGenerateFeatures().
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
-                    && !fileChanged.equals(generateFeaturesFile))
+                    && !fileChanged.getName().equals(generateFeaturesFile.getName()))
                     && serverFeaturesModified()) {
                 optimizeGenerateFeatures(!generateToSrc);
             }
