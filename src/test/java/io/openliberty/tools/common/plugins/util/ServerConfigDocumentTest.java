@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2023, 2024.
+ * (C) Copyright IBM Corporation 2023, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package io.openliberty.tools.common.plugins.util;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -91,7 +92,11 @@ public class ServerConfigDocumentTest {
 		assertTrue("App location four not found.", locFourFound);
 		assertTrue("App location five not found.", locFiveFound);
 		assertTrue("App location six not found.", locSixFound);
-
+		if (OSUtil.isWindows()) {
+			assertEquals("Variable Expanded for !VAR!", "DEFINED_VAL", scd.getProperties().getProperty("this2_value"));
+		} else {
+			assertEquals("Variable Expanded for ${VAR}", "DEFINED_VAL", scd.getProperties().getProperty("this3_value"));
+		}
 	}
 
 	/**

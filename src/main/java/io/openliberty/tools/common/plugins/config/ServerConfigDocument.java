@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2025.
+ * (C) Copyright IBM Corporation 2017, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
@@ -46,6 +48,7 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import io.openliberty.tools.common.plugins.util.LibertyPropFilesUtility;
+import io.openliberty.tools.common.plugins.util.OSUtil;
 import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
@@ -88,6 +91,10 @@ public class ServerConfigDocument {
     private static final XPathExpression XPATH_SERVER_INCLUDE;
     public static final XPathExpression XPATH_SERVER_VARIABLE;
     private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
+    // Windows style: !VAR!
+    private static final Pattern WINDOWS_EXPANSION_VAR_PATTERN;
+    // Linux style: ${VAR}
+    private static final Pattern LINUX_EXPANSION_VAR_PATTERN;
 
 
     static {
@@ -106,6 +113,8 @@ public class ServerConfigDocument {
             // correct
             throw new RuntimeException(ex);
         }
+        WINDOWS_EXPANSION_VAR_PATTERN = Pattern.compile("!(\\w+)!");
+        LINUX_EXPANSION_VAR_PATTERN = Pattern.compile("\\$\\{(\\w+)\\}");
     }
 
     public Set<String> getLocations() {
@@ -321,6 +330,42 @@ public class ServerConfigDocument {
         parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
                 "shared" + File.separator + serverEnvString));
         parsePropertiesFromFile(getFileFromConfigDirectory(serverEnvString));
+        props.forEach((k, v) -> props.setProperty((String)k, resolveExpansionProperties(props, (String)v)));
+    }
+
+    /**
+     * Resolves both Windows (!VAR!) and Linux (${VAR}) placeholders.
+     */
+    private String resolveExpansionProperties(Properties props, String value) {
+        if (value == null) return null;
+        // Resolve Linux style or Windows style
+        String result;
+        if (OSUtil.isWindows()) {
+            result = resolveByPattern(props, value, WINDOWS_EXPANSION_VAR_PATTERN);
+        } else {
+            result = resolveByPattern(props, value, LINUX_EXPANSION_VAR_PATTERN);
+        }
+        return result;
+    }
+
+    private String resolveByPattern(Properties props, String value, Pattern pattern) {
+        StringBuilder sb = new StringBuilder(value);
+        Matcher matcher = pattern.matcher(sb);
+
+        while (matcher.find()) {
+            String varName = matcher.group(1);
+            String replacement = props.getProperty(varName);
+            if (replacement != null) {
+                // Recursively resolve the replacement
+                String resolvedReplacement = resolveExpansionProperties(props, replacement);
+                String sbBeforeReplacement = sb.toString();
+                sb.replace(matcher.start(), matcher.end(), resolvedReplacement);
+                log.debug("Found a recursive variable reference when resolving "+ sbBeforeReplacement +" in server.env. Resolved value is " + sb);
+                // Reset matcher because the string length changed
+                matcher = pattern.matcher(sb);
+            }
+        }
+        return sb.toString();
     }
 
     /**
