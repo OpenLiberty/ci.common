@@ -94,9 +94,12 @@ public class ServerConfigDocumentTest {
 		assertTrue("App location six not found.", locSixFound);
 		if (OSUtil.isWindows()) {
 			assertEquals("Variable Expanded for !VAR!", "DEFINED_VAL", scd.getProperties().getProperty("this2_value"));
+			assertEquals("Variable Expanded for ${VAR}", "DEFINED\\old_value\\dir", scd.getProperties().getProperty("this5_value"));
 		} else {
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED_VAL", scd.getProperties().getProperty("this3_value"));
+			assertEquals("Variable Expanded for ${VAR}", "DEFINED/old_value/dir", scd.getProperties().getProperty("this4_value"));
 		}
+		assertEquals("Variable not Expanded for !this_val", "!this_val", scd.getProperties().getProperty("this6_value"));
 	}
 
 	/**
