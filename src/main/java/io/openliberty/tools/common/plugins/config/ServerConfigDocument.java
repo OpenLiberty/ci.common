@@ -54,8 +54,6 @@ import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
-import org.w3c.dom.Node;
-import org.w3c.dom.NamedNodeMap;
 import org.xml.sax.SAXException;
 
 import io.openliberty.tools.common.CommonLoggerI;
@@ -95,6 +93,7 @@ public class ServerConfigDocument {
     private static final Pattern WINDOWS_EXPANSION_VAR_PATTERN;
     // Linux style: ${VAR}
     private static final Pattern LINUX_EXPANSION_VAR_PATTERN;
+    private static final int MAX_SUBSTITUTION_DEPTH = 5;
 
 
     static {
@@ -330,41 +329,74 @@ public class ServerConfigDocument {
         parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
                 "shared" + File.separator + serverEnvString));
         parsePropertiesFromFile(getFileFromConfigDirectory(serverEnvString));
-        props.forEach((k, v) -> props.setProperty((String)k, resolveExpansionProperties(props, (String)v)));
+        Map<String, String> resolvedMap = new HashMap<>();
+
+        props.forEach((k, v) -> {
+            String key = (String) k;
+            String value = (String) v;
+            Set<String> resolveInProgressProps = new HashSet<>();
+            resolveInProgressProps.add(key);
+            resolvedMap.put(key, resolveExpansionProperties(props, value,key, resolveInProgressProps, MAX_SUBSTITUTION_DEPTH));
+        });
+
+        // After all resolutions are calculated, update the original props
+        props.putAll(resolvedMap);
     }
 
     /**
-     * Resolves both Windows (!VAR!) and Linux (${VAR}) placeholders.
+     * Resolves property placeholders recursively with safety guards.
+     * Uses appendReplacement to ensure a single-pass scan and strict depth control.
+     *
+     * @param props                  The properties source.
+     * @param value                  The string currently being processed.
+     * @param resolveInProgressProps The set of variables in the current stack to detect loops.
+     * @param remainingDepth         Remaining levels of recursion allowed.
+     * @return The resolved string or raw text if depth/circularity limits are hit.
      */
-    private String resolveExpansionProperties(Properties props, String value) {
+    private String resolveExpansionProperties(Properties props, String value, String key, Set<String> resolveInProgressProps, int remainingDepth) {
         if (value == null) return null;
-        // Resolve Linux style or Windows style
-        String result;
-        if (OSUtil.isWindows()) {
-            result = resolveByPattern(props, value, WINDOWS_EXPANSION_VAR_PATTERN);
-        } else {
-            result = resolveByPattern(props, value, LINUX_EXPANSION_VAR_PATTERN);
-        }
-        return result;
-    }
 
-    private String resolveByPattern(Properties props, String value, Pattern pattern) {
-        StringBuilder sb = new StringBuilder(value);
-        Matcher matcher = pattern.matcher(sb);
+        // 1. Initial Depth Check
+        if (remainingDepth <= 0) {
+            log.warn("Max substitution depth reached for key: " + key + ". Returning raw value: " + value);
+            return value;
+        }
+        Pattern pattern = OSUtil.isWindows() ? WINDOWS_EXPANSION_VAR_PATTERN : LINUX_EXPANSION_VAR_PATTERN;
+        Matcher matcher = pattern.matcher(value);
+        StringBuffer sb = new StringBuffer();
 
         while (matcher.find()) {
             String varName = matcher.group(1);
+
+            // 2. Circular Reference Guard
+            if (resolveInProgressProps.contains(varName)) {
+                log.warn("Circular reference detected: " + varName + " depends on itself in key " + key + ". Skipping expansion.");
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
             String replacement = props.getProperty(varName);
             if (replacement != null) {
-                // Recursively resolve the replacement
-                String resolvedReplacement = resolveExpansionProperties(props, replacement);
-                String sbBeforeReplacement = sb.toString();
-                sb.replace(matcher.start(), matcher.end(), resolvedReplacement);
-                log.debug("Found a recursive variable reference when resolving "+ sbBeforeReplacement +" in server.env. Resolved value is " + sb);
-                // Reset matcher because the string length changed
-                matcher = pattern.matcher(sb);
+                // 3. Recursive Logic with Depth Guard
+                if (remainingDepth <= 1) {
+                    log.warn("Depth limit hit at '" + varName + "'. Appending raw value without further expansion.");
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+                } else {
+                    resolveInProgressProps.add(varName);
+                    try {
+                        String resolved = resolveExpansionProperties(props, replacement, key, resolveInProgressProps, remainingDepth - 1);
+                        matcher.appendReplacement(sb, Matcher.quoteReplacement(resolved));
+                    } finally {
+                        resolveInProgressProps.remove(varName);
+                    }
+                }
+            } else {
+                // Variable not found in Properties; leave the original ${VAR} or !VAR!
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
             }
+            log.debug("Resolving Property " + varName + "value with " + sb);
         }
+        // 4. Finalize the string
+        matcher.appendTail(sb);
         return sb.toString();
     }
 
