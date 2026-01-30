@@ -366,12 +366,12 @@ public class ServerConfigDocument {
         StringBuffer sb = new StringBuffer();
 
         while (matcher.find()) {
+            String finalReplacement;
             String varName = matcher.group(1);
 
             // 2. Circular Reference Guard
             if (resolveInProgressProps.contains(varName)) {
                 log.warn("Circular reference detected: " + varName + " depends on itself in key " + key + ". Skipping expansion.");
-                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
                 continue;
             }
             String replacement = props.getProperty(varName);
@@ -379,21 +379,22 @@ public class ServerConfigDocument {
                 // 3. Recursive Logic with Depth Guard
                 if (remainingDepth <= 1) {
                     log.warn("Depth limit hit at '" + varName + "'. Appending raw value without further expansion.");
-                    matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+                    finalReplacement = replacement;
                 } else {
                     resolveInProgressProps.add(varName);
                     try {
                         String resolved = resolveExpansionProperties(props, replacement, key, resolveInProgressProps, remainingDepth - 1);
-                        matcher.appendReplacement(sb, Matcher.quoteReplacement(resolved));
+                        finalReplacement = resolved;
                     } finally {
                         resolveInProgressProps.remove(varName);
                     }
                 }
             } else {
                 // Variable not found in Properties; leave the original ${VAR} or !VAR!
-                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+                finalReplacement = matcher.group(0); // Keep original
             }
-            log.debug("Resolving Property " + varName + "value with " + sb);
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(finalReplacement));
+            log.debug(String.format("Resolving Property %s for %s. Resolved value is %s", varName , value , sb));
         }
         // 4. Finalize the string
         matcher.appendTail(sb);
