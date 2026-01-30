@@ -95,7 +95,7 @@ public class ServerConfigDocumentTest {
 		if (OSUtil.isWindows()) {
 			assertEquals("Variable Expanded for !VAR!", "DEFINED_VAL", scd.getProperties().getProperty("this2_value"));
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED\\old_value\\dir", scd.getProperties().getProperty("this5_value"));
-			assertEquals("Variable Expanded for recursive this8_value=!this5_value!\\!overriden_value!\\dir", "DEFINED_VAL\\old_value\\dir\\old_value\\dir", scd.getProperties().getProperty("this8_value"));
+			assertEquals("Variable Expanded for recursive this8_value=!this5_value!\\!overriden_value!\\dir", "DEFINED\\old_value\\dir\\old_value\\dir", scd.getProperties().getProperty("this8_value"));
 		} else {
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED_VAL", scd.getProperties().getProperty("this3_value"));
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED/old_value/dir", scd.getProperties().getProperty("this4_value"));
