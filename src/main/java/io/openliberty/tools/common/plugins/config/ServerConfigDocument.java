@@ -362,12 +362,12 @@ public class ServerConfigDocument {
             String varName = matcher.group(1);
             // 2. Circular Reference Guard
             if (resolveInProgressProps.contains(varName)) {
-                log.warn("Circular reference detected: " + varName + " depends on itself in key " + key + ". Skipping expansion.");
-                continue;
+                log.warn("Circular reference detected: " + varName + " depends on itself in value " + value + ". Skipping expansion.");
+                break;
             }
             String replacement = props.getProperty(varName);
             if (replacement != null) {
-                // 3. Recursive Logic with Depth Guard
+                // 3. Recursive call
                 // Add to stack before recursing
                 resolveInProgressProps.add(varName);
                 try {
