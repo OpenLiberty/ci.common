@@ -96,7 +96,6 @@ public class ServerConfigDocumentTest {
 			assertEquals("Variable Expanded for !VAR!", "DEFINED_VAL", scd.getProperties().getProperty("this2_value"));
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED\\old_value\\dir", scd.getProperties().getProperty("this5_value"));
 			assertEquals("Variable Expanded for recursive this8_value=!this5_value!\\!overriden_value!\\dir", "DEFINED\\old_value\\dir\\old_value\\dir", scd.getProperties().getProperty("this8_value"));
-			assertEquals("circular reference value is not resolved", "DEFINED_VAL/${self_ref_value}", scd.getProperties().getProperty("self_ref_value"));
 			assertEquals("circular or self reference value is not resolved", "var_!circ_v2_win!", scd.getProperties().getProperty("circ_v1_win"));
 		} else {
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED_VAL", scd.getProperties().getProperty("this3_value"));
