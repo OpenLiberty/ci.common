@@ -96,13 +96,15 @@ public class ServerConfigDocumentTest {
 			assertEquals("Variable Expanded for !VAR!", "DEFINED_VAL", scd.getProperties().getProperty("this2_value"));
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED\\old_value\\dir", scd.getProperties().getProperty("this5_value"));
 			assertEquals("Variable Expanded for recursive this8_value=!this5_value!\\!overriden_value!\\dir", "DEFINED\\old_value\\dir\\old_value\\dir", scd.getProperties().getProperty("this8_value"));
+			assertEquals("circular reference value is not resolved", "DEFINED_VAL/${self_ref_value}", scd.getProperties().getProperty("self_ref_value"));
+			assertEquals("circular or self reference value is not resolved", "var_!circ_v2_win!", scd.getProperties().getProperty("circ_v1_win"));
 		} else {
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED_VAL", scd.getProperties().getProperty("this3_value"));
 			assertEquals("Variable Expanded for ${VAR}", "DEFINED/old_value/dir", scd.getProperties().getProperty("this4_value"));
 			assertEquals("Variable Expanded for recursive this7_value=${this3_value}/${overriden_value}/dir", "DEFINED_VAL/old_value/dir", scd.getProperties().getProperty("this7_value"));
-			assertEquals("circular or self reference value is not resolved", "DEFINED_VAL/${self_ref_value}", scd.getProperties().getProperty("self_ref_value"));
-			assertEquals("recursive reference stopped with more than max", "v7_v6_v5_v4_v3_${depth_v2}", scd.getProperties().getProperty("depth_max"));
-			assertEquals("recursive reference stopped with more than max", "v7_v6_v5_v4_v3_v2_${depth_v1}", scd.getProperties().getProperty("depth_v7"));
+			assertEquals("circular reference value is not resolved", "DEFINED_VAL/${self_ref_value}", scd.getProperties().getProperty("self_ref_value"));
+			assertEquals("recursive reference resolved", "v7_v6_v5_v4_v3_v2_1", scd.getProperties().getProperty("depth_max"));
+			assertEquals("recursive reference resolved", "v7_v6_v5_v4_v3_v2_1", scd.getProperties().getProperty("depth_v7"));
 		}
 		assertEquals("Variable not Expanded for !this_val", "!this_val", scd.getProperties().getProperty("this6_value"));
 	}

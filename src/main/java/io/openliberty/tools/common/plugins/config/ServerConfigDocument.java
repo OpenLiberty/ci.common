@@ -93,7 +93,6 @@ public class ServerConfigDocument {
     private static final Pattern WINDOWS_EXPANSION_VAR_PATTERN;
     // Linux style: ${VAR}
     private static final Pattern LINUX_EXPANSION_VAR_PATTERN;
-    private static final int MAX_SUBSTITUTION_DEPTH = 5;
 
 
     static {
@@ -336,7 +335,7 @@ public class ServerConfigDocument {
             String value = (String) v;
             Set<String> resolveInProgressProps = new HashSet<>();
             resolveInProgressProps.add(key);
-            resolvedMap.put(key, resolveExpansionProperties(props, value,key, resolveInProgressProps, MAX_SUBSTITUTION_DEPTH));
+            resolvedMap.put(key, resolveExpansionProperties(props, value, key, resolveInProgressProps));
         });
 
         // After all resolutions are calculated, update the original props
@@ -349,26 +348,18 @@ public class ServerConfigDocument {
      *
      * @param props                  The properties source.
      * @param value                  The string currently being processed.
+     * @param key                    key of property being processed.
      * @param resolveInProgressProps The set of variables in the current stack to detect loops.
-     * @param remainingDepth         Remaining levels of recursion allowed.
      * @return The resolved string or raw text if depth/circularity limits are hit.
      */
-    private String resolveExpansionProperties(Properties props, String value, String key, Set<String> resolveInProgressProps, int remainingDepth) {
+    private String resolveExpansionProperties(Properties props, String value, String key, Set<String> resolveInProgressProps) {
         if (value == null) return null;
-
-        // 1. Initial Depth Check
-        if (remainingDepth <= 0) {
-            log.warn("Max substitution depth reached for key: " + key + ". Returning raw value: " + value);
-            return value;
-        }
         Pattern pattern = OSUtil.isWindows() ? WINDOWS_EXPANSION_VAR_PATTERN : LINUX_EXPANSION_VAR_PATTERN;
         Matcher matcher = pattern.matcher(value);
         StringBuffer sb = new StringBuffer();
-
         while (matcher.find()) {
             String finalReplacement;
             String varName = matcher.group(1);
-
             // 2. Circular Reference Guard
             if (resolveInProgressProps.contains(varName)) {
                 log.warn("Circular reference detected: " + varName + " depends on itself in key " + key + ". Skipping expansion.");
@@ -377,17 +368,13 @@ public class ServerConfigDocument {
             String replacement = props.getProperty(varName);
             if (replacement != null) {
                 // 3. Recursive Logic with Depth Guard
-                if (remainingDepth <= 1) {
-                    log.warn("Depth limit hit at '" + varName + "'. Appending raw value without further expansion.");
-                    finalReplacement = replacement;
-                } else {
-                    resolveInProgressProps.add(varName);
-                    try {
-                        String resolved = resolveExpansionProperties(props, replacement, key, resolveInProgressProps, remainingDepth - 1);
-                        finalReplacement = resolved;
-                    } finally {
-                        resolveInProgressProps.remove(varName);
-                    }
+                // Add to stack before recursing
+                resolveInProgressProps.add(varName);
+                try {
+                    finalReplacement = resolveExpansionProperties(props, replacement, key, resolveInProgressProps);
+                } finally {
+                    // Remove from stack after finishing this branch (backtracking)
+                    resolveInProgressProps.remove(varName);
                 }
             } else {
                 // Variable not found in Properties; leave the original ${VAR} or !VAR!
