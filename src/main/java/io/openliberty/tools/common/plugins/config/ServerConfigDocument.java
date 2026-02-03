@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2025.
+ * (C) Copyright IBM Corporation 2017, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
@@ -46,13 +48,12 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import io.openliberty.tools.common.plugins.util.LibertyPropFilesUtility;
+import io.openliberty.tools.common.plugins.util.OSUtil;
 import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
-import org.w3c.dom.Node;
-import org.w3c.dom.NamedNodeMap;
 import org.xml.sax.SAXException;
 
 import io.openliberty.tools.common.CommonLoggerI;
@@ -88,6 +89,10 @@ public class ServerConfigDocument {
     private static final XPathExpression XPATH_SERVER_INCLUDE;
     public static final XPathExpression XPATH_SERVER_VARIABLE;
     private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
+    // Windows style: !VAR!
+    private static final Pattern WINDOWS_EXPANSION_VAR_PATTERN;
+    // Linux style: ${VAR}
+    private static final Pattern LINUX_EXPANSION_VAR_PATTERN;
 
 
     static {
@@ -106,6 +111,8 @@ public class ServerConfigDocument {
             // correct
             throw new RuntimeException(ex);
         }
+        WINDOWS_EXPANSION_VAR_PATTERN = Pattern.compile("!(\\w+)!");
+        LINUX_EXPANSION_VAR_PATTERN = Pattern.compile("\\$\\{(\\w+)\\}");
     }
 
     public Set<String> getLocations() {
@@ -321,6 +328,64 @@ public class ServerConfigDocument {
         parsePropertiesFromFile(new File(libertyDirectoryPropertyToFile.get(ServerFeatureUtil.WLP_USER_DIR),
                 "shared" + File.separator + serverEnvString));
         parsePropertiesFromFile(getFileFromConfigDirectory(serverEnvString));
+        Map<String, String> resolvedMap = new HashMap<>();
+
+        props.forEach((k, v) -> {
+            String key = (String) k;
+            String value = (String) v;
+            Set<String> resolveInProgressProps = new HashSet<>();
+            resolveInProgressProps.add(key);
+            resolvedMap.put(key, resolveExpansionProperties(props, value, key, resolveInProgressProps));
+        });
+
+        // After all resolutions are calculated, update the original props
+        props.putAll(resolvedMap);
+    }
+
+    /**
+     * Resolves property placeholders recursively with safety guards.
+     * Uses appendReplacement to ensure a single-pass scan and strict depth control.
+     *
+     * @param props                  The properties source.
+     * @param value                  The string currently being processed.
+     * @param key                    key of property being processed.
+     * @param resolveInProgressProps The set of variables in the current stack to detect loops.
+     * @return The resolved string or raw text if depth/circularity limits are hit.
+     */
+    private String resolveExpansionProperties(Properties props, String value, String key, Set<String> resolveInProgressProps) {
+        if (value == null) return null;
+        Pattern pattern = OSUtil.isWindows() ? WINDOWS_EXPANSION_VAR_PATTERN : LINUX_EXPANSION_VAR_PATTERN;
+        Matcher matcher = pattern.matcher(value);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String finalReplacement;
+            String varName = matcher.group(1);
+            // 2. Circular Reference Guard
+            if (resolveInProgressProps.contains(varName)) {
+                log.warn("Circular reference detected: " + varName + " depends on itself in value " + value + ". Skipping expansion.");
+                break;
+            }
+            String replacement = props.getProperty(varName);
+            if (replacement != null) {
+                // 3. Recursive call
+                // Add to stack before recursing
+                resolveInProgressProps.add(varName);
+                try {
+                    finalReplacement = resolveExpansionProperties(props, replacement, key, resolveInProgressProps);
+                } finally {
+                    // Remove from stack after finishing this branch (backtracking)
+                    resolveInProgressProps.remove(varName);
+                }
+            } else {
+                // Variable not found in Properties; leave the original ${VAR} or !VAR!
+                finalReplacement = matcher.group(0); // Keep original
+            }
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(finalReplacement));
+            log.debug(String.format("Resolving Property %s for %s. Resolved value is %s", varName , value , sb));
+        }
+        // 4. Finalize the string
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 
     /**
