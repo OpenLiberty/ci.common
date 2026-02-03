@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2025.
+ * (C) Copyright IBM Corporation 2019, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1942,10 +1942,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * 
      * @param classes class file paths features should be generated for (can be null if no modified classes)
      * @param optimize if true, generate optimized feature list
-     * @param useTmpDir if true, generate feature file in a hidden directory named in BinaryScannerUtil
+     * @param useTmpDirOut if true, generate feature file in a hidden directory named in BinaryScannerUtil
+     * @param useTmpDirIn if true, the hidden directory named in BinaryScannerUtil will be used as the
+     *                    context or input values to generate features
      * @return true if feature generation was successful
      */
-    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean useTmpDir);
+    public abstract boolean libertyGenerateFeatures(Collection<String> classes, boolean optimize, boolean useTmpDirOut, boolean useTmpDirIn);
 
     /**
      * Install features in regular dev mode. This method should not be used in container mode.
@@ -2176,13 +2178,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    public void cleanUpTempConfig() {
-        if (this.tempConfigPath != null) {
-            File tempConfig = this.tempConfigPath.toFile();
+    public void cleanUpTempConfig(Path myTempConfigPath) {
+        if (myTempConfigPath != null) {
+            File tempConfig = myTempConfigPath.toFile();
             if (tempConfig.exists()) {
                 try {
                     FileUtils.deleteDirectory(tempConfig);
-                    debug("Successfully deleted liberty:dev temporary configuration folder");
+                    debug("Successfully deleted liberty:dev temporary configuration folder: " + myTempConfigPath);
                 } catch (IOException e) {
                     warn("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
                 }
@@ -2233,7 +2235,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 }
 
                 setDevStop(true);
-                cleanUpTempConfig();
+                cleanUpTempConfig(this.tempConfigPath);
                 cleanUpServerEnv();
 
                 if (hotkeyReader != null) {
@@ -2707,13 +2709,18 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         logFeatureGenerationStatus();
     }
 
+    private boolean optimizeGenerateFeatures(boolean useTmpDir) {
+        debug("Entering optimizeGenerateFeatures(boolean)");
+        return optimizeGenerateFeatures(useTmpDir, false);
+    }
+
     /**
      * Generate features using all classes and only user specified features.
      */
-    private boolean optimizeGenerateFeatures(boolean useTmpDir) {
-        debug("Generating optimized features list...use temp directory=" + useTmpDir);
+    private boolean optimizeGenerateFeatures(boolean useTmpDirOut, boolean useTmpDirIn) {
+        debug("Generating optimized features list...use temp directory for output=" + useTmpDirOut + " use temp directory for input=" + useTmpDirIn);
         // scan all class files and provide only user specified features
-        boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDir);
+        boolean generatedFeatures = libertyGenerateFeatures(null, true, useTmpDirOut, useTmpDirIn);
         if (generatedFeatures) {
             modifiedClasses.clear();
             failedToGenerateClasses.clear();
@@ -2732,7 +2739,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         boolean generatedFeatures = false;
         try {
             Collection<String> classPaths = getClassPaths(modifiedClasses);
-            generatedFeatures = libertyGenerateFeatures(classPaths, false, useTmpDir);
+            generatedFeatures = libertyGenerateFeatures(classPaths, false, useTmpDir, false);
             if (generatedFeatures) {
                 modifiedClasses.clear();
                 failedToGenerateClasses.clear();
@@ -4595,7 +4602,20 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !isGeneratedFeaturesFile)
                     && serverFeaturesModified) {
-                generateFeaturesSuccess = optimizeGenerateFeatures(!generateToSrc);
+                // If generating to server dir we use the server dir config files and also the
+                // modified xml file in src dir. Copy them all to the gen. feat. temp dir to
+                // combine them for feature generation.
+                if (!generateToSrc) {
+                    // Deleting generateFeaturesTmpDir also deletes generateFeaturesFile which we "watch" in
+                    // dev mode. This causes a deletion event and we are counting on the handler (this method,
+                    // below) not to call generate features and recreate the file.
+                    cleanUpTempConfig(generateFeaturesTmpDir.toPath());
+                    // copy config files to temp dir
+                    copyToTempDir(serverDirectory, generateFeaturesTmpDir);
+                    // copy changed file to temp dir
+                    copyFile(fileChanged, fileChangedParentDir, generateFeaturesTmpDir, targetFileName);
+                }
+                generateFeaturesSuccess = optimizeGenerateFeatures(!generateToSrc, !generateToSrc);
             }
             if (serverFeaturesModified) {
                 // suppress install feature warning - property must be set before installing using temp dir
@@ -4649,7 +4669,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info("Config file deleted: " + fileChanged.getName());
             deleteFile(fileChanged, fileChangedParentDir, serverDirectory, targetFileName);
             // generate features whenever features have changed and an XML file is deleted,
-            // excluding the generated-features.xml file
+            // excluding the generated-features.xml file. This is important also when we delete the
+            // generateFeaturesTmpDir in the process of handling an xml config modicifcation.
+            // Deleting that directory could cause generated-features.xml to be deleted and we
+            // need to be careful how to handle that event e.g. don't call optimizeGenerateFeatures().
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !fileChanged.equals(generateFeaturesFile))
                     && serverFeaturesModified()) {
@@ -4831,27 +4854,40 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         File tempConfig = tempConfigPath.toFile();
         debug("Temporary configuration folder created: " + tempConfig);
 
-        FileUtils.copyDirectory(serverDirectory, tempConfig, new FileFilter() {
+        copyToTempDir(serverDirectory, tempConfig);
+        copyFile(fileChanged, srcDir, tempConfig, targetFileName);
+        if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generateFeaturesFile)) {
+            copyGeneratedFeaturesFile(tempConfig);
+        }
+        installFeatures(fileChanged, tempConfig, generateFeatures);
+        cleanUpTempConfig(this.tempConfigPath);
+    }
+
+    /**
+     * Copy the liberty config in the sourceDir directory into the supplied temp directory.
+     * Filter out certain directories used in Liberty configuration: workarea, logs, messaging
+     * and also the files dev mode usually ignores e.g. .dir, .file, xxx.dmp etc
+     * 
+     * @param sourceDir  copy files from this directory
+     * @param tempDir    target directory to which files are copied
+     */
+    public File copyToTempDir(File sourceDir, File tempConfig) throws IOException {
+        FileUtils.copyDirectory(sourceDir, tempConfig, new FileFilter() {
             public boolean accept(File pathname) {
                 String name = pathname.getName();
                 String parent = pathname.getParentFile().getName();
-                String serverDirName = serverDirectory.getName();
+                String sourceDirName = sourceDir.getName();
                 // skip:
                 // - ignore list
                 // - workarea, messaging, and logs dirs from the server directory, since those can be
                 // changing
                 boolean skip = ignoreFileOrDir(pathname) || (pathname.isDirectory() && 
-                    (name.equals("workarea") || name.equals("logs") || (name.equals("messaging") && parent.equals(serverDirName))));
+                    (name.equals("workarea") || name.equals("logs") || (name.equals("messaging") && parent.equals(sourceDirName))));
                 return !skip;
             }
         }, true);
-        File parentDir = fileChanged.equals(generateFeaturesFile) ? generateFeaturesOutputDir : srcDir;
-        copyFile(fileChanged, parentDir, tempConfig, targetFileName);
-        if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generateFeaturesFile)) {
-            copyGeneratedFeaturesFile(tempConfig);
-        }
-        installFeatures(fileChanged, tempConfig, generateFeatures);
-        cleanUpTempConfig();
+
+        return tempConfig;
     }
 
     /**
