@@ -2184,7 +2184,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (tempConfig.exists()) {
                 try {
                     FileUtils.deleteDirectory(tempConfig);
-                    debug("Successfully deleted liberty:dev temporary configuration folder");
+                    debug("Successfully deleted liberty:dev temporary configuration folder: " + myTempConfigPath);
                 } catch (IOException e) {
                     warn("Could not delete liberty:dev temporary configuration folder: " + e.getMessage());
                 }
@@ -2710,7 +2710,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private boolean optimizeGenerateFeatures(boolean useTmpDir) {
-        debug("Generating optimized features list...use temp directory (for output)=" + useTmpDir);
+        debug("Entering optimizeGenerateFeatures(boolean)");
         return optimizeGenerateFeatures(useTmpDir, false);
     }
 
@@ -4606,6 +4606,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // modified xml file in src dir. Copy them all to the gen. feat. temp dir to
                 // combine them for feature generation.
                 if (!generateToSrc) {
+                    // Deleting generateFeaturesTmpDir also deletes generateFeaturesFile which we "watch" in
+                    // dev mode. This causes a deletion event and we are counting on the handler (this method,
+                    // below) not to call generate features and recreate the file.
                     cleanUpTempConfig(generateFeaturesTmpDir.toPath());
                     // copy config files to temp dir
                     copyToTempDir(serverDirectory, generateFeaturesTmpDir);
@@ -4666,7 +4669,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info("Config file deleted: " + fileChanged.getName());
             deleteFile(fileChanged, fileChangedParentDir, serverDirectory, targetFileName);
             // generate features whenever features have changed and an XML file is deleted,
-            // excluding the generated-features.xml file
+            // excluding the generated-features.xml file. This is important also when we delete the
+            // generateFeaturesTmpDir in the process of handling an xml config modicifcation.
+            // Deleting that directory could cause generated-features.xml to be deleted and we
+            // need to be careful how to handle that event e.g. don't call optimizeGenerateFeatures().
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !fileChanged.equals(generateFeaturesFile))
                     && serverFeaturesModified()) {
@@ -4849,8 +4855,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         debug("Temporary configuration folder created: " + tempConfig);
 
         copyToTempDir(serverDirectory, tempConfig);
-        File parentDir = fileChanged.equals(generateFeaturesFile) ? generateFeaturesOutputDir : srcDir;
-        copyFile(fileChanged, parentDir, tempConfig, targetFileName);
+        copyFile(fileChanged, srcDir, tempConfig, targetFileName);
         if (generateFeatures && generateFeaturesSuccess && !fileChanged.equals(generateFeaturesFile)) {
             copyGeneratedFeaturesFile(tempConfig);
         }
