@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2026.
+ * (C) Copyright IBM Corporation 2019, 2026
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2689,11 +2689,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     private void deleteGenFeaturesFile(File dir) {
-        // processConfigFileChange() ignores deletion of generated features file
-        File srcGenFeaturesFile = new File(dir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
-        if (srcGenFeaturesFile.exists()) {
-            if (!srcGenFeaturesFile.delete()) {
-                debug("Error trying to delete the generated features file:" + srcGenFeaturesFile.getAbsolutePath());
+        // N.B. processConfigFileChange() will be called upon deletion of generated features file, it should be ignored
+        File oldGenFeaturesFile = new File(dir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+        if (oldGenFeaturesFile.exists()) {
+            if (!oldGenFeaturesFile.delete()) {
+                debug("Error trying to delete the generated features file:" + oldGenFeaturesFile.getAbsolutePath());
             }
         }
     }
@@ -4682,6 +4682,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // generateFeaturesTmpDir in the process of handling an xml config modicifcation.
             // Deleting that directory could cause generated-features.xml to be deleted and we
             // need to be careful how to handle that event e.g. don't call optimizeGenerateFeatures().
+            // Another scenario, when we toggle generateToSrc option we delete the old file and change the
+            // value of generateFeaturesFile. Therefore we must only use the base name of generateFeaturesFile
+            // in this file name check.
             if (generateFeatures && (fileChanged.getName().endsWith(".xml")
                     && !fileChanged.getName().equals(generateFeaturesFile.getName()))
                     && serverFeaturesModified()) {
