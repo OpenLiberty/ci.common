@@ -381,7 +381,7 @@ public class ServerConfigDocument {
                 finalReplacement = matcher.group(0); // Keep original
             }
             matcher.appendReplacement(sb, Matcher.quoteReplacement(finalReplacement));
-            log.info(String.format("Resolving Property %s for expression %s. Resolved value is %s", varName , value , sb));
+            log.info(String.format("Resolving Property %s for expression %s. Resolved expression value is %s", varName , value , sb));
         }
         // 4. Finalize the string
         matcher.appendTail(sb);
