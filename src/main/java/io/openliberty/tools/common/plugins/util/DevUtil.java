@@ -95,6 +95,8 @@ import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.io.monitor.FileAlterationListener;
 import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -2067,7 +2069,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
 
     protected void parseHttpPort(String webAppMessage, int portPrefixIndex) throws PluginExecutionException {
-        if (!webAppMessage.contains(HTTP_PREFIX)) {
+        if (!webAppMessage.contains(HTTP_PREFIX) && !webAppMessage.contains(HTTP_PREFIX_ESCAPED)) {
             return;
         }
         int portIndex = portPrefixIndex + 1;
@@ -2076,7 +2078,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // if no ending slash, the port ends at the end of the message
             portEndIndex = webAppMessage.length();
         }
-        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex);
+        String parsedHttpPort = webAppMessage.substring(portIndex, portEndIndex).replace("/","").replace("\\","");
         debug("Parsed http port: " + parsedHttpPort);
         if (container) {
             httpPort = findLocalPort(parsedHttpPort);
@@ -2087,29 +2089,53 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
+    /**
+     * Extracts the "message" field value from a JSON string.
+     *
+     * @param jsonString The JSON string to parse
+     * @return The value of the "message" field if present, null otherwise
+     */
+    private static String getMessageKeyFromJson(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return null;
+        }
+        try {
+            JSONObject jsonObject = new JSONObject(jsonString);
+            return jsonObject.optString("message", null);
+        } catch (JSONException e) {
+            // If parsing fails, it's not a valid JSON object
+            return null;
+        }
+    }
+
     protected void parseHttpsPort(List<String> messages) throws PluginExecutionException {
         for (String message : messages) {
             debug("Looking for https port in message: " + message);
-            String httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
-            String[] messageTokens = httpsMessageContents.split(" ");
+            String httpsMessageContents;
+            // check message format. if message is a json, only extract "message" node
+            String messageFromJson = getMessageKeyFromJson(message);
+            if (messageFromJson != null) {
+                debug("Message is in json format");
+                httpsMessageContents = messageFromJson.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            } else {
+                httpsMessageContents = message.split(LISTENING_ON_PORT_MESSAGE_PREFIX)[1];
+            }
             // Look for endpoint with name containing "-ssl"
-            for (String token : messageTokens) {
-                if (token.contains("-ssl")) {
-                    String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
-                    if (parsedHttpsPort != null) {
-                        debug("Parsed https port: " + parsedHttpsPort);
-                        if (container) {
-                            httpsPort = findLocalPort(parsedHttpsPort);
-                            containerHttpsPort = parsedHttpsPort;
-                        }
-                        else {
-                            httpsPort = parsedHttpsPort;
-                        }
-                        return;
+            if (httpsMessageContents.contains("-ssl")) {
+                String[] messageTokens = httpsMessageContents.split(" ");
+                String parsedHttpsPort = getPortFromMessageTokens(messageTokens);
+                if (parsedHttpsPort != null) {
+                    debug("Parsed https port: " + parsedHttpsPort);
+                    if (container) {
+                        httpsPort = findLocalPort(parsedHttpsPort);
+                        containerHttpsPort = parsedHttpsPort;
                     } else {
-                        throw new PluginExecutionException(
-                                "Could not parse the https port number from the log message: " + message);
+                        httpsPort = parsedHttpsPort;
                     }
+                    return;
+                } else {
+                    throw new PluginExecutionException(
+                            "Could not parse the https port number from the log message: " + message);
                 }
             }
         }
@@ -2514,78 +2540,88 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             hotTests = true;
         }
         if (startup) {
-            if (container) {
-                boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
-                boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
-                boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
-                if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
-                    info(formatAttentionMessage(""));
-                    info(formatAttentionTitle("Liberty container port information:"));
-                }
-                if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
-                        || (containerHttpsPort != null && httpsPort != null && nonDefaultHttpsPortUsed)
-                        || (libertyDebug && nonDefaultDebugPortUsed)) {
-                    warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
-                }
-                if (containerHttpPort != null) {
-                    if (httpPort != null) {
-                        if (!nonDefaultHttpPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ]"));
-                        } else {
-                            info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
-                        }
-                    } else {
-                        info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
-                    }
-                }
-                if (containerHttpsPort != null) {
-                    if (httpsPort != null) {
-                        if (!nonDefaultHttpsPortUsed) {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ]"));
-                        } else {
-                            info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
-                        }
-                    } else {
-                        info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
-                    }
-                }
-                if (libertyDebug) {
-                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    if (!nonDefaultDebugPortUsed) {
-                        info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ]"));
-                    } else {
-                        info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ] <"));
-                    }
-                }
-                info(formatAttentionMessage(""));
-                info(formatAttentionTitle("Container network information:"));
-                info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
-
-                String[] networks = getContainerNetworks(containerName);
-                if (networks != null) {
-                    for (String network : networks) {
-                        info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on container network [ " + network + " ]"));
-                    }
-                }
-            }
-            else {
-                if (httpPort != null || httpsPort != null || libertyDebug) {
-                    info(formatAttentionMessage(""));
-                    info(formatAttentionTitle("Liberty server port information:"));
-                }
-                if (httpPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
-                }
-                if (httpsPort != null) {
-                    info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
-                }
-                if (libertyDebug) {
-                    int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
-                    info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
-                }
-            }
+            printPortInfo(true);
             // print barrier footer
             info(formatAttentionBarrier());
+        }
+    }
+
+    private void printPortInfo(boolean pKeyPressed) throws PluginExecutionException {
+        if (container) {
+            boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
+            boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
+            boolean nonDefaultDebugPortUsed = alternativeDebugPort != -1; // this is set when a random ephemeral port is selected
+            if (containerHttpPort != null || containerHttpsPort != null || libertyDebug) {
+                if (!pKeyPressed) {
+                    //this line not needed when showing port info on keypress of "p"
+                    info(formatAttentionMessage(""));
+                }
+                info(formatAttentionTitle("Liberty container port information:"));
+            }
+            if ((containerHttpPort != null && httpPort != null && nonDefaultHttpPortUsed)
+                    || (containerHttpsPort != null && httpsPort != null && nonDefaultHttpsPortUsed)
+                    || (libertyDebug && nonDefaultDebugPortUsed)) {
+                warn(formatAttentionMessage("The Liberty container is using non-default host ports to avoid port conflict errors."));
+            }
+            if (containerHttpPort != null) {
+                if (httpPort != null) {
+                    if (!nonDefaultHttpPortUsed) {
+                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
+                    }
+                } else {
+                    info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
+                }
+            }
+            if (containerHttpsPort != null) {
+                if (httpsPort != null) {
+                    if (!nonDefaultHttpsPortUsed) {
+                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ]"));
+                    } else {
+                        info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
+                    }
+                } else {
+                    info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
+                }
+            }
+            if (libertyDebug) {
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                if (!nonDefaultDebugPortUsed) {
+                    info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ]"));
+                } else {
+                    info(formatAttentionMessage("Liberty debug port mapped to container host port: [ " + debugPort + " ] <"));
+                }
+            }
+            info(formatAttentionMessage(""));
+            info(formatAttentionTitle("Container network information:"));
+            info(formatAttentionMessage("Container name: [ " + containerName + " ]"));
+
+            String[] networks = getContainerNetworks(containerName);
+            if (networks != null) {
+                for (String network : networks) {
+                    info(formatAttentionMessage("IP address [ " + getContainerIPAddress(containerName, network) + " ] on container network [ " + network + " ]"));
+                }
+            }
+        }
+        else {
+            if (httpPort != null || httpsPort != null || libertyDebug) {
+                if (!pKeyPressed) {
+                    //this line not needed when showing port info on keypress of "p"
+                    info(formatAttentionMessage(""));
+                }
+                info(formatAttentionTitle("Liberty server port information:"));
+            }
+            if (httpPort != null) {
+                info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
+            }
+            if (httpsPort != null) {
+                info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
+            }
+            if (libertyDebug) {
+                int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
+                info(formatAttentionMessage("Liberty debug port: [ " + debugPort + " ]"));
+            }
         }
     }
 
@@ -2615,6 +2651,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             info(formatAttentionMessage("r - restart the server, type 'r' and press Enter."));
         }
         info(formatAttentionMessage("h - see the help menu for available actions, type 'h' and press Enter."));
+        info(formatAttentionMessage("p - see the port information, type 'p' and press Enter."));
         info(formatAttentionMessage("q - stop the server and quit dev mode, press Ctrl-C or type 'q' and press Enter."));
     }
 
@@ -2798,6 +2835,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             HotKey s = new HotKey("s");
             HotKey o = new HotKey("o");
             HotKey t = new HotKey("t");
+            HotKey p = new HotKey("p");
             HotKey enter = new HotKey("");
             if (scanner.hasNextLine()) {
                 synchronized (inputUnavailable) {
@@ -2836,6 +2874,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         } else {
                             warn("Cannot optimize features because automatic generation of features is off.");
                             warn("To toggle the automatic generation of features, type 'g' and press Enter.");
+                        }
+                    } else if (p.isPressed(line)) {
+                        try {
+                            info(formatAttentionBarrier());
+                            printPortInfo(true);
+                            info(formatAttentionBarrier());
+                        } catch (PluginExecutionException e) {
+                            error("Could not get port information.", e);
                         }
                     } else if ((t.isPressed(line) && isChangeOnDemandTestsAction()) || (enter.isPressed(line) && !isChangeOnDemandTestsAction())) {
                         debug("Detected test command. Running tests... ");
@@ -3620,6 +3666,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             debug("Setting file track mode to FILE_WATCHER.");
                             trackingMode = FileTrackMode.FILE_WATCHER;
                             disablePolling();
+                            Watchable watchable = wk.watchable(); // for debug msg below
+                            boolean valid = wk.reset();
+                            if (!valid) {
+                                debug("WatchService key has been unregistered for " + watchable);
+                            }
                         }
                     } catch (Exception e) {
                         error("An error occurred attempting to retrieve the watch key or close the file watcher. " + e.getMessage(), e);
