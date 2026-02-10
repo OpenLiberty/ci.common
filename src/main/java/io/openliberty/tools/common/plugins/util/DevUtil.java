@@ -2755,7 +2755,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         logFeatureGenerationStatus();
     }
 
-    private boolean optimizeGenerateFeatures(boolean useTmpDir) {
+    protected boolean optimizeGenerateFeatures(boolean useTmpDir) {
         debug("Entering optimizeGenerateFeatures(boolean)");
         return optimizeGenerateFeatures(useTmpDir, false);
     }
@@ -2763,7 +2763,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     /**
      * Generate features using all classes and only user specified features.
      */
-    private boolean optimizeGenerateFeatures(boolean useTmpDirOut, boolean useTmpDirIn) {
+    protected boolean optimizeGenerateFeatures(boolean useTmpDirOut, boolean useTmpDirIn) {
         debug("Generating optimized features list...use temp directory for output=" + useTmpDirOut + " use temp directory for input=" + useTmpDirIn);
         // scan all class files and provide only user specified features
         boolean generatedFeatures = libertyGenerateFeatures(null, true, generateToSrc, useTmpDirOut, useTmpDirIn);
