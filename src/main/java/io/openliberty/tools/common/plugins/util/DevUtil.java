@@ -3447,15 +3447,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * 
-     * @return {@code Collection<String>} of class paths
-     * @throws IOException
-     */
-    public Collection<String> getJavaSourceClassPaths() throws IOException {
-        return getClassPaths(modifiedClasses);
-    }
-
-    /**
-     * 
      * @param classFiles javaSourceClassFiles that have been modified
      * @return {@code Collection<String>} of class paths
      * @throws IOException
