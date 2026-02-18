@@ -438,6 +438,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private boolean generateToSrc;
     private Set<String> generatedFeaturesSet; // set of features in generated-features.xml file
     private boolean generatedFeaturesModified;
+    private boolean generatedFeaturesCopied;
     private Set<String> compileArtifactPaths;
     private Set<String> testArtifactPaths;
     protected File generateFeaturesFile; // the file that is created from the generate-features goal/task
@@ -565,6 +566,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.testArtifactPaths = testArtifactPaths;
         this.monitoredWebResourceDirs = monitoredWebResourceDirs;
         this.generatedFeaturesModified = false;
+        this.generatedFeaturesCopied = false;
         if (this.generateFeatures) {
             this.generatedFeaturesSet = getGeneratedFeatures();
         } else {
@@ -580,6 +582,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     public void copyGeneratedFeaturesFile(File destinationDir) throws IOException {
         copyFile(generateFeaturesFile, generateFeaturesOutputDir, destinationDir, null);
+        if (destinationDir.equals(serverDirectory)) {
+            generatedFeaturesCopied = true; // features copied into server dir and not some temp dir
+        }
     }
     /**
      * Run unit and/or integration tests
@@ -4673,14 +4678,26 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 System.setProperty(SKIP_BETA_INSTALL_WARNING, Boolean.TRUE.toString());
                 installFeaturesToTempDir(fileChanged, fileChangedParentDir, targetFileName, generateFeaturesSuccess);
             }
-            copyFile(fileChanged, fileChangedParentDir, serverDirectory, targetFileName);
-
-            // if the generated features file was modified as a result of another config
-            // file modification, copy it over to target so the server picks up the changes
-            // together
+            // Copy the config file which was changed to the server directory unless it is
+            // the generated features file. The generated features file may have been copied 
+            // to the server directory already as a result of a change to the build file (pom.xml)
+            // or the server.xml.
+            if (!isGeneratedFeaturesFile) { // all other config files
+                copyFile(fileChanged, fileChangedParentDir, serverDirectory, targetFileName);
+            } else {
+                if (!generatedFeaturesCopied) {
+                    copyGeneratedFeaturesFile(serverDirectory);
+                }
+                generatedFeaturesCopied = false;
+            }
+            // If the generated features file was modified as a result of another config file modification
+            // (usually server.xml), copy it over to target so the server picks up the two changes together
             if (generateFeaturesSuccess && generatedFeaturesModified && !isGeneratedFeaturesFile) {
-                // this logic is not entered if the fileChanged is the generated features file
-                // copy generated features file to server dir
+                // This logic is not entered if the fileChanged is the generated features file.
+                // Copy generated features file to server dir and set generatedFeaturesCopied true
+                // (not referring to generatedFeaturesModified).
+                // Leave generatedFeaturesCopied true because the call to optimize/incrementalGenerateFeatures that was
+                // required to get into this IF block will also generate a file change event for generatedFeaturesFile
                 copyGeneratedFeaturesFile(serverDirectory);
                 generatedFeaturesModified = false;
             }
