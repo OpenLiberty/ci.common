@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2021, 2025.
+ * (C) Copyright IBM Corporation 2021, 2026
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,36 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "binary-app-scanner";
     public static final String BINARY_SCANNER_MAVEN_TYPE = "jar";
     public static final String BINARY_SCANNER_MAVEN_VERSION = "[25.0.0.2]";
+
+    // The coordinates to use for Open Liberty versions 25.0.0.7 and up
+    public static final String OLBASE_FEATURELIST_GROUP_ID = "io.openliberty.features";
+    public static final String OLBASE_FEATURELIST_ARTIFACT_ID = "open_liberty_featurelist";
+    public static final String OLBASE_FEATURELIST_TYPE = "compile";
+    public static final String OLBASE_FEATURELIST_VERSION = "[25.0.0.7)";
+
+    // The coordinates to use for WebSphere Liberty versions 25.0.0.7 to 25.0.0.9
+    public static final String WSBASE1_FEATURELIST_GROUP_ID = "io.openliberty.features";
+    public static final String WSBASE1_FEATURELIST_ARTIFACT_ID = "websphere_liberty_base__featurelist";
+    public static final String WSBASE1_FEATURELIST_TYPE = "compile";
+    public static final String WSBASE1_FEATURELIST_VERSION = "[25.0.0.7]";
+
+    // The coordinates to use for WebSphere Liberty versions 25.0.0.10 and up
+    public static final String WSBASE2_FEATURELIST_GROUP_ID = "com.ibm.websphere.appserver.features";
+    public static final String WSBASE2_FEATURELIST_ARTIFACT_ID = "websphere_liberty_base__featurelist";
+    public static final String WSBASE2_FEATURELIST_TYPE = "compile";
+    public static final String WSBASE2_FEATURELIST_VERSION = "[25.0.0.10)";
+
+    // The coordinates to use for WebSphere Liberty versions 25.0.0.7 to 25.0.0.9
+    public static final String WSCORE1_FEATURELIST_GROUP_ID = "io.openliberty.features";
+    public static final String WSCORE1_FEATURELIST_ARTIFACT_ID = "websphere_liberty_core__featurelist";
+    public static final String WSCORE1_FEATURELIST_TYPE = "compile";
+    public static final String WSCORE1_FEATURELIST_VERSION = "[25.0.0.7]";
+
+    // The coordinates to use for WebSphere Liberty versions 25.0.0.10 and up
+    public static final String WSCORE2_FEATURELIST_GROUP_ID = "com.ibm.websphere.appserver.features";
+    public static final String WSCORE2_FEATURELIST_ARTIFACT_ID = "websphere_liberty_core__featurelist";
+    public static final String WSCORE2_FEATURELIST_TYPE = "compile";
+    public static final String WSCORE2_FEATURELIST_VERSION = "[25.0.0.10)";
 
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
     public static final String GENERATED_FEATURES_DIR_PATH = "configDropins/overrides/";
@@ -82,13 +112,13 @@ public abstract class BinaryScannerUtil {
     public abstract boolean isDebugEnabled();
 
     // The jar file containing the binary scanner code
-    private File binaryScanner;
+    private File binaryScannerJar;
     private URLClassLoader binaryScannerClassLoader = null;
     private Class binaryScannerClass = null;
     private Method binaryScannerMethod = null;
 
     public BinaryScannerUtil(File binaryScanner) {
-        this.binaryScanner = binaryScanner;
+        this.binaryScannerJar = binaryScanner;
     }
 
     /**
@@ -125,7 +155,7 @@ public abstract class BinaryScannerUtil {
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
             FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException {
         Set<String> featureList = null;
-        if (binaryScanner != null && binaryScanner.exists()) {
+        if (binaryScannerJar != null && binaryScannerJar.exists()) {
             // if we are already generating features for all class files (optimize=true) and
             // we are not passing any user specified features (currentFeatureSet is empty)
             // we do not need to rerun the binary scanner if it fails
@@ -141,7 +171,7 @@ public abstract class BinaryScannerUtil {
                     logLevel = null;
                     logLocation = null;
                 }
-                debug("Calling " + binaryScanner.getName() + " with the following inputs...\n" +
+                debug("Calling " + binaryScannerJar.getName() + " with the following inputs...\n" +
                         "  binaryInputs: " + binaryInputs + "\n" +
                         "  targetJavaEE: " + targetJavaEE + "\n" +
                         "  targetMicroP: " + targetMicroProfile + "\n" +
@@ -232,10 +262,10 @@ public abstract class BinaryScannerUtil {
                 throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + loadingException.toString());
             }
         } else {
-            if (binaryScanner == null) {
+            if (binaryScannerJar == null) {
                 throw new PluginExecutionException("The binary scanner jar location is not defined.");
             } else {
-                throw new PluginExecutionException("Could not find the binary scanner jar at " + binaryScanner.getAbsolutePath());
+                throw new PluginExecutionException("Could not find the binary scanner jar at " + binaryScannerJar.getAbsolutePath());
             }
         }
         return featureList;
@@ -317,7 +347,7 @@ public abstract class BinaryScannerUtil {
     private ClassLoader getScannerClassLoader() throws MalformedURLException {
         if (binaryScannerClassLoader == null) {
             ClassLoader cl = this.getClass().getClassLoader();
-            binaryScannerClassLoader = new URLClassLoader(new URL[] { binaryScanner.toURI().toURL() }, cl);
+            binaryScannerClassLoader = new URLClassLoader(new URL[] { binaryScannerJar.toURI().toURL() }, cl);
         }
         return binaryScannerClassLoader;
     }
@@ -335,6 +365,10 @@ public abstract class BinaryScannerUtil {
             Class driveScan = getScannerClass();
             // args: Set<String>, String, String, Set<String>, String, String, Locale
             // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
+            // Set<String> generateFeatureList()
+            // Set<String>, String, String, Set<String>, File, File, String, String, Locale
+            // binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, baseFeatureListFile, coreFeatureListFile, logLocation, logLevel, locale
+
             binaryScannerMethod = driveScan.getMethod("generateFeatureList", Set.class, String.class, String.class,
                     Set.class, String.class, String.class, java.util.Locale.class);
             if (binaryScannerMethod == null) {
