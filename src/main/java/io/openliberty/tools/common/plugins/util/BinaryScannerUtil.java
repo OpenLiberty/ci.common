@@ -175,17 +175,6 @@ public abstract class BinaryScannerUtil {
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
-                warn ("Calling " + binaryScannerJar.getName() + " with the following inputs...\n" +
-                        "  binaryInputs: " + binaryInputs + "\n" +
-                        "  targetJavaEE: " + targetJavaEE + "\n" +
-                        "  targetMicroP: " + targetMicroProfile + "\n" +
-                        "  currentFeatures: " + currentFeatureSet + "\n" +
-                        "  baseFeatureListFile: " + ((baseFeatureListFile==null) ? "null" : baseFeatureListFile.getAbsolutePath()) + "\n" +
-                        "  baseFeatureListFile: " + baseFeatureListFile + "\n" +
-                        "  coreFeatureListFile: " + ((coreFeatureListFile==null) ? "null" : coreFeatureListFile.getAbsolutePath()) + "\n" +
-                        "  logLocation: " + logLocation + "\n" +
-                        "  logLevel: " + logLevel + "\n" +
-                        "  locale: " + java.util.Locale.getDefault());
                 featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                         currentFeatureSet, baseFeatureListFile, coreFeatureListFile, logLocation, logLevel, java.util.Locale.getDefault());
                 for (String s : featureList) {debug(s);};
