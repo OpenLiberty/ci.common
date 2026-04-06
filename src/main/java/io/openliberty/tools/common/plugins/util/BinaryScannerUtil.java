@@ -36,31 +36,25 @@ public abstract class BinaryScannerUtil {
     public static final String OLBASE_FEATURELIST_GROUP_ID = "io.openliberty.features";
     public static final String OLBASE_FEATURELIST_ARTIFACT_ID = "open_liberty_featurelist";
     public static final String OLBASE_FEATURELIST_TYPE = "xml";
-    public static final String OLBASE_FEATURELIST_VERSION = "[25.0.0.7]";
+    // the version number is generated at the point of use
 
     // The coordinates to use for WebSphere Liberty versions 25.0.0.7 to 25.0.0.9
-    public static final String WSBASE1_FEATURELIST_GROUP_ID = "io.openliberty.features";
-    public static final String WSBASE1_FEATURELIST_ARTIFACT_ID = "websphere_liberty_base__featurelist";
-    public static final String WSBASE1_FEATURELIST_TYPE = "compile";
-    public static final String WSBASE1_FEATURELIST_VERSION = "[25.0.0.7]";
+    // We will use them for releases prior to 25.0.0.7
+    // io.openliberty.features:websphere_liberty_base__featurelist:xml:25.0.0.7
+    // io.openliberty.features:websphere_liberty_core__featurelist:xml:25.0.0.7
 
     // The coordinates to use for WebSphere Liberty versions 25.0.0.10 and up
-    public static final String WSBASE2_FEATURELIST_GROUP_ID = "com.ibm.websphere.appserver.features";
-    public static final String WSBASE2_FEATURELIST_ARTIFACT_ID = "websphere_liberty_base__featurelist";
-    public static final String WSBASE2_FEATURELIST_TYPE = "compile";
-    public static final String WSBASE2_FEATURELIST_VERSION = "[25.0.0.10)";
+    // Publishing stopped with 25.0.0.12 so this value is used for 26.0.0.1 and up.
+    // com.ibm.websphere.appserver.features:websphere_liberty_base__featurelist:xml:25.0.0.xx
+    // com.ibm.websphere.appserver.features:websphere_liberty_core__featurelist:xml:25.0.0.xx
 
-    // The coordinates to use for WebSphere Liberty versions 25.0.0.7 to 25.0.0.9
-    public static final String WSCORE1_FEATURELIST_GROUP_ID = "io.openliberty.features";
-    public static final String WSCORE1_FEATURELIST_ARTIFACT_ID = "websphere_liberty_core__featurelist";
-    public static final String WSCORE1_FEATURELIST_TYPE = "compile";
-    public static final String WSCORE1_FEATURELIST_VERSION = "[25.0.0.7]";
+    // These coordinates are used in different combinations to access WebSphere Liberty feature lists 25.0.0.7 and up
+    public static final String WS1_FEATURELIST_GROUP_ID = "io.openliberty.features";
+    public static final String WS2_FEATURELIST_GROUP_ID = "com.ibm.websphere.appserver.features";
+    public static final String WSBASE_FEATURELIST_ARTIFACT_ID = "websphere_liberty_base__featurelist";
+    public static final String WSCORE_FEATURELIST_ARTIFACT_ID = "websphere_liberty_core__featurelist";
+    public static final String WS_FEATURELIST_TYPE = "xml";
 
-    // The coordinates to use for WebSphere Liberty versions 25.0.0.10 and up
-    public static final String WSCORE2_FEATURELIST_GROUP_ID = "com.ibm.websphere.appserver.features";
-    public static final String WSCORE2_FEATURELIST_ARTIFACT_ID = "websphere_liberty_core__featurelist";
-    public static final String WSCORE2_FEATURELIST_TYPE = "compile";
-    public static final String WSCORE2_FEATURELIST_VERSION = "[25.0.0.10)";
 
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
     public static final String GENERATED_FEATURES_DIR_PATH = "configDropins/overrides/";
