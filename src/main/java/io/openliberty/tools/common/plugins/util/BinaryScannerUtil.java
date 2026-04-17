@@ -33,9 +33,9 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_MAVEN_VERSION = "[25.0.0.2.1]";
 
     // The coordinates to use for Open Liberty versions 25.0.0.7 and up
-    public static final String OLBASE_FEATURELIST_GROUP_ID = "io.openliberty.features";
-    public static final String OLBASE_FEATURELIST_ARTIFACT_ID = "open_liberty_featurelist";
-    public static final String OLBASE_FEATURELIST_TYPE = "xml";
+    public static final String OL_FEATURELIST_GROUP_ID = "io.openliberty.features";
+    public static final String OL_FEATURELIST_ARTIFACT_ID = "open_liberty_featurelist";
+    public static final String OL_FEATURELIST_TYPE = "xml";
     // the version number is generated at the point of use
 
     // The coordinates to use for WebSphere Liberty versions 25.0.0.7 to 25.0.0.9
