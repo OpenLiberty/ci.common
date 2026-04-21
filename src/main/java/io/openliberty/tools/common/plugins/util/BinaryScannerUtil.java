@@ -288,7 +288,7 @@ public abstract class BinaryScannerUtil {
      */
     public Set<String> reRunBinaryScanner(Set<String> allClassesDirectories, String logLocation, String targetJavaEE, String targetMicroProfile,
             Map featureListFileMap) throws PluginExecutionException {
-        Set<String> featureList = null;
+        Set<String> generatedFeatureList = null;
         try {
             Method generateFeatureSetMethod = getScannerMethod();
             Set<String> binaryInputs = allClassesDirectories;
@@ -308,21 +308,21 @@ public abstract class BinaryScannerUtil {
                   "  logLocation: " + logLocation + "\n" +
                   "  logLevel: " + logLevel + "\n" +
                   "  locale: " + java.util.Locale.getDefault());
-            featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
+            generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                     currentFeaturesSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
-            for (String s : featureList) {debug(s);};
+            for (String s : generatedFeatureList) {debug(s);};
         } catch (InvocationTargetException ite) {
             Throwable scannerException = ite.getCause();
             if (scannerException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                 // this happens when the list of features passed in contains conflicts so now no recommendation possible
                 debug("RuntimeException from re-run of binary scanner", scannerException); // shouldn't happen
-                featureList = null;
+                generatedFeatureList = null;
             } else if (scannerException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
                 // The features in the scanned files conflict with each other, no recommendation possible
-                featureList = getNoSampleFeatureList();
+                generatedFeatureList = getNoSampleFeatureList();
             } else if (scannerException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
                 // The features in the scanned files conflict with each other, no recommendation possible
-                featureList = getNoSampleFeatureList();
+                generatedFeatureList = getNoSampleFeatureList();
             } else {
                 debug("Exception from rerunning binary scanner.", scannerException);
                 throw new PluginExecutionException("Error scanning the application for Liberty feature recommendations: " + scannerException.toString());
@@ -335,7 +335,7 @@ public abstract class BinaryScannerUtil {
             }
             throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar for recommendations: " + loadingException.toString());
         }
-        return featureList;
+        return generatedFeatureList;
     }
 
     private Set<String> getNoSampleFeatureList() {
