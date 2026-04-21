@@ -6,6 +6,11 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -14,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.junit.Assume;
 import org.junit.Test;
 
 import io.openliberty.tools.common.plugins.util.InstallFeatureUtil.ProductProperties;
@@ -266,6 +272,59 @@ public class InstallFeatureUtilTest extends BaseInstallFeatureUtilTest {
     @Test(expected = PluginExecutionException.class)
     public void testInvalidVerifyOption() throws Exception {
         getNewInstallFeatureUtil(installDir, buildDir, null, null, new HashSet<String>(), "invalid");
+    }
+    
+    /**
+     * Test that constructor handles null environmentVariables by initializing to empty map
+     */
+    @Test
+    public void testConstructorNullEnvironmentVariables() throws Exception {
+        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir);
+        String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
+        List<String> additionalJsons = new ArrayList<String>();
+        Collection<Map<String, String>> keyMap = new ArrayList<>();
+        
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, buildDir, null, null, 
+                new HashSet<String>(), propertiesList, openLibertyVersion, additionalJsons, "enforce", keyMap);
+        
+        // Use reflection to verify environmentVariables field is non-null and empty
+        Field enviromentVariablesField = InstallFeatureUtil.class.getDeclaredField("environmentVariables");
+        enviromentVariablesField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> environmentVariables = (Map<String, String>) enviromentVariablesField.get(util);
+        
+        assertNotNull("environmentVariables should not be null when null is passed to constructor", environmentVariables);
+        assertTrue("environmentVariables should be empty when null is passed to constructor", environmentVariables.isEmpty());
+    }
+    
+    /**
+     * Test that constructor preserves non-null environmentVariables
+     */
+    @Test
+    public void testConstructorWithEnvironmentVariables() throws Exception {
+        List<ProductProperties> propertiesList = InstallFeatureUtil.loadProperties(installDir);
+        String openLibertyVersion = InstallFeatureUtil.getOpenLibertyVersion(propertiesList);
+        List<String> additionalJsons = new ArrayList<String>();
+        Collection<Map<String, String>> keyMap = new ArrayList<>();
+        
+        Map<String, String> providedEnvVars = new HashMap<>();
+        providedEnvVars.put("JAVA_HOME", "/custom/java/home");
+        providedEnvVars.put("CUSTOM_VAR", "custom_value");
+        
+        // Create a test util that accepts environmentVariables parameter
+        InstallFeatureUtil util = new InstallFeatureTestUtil(installDir, buildDir, null, null, 
+                new HashSet<String>(), propertiesList, openLibertyVersion, additionalJsons, "enforce", keyMap, providedEnvVars);
+        
+        // Use reflection to verify environmentVariables field contains the provided map
+        Field environmentVariablesField = InstallFeatureUtil.class.getDeclaredField("environmentVariables");
+        environmentVariablesField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> environmentVariables = (Map<String, String>) environmentVariablesField.get(util);
+        
+        assertNotNull("environmentVariables should not be null", environmentVariables);
+        assertEquals("environmentVariables should have 2 entries", 2, environmentVariables.size());
+        assertEquals("/custom/java/home", environmentVariables.get("JAVA_HOME"));
+        assertEquals("custom_value", environmentVariables.get("CUSTOM_VAR"));
     }
 }
 

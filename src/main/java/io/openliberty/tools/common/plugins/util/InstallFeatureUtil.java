@@ -92,7 +92,7 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     
     private final Collection<Map<String, String>> keyMap;
     
-    
+    private final Map<String, String> environmentVariables;
     
     /**
      * An enum for specifying verify option
@@ -122,8 +122,39 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
 
     /**
      * Initialize the utility and check for unsupported scenarios.
-     * 
+     * Calls the constructor InstallFeatureUtil(java.io.File, java.io.File, java.lang.String, java.lang.String, java.util.Set, java.util.List, java.lang.String, java.lang.String, java.util.List, java.lang.String, java.util.Collection, java.util.Map)
+     * with environmentVariables set to null.
+     *
      * @param installDirectory   The install directory
+     * @param buildDirectory     The build directory
+     * @param from               The "from" parameter specified in the plugin
+     *                           configuration, or null if not specified
+     * @param to                 The "to" parameter specified in the plugin
+     *                           configuration, or null if not specified
+     * @param pluginListedEsas   The list of ESAs specified in the plugin
+     *                           configuration, or null if not specified
+     * @param propertiesList     The list of product properties installed with the
+     *                           Open Liberty runtime
+     * @param openLibertyVersion The version of the Open Liberty runtime
+     * @param containerName      The container name if the features should be
+     *                           installed in a container. Otherwise null.
+     * @param additionalJsons    The list of additional JSONS to search
+     *                           for features from
+     * @param verifyValue        The verify option value
+     * @param keyMap             The key map for feature verification
+     * @throws PluginScenarioException  If the current scenario is not supported
+     * @throws PluginExecutionException If properties files cannot be found in the
+     *                                  installDirectory/lib/versions
+     */
+    public InstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, String containerName, List<String> additionalJsons, String verifyValue, Collection<Map<String, String>> keyMap) throws PluginScenarioException, PluginExecutionException {
+        this(installDirectory, buildDirectory, from, to, pluginListedEsas, propertiesList, openLibertyVersion, containerName, additionalJsons, verifyValue, keyMap, null);
+    }
+
+    /**
+     * Initialize the utility and check for unsupported scenarios.
+     *
+     * @param installDirectory   The install directory
+     * @param buildDirectory     The build directory
      * @param from               The "from" parameter specified in the plugin
      *                           configuration, or null if not specified
      * @param to                 The "to" parameter specified in the plugin
@@ -137,11 +168,14 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      *                           installed in a container. Otherwise null.
      * @param additionalJsons	 The list of additional JSONS to search
      * 							 for features from
+     * @param verifyValue        The verify option value
+     * @param keyMap             The key map for feature verification
+     * @param environmentVariables Environment variables to pass to processes (e.g., JAVA_HOME)
      * @throws PluginScenarioException  If the current scenario is not supported
      * @throws PluginExecutionException If properties files cannot be found in the
      *                                  installDirectory/lib/versions
      */
-    public InstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, String containerName, List<String> additionalJsons, String verifyValue, Collection<Map<String, String>> keyMap) throws PluginScenarioException, PluginExecutionException {
+    public InstallFeatureUtil(File installDirectory, File buildDirectory, String from, String to, Set<String> pluginListedEsas, List<ProductProperties> propertiesList, String openLibertyVersion, String containerName, List<String> additionalJsons, String verifyValue, Collection<Map<String, String>> keyMap, Map<String, String> environmentVariables) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
         this.buildDirectory = buildDirectory;
         this.to = to;
@@ -157,7 +191,9 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         }else {
             this.keyMap = keyMap;
         }
-        
+
+        this.environmentVariables = environmentVariables == null ? new HashMap<>() : environmentVariables;
+
         try {
           this.verifyOption = VerifyOption.valueOf(verifyValue);
 	} catch (IllegalArgumentException e) {
@@ -1119,7 +1155,10 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      *             if product validation failed or could not be run
      */
     private void productInfoValidate() throws PluginExecutionException {
-        String output = productInfo(installDirectory, "validate");
+        if (environmentVariables != null && environmentVariables.containsKey("JAVA_HOME")) {
+            info("Product validation is using toolchain JAVA_HOME: " + environmentVariables.get("JAVA_HOME"));
+        }
+        String output = productInfo(installDirectory, "validate", environmentVariables);
         if (output == null) {
             throw new PluginExecutionException(
                     "Could not perform product validation. The productInfo command returned with no output");
@@ -1140,6 +1179,20 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
      * @throws PluginExecutionException if the exit value of the command was not 0
      */
     public static String productInfo(File installDirectory, String action) throws PluginExecutionException {
+        return productInfo(installDirectory, action, null);
+    }
+
+    /**
+     * Runs the productInfo command with environment variables and returns the output
+     * Made public static for tests to use in LMP/LGP
+     *
+     * @param installDirectory The directory of the installed runtime
+     * @param action           The action to perform for the productInfo command
+     * @param environmentVariables          Environment variables to set (e.g., JAVA_HOME). Can be null.
+     * @return The command output
+     * @throws PluginExecutionException if the exit value of the command was not 0
+     */
+    public static String productInfo(File installDirectory, String action, Map<String, String> environmentVariables) throws PluginExecutionException {
         Process pr = null;
         BufferedReader in = null;
         StringBuilder sb = new StringBuilder();
@@ -1151,7 +1204,20 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             } else {
                 productInfoFile = installDirectory + "/bin/productInfo";
             }
+
             ProcessBuilder pb = new ProcessBuilder(productInfoFile, action);
+            Properties sysp = System.getProperties() != null ? System.getProperties() : new Properties();
+            String javaHome = sysp.getProperty("java.home");
+            if (javaHome != null) {
+                pb.environment().put("JAVA_HOME", javaHome);
+            }
+
+            // Apply environment variables from toolchain if provided
+            if (environmentVariables != null && !environmentVariables.isEmpty()) {
+                pb.environment().putAll(environmentVariables);
+            }
+
+            pb.redirectErrorStream(true);
             pr = pb.start();
 
             in = new BufferedReader(new InputStreamReader(pr.getInputStream()));
