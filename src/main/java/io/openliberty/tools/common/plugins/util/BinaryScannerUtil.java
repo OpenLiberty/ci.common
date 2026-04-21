@@ -328,7 +328,7 @@ public abstract class BinaryScannerUtil {
                 debug("Caused by exception2:"+loadingException.getCause().getClass().getName());
                 debug("Caused by exception message2:"+loadingException.getCause().getMessage());
             }
-            throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar for recommendations: " + loadingException.toString());
+            throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar for Liberty feature recommendations: " + loadingException.toString());
         }
         return featureList;
     }
