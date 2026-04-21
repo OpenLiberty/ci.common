@@ -31,7 +31,7 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_MAVEN_GROUP_ID = "com.ibm.websphere.appmod.tools";
     public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "binary-app-scanner";
     public static final String BINARY_SCANNER_MAVEN_TYPE = "jar";
-    public static final String BINARY_SCANNER_MAVEN_VERSION = "[26.0.0.2-20260420]";
+    public static final String BINARY_SCANNER_MAVEN_VERSION = "[25.0.0.2.2]";
 
     // The coordinates to use for Open Liberty versions 25.0.0.7 and up
     public static final String OL_FEATURELIST_GROUP_ID = "io.openliberty.features";
@@ -154,7 +154,7 @@ public abstract class BinaryScannerUtil {
             String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
             FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException {
-        Set<String> featureList = null;
+        Set<String> generatedFeatureList = null;
         if (binaryScannerJar != null && binaryScannerJar.exists()) {
             // if we are already generating features for all class files (optimize=true) and
             // we are not passing any user specified features (currentFeatureSet is empty)
@@ -180,18 +180,9 @@ public abstract class BinaryScannerUtil {
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
-                warn ("Calling " + binaryScannerJar.getName() + " with the following inputs...\n" +
-                        "  binaryInputs: " + binaryInputs + "\n" +
-                        "  targetJavaEE: " + targetJavaEE + "\n" +
-                        "  targetMicroP: " + targetMicroProfile + "\n" +
-                        "  currentFeatures: " + currentFeatureSet + "\n" +
-                        "  featureListFileMap: " + featureListFileMap + "\n" +
-                        "  logLocation: " + logLocation + "\n" +
-                        "  logLevel: " + logLevel + "\n" +
-                        "  locale: " + java.util.Locale.getDefault());
-                featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
+                generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                         currentFeatureSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
-                for (String s : featureList) {debug(s);};
+                for (String s : generatedFeatureList) {debug(s);};
             } catch (InvocationTargetException ite) {
                 // This is the exception from the JVM that indicates there was an exception in the method we
                 // called through reflection. We must extract the actual exception from the 'cause' field.
@@ -278,7 +269,7 @@ public abstract class BinaryScannerUtil {
                 throw new PluginExecutionException("Could not find the binary scanner jar at " + binaryScannerJar.getAbsolutePath());
             }
         }
-        return featureList;
+        return generatedFeatureList;
     }
 
     /**
