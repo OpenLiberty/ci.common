@@ -241,7 +241,7 @@ public abstract class BinaryScannerUtil {
                     // The EE and MP version numbers are in range but they are not compatible with each other based on the standards.
                     throw new IllegalTargetComboException(getInvalidEETarget(scannerException), getInvalidMPTarget(scannerException));
                 } else if (scannerException.getClass().getName().equals(VERSIONLESS_FEATURE_EXCEPTION)) {
-                    // One of the existing features has no feature specified and the binary scanner does not support this.
+                    // One of the existing features has no version specified and the binary scanner does not support this.
                     throw new VersionlessFeatureDetectedException();
                 } else if (scannerException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
                     // Used by binary scanner 22.0.0.3, remove after 22.0.0.4 is in sonatype
