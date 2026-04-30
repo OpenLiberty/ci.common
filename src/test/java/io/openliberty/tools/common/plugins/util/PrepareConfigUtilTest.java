@@ -22,7 +22,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 
 import org.junit.After;
 import org.junit.Before;
@@ -293,5 +295,288 @@ public class PrepareConfigUtilTest {
         assertTrue("Server directory with special characters should be created", mockServerDir.exists());
         assertTrue("Server directory name should contain special characters",
                 mockServerDir.getName().equals(specialServerName));
+    }
+
+    /**
+     * Test getBuildFileModificationTime with Maven pom.xml.
+     */
+    @Test
+    public void testGetBuildFileModificationTimeWithMaven() throws IOException {
+        File pomFile = new File(buildDirectory, "pom.xml");
+        pomFile.createNewFile();
+        
+        Long modTime = PrepareConfigUtil.getBuildFileModificationTime(buildDirectory);
+        
+        assertNotNull("Modification time should not be null", modTime);
+        assertTrue("Modification time should be positive", modTime > 0);
+    }
+
+    /**
+     * Test getBuildFileModificationTime with Gradle build.gradle.
+     */
+    @Test
+    public void testGetBuildFileModificationTimeWithGradle() throws IOException {
+        File gradleFile = new File(buildDirectory, "build.gradle");
+        gradleFile.createNewFile();
+        
+        Long modTime = PrepareConfigUtil.getBuildFileModificationTime(buildDirectory);
+        
+        assertNotNull("Modification time should not be null", modTime);
+        assertTrue("Modification time should be positive", modTime > 0);
+    }
+
+    /**
+     * Test getBuildFileModificationTime with Gradle build.gradle.kts.
+     */
+    @Test
+    public void testGetBuildFileModificationTimeWithGradleKts() throws IOException {
+        File gradleKtsFile = new File(buildDirectory, "build.gradle.kts");
+        gradleKtsFile.createNewFile();
+        
+        Long modTime = PrepareConfigUtil.getBuildFileModificationTime(buildDirectory);
+        
+        assertNotNull("Modification time should not be null", modTime);
+        assertTrue("Modification time should be positive", modTime > 0);
+    }
+
+    /**
+     * Test getBuildFileModificationTime with no build file.
+     */
+    @Test
+    public void testGetBuildFileModificationTimeWithNoBuildFile() {
+        Long modTime = PrepareConfigUtil.getBuildFileModificationTime(buildDirectory);
+        
+        assertEquals("Modification time should be null when no build file exists", null, modTime);
+    }
+
+    /**
+     * Test getBuildFileModificationTime with null directory.
+     */
+    @Test
+    public void testGetBuildFileModificationTimeWithNullDirectory() {
+        Long modTime = PrepareConfigUtil.getBuildFileModificationTime(null);
+        
+        assertEquals("Modification time should be null for null directory", null, modTime);
+    }
+
+    /**
+     * Test getBuildFileModificationTime prefers pom.xml over build.gradle.
+     */
+    @Test
+    public void testGetBuildFileModificationTimePrefersMaven() throws IOException, InterruptedException {
+        File pomFile = new File(buildDirectory, "pom.xml");
+        pomFile.createNewFile();
+        
+        // Sleep to ensure different timestamps
+        Thread.sleep(10);
+        
+        File gradleFile = new File(buildDirectory, "build.gradle");
+        gradleFile.createNewFile();
+        
+        Long modTime = PrepareConfigUtil.getBuildFileModificationTime(buildDirectory);
+        Long pomTime = pomFile.lastModified();
+        
+        assertNotNull("Modification time should not be null", modTime);
+        assertEquals("Should return pom.xml modification time", pomTime, modTime);
+    }
+
+    /**
+     * Test getConfigFilePath with Maven target directory.
+     */
+    @Test
+    public void testGetConfigFilePathWithMaven() throws IOException {
+        File targetDir = new File(buildDirectory, "target");
+        targetDir.mkdirs();
+        File configFile = new File(targetDir, "liberty-plugin-config.xml");
+        configFile.createNewFile();
+        
+        File result = PrepareConfigUtil.getConfigFilePath(buildDirectory);
+        
+        assertNotNull("Config file path should not be null", result);
+        assertTrue("Config file should exist", result.exists());
+        assertEquals("Should return Maven config file", configFile, result);
+    }
+
+    /**
+     * Test getConfigFilePath with Gradle build directory.
+     */
+    @Test
+    public void testGetConfigFilePathWithGradle() throws IOException {
+        File buildDir = new File(buildDirectory, "build");
+        buildDir.mkdirs();
+        File configFile = new File(buildDir, "liberty-plugin-config.xml");
+        configFile.createNewFile();
+        
+        File result = PrepareConfigUtil.getConfigFilePath(buildDirectory);
+        
+        assertNotNull("Config file path should not be null", result);
+        assertTrue("Config file should exist", result.exists());
+        assertEquals("Should return Gradle config file", configFile, result);
+    }
+
+    /**
+     * Test getConfigFilePath with no config file (returns default Maven path).
+     */
+    @Test
+    public void testGetConfigFilePathWithNoConfigFile() {
+        File result = PrepareConfigUtil.getConfigFilePath(buildDirectory);
+        
+        assertNotNull("Config file path should not be null", result);
+        assertFalse("Config file should not exist", result.exists());
+        assertTrue("Should return Maven target path by default", 
+                result.getPath().contains("target"));
+    }
+
+    /**
+     * Test getConfigFilePath with null directory.
+     */
+    @Test
+    public void testGetConfigFilePathWithNullDirectory() {
+        File result = PrepareConfigUtil.getConfigFilePath(null);
+        
+        assertEquals("Config file path should be null for null directory", null, result);
+    }
+
+    /**
+     * Test getConfigFilePath prefers Maven over Gradle.
+     */
+    @Test
+    public void testGetConfigFilePathPrefersMaven() throws IOException {
+        // Create both Maven and Gradle config files
+        File targetDir = new File(buildDirectory, "target");
+        targetDir.mkdirs();
+        File mavenConfig = new File(targetDir, "liberty-plugin-config.xml");
+        mavenConfig.createNewFile();
+        
+        File buildDir = new File(buildDirectory, "build");
+        buildDir.mkdirs();
+        File gradleConfig = new File(buildDir, "liberty-plugin-config.xml");
+        gradleConfig.createNewFile();
+        
+        File result = PrepareConfigUtil.getConfigFilePath(buildDirectory);
+        
+        assertEquals("Should prefer Maven config file", mavenConfig, result);
+    }
+
+    /**
+     * Test isMockServerInConfig with mock server reference.
+     */
+    @Test
+    public void testIsMockServerInConfigWithMockServer() throws IOException {
+        File configFile = new File(buildDirectory, "liberty-plugin-config.xml");
+        String content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<liberty-plugin-config>\n" +
+                "  <installDirectory>/path/to/tmp/wlp</installDirectory>\n" +
+                "</liberty-plugin-config>";
+        Files.write(configFile.toPath(), content.getBytes());
+        
+        boolean result = PrepareConfigUtil.isMockServerInConfig(configFile);
+        
+        assertTrue("Should detect mock server reference", result);
+    }
+
+    /**
+     * Test isMockServerInConfig without mock server reference.
+     */
+    @Test
+    public void testIsMockServerInConfigWithoutMockServer() throws IOException {
+        File configFile = new File(buildDirectory, "liberty-plugin-config.xml");
+        String content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<liberty-plugin-config>\n" +
+                "  <installDirectory>/path/to/wlp</installDirectory>\n" +
+                "</liberty-plugin-config>";
+        Files.write(configFile.toPath(), content.getBytes());
+        
+        boolean result = PrepareConfigUtil.isMockServerInConfig(configFile);
+        
+        assertFalse("Should not detect mock server reference", result);
+    }
+
+    /**
+     * Test isMockServerInConfig with null file.
+     */
+    @Test
+    public void testIsMockServerInConfigWithNullFile() {
+        boolean result = PrepareConfigUtil.isMockServerInConfig(null);
+        
+        assertFalse("Should return false for null file", result);
+    }
+
+    /**
+     * Test isMockServerInConfig with non-existent file.
+     */
+    @Test
+    public void testIsMockServerInConfigWithNonExistentFile() {
+        File configFile = new File(buildDirectory, "non-existent.xml");
+        
+        boolean result = PrepareConfigUtil.isMockServerInConfig(configFile);
+        
+        assertFalse("Should return false for non-existent file", result);
+    }
+
+    /**
+     * Test validateMockServerStructure with valid structure.
+     */
+    @Test
+    public void testValidateMockServerStructureWithValidStructure() throws IOException {
+        PrepareConfigUtil.createMockLibertyServerStructure(buildDirectory, SERVER_NAME);
+        
+        boolean result = PrepareConfigUtil.validateMockServerStructure(buildDirectory, SERVER_NAME);
+        
+        assertTrue("Should validate successfully with complete structure", result);
+    }
+
+    /**
+     * Test validateMockServerStructure with missing structure.
+     */
+    @Test
+    public void testValidateMockServerStructureWithMissingStructure() {
+        boolean result = PrepareConfigUtil.validateMockServerStructure(buildDirectory, SERVER_NAME);
+        
+        assertFalse("Should fail validation when structure doesn't exist", result);
+    }
+
+    /**
+     * Test validateMockServerStructure with null build directory.
+     */
+    @Test
+    public void testValidateMockServerStructureWithNullBuildDir() {
+        boolean result = PrepareConfigUtil.validateMockServerStructure(null, SERVER_NAME);
+        
+        assertFalse("Should fail validation with null build directory", result);
+    }
+
+    /**
+     * Test validateMockServerStructure with null server name.
+     */
+    @Test
+    public void testValidateMockServerStructureWithNullServerName() {
+        boolean result = PrepareConfigUtil.validateMockServerStructure(buildDirectory, null);
+        
+        assertFalse("Should fail validation with null server name", result);
+    }
+
+    /**
+     * Test validateMockServerStructure with empty server name.
+     */
+    @Test
+    public void testValidateMockServerStructureWithEmptyServerName() {
+        boolean result = PrepareConfigUtil.validateMockServerStructure(buildDirectory, "");
+        
+        assertFalse("Should fail validation with empty server name", result);
+    }
+
+    /**
+     * Test validateMockServerStructure with incomplete structure (missing tmp directory).
+     */
+    @Test
+    public void testValidateMockServerStructureWithIncompleteStructure() throws IOException {
+        // Create only the server directory without proper parent structure
+        File serverDir = new File(buildDirectory, "servers/" + SERVER_NAME);
+        serverDir.mkdirs();
+        
+        boolean result = PrepareConfigUtil.validateMockServerStructure(buildDirectory, SERVER_NAME);
+        
+        assertFalse("Should fail validation with incomplete structure", result);
     }
 }
