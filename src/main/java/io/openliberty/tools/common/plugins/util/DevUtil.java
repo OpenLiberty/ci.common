@@ -5014,8 +5014,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private File getTargetFile(File fileChanged, File srcDir, File targetDir, String targetFileName)
             throws IOException {
-        String relPath = fileChanged.getCanonicalPath().substring(
-                fileChanged.getCanonicalPath().indexOf(srcDir.getCanonicalPath()) + srcDir.getCanonicalPath().length());
+        int srcDirIndex = fileChanged.getCanonicalPath().indexOf(srcDir.getCanonicalPath());
+        if (srcDirIndex < 0 ) { // warn plugin developer this input is invalid, should not happen in production
+            new IllegalArgumentException("fileChanged " + fileChanged + " is not in srcDir " + srcDir).printStackTrace();
+        }
+        String relPath = fileChanged.getCanonicalPath().substring(srcDirIndex + srcDir.getCanonicalPath().length());
         if (targetFileName != null) {
             relPath = relPath.substring(0, relPath.indexOf(fileChanged.getName())) + targetFileName;
         }
