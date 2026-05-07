@@ -30,12 +30,18 @@ import java.nio.file.Paths;
 public class PrepareConfigUtil {
 
     /**
+     * Default name for the temporary directory used for mock Liberty server structures.
+     */
+    public static final String DEFAULT_TEMP_DIR_NAME = "tmp/liberty-var-cache";
+
+    /**
      * Create a mock Liberty server structure in the build output directory.
      * This mimics the actual Liberty server directory structure without installing Liberty.
+     * Uses the default temporary directory name.
      *
      * <p>Structure created:</p>
      * <pre>
-     * buildDir/tmp/
+     * buildDir/tmp/liberty-var-cache/
      *   └── wlp/
      *       └── usr/
      *           └── servers/
@@ -48,19 +54,49 @@ public class PrepareConfigUtil {
      *
      * @param buildDirectory The build output directory (e.g., target/ for Maven, build/ for Gradle)
      * @param serverName The name of the Liberty server
-     * @return The mock server directory (buildDir/tmp/wlp/usr/servers/{serverName})
+     * @return The mock server directory (buildDir/tmp/liberty-var-cache/wlp/usr/servers/{serverName})
      * @throws IOException if directory creation fails
      */
     public static File createMockLibertyServerStructure(File buildDirectory, String serverName) throws IOException {
+        return createMockLibertyServerStructure(buildDirectory, serverName, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Create a mock Liberty server structure in the build output directory with a custom temporary directory name.
+     * This mimics the actual Liberty server directory structure without installing Liberty.
+     *
+     * <p>Structure created:</p>
+     * <pre>
+     * buildDir/{tempDirName}/
+     *   └── wlp/
+     *       └── usr/
+     *           └── servers/
+     *               └── {serverName}/
+     *                   ├── server.xml
+     *                   ├── bootstrap.properties
+     *                   ├── server.env
+     *                   └── jvm.options
+     * </pre>
+     *
+     * @param buildDirectory The build output directory (e.g., target/ for Maven, build/ for Gradle)
+     * @param serverName The name of the Liberty server
+     * @param tempDirName The name of the temporary directory (e.g., "liberty-var-cache", "tmp")
+     * @return The mock server directory (buildDir/{tempDirName}/wlp/usr/servers/{serverName})
+     * @throws IOException if directory creation fails
+     */
+    public static File createMockLibertyServerStructure(File buildDirectory, String serverName, String tempDirName) throws IOException {
         if (buildDirectory == null) {
             throw new IllegalArgumentException("Build directory cannot be null");
         }
         if (serverName == null || serverName.trim().isEmpty()) {
             throw new IllegalArgumentException("Server name cannot be null or empty");
         }
+        if (tempDirName == null || tempDirName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Temporary directory name cannot be null or empty");
+        }
 
-        // Create tmp directory in build output
-        File tmpDir = new File(buildDirectory, "tmp");
+        // Create temporary directory in build output
+        File tmpDir = new File(buildDirectory, tempDirName);
         
         // Create Liberty server structure: wlp/usr/servers/{serverName}
         File wlpDir = new File(tmpDir, "wlp");
@@ -79,59 +115,116 @@ public class PrepareConfigUtil {
     }
 
     /**
-     * Get the mock install directory path.
+     * Get the mock install directory path using the default temporary directory name.
      *
      * @param buildDirectory The build output directory
-     * @return The mock install directory (buildDir/tmp/wlp)
+     * @return The mock install directory (buildDir/tmp/liberty-var-cache/wlp)
      */
     public static File getMockInstallDirectory(File buildDirectory) {
-        File tmpDir = new File(buildDirectory, "tmp");
+        return getMockInstallDirectory(buildDirectory, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Get the mock install directory path with a custom temporary directory name.
+     *
+     * @param buildDirectory The build output directory
+     * @param tempDirName The name of the temporary directory
+     * @return The mock install directory (buildDir/{tempDirName}/wlp)
+     */
+    public static File getMockInstallDirectory(File buildDirectory, String tempDirName) {
+        File tmpDir = new File(buildDirectory, tempDirName);
         return new File(tmpDir, "wlp");
     }
 
     /**
-     * Get the mock user directory path.
+     * Get the mock user directory path using the default temporary directory name.
      *
      * @param buildDirectory The build output directory
-     * @return The mock user directory (buildDir/tmp/wlp/usr)
+     * @return The mock user directory (buildDir/tmp/liberty-var-cache/wlp/usr)
      */
     public static File getMockUserDirectory(File buildDirectory) {
-        File mockInstallDir = getMockInstallDirectory(buildDirectory);
+        return getMockUserDirectory(buildDirectory, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Get the mock user directory path with a custom temporary directory name.
+     *
+     * @param buildDirectory The build output directory
+     * @param tempDirName The name of the temporary directory
+     * @return The mock user directory (buildDir/{tempDirName}/wlp/usr)
+     */
+    public static File getMockUserDirectory(File buildDirectory, String tempDirName) {
+        File mockInstallDir = getMockInstallDirectory(buildDirectory, tempDirName);
         return new File(mockInstallDir, "usr");
     }
 
     /**
-     * Get the mock servers directory path.
+     * Get the mock servers directory path using the default temporary directory name.
      *
      * @param buildDirectory The build output directory
-     * @return The mock servers directory (buildDir/tmp/wlp/usr/servers)
+     * @return The mock servers directory (buildDir/tmp/liberty-var-cache/wlp/usr/servers)
      */
     public static File getMockServersDirectory(File buildDirectory) {
-        File mockUserDir = getMockUserDirectory(buildDirectory);
+        return getMockServersDirectory(buildDirectory, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Get the mock servers directory path with a custom temporary directory name.
+     *
+     * @param buildDirectory The build output directory
+     * @param tempDirName The name of the temporary directory
+     * @return The mock servers directory (buildDir/{tempDirName}/wlp/usr/servers)
+     */
+    public static File getMockServersDirectory(File buildDirectory, String tempDirName) {
+        File mockUserDir = getMockUserDirectory(buildDirectory, tempDirName);
         return new File(mockUserDir, "servers");
     }
 
     /**
-     * Get the mock server directory path for a specific server.
+     * Get the mock server directory path for a specific server using the default temporary directory name.
      *
      * @param buildDirectory The build output directory
      * @param serverName The name of the Liberty server
-     * @return The mock server directory (buildDir/tmp/wlp/usr/servers/{serverName})
+     * @return The mock server directory (buildDir/tmp/liberty-var-cache/wlp/usr/servers/{serverName})
      */
     public static File getMockServerDirectory(File buildDirectory, String serverName) {
-        File mockServersDir = getMockServersDirectory(buildDirectory);
+        return getMockServerDirectory(buildDirectory, serverName, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Get the mock server directory path for a specific server with a custom temporary directory name.
+     *
+     * @param buildDirectory The build output directory
+     * @param serverName The name of the Liberty server
+     * @param tempDirName The name of the temporary directory
+     * @return The mock server directory (buildDir/{tempDirName}/wlp/usr/servers/{serverName})
+     */
+    public static File getMockServerDirectory(File buildDirectory, String serverName, String tempDirName) {
+        File mockServersDir = getMockServersDirectory(buildDirectory, tempDirName);
         return new File(mockServersDir, serverName);
     }
 
     /**
-     * Validate that the mock server structure exists.
+     * Validate that the mock server structure exists using the default temporary directory name.
      *
      * @param buildDirectory The build output directory
      * @param serverName The name of the Liberty server
      * @return true if the mock server structure exists, false otherwise
      */
     public static boolean mockServerStructureExists(File buildDirectory, String serverName) {
-        File mockServerDir = getMockServerDirectory(buildDirectory, serverName);
+        return mockServerStructureExists(buildDirectory, serverName, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Validate that the mock server structure exists with a custom temporary directory name.
+     *
+     * @param buildDirectory The build output directory
+     * @param serverName The name of the Liberty server
+     * @param tempDirName The name of the temporary directory
+     * @return true if the mock server structure exists, false otherwise
+     */
+    public static boolean mockServerStructureExists(File buildDirectory, String serverName, String tempDirName) {
+        File mockServerDir = getMockServerDirectory(buildDirectory, serverName, tempDirName);
         return mockServerDir.exists() && mockServerDir.isDirectory();
     }
 
@@ -203,26 +296,38 @@ public class PrepareConfigUtil {
 
     /**
      * Check if the liberty-plugin-config.xml file points to a mock server directory.
-     * This is determined by checking if the config file content contains "tmp" directory reference.
+     * This is determined by checking if the config file content contains the temporary directory reference.
      *
      * @param configFile The liberty-plugin-config.xml file
      * @return true if the config points to a mock server, false otherwise
      */
     public static boolean isMockServerInConfig(File configFile) {
+        return isMockServerInConfig(configFile, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Check if the liberty-plugin-config.xml file points to a mock server directory with a custom temporary directory name.
+     * This is determined by checking if the config file content contains the specified temporary directory reference.
+     *
+     * @param configFile The liberty-plugin-config.xml file
+     * @param tempDirName The name of the temporary directory to check for
+     * @return true if the config points to a mock server, false otherwise
+     */
+    public static boolean isMockServerInConfig(File configFile, String tempDirName) {
         if (configFile == null || !configFile.exists()) {
             return false;
         }
 
         try {
             String content = new String(Files.readAllBytes(configFile.toPath()), StandardCharsets.UTF_8);
-            return content.contains("tmp");
+            return content.contains(tempDirName);
         } catch (IOException e) {
             return false;
         }
     }
 
     /**
-     * Validate that the mock server structure exists and is properly configured.
+     * Validate that the mock server structure exists and is properly configured using the default temporary directory name.
      * This performs comprehensive validation including:
      * - Mock server directory exists
      * - Config file exists and points to mock server
@@ -233,26 +338,42 @@ public class PrepareConfigUtil {
      * @return true if the mock server structure is valid, false otherwise
      */
     public static boolean validateMockServerStructure(File buildDirectory, String serverName) {
+        return validateMockServerStructure(buildDirectory, serverName, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Validate that the mock server structure exists and is properly configured with a custom temporary directory name.
+     * This performs comprehensive validation including:
+     * - Mock server directory exists
+     * - Config file exists and points to mock server
+     * - Mock server directory structure is intact
+     *
+     * @param buildDirectory The build output directory
+     * @param serverName The name of the Liberty server
+     * @param tempDirName The name of the temporary directory
+     * @return true if the mock server structure is valid, false otherwise
+     */
+    public static boolean validateMockServerStructure(File buildDirectory, String serverName, String tempDirName) {
         if (buildDirectory == null || serverName == null || serverName.trim().isEmpty()) {
             return false;
         }
 
         // Check if mock server directory exists
-        if (!mockServerStructureExists(buildDirectory, serverName)) {
+        if (!mockServerStructureExists(buildDirectory, serverName, tempDirName)) {
             return false;
         }
 
-        // Check if tmp directory exists
-        File tmpDir = new File(buildDirectory, "tmp");
+        // Check if temporary directory exists
+        File tmpDir = new File(buildDirectory, tempDirName);
         if (!tmpDir.exists() || !tmpDir.isDirectory()) {
             return false;
         }
 
         // Verify the complete directory structure
-        File mockInstallDir = getMockInstallDirectory(buildDirectory);
-        File mockUserDir = getMockUserDirectory(buildDirectory);
-        File mockServersDir = getMockServersDirectory(buildDirectory);
-        File mockServerDir = getMockServerDirectory(buildDirectory, serverName);
+        File mockInstallDir = getMockInstallDirectory(buildDirectory, tempDirName);
+        File mockUserDir = getMockUserDirectory(buildDirectory, tempDirName);
+        File mockServersDir = getMockServersDirectory(buildDirectory, tempDirName);
+        File mockServerDir = getMockServerDirectory(buildDirectory, serverName, tempDirName);
 
         return mockInstallDir.exists() && mockInstallDir.isDirectory() &&
                mockUserDir.exists() && mockUserDir.isDirectory() &&
@@ -261,13 +382,24 @@ public class PrepareConfigUtil {
     }
 
     /**
-     * Clean up the mock server structure.
+     * Clean up the mock server structure using the default temporary directory name.
      *
      * @param buildDirectory The build output directory
      * @throws IOException if cleanup fails
      */
     public static void cleanMockServerStructure(File buildDirectory) throws IOException {
-        File tmpDir = new File(buildDirectory, "tmp");
+        cleanMockServerStructure(buildDirectory, DEFAULT_TEMP_DIR_NAME);
+    }
+
+    /**
+     * Clean up the mock server structure with a custom temporary directory name.
+     *
+     * @param buildDirectory The build output directory
+     * @param tempDirName The name of the temporary directory
+     * @throws IOException if cleanup fails
+     */
+    public static void cleanMockServerStructure(File buildDirectory, String tempDirName) throws IOException {
+        File tmpDir = new File(buildDirectory, tempDirName);
         if (tmpDir.exists()) {
             deleteDirectory(tmpDir);
         }

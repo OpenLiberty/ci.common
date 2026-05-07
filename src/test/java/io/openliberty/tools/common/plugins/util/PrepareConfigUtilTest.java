@@ -67,9 +67,39 @@ public class PrepareConfigUtilTest {
         assertTrue("Mock server directory should exist", mockServerDir.exists());
         assertTrue("Mock server directory should be a directory", mockServerDir.isDirectory());
 
-        // Verify the directory structure
-        File tmpDir = new File(buildDirectory, "tmp");
-        assertTrue("tmp directory should exist", tmpDir.exists());
+        // Verify the directory structure using default temp dir name
+        File tmpDir = new File(buildDirectory, PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME);
+        assertTrue("liberty-var-cache directory should exist", tmpDir.exists());
+
+        File wlpDir = new File(tmpDir, "wlp");
+        assertTrue("wlp directory should exist", wlpDir.exists());
+
+        File usrDir = new File(wlpDir, "usr");
+        assertTrue("usr directory should exist", usrDir.exists());
+
+        File serversDir = new File(usrDir, "servers");
+        assertTrue("servers directory should exist", serversDir.exists());
+
+        File serverDir = new File(serversDir, SERVER_NAME);
+        assertTrue("Server directory should exist", serverDir.exists());
+        assertEquals("Mock server directory should match expected path", serverDir, mockServerDir);
+    }
+
+    /**
+     * Test creating a mock Liberty server structure with custom temp directory name.
+     */
+    @Test
+    public void testCreateMockLibertyServerStructureWithCustomTempDir() throws IOException {
+        String customTempDir = "my-custom-temp";
+        File mockServerDir = PrepareConfigUtil.createMockLibertyServerStructure(buildDirectory, SERVER_NAME, customTempDir);
+
+        assertNotNull("Mock server directory should not be null", mockServerDir);
+        assertTrue("Mock server directory should exist", mockServerDir.exists());
+        assertTrue("Mock server directory should be a directory", mockServerDir.isDirectory());
+
+        // Verify the directory structure with custom temp dir
+        File tmpDir = new File(buildDirectory, customTempDir);
+        assertTrue("Custom temp directory should exist", tmpDir.exists());
 
         File wlpDir = new File(tmpDir, "wlp");
         assertTrue("wlp directory should exist", wlpDir.exists());
@@ -145,8 +175,21 @@ public class PrepareConfigUtilTest {
         File mockInstallDir = PrepareConfigUtil.getMockInstallDirectory(buildDirectory);
 
         assertNotNull("Mock install directory should not be null", mockInstallDir);
-        assertEquals("Mock install directory should be build/tmp/wlp",
-                new File(new File(buildDirectory, "tmp"), "wlp"), mockInstallDir);
+        assertEquals("Mock install directory should be build/liberty-var-cache/wlp",
+                new File(new File(buildDirectory, PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME), "wlp"), mockInstallDir);
+    }
+
+    /**
+     * Test getMockInstallDirectory with custom temp directory.
+     */
+    @Test
+    public void testGetMockInstallDirectoryWithCustomTempDir() {
+        String customTempDir = "my-temp";
+        File mockInstallDir = PrepareConfigUtil.getMockInstallDirectory(buildDirectory, customTempDir);
+
+        assertNotNull("Mock install directory should not be null", mockInstallDir);
+        assertEquals("Mock install directory should use custom temp dir",
+                new File(new File(buildDirectory, customTempDir), "wlp"), mockInstallDir);
     }
 
     /**
@@ -157,8 +200,21 @@ public class PrepareConfigUtilTest {
         File mockUserDir = PrepareConfigUtil.getMockUserDirectory(buildDirectory);
 
         assertNotNull("Mock user directory should not be null", mockUserDir);
-        assertEquals("Mock user directory should be build/tmp/wlp/usr",
-                new File(new File(new File(buildDirectory, "tmp"), "wlp"), "usr"), mockUserDir);
+        assertEquals("Mock user directory should be build/liberty-var-cache/wlp/usr",
+                new File(new File(new File(buildDirectory, PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME), "wlp"), "usr"), mockUserDir);
+    }
+
+    /**
+     * Test getMockUserDirectory with custom temp directory.
+     */
+    @Test
+    public void testGetMockUserDirectoryWithCustomTempDir() {
+        String customTempDir = "my-temp";
+        File mockUserDir = PrepareConfigUtil.getMockUserDirectory(buildDirectory, customTempDir);
+
+        assertNotNull("Mock user directory should not be null", mockUserDir);
+        assertEquals("Mock user directory should use custom temp dir",
+                new File(new File(new File(buildDirectory, customTempDir), "wlp"), "usr"), mockUserDir);
     }
 
     /**
@@ -169,8 +225,22 @@ public class PrepareConfigUtilTest {
         File mockServersDir = PrepareConfigUtil.getMockServersDirectory(buildDirectory);
 
         assertNotNull("Mock servers directory should not be null", mockServersDir);
-        assertEquals("Mock servers directory should be build/tmp/wlp/usr/servers",
-                new File(new File(new File(new File(buildDirectory, "tmp"), "wlp"), "usr"), "servers"),
+        assertEquals("Mock servers directory should be build/liberty-var-cache/wlp/usr/servers",
+                new File(new File(new File(new File(buildDirectory, PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME), "wlp"), "usr"), "servers"),
+                mockServersDir);
+    }
+
+    /**
+     * Test getMockServersDirectory with custom temp directory.
+     */
+    @Test
+    public void testGetMockServersDirectoryWithCustomTempDir() {
+        String customTempDir = "my-temp";
+        File mockServersDir = PrepareConfigUtil.getMockServersDirectory(buildDirectory, customTempDir);
+
+        assertNotNull("Mock servers directory should not be null", mockServersDir);
+        assertEquals("Mock servers directory should use custom temp dir",
+                new File(new File(new File(new File(buildDirectory, customTempDir), "wlp"), "usr"), "servers"),
                 mockServersDir);
     }
 
@@ -241,8 +311,27 @@ public class PrepareConfigUtilTest {
 
         // Verify it's cleaned
         assertFalse("Mock server structure should not exist after cleanup", mockServerDir.exists());
-        File tmpDir = new File(buildDirectory, "tmp");
-        assertFalse("tmp directory should not exist after cleanup", tmpDir.exists());
+        File tmpDir = new File(buildDirectory, PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME);
+        assertFalse("liberty-var-cache directory should not exist after cleanup", tmpDir.exists());
+    }
+
+    /**
+     * Test cleanMockServerStructure with custom temp directory.
+     */
+    @Test
+    public void testCleanMockServerStructureWithCustomTempDir() throws IOException {
+        String customTempDir = "my-temp";
+        // Create the structure with custom temp dir
+        File mockServerDir = PrepareConfigUtil.createMockLibertyServerStructure(buildDirectory, SERVER_NAME, customTempDir);
+        assertTrue("Mock server structure should exist before cleanup", mockServerDir.exists());
+
+        // Clean the structure
+        PrepareConfigUtil.cleanMockServerStructure(buildDirectory, customTempDir);
+
+        // Verify it's cleaned
+        assertFalse("Mock server structure should not exist after cleanup", mockServerDir.exists());
+        File tmpDir = new File(buildDirectory, customTempDir);
+        assertFalse("Custom temp directory should not exist after cleanup", tmpDir.exists());
     }
 
     /**
@@ -251,13 +340,13 @@ public class PrepareConfigUtilTest {
      */
     @Test
     public void testCleanMockServerStructureWhenNotExists() throws IOException {
-        File tmpDir = new File(buildDirectory, "tmp");
-        assertFalse("tmp directory should not exist initially", tmpDir.exists());
+        File tmpDir = new File(buildDirectory, PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME);
+        assertFalse("liberty-var-cache directory should not exist initially", tmpDir.exists());
 
         // Should not throw exception
         PrepareConfigUtil.cleanMockServerStructure(buildDirectory);
 
-        assertFalse("tmp directory should still not exist", tmpDir.exists());
+        assertFalse("liberty-var-cache directory should still not exist", tmpDir.exists());
     }
 
     /**
@@ -466,13 +555,31 @@ public class PrepareConfigUtilTest {
         File configFile = new File(buildDirectory, "liberty-plugin-config.xml");
         String content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                 "<liberty-plugin-config>\n" +
-                "  <installDirectory>/path/to/tmp/wlp</installDirectory>\n" +
+                "  <installDirectory>/path/to/tmp/liberty-var-cache/wlp</installDirectory>\n" +
                 "</liberty-plugin-config>";
         Files.write(configFile.toPath(), content.getBytes());
         
         boolean result = PrepareConfigUtil.isMockServerInConfig(configFile);
         
         assertTrue("Should detect mock server reference", result);
+    }
+
+    /**
+     * Test isMockServerInConfig with custom temp directory reference.
+     */
+    @Test
+    public void testIsMockServerInConfigWithCustomTempDir() throws IOException {
+        String customTempDir = "my-custom-temp";
+        File configFile = new File(buildDirectory, "liberty-plugin-config.xml");
+        String content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<liberty-plugin-config>\n" +
+                "  <installDirectory>/path/to/" + customTempDir + "/wlp</installDirectory>\n" +
+                "</liberty-plugin-config>";
+        Files.write(configFile.toPath(), content.getBytes());
+        
+        boolean result = PrepareConfigUtil.isMockServerInConfig(configFile, customTempDir);
+        
+        assertTrue("Should detect custom temp dir reference", result);
     }
 
     /**
@@ -567,7 +674,7 @@ public class PrepareConfigUtilTest {
     }
 
     /**
-     * Test validateMockServerStructure with incomplete structure (missing tmp directory).
+     * Test validateMockServerStructure with incomplete structure (missing temp directory).
      */
     @Test
     public void testValidateMockServerStructureWithIncompleteStructure() throws IOException {
@@ -578,5 +685,27 @@ public class PrepareConfigUtilTest {
         boolean result = PrepareConfigUtil.validateMockServerStructure(buildDirectory, SERVER_NAME);
         
         assertFalse("Should fail validation with incomplete structure", result);
+    }
+
+    /**
+     * Test validateMockServerStructure with custom temp directory.
+     */
+    @Test
+    public void testValidateMockServerStructureWithCustomTempDir() throws IOException {
+        String customTempDir = "my-temp";
+        PrepareConfigUtil.createMockLibertyServerStructure(buildDirectory, SERVER_NAME, customTempDir);
+        
+        boolean result = PrepareConfigUtil.validateMockServerStructure(buildDirectory, SERVER_NAME, customTempDir);
+        
+        assertTrue("Should validate successfully with custom temp dir", result);
+    }
+
+    /**
+     * Test that default constant is set correctly.
+     */
+    @Test
+    public void testDefaultTempDirNameConstant() {
+        assertEquals("Default temp dir name should be tmp/liberty-var-cache",
+                "tmp/liberty-var-cache", PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME);
     }
 }
