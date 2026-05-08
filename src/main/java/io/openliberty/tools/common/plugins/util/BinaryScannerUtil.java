@@ -42,23 +42,23 @@ public abstract class BinaryScannerUtil {
     public static final String OL_FEATURELIST_KEY = "openLiberty";
 
     // The coordinates to use for WebSphere Liberty versions describe three different
-    // cadres. Version 25.0.0.7 and earlier are the first cadre. Version 25.0.0.8 through
-    // to 25.0.0.12 are the second cadre. The last cadre is versions 26.0.0.1 and onward.
-    // Maven coordinates for cadre 1
-    public static final String WS_FEATURE_LIST_VERSION_CADRE1 = "25.0.0.7";
-    public static final String WS_FEATURELIST_GROUP_ID_CADRE1 = "io.openliberty.features";
-    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_CADRE1 = "websphere_liberty_base__featurelist";
-    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_CADRE1 = "websphere_liberty_core__featurelist";
-    // Maven coordinates for cadre 2
-    //public static final String WS_FEATURE_LIST_VERSION_CADRE2 = versions between cadres 1 and 3
-    public static final String WS_FEATURELIST_GROUP_ID_CADRE2 = "com.ibm.websphere.appserver.features";
-    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_CADRE2 = WS_BASE_FEATURE_LIST_ARTIFACT_ID_CADRE1;
-    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_CADRE2 = WS_CORE_FEATURE_LIST_ARTIFACT_ID_CADRE1;
-    // Maven coordinates for cadre 3
-    public static final String WS_FEATURE_LIST_VERSION_CADRE3 = "26.0.0.1";
-    public static final String WS_FEATURELIST_GROUP_ID_CADRE3 = WS_FEATURELIST_GROUP_ID_CADRE2;
-    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_CADRE3 = "websphere_liberty_base_featurelist";
-    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_CADRE3 = "websphere_liberty_core_featurelist";
+    // batches. Version 25.0.0.7 and earlier are the first batch. Version 25.0.0.8 through
+    // to 25.0.0.12 are the second batch. The last batch is versions 26.0.0.1 and onward.
+    // Maven coordinates for batch 1
+    public static final String WS_FEATURE_LIST_VERSION_BATCH1 = "25.0.0.7";
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH1 = "io.openliberty.features";
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH1 = "websphere_liberty_base__featurelist";
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH1 = "websphere_liberty_core__featurelist";
+    // Maven coordinates for batch 2
+    //public static final String WS_FEATURE_LIST_VERSION_BATCH2 = versions between batches 1 and 3
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH2 = "com.ibm.websphere.appserver.features";
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH2 = WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH1;
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH2 = WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH1;
+    // Maven coordinates for batch 3
+    public static final String WS_FEATURE_LIST_VERSION_BATCH3 = "26.0.0.1";
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH3 = WS_FEATURELIST_GROUP_ID_BATCH2;
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH3 = "websphere_liberty_base_featurelist";
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH3 = "websphere_liberty_core_featurelist";
     // The remaining coordinate is the same for all three
     public static final String WS_FEATURELIST_TYPE = "xml";
     // The following keys are used when passing the feature list files to the scanner
