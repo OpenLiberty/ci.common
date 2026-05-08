@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2021, 2025.
+ * (C) Copyright IBM Corporation 2021, 2026
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public abstract class BinaryScannerUtil {
@@ -30,16 +31,52 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_MAVEN_GROUP_ID = "com.ibm.websphere.appmod.tools";
     public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "binary-app-scanner";
     public static final String BINARY_SCANNER_MAVEN_TYPE = "jar";
-    public static final String BINARY_SCANNER_MAVEN_VERSION = "[25.0.0.2,)";
+    public static final String BINARY_SCANNER_MAVEN_VERSION = "[26.0.0.2-20260420]";
+
+    // The coordinates to use for Open Liberty versions 25.0.0.7 and up
+    public static final String OL_FEATURELIST_GROUP_ID = "io.openliberty.features";
+    public static final String OL_FEATURELIST_ARTIFACT_ID = "open_liberty_featurelist";
+    public static final String OL_FEATURELIST_TYPE = "xml";
+    // the version number is generated at the point of use
+    // The following key is used when passing the feature list file to the scanner
+    public static final String OL_FEATURELIST_KEY = "openLiberty";
+
+    // The coordinates to use for WebSphere Liberty versions describe three different
+    // batches. Version 25.0.0.7 and earlier are the first batch. Version 25.0.0.8 through
+    // to 25.0.0.12 are the second batch. The last batch is versions 26.0.0.1 and onward.
+    // Maven coordinates for batch 1
+    public static final String WS_FEATURE_LIST_VERSION_BATCH1 = "25.0.0.7";
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH1 = "io.openliberty.features";
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH1 = "websphere_liberty_base__featurelist";
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH1 = "websphere_liberty_core__featurelist";
+    // Maven coordinates for batch 2
+    //public static final String WS_FEATURE_LIST_VERSION_BATCH2 = versions between batches 1 and 3
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH2 = "com.ibm.websphere.appserver.features";
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH2 = WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH1;
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH2 = WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH1;
+    // Maven coordinates for batch 3
+    public static final String WS_FEATURE_LIST_VERSION_BATCH3 = "26.0.0.1";
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH3 = WS_FEATURELIST_GROUP_ID_BATCH2;
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH3 = "websphere_liberty_base_featurelist";
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH3 = "websphere_liberty_core_featurelist";
+    // The remaining coordinate is the same for all three
+    public static final String WS_FEATURELIST_TYPE = "xml";
+    // The following keys are used when passing the feature list files to the scanner
+    public static final String WSBASE_FEATURELIST_KEY = "liberty";
+    public static final String WSCORE_FEATURELIST_KEY = "libertyCore";
 
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
-    public static final String GENERATED_FEATURES_FILE_PATH = "configDropins/overrides/" + GENERATED_FEATURES_FILE_NAME;
+    public static final String GENERATED_FEATURES_DIR_PATH = "configDropins/overrides/";
+    public static final String GENERATED_FEATURES_FILE_PATH = GENERATED_FEATURES_DIR_PATH + GENERATED_FEATURES_FILE_NAME;
+    public static final String GENERATED_FEATURES_TEMP_DIR = ".libertyFeatures";
+    public static final String GENERATED_FEATURES_TEMP_PATH = GENERATED_FEATURES_TEMP_DIR + File.separator + GENERATED_FEATURES_FILE_PATH;
     private static final String FEATURE_MODIFIED_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException";
     private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
     private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
     private static final String FEATURE_NOT_AVAILABLE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureNotAvailableAtRequestedLevelException";
     private static final String ILLEGAL_TARGET_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetException";
     private static final String ILLEGAL_TARGET_COMBINATION_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetCombinationException";
+    private static final String VERSIONLESS_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.VersionlessFeatureException";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
@@ -79,13 +116,13 @@ public abstract class BinaryScannerUtil {
     public abstract boolean isDebugEnabled();
 
     // The jar file containing the binary scanner code
-    private File binaryScanner;
+    private File binaryScannerJar;
     private URLClassLoader binaryScannerClassLoader = null;
     private Class binaryScannerClass = null;
     private Method binaryScannerMethod = null;
 
     public BinaryScannerUtil(File binaryScanner) {
-        this.binaryScanner = binaryScanner;
+        this.binaryScannerJar = binaryScanner;
     }
 
     /**
@@ -118,11 +155,11 @@ public abstract class BinaryScannerUtil {
      *                                       scanner when used in combination with each other. E.g. EE 7 and MP 2.1
      */
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
-            String logLocation, String targetJavaEE, String targetMicroProfile, boolean optimize)
+            String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
-            FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException {
-        Set<String> featureList = null;
-        if (binaryScanner != null && binaryScanner.exists()) {
+            FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException, VersionlessFeatureDetectedException {
+        Set<String> generatedFeatureList = null;
+        if (binaryScannerJar != null && binaryScannerJar.exists()) {
             // if we are already generating features for all class files (optimize=true) and
             // we are not passing any user specified features (currentFeatureSet is empty)
             // we do not need to rerun the binary scanner if it fails
@@ -138,17 +175,18 @@ public abstract class BinaryScannerUtil {
                     logLevel = null;
                     logLocation = null;
                 }
-                debug("Calling " + binaryScanner.getName() + " with the following inputs...\n" +
+                debug("Calling " + binaryScannerJar.getName() + " with the following inputs...\n" +
                         "  binaryInputs: " + binaryInputs + "\n" +
                         "  targetJavaEE: " + targetJavaEE + "\n" +
                         "  targetMicroP: " + targetMicroProfile + "\n" +
                         "  currentFeatures: " + currentFeatureSet + "\n" +
+                        "  featureListFileMap: " + featureListFileMap + "\n" +
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
-                featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
-                        currentFeatureSet, logLocation, logLevel, java.util.Locale.getDefault());
-                for (String s : featureList) {debug(s);};
+                generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
+                        currentFeatureSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
+                for (String s : generatedFeatureList) {debug(s);};
             } catch (InvocationTargetException ite) {
                 // This is the exception from the JVM that indicates there was an exception in the method we
                 // called through reflection. We must extract the actual exception from the 'cause' field.
@@ -168,7 +206,7 @@ public abstract class BinaryScannerUtil {
                     // The list of features from the app is passed in but it contains conflicts
                     Set<String> conflicts = getFeatures(scannerException);
                     // always rerun binary scanner in this scenario, this exception only occurs if a current feature list is passed to binary scanner
-                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile);
+                    Set<String> sampleFeatureList = reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap);
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -178,7 +216,7 @@ public abstract class BinaryScannerUtil {
                     // The scanned files conflict with each other or with current features
                     Set<String> conflicts = getFeatures(scannerException);
                     //  rerun binary scanner with all class files and without the current feature set to get feature recommendations
-                    Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile): null;
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap): null;
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -188,7 +226,7 @@ public abstract class BinaryScannerUtil {
                     // The scanned files conflict and the scanner suggests modifying some features
                     Set<String> modifications = getFeatures(scannerException);
                     //  rerun binary scanner with all class files and without the current feature set
-                    Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile) : null;
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunBinaryScanner(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap) : null;
                     throw new FeatureModifiedException(modifications, 
                             (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, scannerException.getLocalizedMessage());
                 } else if (scannerException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
@@ -205,6 +243,9 @@ public abstract class BinaryScannerUtil {
                 } else if (scannerException.getClass().getName().equals(ILLEGAL_TARGET_COMBINATION_EXCEPTION)) {
                     // The EE and MP version numbers are in range but they are not compatible with each other based on the standards.
                     throw new IllegalTargetComboException(getInvalidEETarget(scannerException), getInvalidMPTarget(scannerException));
+                } else if (scannerException.getClass().getName().equals(VERSIONLESS_FEATURE_EXCEPTION)) {
+                    // One of the existing features has no version specified and the binary scanner does not support this.
+                    throw new VersionlessFeatureDetectedException();
                 } else if (scannerException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
                     // Used by binary scanner 22.0.0.3, remove after 22.0.0.4 is in sonatype
                     // TODO: Affected by issue #1558
@@ -229,13 +270,13 @@ public abstract class BinaryScannerUtil {
                 throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar: " + loadingException.toString());
             }
         } else {
-            if (binaryScanner == null) {
+            if (binaryScannerJar == null) {
                 throw new PluginExecutionException("The binary scanner jar location is not defined.");
             } else {
-                throw new PluginExecutionException("Could not find the binary scanner jar at " + binaryScanner.getAbsolutePath());
+                throw new PluginExecutionException("Could not find the binary scanner jar at " + binaryScannerJar.getAbsolutePath());
             }
         }
-        return featureList;
+        return generatedFeatureList;
     }
 
     /**
@@ -252,9 +293,9 @@ public abstract class BinaryScannerUtil {
      * @return - a set of features that will allow the application to run in a Liberty server
      * @throws PluginExecutionException - any exception that prevents the scanner from running
      */
-    public Set<String> reRunBinaryScanner(Set<String> allClassesDirectories, String logLocation, String targetJavaEE, String targetMicroProfile)
-            throws PluginExecutionException {
-        Set<String> featureList = null;
+    public Set<String> reRunBinaryScanner(Set<String> allClassesDirectories, String logLocation, String targetJavaEE, String targetMicroProfile,
+            Map featureListFileMap) throws PluginExecutionException {
+        Set<String> generatedFeatureList = null;
         try {
             Method generateFeatureSetMethod = getScannerMethod();
             Set<String> binaryInputs = allClassesDirectories;
@@ -274,21 +315,21 @@ public abstract class BinaryScannerUtil {
                   "  logLocation: " + logLocation + "\n" +
                   "  logLevel: " + logLevel + "\n" +
                   "  locale: " + java.util.Locale.getDefault());
-            featureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
-                    currentFeaturesSet, logLocation, logLevel, java.util.Locale.getDefault());
-            for (String s : featureList) {debug(s);};
+            generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
+                    currentFeaturesSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
+            for (String s : generatedFeatureList) {debug(s);};
         } catch (InvocationTargetException ite) {
             Throwable scannerException = ite.getCause();
             if (scannerException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                 // this happens when the list of features passed in contains conflicts so now no recommendation possible
                 debug("RuntimeException from re-run of binary scanner", scannerException); // shouldn't happen
-                featureList = null;
+                generatedFeatureList = null;
             } else if (scannerException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
                 // The features in the scanned files conflict with each other, no recommendation possible
-                featureList = getNoSampleFeatureList();
+                generatedFeatureList = getNoSampleFeatureList();
             } else if (scannerException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
                 // The features in the scanned files conflict with each other, no recommendation possible
-                featureList = getNoSampleFeatureList();
+                generatedFeatureList = getNoSampleFeatureList();
             } else {
                 debug("Exception from rerunning binary scanner.", scannerException);
                 throw new PluginExecutionException("Error scanning the application for Liberty feature recommendations: " + scannerException.toString());
@@ -299,9 +340,9 @@ public abstract class BinaryScannerUtil {
                 debug("Caused by exception2:"+loadingException.getCause().getClass().getName());
                 debug("Caused by exception message2:"+loadingException.getCause().getMessage());
             }
-            throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar for recommendations: " + loadingException.toString());
+            throw new PluginExecutionException("An error occurred when trying to call the binary scanner jar for Liberty feature recommendations: " + loadingException.toString());
         }
-        return featureList;
+        return generatedFeatureList;
     }
 
     private Set<String> getNoSampleFeatureList() {
@@ -314,7 +355,7 @@ public abstract class BinaryScannerUtil {
     private ClassLoader getScannerClassLoader() throws MalformedURLException {
         if (binaryScannerClassLoader == null) {
             ClassLoader cl = this.getClass().getClassLoader();
-            binaryScannerClassLoader = new URLClassLoader(new URL[] { binaryScanner.toURI().toURL() }, cl);
+            binaryScannerClassLoader = new URLClassLoader(new URL[] { binaryScannerJar.toURI().toURL() }, cl);
         }
         return binaryScannerClassLoader;
     }
@@ -330,10 +371,12 @@ public abstract class BinaryScannerUtil {
     private Method getScannerMethod() throws MalformedURLException, ClassNotFoundException, NoSuchMethodException, PluginExecutionException, SecurityException {
         if (binaryScannerMethod == null) {
             Class driveScan = getScannerClass();
-            // args: Set<String>, String, String, Set<String>, String, String, Locale
-            // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
+            // Method name and return type: Set<String> generateFeatureList()
+            // arg types: Set<String>, String, String, Set<String>, Map, String, String, Locale
+            // arg names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, featureListFileMap, logLocation, logLevel, locale
+
             binaryScannerMethod = driveScan.getMethod("generateFeatureList", Set.class, String.class, String.class,
-                    Set.class, String.class, String.class, java.util.Locale.class);
+                    Set.class, Map.class, String.class, String.class, java.util.Locale.class);
             if (binaryScannerMethod == null) {
                 throw new PluginExecutionException("Error finding binary scanner method using reflection");
             }
@@ -592,5 +635,9 @@ public abstract class BinaryScannerUtil {
         IllegalTargetComboException(String eeLevel, String mpLevel) {
             super(eeLevel, mpLevel);
         }
+    }
+
+    public class VersionlessFeatureDetectedException extends Exception {
+        private static final long serialVersionUID = 1L;
     }
 }
