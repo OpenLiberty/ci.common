@@ -32,7 +32,7 @@ public class PrepareConfigUtil {
     /**
      * Default name for the temporary directory used for mock Liberty server structures.
      */
-    public static final String DEFAULT_TEMP_DIR_NAME = "tmp/liberty-var-cache";
+    public static final String DEFAULT_TEMP_DIR_NAME = ".libertyls-var-cache";
 
     /**
      * Create a mock Liberty server structure in the build output directory.
@@ -41,7 +41,7 @@ public class PrepareConfigUtil {
      *
      * <p>Structure created:</p>
      * <pre>
-     * buildDir/tmp/liberty-var-cache/
+     * buildDir/.libertyls-var-cache/
      *   └── wlp/
      *       └── usr/
      *           └── servers/
@@ -54,7 +54,7 @@ public class PrepareConfigUtil {
      *
      * @param buildDirectory The build output directory (e.g., target/ for Maven, build/ for Gradle)
      * @param serverName The name of the Liberty server
-     * @return The mock server directory (buildDir/tmp/liberty-var-cache/wlp/usr/servers/{serverName})
+     * @return The mock server directory (buildDir/.libertyls-var-cache/wlp/usr/servers/{serverName})
      * @throws IOException if directory creation fails
      */
     public static File createMockLibertyServerStructure(File buildDirectory, String serverName) throws IOException {
@@ -80,7 +80,7 @@ public class PrepareConfigUtil {
      *
      * @param buildDirectory The build output directory (e.g., target/ for Maven, build/ for Gradle)
      * @param serverName The name of the Liberty server
-     * @param tempDirName The name of the temporary directory (e.g., "liberty-var-cache", "tmp")
+     * @param tempDirName The name of the temporary directory (e.g., ".libertyls-var-cache", "my-temp")
      * @return The mock server directory (buildDir/{tempDirName}/wlp/usr/servers/{serverName})
      * @throws IOException if directory creation fails
      */
@@ -185,7 +185,7 @@ public class PrepareConfigUtil {
      *
      * @param buildDirectory The build output directory
      * @param serverName The name of the Liberty server
-     * @return The mock server directory (buildDir/tmp/liberty-var-cache/wlp/usr/servers/{serverName})
+     * @return The mock server directory (buildDir/.libertyls-var-cache/wlp/usr/servers/{serverName})
      */
     public static File getMockServerDirectory(File buildDirectory, String serverName) {
         return getMockServerDirectory(buildDirectory, serverName, DEFAULT_TEMP_DIR_NAME);

@@ -555,7 +555,7 @@ public class PrepareConfigUtilTest {
         File configFile = new File(buildDirectory, "liberty-plugin-config.xml");
         String content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
                 "<liberty-plugin-config>\n" +
-                "  <installDirectory>/path/to/tmp/liberty-var-cache/wlp</installDirectory>\n" +
+                "  <installDirectory>/path/to/.libertyls-var-cache/wlp</installDirectory>\n" +
                 "</liberty-plugin-config>";
         Files.write(configFile.toPath(), content.getBytes());
         
@@ -705,7 +705,7 @@ public class PrepareConfigUtilTest {
      */
     @Test
     public void testDefaultTempDirNameConstant() {
-        assertEquals("Default temp dir name should be tmp/liberty-var-cache",
-                "tmp/liberty-var-cache", PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME);
+        assertEquals("Default temp dir name should be .libertyls-var-cache",
+                ".libertyls-var-cache", PrepareConfigUtil.DEFAULT_TEMP_DIR_NAME);
     }
 }
