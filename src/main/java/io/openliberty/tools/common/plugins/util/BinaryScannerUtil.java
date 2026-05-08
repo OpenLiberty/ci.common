@@ -31,7 +31,7 @@ public abstract class BinaryScannerUtil {
     public static final String BINARY_SCANNER_MAVEN_GROUP_ID = "com.ibm.websphere.appmod.tools";
     public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "binary-app-scanner";
     public static final String BINARY_SCANNER_MAVEN_TYPE = "jar";
-    public static final String BINARY_SCANNER_MAVEN_VERSION = "[25.0.0.2.2]";
+    public static final String BINARY_SCANNER_MAVEN_VERSION = "[26.0.0.2-20260420]";
 
     // The coordinates to use for Open Liberty versions 25.0.0.7 and up
     public static final String OL_FEATURELIST_GROUP_ID = "io.openliberty.features";
@@ -41,26 +41,29 @@ public abstract class BinaryScannerUtil {
     // The following key is used when passing the feature list file to the scanner
     public static final String OL_FEATURELIST_KEY = "openLiberty";
 
-    // The coordinates to use for WebSphere Liberty versions 25.0.0.7 to 25.0.0.9
-    // We will use them for releases prior to 25.0.0.7
-    // io.openliberty.features:websphere_liberty_base__featurelist:xml:25.0.0.7
-    // io.openliberty.features:websphere_liberty_core__featurelist:xml:25.0.0.7
-
-    // The coordinates to use for WebSphere Liberty versions 25.0.0.10 and up
-    // Publishing stopped with 25.0.0.12 so this value is used for 26.0.0.1 and up.
-    // com.ibm.websphere.appserver.features:websphere_liberty_base__featurelist:xml:25.0.0.xx
-    // com.ibm.websphere.appserver.features:websphere_liberty_core__featurelist:xml:25.0.0.xx
-
-    // These coordinates are used in different combinations to access WebSphere Liberty feature lists 25.0.0.7 and up
-    public static final String WS1_FEATURELIST_GROUP_ID = "io.openliberty.features";
-    public static final String WS2_FEATURELIST_GROUP_ID = "com.ibm.websphere.appserver.features";
-    public static final String WSBASE_FEATURELIST_ARTIFACT_ID = "websphere_liberty_base__featurelist";
-    public static final String WSCORE_FEATURELIST_ARTIFACT_ID = "websphere_liberty_core__featurelist";
+    // The coordinates to use for WebSphere Liberty versions describe three different
+    // batches. Version 25.0.0.7 and earlier are the first batch. Version 25.0.0.8 through
+    // to 25.0.0.12 are the second batch. The last batch is versions 26.0.0.1 and onward.
+    // Maven coordinates for batch 1
+    public static final String WS_FEATURE_LIST_VERSION_BATCH1 = "25.0.0.7";
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH1 = "io.openliberty.features";
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH1 = "websphere_liberty_base__featurelist";
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH1 = "websphere_liberty_core__featurelist";
+    // Maven coordinates for batch 2
+    //public static final String WS_FEATURE_LIST_VERSION_BATCH2 = versions between batches 1 and 3
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH2 = "com.ibm.websphere.appserver.features";
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH2 = WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH1;
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH2 = WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH1;
+    // Maven coordinates for batch 3
+    public static final String WS_FEATURE_LIST_VERSION_BATCH3 = "26.0.0.1";
+    public static final String WS_FEATURELIST_GROUP_ID_BATCH3 = WS_FEATURELIST_GROUP_ID_BATCH2;
+    public static final String WS_BASE_FEATURE_LIST_ARTIFACT_ID_BATCH3 = "websphere_liberty_base_featurelist";
+    public static final String WS_CORE_FEATURE_LIST_ARTIFACT_ID_BATCH3 = "websphere_liberty_core_featurelist";
+    // The remaining coordinate is the same for all three
     public static final String WS_FEATURELIST_TYPE = "xml";
     // The following keys are used when passing the feature list files to the scanner
     public static final String WSBASE_FEATURELIST_KEY = "liberty";
     public static final String WSCORE_FEATURELIST_KEY = "libertyCore";
-
 
     public static final String GENERATED_FEATURES_FILE_NAME = "generated-features.xml";
     public static final String GENERATED_FEATURES_DIR_PATH = "configDropins/overrides/";
