@@ -73,6 +73,7 @@ public abstract class BinaryScannerUtil {
     private static final String FEATURE_NOT_AVAILABLE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureNotAvailableAtRequestedLevelException";
     private static final String ILLEGAL_TARGET_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetException";
     private static final String ILLEGAL_TARGET_COMBINATION_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.IllegalTargetCombinationException";
+    private static final String VERSIONLESS_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.VersionlessFeatureException";
     public static final String BINARY_SCANNER_CONFLICT_MESSAGE1 = "A working set of features could not be generated due to conflicts " +
             "between configured features and the application's API usage: %s. Review and update your server configuration and " +
             "application to ensure they are not using conflicting features and APIs from different levels of MicroProfile, " +
@@ -153,7 +154,7 @@ public abstract class BinaryScannerUtil {
     public Set<String> runBinaryScanner(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
             String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
-            FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException {
+            FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException, VersionlessFeatureDetectedException {
         Set<String> generatedFeatureList = null;
         if (binaryScannerJar != null && binaryScannerJar.exists()) {
             // if we are already generating features for all class files (optimize=true) and
@@ -239,6 +240,9 @@ public abstract class BinaryScannerUtil {
                 } else if (scannerException.getClass().getName().equals(ILLEGAL_TARGET_COMBINATION_EXCEPTION)) {
                     // The EE and MP version numbers are in range but they are not compatible with each other based on the standards.
                     throw new IllegalTargetComboException(getInvalidEETarget(scannerException), getInvalidMPTarget(scannerException));
+                } else if (scannerException.getClass().getName().equals(VERSIONLESS_FEATURE_EXCEPTION)) {
+                    // One of the existing features has no version specified and the binary scanner does not support this.
+                    throw new VersionlessFeatureDetectedException();
                 } else if (scannerException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
                     // Used by binary scanner 22.0.0.3, remove after 22.0.0.4 is in sonatype
                     // TODO: Affected by issue #1558
@@ -628,5 +632,9 @@ public abstract class BinaryScannerUtil {
         IllegalTargetComboException(String eeLevel, String mpLevel) {
             super(eeLevel, mpLevel);
         }
+    }
+
+    public class VersionlessFeatureDetectedException extends Exception {
+        private static final long serialVersionUID = 1L;
     }
 }
