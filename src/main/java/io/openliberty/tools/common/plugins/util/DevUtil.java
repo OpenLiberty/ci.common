@@ -388,8 +388,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private String containerHttpsPort;
     private final long compileWaitMillis;
     private AtomicBoolean inputUnavailable;
-    private AtomicBoolean serverStarting;
-    private AtomicBoolean earlyQuitRequested;
+    AtomicBoolean serverStarting;
+    AtomicBoolean earlyQuitRequested;
     private int alternativeDebugPort = -1;
     private boolean libertyDebug;
     private int libertyDebugPort;
@@ -2826,6 +2826,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             earlyQuitRequested.set(true);
                         }
                         runShutdownHook(executor);
+                    } else if (serverStarting.get()) {
+                        // During server startup, only 'q' is allowed. Ignore all other keys.
+                        if (!line.trim().isEmpty()) {
+                            info("Server is starting. Only 'q' (quit) is available. Please wait for server to start.");
+                        }
                     } else if (r.isPressed(line)) {
                         debug("Detected restart command");
                         try {

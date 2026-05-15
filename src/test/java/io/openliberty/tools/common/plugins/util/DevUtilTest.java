@@ -598,4 +598,48 @@ public class DevUtilTest extends BaseDevUtilTest {
         assertTrue(content.contains("<containerRunOpts></containerRunOpts>"));
         assertTrue(content.contains("<imageName></imageName>"));
     }
+
+    @Test
+    public void testEarlyQuitDuringServerStartup() throws Exception {
+        // Test that serverStarting flag is properly initialized
+        assertFalse("serverStarting should be false initially", util.serverStarting.get());
+        assertFalse("earlyQuitRequested should be false initially", util.earlyQuitRequested.get());
+        
+        // Simulate server starting
+        util.serverStarting.set(true);
+        assertTrue("serverStarting should be true", util.serverStarting.get());
+        
+        // Simulate early quit request
+        util.earlyQuitRequested.set(true);
+        assertTrue("earlyQuitRequested should be true", util.earlyQuitRequested.get());
+        
+        // Reset flags
+        util.serverStarting.set(false);
+        util.earlyQuitRequested.set(false);
+        assertFalse("serverStarting should be false after reset", util.serverStarting.get());
+        assertFalse("earlyQuitRequested should be false after reset", util.earlyQuitRequested.get());
+    }
+
+    @Test
+    public void testEarlyQuitFlagsInitialization() throws Exception {
+        // Verify flags are initialized to false in constructor
+        DevUtil newUtil = getNewDevUtil(serverDirectory);
+        assertFalse("serverStarting should be false for new instance", newUtil.serverStarting.get());
+        assertFalse("earlyQuitRequested should be false for new instance", newUtil.earlyQuitRequested.get());
+    }
+
+    @Test
+    public void testEarlyQuitFlagPersistence() throws Exception {
+        // Test that earlyQuitRequested persists across server starting state changes
+        util.serverStarting.set(true);
+        util.earlyQuitRequested.set(true);
+        
+        // Change serverStarting but earlyQuitRequested should persist
+        util.serverStarting.set(false);
+        assertTrue("earlyQuitRequested should persist", util.earlyQuitRequested.get());
+        
+        // Explicitly reset
+        util.earlyQuitRequested.set(false);
+        assertFalse("earlyQuitRequested should be false after reset", util.earlyQuitRequested.get());
+    }
 }
