@@ -2826,10 +2826,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             earlyQuitRequested.set(true);
                         }
                         runShutdownHook(executor);
+                    } else if (h.isPressed(line)) {
+                        info(formatAttentionBarrier());
+                        printHelpMessages();
+                        info(formatAttentionBarrier());
                     } else if (serverStarting.get()) {
-                        // During server startup, only 'q' is allowed. Ignore all other keys.
+                        // During server startup, only 'q' and 'h' are allowed. Ignore all other keys.
                         if (!line.trim().isEmpty()) {
-                            info("Server is starting. Only 'q' (quit) is available. Please wait for server to start.");
+                            info("The requested command is not available during server startup.");
                         }
                     } else if (r.isPressed(line)) {
                         debug("Detected restart command");
@@ -2840,10 +2844,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not restart the server.", e);
                             runShutdownHook(executor);
                         }
-                    } else if (h.isPressed(line)) {
-                        info(formatAttentionBarrier());
-                        printHelpMessages();
-                        info(formatAttentionBarrier());
                     } else if (g.isPressed(line)) {
                         toggleFeatureGeneration();
                     } else if (o.isPressed(line)) {
