@@ -388,6 +388,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private String containerHttpsPort;
     private final long compileWaitMillis;
     private AtomicBoolean inputUnavailable;
+    AtomicBoolean serverStarting;
+    AtomicBoolean earlyQuitRequested;
     private int alternativeDebugPort = -1;
     private boolean libertyDebug;
     private int libertyDebugPort;
@@ -503,6 +505,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.devStop = new AtomicBoolean(false);
         this.compileWaitMillis = compileWaitMillis;
         this.inputUnavailable = new AtomicBoolean(false);
+        this.serverStarting = new AtomicBoolean(false);
+        this.earlyQuitRequested = new AtomicBoolean(false);
         this.libertyDebug = libertyDebug;
         this.detectedAppStarted = new AtomicBoolean(false);
         this.useBuildRecompile = useBuildRecompile;
@@ -791,12 +795,25 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                                  failed.
      */
     public void startServer(boolean buildContainer, boolean pullParentImage) throws PluginExecutionException {
+        serverStarting.set(true);
         try {
+            // Check if early quit was requested before we even start
+            if (earlyQuitRequested.get()) {
+                debug("Early quit detected before server start, aborting startup");
+                return;
+            }
+            
             final ServerTask serverTask;
             try {
                 serverTask = getServerTask();
             } catch (Exception e) {
                 throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+            }
+
+            // Check for early quit after getting server task
+            if (earlyQuitRequested.get()) {
+                debug("Early quit detected after getting server task, aborting startup");
+                return;
             }
 
             // Set debug variables in server.env if debug enabled
@@ -907,6 +924,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 try {
                     observer.initialize();
                     while (!messagesModified.get()) {
+                        // Check for early quit request
+                        if (earlyQuitRequested.get()) {
+                            debug("Early quit detected while waiting for messages.log update");
+                            throw new PluginScenarioException("Server startup aborted by user");
+                        }
                         checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         observer.checkAndNotify();
                         // wait for the log file to update during server startup
@@ -933,6 +955,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 // Wait until log exists
                 try {
                     while (!messagesLogFile.exists()) {
+                        // Check for early quit request
+                        if (earlyQuitRequested.get()) {
+                            debug("Early quit detected while waiting for messages.log creation");
+                            throw new PluginScenarioException("Server startup aborted by user");
+                        }
                         checkStopDevMode(false); // stop dev mode if the server thread was terminated
                         // wait for the log file to appear during server startup
                         Thread.sleep(500);
@@ -980,6 +1007,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             parseHostNameAndPorts(serverTask, messagesLogFile);
         } catch (IOException e) {
             throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+        } finally {
+            serverStarting.set(false);
         }
     }
 
@@ -2443,9 +2472,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private HotkeyReader hotkeyReader = null;
 
     /**
+     * Start the hotkey reader thread early (before server startup) to allow
+     * users to quit during server startup. This method does not print dev mode
+     * messages - those will be printed later by runHotkeyReaderThread.
+     *
+     * @param executor the test thread executor
+     */
+    public void startEarlyHotkeyReader(ThreadPoolExecutor executor) {
+        if (inputUnavailable.get()) {
+            return;
+        }
+        if (hotkeyReader == null) {
+            hotkeyReader = new HotkeyReader(executor);
+            new Thread(hotkeyReader).start();
+            debug("Started early hotkey reader to allow quit during server startup.");
+        }
+    }
+
+    /**
      * Run a hotkey reader thread. If the thread is already running, re-prints the
      * message about pressing enter to run tests.
-     * 
+     *
      * @param executor the test thread executor
      */
     public void runHotkeyReaderThread(ThreadPoolExecutor executor) {
@@ -2773,7 +2820,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     String line = scanner.nextLine();
                     if (q.isPressed(line)) {
                         debug("Detected exit command");
+                        // If server is still starting, set the early quit flag
+                        if (serverStarting.get()) {
+                            info("Quit requested during server startup. Stopping server...");
+                            earlyQuitRequested.set(true);
+                        }
                         runShutdownHook(executor);
+                    } else if (h.isPressed(line)) {
+                        info(formatAttentionBarrier());
+                        printHelpMessages();
+                        info(formatAttentionBarrier());
+                    } else if (serverStarting.get()) {
+                        // During server startup, only 'q' and 'h' are allowed. Ignore all other keys.
+                        if (!line.trim().isEmpty()) {
+                            info("The requested command is not available during server startup.");
+                        }
                     } else if (r.isPressed(line)) {
                         debug("Detected restart command");
                         try {
@@ -2783,10 +2844,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             error("Could not restart the server.", e);
                             runShutdownHook(executor);
                         }
-                    } else if (h.isPressed(line)) {
-                        info(formatAttentionBarrier());
-                        printHelpMessages();
-                        info(formatAttentionBarrier());
                     } else if (g.isPressed(line)) {
                         toggleFeatureGeneration();
                     } else if (o.isPressed(line)) {
