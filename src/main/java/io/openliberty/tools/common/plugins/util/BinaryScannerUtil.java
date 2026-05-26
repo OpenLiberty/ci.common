@@ -29,9 +29,9 @@ import java.util.Set;
 public abstract class BinaryScannerUtil {
 
     public static final String BINARY_SCANNER_MAVEN_GROUP_ID = "com.ibm.websphere.appmod.tools";
-    public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "binary-app-scanner";
+    public static final String BINARY_SCANNER_MAVEN_ARTIFACT_ID = "feature-gen";
     public static final String BINARY_SCANNER_MAVEN_TYPE = "jar";
-    public static final String BINARY_SCANNER_MAVEN_VERSION = "[26.0.0.2-20260420]";
+    public static final String BINARY_SCANNER_MAVEN_VERSION = "[0.0.1-SNAPSHOT,)"; // use the specified version or later
 
     // The coordinates to use for Open Liberty versions 25.0.0.7 and up
     public static final String OL_FEATURELIST_GROUP_ID = "io.openliberty.features";
