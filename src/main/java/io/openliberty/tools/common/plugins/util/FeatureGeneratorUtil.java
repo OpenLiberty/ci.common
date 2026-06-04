@@ -201,10 +201,10 @@ public abstract class FeatureGeneratorUtil {
                 // we read from the build file is out of range for the feature generator. For EE we only use the first
                 // digit: ee6 to ee9. For MP we use the first two digits mp1.2 to mp5.0.
                 // 6. IllegalTargetCombinationException means that the EE level and the MP level are not compatible.
-                Throwable featureGenException = ite.getCause();
-                if (featureGenException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
+                Throwable generatorException = ite.getCause();
+                if (generatorException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                     // The list of features from the app is passed in but it contains conflicts
-                    Set<String> conflicts = getFeatures(featureGenException);
+                    Set<String> conflicts = getFeatures(generatorException);
                     // always rerun feature generator in this scenario, this exception only occurs if a current feature list is passed to feature generator
                     Set<String> sampleFeatureList = reRunFeatureGenerator(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap);
                     if (sampleFeatureList == null) {
@@ -212,9 +212,9 @@ public abstract class FeatureGeneratorUtil {
                     } else {
                         throw new RecommendationSetException(true, conflicts, sampleFeatureList);
                     }
-                } else if (featureGenException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
+                } else if (generatorException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
                     // The scanned files conflict with each other or with current features
-                    Set<String> conflicts = getFeatures(featureGenException);
+                    Set<String> conflicts = getFeatures(generatorException);
                     //  rerun feature generator with all class files and without the current feature set to get feature recommendations
                     Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap): null;
                     if (sampleFeatureList == null) {
@@ -222,34 +222,34 @@ public abstract class FeatureGeneratorUtil {
                     } else {
                         throw new RecommendationSetException(false, conflicts, sampleFeatureList);
                     }
-                } else if (featureGenException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
+                } else if (generatorException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
                     // The scanned files conflict and the generator suggests modifying some features
-                    Set<String> modifications = getFeatures(featureGenException);
+                    Set<String> modifications = getFeatures(generatorException);
                     //  rerun feature generator with all class files and without the current feature set
                     Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap) : null;
                     throw new FeatureModifiedException(modifications, 
-                            (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, featureGenException.getLocalizedMessage());
-                } else if (featureGenException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
+                            (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, generatorException.getLocalizedMessage());
+                } else if (generatorException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
                     // The list of features required by app or passed to feature generator do not exist
                     // at the required EE or MP level
-                    Set<String> conflicts = getFeatures(featureGenException);
-                    Set<String> unavailableFeatures = getUnavailableEEFeatures(featureGenException);
-                    unavailableFeatures.addAll(getUnavailableMPFeatures(featureGenException));
+                    Set<String> conflicts = getFeatures(generatorException);
+                    Set<String> unavailableFeatures = getUnavailableEEFeatures(generatorException);
+                    unavailableFeatures.addAll(getUnavailableMPFeatures(generatorException));
                     throw new FeatureUnavailableException(conflicts, unavailableFeatures, targetMicroProfile,
                             targetJavaEE);
-                } else if (featureGenException.getClass().getName().equals(ILLEGAL_TARGET_EXCEPTION)) {
+                } else if (generatorException.getClass().getName().equals(ILLEGAL_TARGET_EXCEPTION)) {
                     // The EE and/or the MP version number is out of range
-                    throw new IllegalTargetException(getInvalidEETarget(featureGenException), getInvalidMPTarget(featureGenException));
-                } else if (featureGenException.getClass().getName().equals(ILLEGAL_TARGET_COMBINATION_EXCEPTION)) {
+                    throw new IllegalTargetException(getInvalidEETarget(generatorException), getInvalidMPTarget(generatorException));
+                } else if (generatorException.getClass().getName().equals(ILLEGAL_TARGET_COMBINATION_EXCEPTION)) {
                     // The EE and MP version numbers are in range but they are not compatible with each other based on the standards.
-                    throw new IllegalTargetComboException(getInvalidEETarget(featureGenException), getInvalidMPTarget(featureGenException));
-                } else if (featureGenException.getClass().getName().equals(VERSIONLESS_FEATURE_EXCEPTION)) {
+                    throw new IllegalTargetComboException(getInvalidEETarget(generatorException), getInvalidMPTarget(generatorException));
+                } else if (generatorException.getClass().getName().equals(VERSIONLESS_FEATURE_EXCEPTION)) {
                     // One of the existing features has no version specified and the feature generator does not support this.
                     throw new VersionlessFeatureDetectedException();
-                } else if (featureGenException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
+                } else if (generatorException.getClass().getName().contains("java.lang.IllegalArgumentException")) {
                     // Used by feature generator 22.0.0.3, remove after 22.0.0.4 is in sonatype
                     // TODO: Affected by issue #1558
-                    String msg = featureGenException.getMessage();
+                    String msg = generatorException.getMessage();
                     if (msg.contains("CWMIG12056E")) {
                         if (msg.contains("targetJavaEE")) {
                             throw new PluginExecutionException(FEATURE_GEN_INVALID_EE_MESSAGE);
@@ -259,8 +259,8 @@ public abstract class FeatureGeneratorUtil {
                     }
                     // otherwise exit this if statement and execute default behaviour.
                 }
-                debug("Exception from feature generator.", featureGenException);
-                throw new PluginExecutionException("Error scanning the application for Liberty features: " + featureGenException.toString());
+                debug("Exception from feature generator.", generatorException);
+                throw new PluginExecutionException("Error scanning the application for Liberty features: " + generatorException.toString());
             } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException loadingException){
                 Object o = loadingException.getCause();
                 if (o != null) {
@@ -319,20 +319,20 @@ public abstract class FeatureGeneratorUtil {
                     currentFeaturesSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
             for (String s : generatedFeatureList) {debug(s);};
         } catch (InvocationTargetException ite) {
-            Throwable featureGenException = ite.getCause();
-            if (featureGenException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
+            Throwable generatorException = ite.getCause();
+            if (generatorException.getClass().getName().equals(PROVIDED_FEATURE_EXCEPTION)) {
                 // this happens when the list of features passed in contains conflicts so now no recommendation possible
-                debug("RuntimeException from re-run of feature generator", featureGenException); // shouldn't happen
+                debug("RuntimeException from re-run of feature generator", generatorException); // shouldn't happen
                 generatedFeatureList = null;
-            } else if (featureGenException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
+            } else if (generatorException.getClass().getName().equals(FEATURE_CONFLICT_EXCEPTION)) {
                 // The features in the scanned files conflict with each other, no recommendation possible
                 generatedFeatureList = getNoSampleFeatureList();
-            } else if (featureGenException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
+            } else if (generatorException.getClass().getName().equals(FEATURE_MODIFIED_EXCEPTION)) {
                 // The features in the scanned files conflict with each other, no recommendation possible
                 generatedFeatureList = getNoSampleFeatureList();
             } else {
-                debug("Exception from rerunning feature generator.", featureGenException);
-                throw new PluginExecutionException("Error scanning the application for Liberty feature recommendations: " + featureGenException.toString());
+                debug("Exception from rerunning feature generator.", generatorException);
+                throw new PluginExecutionException("Error scanning the application for Liberty feature recommendations: " + generatorException.toString());
             }
         } catch (MalformedURLException|ClassNotFoundException|NoSuchMethodException|IllegalAccessException loadingException){
             Object o = loadingException.getCause();
