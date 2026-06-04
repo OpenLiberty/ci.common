@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public abstract class FeatureGenUtil {
+public abstract class FeatureGeneratorUtil {
 
     public static final String FEATURE_GEN_MAVEN_GROUP_ID = "com.ibm.websphere.appmod.tools";
     public static final String FEATURE_GEN_MAVEN_ARTIFACT_ID = "feature-gen";
@@ -121,7 +121,7 @@ public abstract class FeatureGenUtil {
     private Class featureGenClass = null;
     private Method featureGenMethod = null;
 
-    public FeatureGenUtil(File featureGen) {
+    public FeatureGeneratorUtil(File featureGen) {
         this.featureGenJar = featureGen;
     }
 
