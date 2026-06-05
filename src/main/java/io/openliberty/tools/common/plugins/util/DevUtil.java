@@ -560,7 +560,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
         this.generateFeatures = generateFeatures;
         this.generateToSrc = generateToSrc;
-        this.generateFeaturesTmpDir = new File(buildDirectory, BinaryScannerUtil.GENERATED_FEATURES_TEMP_DIR);
+        this.generateFeaturesTmpDir = new File(buildDirectory, FeatureGeneratorUtil.GENERATED_FEATURES_TEMP_DIR);
         initGenerationContext();
         this.compileArtifactPaths = compileArtifactPaths;
         this.testArtifactPaths = testArtifactPaths;
@@ -577,7 +577,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void initGenerationContext() {
         this.generateFeaturesOutputDir = generateToSrc ? configDirectory : generateFeaturesTmpDir;
-        this.generateFeaturesFile = new File(generateFeaturesOutputDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+        this.generateFeaturesFile = new File(generateFeaturesOutputDir, FeatureGeneratorUtil.GENERATED_FEATURES_FILE_PATH);
     }
 
     public void copyGeneratedFeaturesFile(File destinationDir) throws IOException {
@@ -1950,8 +1950,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param classes class file paths features should be generated for (can be null if no modified classes)
      * @param optimize if true, generate optimized feature list
      * @param generateToSrc if true, generate feature list into file in src/main/liberty
-     * @param useTmpDirOut if true, generate feature file in a hidden directory named in BinaryScannerUtil
-     * @param useTmpDirIn if true, the hidden directory named in BinaryScannerUtil will be used as the
+     * @param useTmpDirOut if true, generate feature file in a hidden directory named in FeatureGeneratorUtil
+     * @param useTmpDirIn if true, the hidden directory named in FeatureGeneratorUtil will be used as the
      *                    context or input values to generate features
      * @return true if feature generation was successful
      */
@@ -2728,7 +2728,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void deleteGenFeaturesFile(File dir) {
         // N.B. processConfigFileChange() will be called upon deletion of generated features file, it should be ignored
-        File oldGenFeaturesFile = new File(dir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+        File oldGenFeaturesFile = new File(dir, FeatureGeneratorUtil.GENERATED_FEATURES_FILE_PATH);
         if (oldGenFeaturesFile.exists()) {
             if (!oldGenFeaturesFile.delete()) {
                 debug("Error trying to delete the generated features file:" + oldGenFeaturesFile.getAbsolutePath());
@@ -2743,9 +2743,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     private void infoSrcDirModified() {
         String generatedFileCanonicalPath;
         try {
-            generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).getCanonicalPath();
+            generatedFileCanonicalPath = new File(configDirectory, FeatureGeneratorUtil.GENERATED_FEATURES_FILE_PATH).getCanonicalPath();
         } catch (IOException e) {
-            generatedFileCanonicalPath = new File(configDirectory, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH).toString();
+            generatedFileCanonicalPath = new File(configDirectory, FeatureGeneratorUtil.GENERATED_FEATURES_FILE_PATH).toString();
         }
         info("The source configuration directory will be modified. Features will automatically be generated in a new file: " + generatedFileCanonicalPath);
     }
@@ -3090,7 +3090,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
 
             // Always register the generated file in the temp dir. because generateToSrc can be toggled on and off in dev mode
-            File hiddenTempGenerateFeaturesFile = new File(generateFeaturesTmpDir, BinaryScannerUtil.GENERATED_FEATURES_FILE_PATH);
+            File hiddenTempGenerateFeaturesFile = new File(generateFeaturesTmpDir, FeatureGeneratorUtil.GENERATED_FEATURES_FILE_PATH);
             hiddenTempGenerateFeaturesFile.getParentFile().mkdirs(); // must only mkdir on the directories
             registerSingleFile(hiddenTempGenerateFeaturesFile, executor);
 
@@ -4265,7 +4265,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // TODO process ALL files in newly registered directory, not just the generated features file https://github.com/OpenLiberty/ci.maven/issues/1548
                     // check if the generated features file exists in any of the newly registered directories
                     Iterator<File> it = FileUtils.iterateFiles(fileChanged,
-                            new NameFileFilter(BinaryScannerUtil.GENERATED_FEATURES_FILE_NAME),
+                            new NameFileFilter(FeatureGeneratorUtil.GENERATED_FEATURES_FILE_NAME),
                             TrueFileFilter.INSTANCE);
                     if (it.hasNext()) {
                         File newlyRegisteredFile = it.next();
