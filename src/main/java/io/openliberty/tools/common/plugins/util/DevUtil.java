@@ -4514,8 +4514,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         } else if ((directory.startsWith(configPath)
                 || directory.startsWith(gfTmpDirPath))
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) {
-            // configuration file or generate-features.xml in temp directory
-            processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, false);
+            // configuration file or generated-features.xml in temp directory (do not handle other files in temp dir.)
+            if (directory.startsWith(configPath) || fileChanged.getName().equals(FeatureGeneratorUtil.GENERATED_FEATURES_FILE_NAME)) {
+                // special case: install features copies all the config files to gfTmpDir. Process only the generated-features.xml.
+                processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, false);
+            }
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
                    && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
