@@ -4512,9 +4512,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // server will load new properties
             processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, true);
         } else if ((directory.startsWith(configPath)
-                || directory.startsWith(gfTmpDirPath))
+                || (directory.startsWith(gfTmpDirPath)
+                       && fileChanged.getName().equals(FeatureGeneratorUtil.GENERATED_FEATURES_FILE_NAME)))
                 && !isGeneratedConfigFile(fileChanged, configDirectory, serverDirectory)) {
-            // configuration file or generate-features.xml in temp directory
+            // configuration files or generated-features.xml in temp directory
+            // Do not handle other files in temp dir. since install features method copies all the config files to gfTmpDir.
+            // Exclude bootstrap and server.env which were generated.
             processConfigFileChange(fileChanged, changeType, executor, numApplicationUpdatedMessages, false);
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
