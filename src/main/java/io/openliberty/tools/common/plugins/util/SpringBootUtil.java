@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2018.
+ * (C) Copyright IBM Corporation 2018, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,10 @@ public class SpringBootUtil {
 
     public static final String BOOT_VERSION_ATTRIBUTE = "Spring-Boot-Version";
     public static final String BOOT_START_CLASS_ATTRIBUTE = "Start-Class";
-    public static final String BOOT_JAR_EXPRESSION = "BOOT-INF/lib/spring-boot-\\d[\\.]\\d[\\.]\\d.RELEASE.jar";
-    public static final String BOOT_WAR_EXPRESSION = "WEB-INF/lib/spring-boot-\\d[\\.]\\d[\\.]\\d.RELEASE.jar";
+    // Updated regex to support both old (.RELEASE) and new versioning schemes (Spring Boot 3.0+, 4.0+)
+    // Matches: spring-boot-X.Y.Z.RELEASE.jar (old) or spring-boot-X.Y.Z.jar (new)
+    public static final String BOOT_JAR_EXPRESSION = "BOOT-INF/lib/spring-boot-\\d+[\\.]\\d+[\\.]\\d+(\\.RELEASE)?\\.jar";
+    public static final String BOOT_WAR_EXPRESSION = "WEB-INF/lib/spring-boot-\\d+[\\.]\\d+[\\.]\\d+(\\.RELEASE)?\\.jar";
     
     /**
      * Check whether the given artifact is a Spring Boot Uber JAR
