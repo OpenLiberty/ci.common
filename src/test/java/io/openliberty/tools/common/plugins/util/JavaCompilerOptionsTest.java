@@ -34,16 +34,15 @@ public class JavaCompilerOptionsTest {
         jco.setEncoding("UTF-8");
         
         List<String> result = jco.getOptions();
-        int i = 0;
-        assertTrue(result.get(i++).equals("-source"));
-        assertTrue(result.get(i++).equals("9"));
-        assertTrue(result.get(i++).equals("-target"));
-        assertTrue(result.get(i++).equals("1.8"));
-        assertTrue(result.get(i++).equals("--release"));
-        assertTrue(result.get(i++).equals("10"));
-        assertTrue(result.get(i++).equals("-encoding"));
-        assertTrue(result.get(i++).equals("UTF-8"));
-        assertEquals(i, result.size());
+        assertEquals(8, result.size());
+        assertTrue(result.contains("-source"));
+        assertTrue(result.contains("9"));
+        assertTrue(result.contains("-target"));
+        assertTrue(result.contains("1.8"));
+        assertTrue(result.contains("--release"));
+        assertTrue(result.contains("10"));
+        assertTrue(result.contains("-encoding"));
+        assertTrue(result.contains("UTF-8"));
     }
     
     @Test
@@ -62,9 +61,9 @@ public class JavaCompilerOptionsTest {
 
         List<String> result = jco.getOptions();
         assertEquals(3, result.size());
-        assertTrue(result.get(0).equals("-nowarn"));
-        assertTrue(result.get(1).equals("-source"));
-        assertTrue(result.get(2).equals("10"));
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("-source"));
+        assertTrue(result.contains("10"));
     }
 
     @Test
@@ -74,9 +73,9 @@ public class JavaCompilerOptionsTest {
 
         List<String> result = jco.getOptions();
         assertEquals(3, result.size());
-        assertTrue(result.get(0).equals("-nowarn"));
-        assertTrue(result.get(1).equals("-target"));
-        assertTrue(result.get(2).equals("10"));
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("-target"));
+        assertTrue(result.contains("10"));
     }
 
     @Test
@@ -86,9 +85,9 @@ public class JavaCompilerOptionsTest {
 
         List<String> result = jco.getOptions();
         assertEquals(3, result.size());
-        assertTrue(result.get(0).equals("-nowarn"));
-        assertTrue(result.get(1).equals("--release"));
-        assertTrue(result.get(2).equals("10"));
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("--release"));
+        assertTrue(result.contains("10"));
     }
 
     @Test
@@ -98,9 +97,121 @@ public class JavaCompilerOptionsTest {
 
         List<String> result = jco.getOptions();
         assertEquals(3, result.size());
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("-encoding"));
+        assertTrue(result.contains("UTF-8"));
+    }
+
+    @Test
+    public void testAnnotationProcessorPath() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setAnnotationProcessorPath("/path/to/lombok.jar:/path/to/mapstruct.jar");
+
+        List<String> result = jco.getOptions();
+        assertEquals(3, result.size());
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("-processorpath"));
+        assertTrue(result.contains("/path/to/lombok.jar:/path/to/mapstruct.jar"));
+    }
+
+    @Test
+    public void testAnnotationProcessorPathWithOtherOptions() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setRelease("17");
+        jco.setEncoding("UTF-8");
+        jco.setAnnotationProcessorPath("/path/to/lombok.jar");
+
+        List<String> result = jco.getOptions();
+        assertEquals(7, result.size());
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("--release"));
+        assertTrue(result.contains("17"));
+        assertTrue(result.contains("-encoding"));
+        assertTrue(result.contains("UTF-8"));
+        assertTrue(result.contains("-processorpath"));
+        assertTrue(result.contains("/path/to/lombok.jar"));
+    }
+
+    @Test
+    public void testAnnotationProcessorPathNull() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setAnnotationProcessorPath(null);
+
+        List<String> result = jco.getOptions();
+        assertEquals(1, result.size());
         assertTrue(result.get(0).equals("-nowarn"));
-        assertTrue(result.get(1).equals("-encoding"));
-        assertTrue(result.get(2).equals("UTF-8"));
+    }
+
+    @Test
+    public void testAnnotationProcessorPathEmpty() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setAnnotationProcessorPath("");
+
+        List<String> result = jco.getOptions();
+        assertEquals(1, result.size());
+        assertTrue(result.get(0).equals("-nowarn"));
+    }
+
+    @Test
+    public void testAnnotationProcessors() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setAnnotationProcessors("lombok.AnnotationProcessor,org.mapstruct.ap.MappingProcessor");
+
+        List<String> result = jco.getOptions();
+        assertEquals(3, result.size());
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("-processor"));
+        assertTrue(result.contains("lombok.AnnotationProcessor,org.mapstruct.ap.MappingProcessor"));
+    }
+
+    @Test
+    public void testAnnotationProcessorsWithPath() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setAnnotationProcessorPath("/path/to/lombok.jar");
+        jco.setAnnotationProcessors("lombok.AnnotationProcessor");
+
+        List<String> result = jco.getOptions();
+        assertEquals(5, result.size());
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("-processorpath"));
+        assertTrue(result.contains("/path/to/lombok.jar"));
+        assertTrue(result.contains("-processor"));
+        assertTrue(result.contains("lombok.AnnotationProcessor"));
+    }
+
+    @Test
+    public void testAnnotationProcessorsNull() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setAnnotationProcessors(null);
+
+        List<String> result = jco.getOptions();
+        assertEquals(1, result.size());
+        assertTrue(result.contains("-nowarn"));
+    }
+
+    @Test
+    public void testAnnotationProcessorsEmpty() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        jco.setAnnotationProcessors("");
+
+        List<String> result = jco.getOptions();
+        assertEquals(1, result.size());
+        assertTrue(result.contains("-nowarn"));
+    }
+
+    @Test
+    public void testCompilerArgs() throws Exception {
+        JavaCompilerOptions jco = new JavaCompilerOptions();
+        List<String> args = new java.util.ArrayList<>();
+        args.add("-parameters");
+        args.add("-Xlint:unchecked");
+        jco.setCompilerArgs(args);
+
+        List<String> result = jco.getOptions();
+        assertEquals(3, result.size());
+        assertTrue(result.contains("-nowarn"));
+        assertTrue(result.contains("-parameters"));
+        assertTrue(result.contains("-Xlint:unchecked"));
     }
 
 }
