@@ -358,8 +358,8 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
             debug("Exception received: "+e.getMessage(), e);
             return result;
         }
-        
-        info("Parsing the server file for features and includes: " + getRelativeServerFilePath(serverDirectory, serverFile));
+
+        info("Parsing the server file for features and includes: " + getRelativeServerFilePathForDisplay(serverDirectory, serverFile));
         updatedParsedXmls.add(canonicalServerFile);
         if (!canonicalServerFile.exists()) {
             warn("The server file " + canonicalServerFile + " does not exist. Skipping its features.");
@@ -669,12 +669,16 @@ public abstract class ServerFeatureUtil extends AbstractContainerSupportUtil imp
 
 
     // return the server file path relative to the server directory
-    private String getRelativeServerFilePath(File serverDirectory, File serverFile) {
+    private String getRelativeServerFilePathForDisplay(File serverDirectory, File serverFile) {
         try {
             File canonicalServerDirectory = serverDirectory.getCanonicalFile();
             URI serverDirectoryUri = canonicalServerDirectory.toURI();
             URI serverFileUri = serverFile.toURI();
-            return serverDirectory.getName() + File.separator + serverDirectoryUri.relativize(serverFileUri).getPath();
+            if (serverDirectoryUri.relativize(serverFileUri).equals(serverFileUri)) {
+                return serverFileUri.getPath().toString();
+            } else {
+                return serverDirectory.getName() + File.separator + serverDirectoryUri.relativize(serverFileUri).getPath();
+            }
         } catch (IOException e1) {
             debug("Unable to determine the file path of " + serverFile + " relative to the server directory "
                     + serverDirectory);
