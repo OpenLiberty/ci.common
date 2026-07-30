@@ -2548,8 +2548,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // it's available
                     inputUnavailable.wait(500);
                 }
-                printDevModeMessages(inputUnavailable.get(), firstStartup);
-                firstStartup = false;
+                // firstStartup is false by the time this is called after initial startup.
+                printDevModeMessages(inputUnavailable.get(), false);
             } catch (InterruptedException e) {
                 debug("Interrupted while waiting to determine whether input can be read", e);
             } catch (PluginExecutionException pe) {
@@ -3175,6 +3175,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 for (File f : propertyFilesMap.keySet()) {
                     registerSingleFile(f, executor);
                 }
+            }
+
+            if (firstStartup) {
+                synchronized (inputUnavailable) {
+                    try {
+                        printDevModeMessages(inputUnavailable.get(), true);
+                    } catch (PluginExecutionException pe) {
+                        error(pe.getMessage());
+                    }
+                }
+                firstStartup = false;
             }
 
             initWatchLoop();
