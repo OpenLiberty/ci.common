@@ -2598,7 +2598,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private void printPortInfo(boolean pKeyPressed) throws PluginExecutionException {
+    void printPortInfo(boolean pKeyPressed) throws PluginExecutionException {
         if (container) {
             boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
             boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
@@ -2622,6 +2622,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else {
                         info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
                     }
+                    info(formatAttentionMessage("URL: http://localhost:" + httpPort + "/"));
                 } else {
                     info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
                 }
@@ -2633,6 +2634,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else {
                         info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
                     }
+                    info(formatAttentionMessage("URL: https://localhost:" + httpsPort + "/"));
                 } else {
                     info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
                 }
@@ -2666,9 +2668,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             if (httpPort != null) {
                 info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
+                info(formatAttentionMessage("URL: http://" + hostName + ":" + httpPort + "/"));
             }
             if (httpsPort != null) {
                 info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
+                info(formatAttentionMessage("URL: https://" + hostName + ":" + httpsPort + "/"));
             }
             if (libertyDebug) {
                 int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);

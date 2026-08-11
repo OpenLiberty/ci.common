@@ -18,6 +18,7 @@ package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -74,10 +75,20 @@ public class BaseDevUtilTest {
             
         }
 
+        public final List<String> infoMessages = new ArrayList<>();
+
         @Override
         public void info(String msg) {
-            // not needed for tests
-            
+            infoMessages.add(msg);
+        }
+
+        public boolean hasMessage(String substring) {
+            for (String msg : infoMessages) {
+                if (msg.contains(substring)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
