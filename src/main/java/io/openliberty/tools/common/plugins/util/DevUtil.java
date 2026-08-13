@@ -5878,7 +5878,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     /**
      * Trigger a compile of the entire specified module. This is only used in a
-     * multi-module scenario. Adds all Java files to the to be compiled list so that
+     * multi-module scenario. Adds all Java files to the to-be-compiled list so that
      * they will be compiled on next watch loop.
      * 
      * @param project   ProjectModule, the module to be compiled
