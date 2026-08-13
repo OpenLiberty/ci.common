@@ -24,7 +24,7 @@ import java.util.List;
 import org.junit.Test;
 
 /**
- * Tests that printPortInfo outputs a clickable server URL alongside each port line.
+ * Tests that printPortInfo outputs a clickable Liberty welcome page URL alongside each port line.
  */
 public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
 
@@ -49,7 +49,7 @@ public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
         assertTrue("Expected HTTP port line to be printed",
                 util.hasMessage("Liberty server HTTP port: [ 9080 ]"));
         assertTrue("Expected HTTP URL to be printed",
-                util.hasMessage("Liberty server URL: http://myhostname:9080/"));
+                util.hasMessage("Liberty welcome page: http://myhostname:9080/"));
     }
 
     @Test
@@ -64,9 +64,9 @@ public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
         util.printPortInfo(true);
 
         assertTrue("Expected URL with actual IP address",
-                util.hasMessage("Liberty server URL: http://192.168.1.26:9080/"));
+                util.hasMessage("Liberty welcome page: http://192.168.1.26:9080/"));
         assertFalse("localhost should not appear in URL when server bound to IP",
-                util.hasMessage("Liberty server URL: http://localhost:9080/"));
+                util.hasMessage("Liberty welcome page: http://localhost:9080/"));
     }
 
     // -----------------------------------------------------------------------
@@ -90,7 +90,7 @@ public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
         assertTrue("Expected HTTPS port line to be printed",
                 util.hasMessage("Liberty server HTTPS port: [ 9443 ]"));
         assertTrue("Expected HTTPS URL to be printed",
-                util.hasMessage("Liberty server URL: https://myhostname:9443/"));
+                util.hasMessage("Liberty welcome page: https://myhostname:9443/"));
     }
 
     // -----------------------------------------------------------------------
@@ -105,9 +105,9 @@ public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
         util.printPortInfo(true);
 
         assertFalse("No URL should be printed when no port is available",
-                util.hasMessage("Liberty server URL: http://"));
+                util.hasMessage("Liberty welcome page: http://"));
         assertFalse("No URL should be printed when no port is available",
-                util.hasMessage("Liberty server URL: https://"));
+                util.hasMessage("Liberty welcome page: https://"));
     }
 
     // -----------------------------------------------------------------------
@@ -127,7 +127,7 @@ public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
         assertTrue("Expected HTTP port line with non-default port",
                 util.hasMessage("Liberty server HTTP port: [ 9085 ]"));
         assertTrue("Expected HTTP URL with non-default port",
-                util.hasMessage("Liberty server URL: http://myhostname:9085/"));
+                util.hasMessage("Liberty welcome page: http://myhostname:9085/"));
     }
 
     // -----------------------------------------------------------------------
@@ -145,6 +145,6 @@ public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
         util.printPortInfo(true);
 
         assertTrue("Expected HTTP URL with localhost",
-                util.hasMessage("Liberty server URL: http://localhost:9080/"));
+                util.hasMessage("Liberty welcome page: http://localhost:9080/"));
     }
 }
