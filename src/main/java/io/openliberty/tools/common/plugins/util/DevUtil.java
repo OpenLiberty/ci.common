@@ -2801,6 +2801,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         info("The source configuration directory will be modified. Features will automatically be generated in a new file: " + generatedFileCanonicalPath);
     }
 
+    protected void setContainerHttpPort(String containerHttpPort) {
+        this.containerHttpPort = containerHttpPort;
+    }
+
+    protected void setContainerHttpsPort(String containerHttpsPort) {
+        this.containerHttpsPort = containerHttpsPort;
+    }
+
+    protected void setHttpPort(String httpPort) {
+        this.httpPort = httpPort;
+    }
+
+    protected void setHttpsPort(String httpsPort) {
+        this.httpsPort = httpsPort;
+    }
+
     // called by Liberty plugins
     protected void setFeatureGeneration(boolean generateFeatures) {
         this.generateFeatures = generateFeatures;

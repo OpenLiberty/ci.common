@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2025.
+ * (C) Copyright IBM Corporation 2025, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import java.util.List;
 import org.junit.Test;
 
 /**
- * Tests that printPortInfo outputs a clickable Liberty welcome page URL alongside each port line.
+ * Tests that printPortInfo outputs a Liberty welcome page URL alongside each port line,
+ * for both non-container (server) and container modes.
  */
 public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
 
@@ -146,5 +147,41 @@ public class DevUtilPrintPortInfoTest extends BaseDevUtilTest {
 
         assertTrue("Expected HTTP URL with localhost",
                 util.hasMessage("Liberty welcome page: http://localhost:9080/"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Container: HTTP port
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testContainerHttpPortUrlPrinted() throws Exception {
+        DevTestUtil util = getNewContainerUtil();
+        // Internal container port 9080 mapped to host port 9080
+        util.setContainerPorts("9080", "9080", null, null);
+
+        util.printPortInfo(true);
+
+        assertTrue("Expected container HTTP port line to be printed",
+                util.hasMessage("Internal container HTTP port [ 9080 ] is mapped to container host port [ 9080 ]"));
+        assertTrue("Expected container HTTP welcome page URL to be printed",
+                util.hasMessage("Liberty welcome page: http://localhost:9080/"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Container: HTTPS port
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void testContainerHttpsPortUrlPrinted() throws Exception {
+        DevTestUtil util = getNewContainerUtil();
+        // Internal container port 9443 mapped to host port 9443
+        util.setContainerPorts(null, null, "9443", "9443");
+
+        util.printPortInfo(true);
+
+        assertTrue("Expected container HTTPS port line to be printed",
+                util.hasMessage("Internal container HTTPS port [ 9443 ] is mapped to container host port [ 9443 ]"));
+        assertTrue("Expected container HTTPS welcome page URL to be printed",
+                util.hasMessage("Liberty welcome page: https://localhost:9443/"));
     }
 }
