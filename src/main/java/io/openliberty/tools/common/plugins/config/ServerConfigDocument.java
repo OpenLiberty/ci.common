@@ -202,7 +202,7 @@ public class ServerConfigDocument {
         this.originalServerXMLFile = originalServerXMLFile;
     }
 
-    private DocumentBuilder getDocumentBuilder() {
+    private static DocumentBuilder getDocumentBuilder() {
         DocumentBuilder docBuilder;
 
         DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
@@ -1005,4 +1005,32 @@ public class ServerConfigDocument {
         this.springBootAppNodeLocation = springBootAppNodeLocation;
     }
 
+    /**
+     * Parses a loose application XML file and returns a list of all sourceOnDisk
+     * attribute values found on {@code <file>} and {@code <dir>} elements.
+     *
+     * @param looseAppFile - the loose application XML file to parse
+     * @return a List of sourceOnDisk path strings; empty if none are found or the file cannot be parsed
+     * @throws FileNotFoundException if the file does not exist
+     * @throws IOException if the file cannot be read
+     */
+    public static Set<String> getSourceOnDiskPaths(File looseAppFile) throws FileNotFoundException, IOException {
+        Set<String> result = new HashSet<String>();
+        Document doc;
+        try (FileInputStream is = new FileInputStream(looseAppFile)) {
+            doc = getDocumentBuilder().parse(is);
+        } catch (SAXException e) {
+            return result; // not valid XML
+        }
+        for (String tag : new String[]{"file", "dir"}) {
+            NodeList nodes = doc.getElementsByTagName(tag);
+            for (int i = 0; i < nodes.getLength(); i++) {
+                org.w3c.dom.Node attr = nodes.item(i).getAttributes().getNamedItem("sourceOnDisk");
+                if (attr != null && !attr.getNodeValue().isEmpty()) {
+                    result.add(attr.getNodeValue());
+                }
+            }
+        }
+        return result;
+    }
 }

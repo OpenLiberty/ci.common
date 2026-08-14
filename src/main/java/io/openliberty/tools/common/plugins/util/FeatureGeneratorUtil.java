@@ -16,6 +16,7 @@
 package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
@@ -25,6 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
 
 public abstract class FeatureGeneratorUtil {
 
@@ -135,6 +138,7 @@ public abstract class FeatureGeneratorUtil {
      * @param currentFeatureSet - the features already specified in the server configuration
      * @param classFiles - a set of class files for the generator to handle. Should be a subset of allClassesDirectories
      * @param allClassesDirectories - the directories containing all the class files of the application
+     * @param looseConfigFilePath - the absolute path to the xml config of the loose application
      * @param logLocation - directory name relative to project or absolute path passed to feature generator
      * @param targetJavaEE - generate features valid for the indicated version of EE
      * @param targetMicroProfile - generate features valid for the indicated version of MicroProfile
@@ -155,7 +159,7 @@ public abstract class FeatureGeneratorUtil {
      *                                       generator when used in combination with each other. E.g. EE 7 and MP 2.1
      */
     public Set<String> runFeatureGenerator(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
-            String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
+            String looseConfigFilePath, String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
             FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException, VersionlessFeatureDetectedException {
         Set<String> generatedFeatureList = null;
@@ -167,7 +171,8 @@ public abstract class FeatureGeneratorUtil {
             try {
                 Method generateFeatureSetMethod = getGeneratorMethod();
                 // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
-                Set<String> binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, optimize);
+                Set<String> binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, looseConfigFilePath, optimize);
+
                 String logLevel;
                 if (isDebugEnabled()) {
                     logLevel = "*=FINE";  // generate messages for debugging by support team
@@ -384,9 +389,24 @@ public abstract class FeatureGeneratorUtil {
         return featureGenMethod;
     }
 
-    private static Set<String> getBinaryInputs(List<String> classFiles, Set<String> classDirectories, boolean optimize) throws PluginExecutionException {
+    private Set<String> getBinaryInputs(List<String> classFiles, Set<String> classDirectories, String looseConfigFilePath, boolean optimize) throws PluginExecutionException {
         Set<String> resultSet;
         if (optimize) {
+            // Use either the loose app config or the class directories
+            if (looseConfigFilePath != null) {
+                try {
+                    File looseAppFile = new File(looseConfigFilePath);
+                    if (looseAppFile.exists()) {
+                        resultSet = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
+                        if (!resultSet.isEmpty()) {
+                            return resultSet;
+                        }
+                    }
+                } catch (IOException e) {
+                    // if the app config is invalid try the class directories instead
+                }
+                warn("Application descriptor file not found while generating features, using class files instead: " + looseConfigFilePath);
+            }
             if (classDirectories == null || classDirectories.isEmpty()) {
                 return new HashSet<String>();
             }
