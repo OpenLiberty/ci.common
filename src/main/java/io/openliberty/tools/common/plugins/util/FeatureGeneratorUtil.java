@@ -389,7 +389,7 @@ public abstract class FeatureGeneratorUtil {
         return featureGenMethod;
     }
 
-    private static Set<String> getBinaryInputs(List<String> classFiles, Set<String> classDirectories, String looseConfigFilePath, boolean optimize) throws PluginExecutionException {
+    private Set<String> getBinaryInputs(List<String> classFiles, Set<String> classDirectories, String looseConfigFilePath, boolean optimize) throws PluginExecutionException {
         Set<String> resultSet;
         if (optimize) {
             // Use either the loose app config or the class directories
@@ -405,6 +405,7 @@ public abstract class FeatureGeneratorUtil {
                 } catch (IOException e) {
                     // if the app config is invalid try the class directories instead
                 }
+                warn("Application descriptor file not found while generating features, using class files instead: " + looseConfigFilePath);
             }
             if (classDirectories == null || classDirectories.isEmpty()) {
                 return new HashSet<String>();
