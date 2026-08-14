@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019, 2025.
+ * (C) Copyright IBM Corporation 2019, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2564,7 +2564,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    private void printPortInfo(boolean pKeyPressed) throws PluginExecutionException {
+    void printPortInfo(boolean pKeyPressed) throws PluginExecutionException {
         if (container) {
             boolean nonDefaultHttpPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTP_PORT).equals(httpPort);
             boolean nonDefaultHttpsPortUsed = !skipDefaultPorts && !String.valueOf(LIBERTY_DEFAULT_HTTPS_PORT).equals(httpsPort);
@@ -2588,6 +2588,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else {
                         info(formatAttentionMessage("Internal container HTTP port [ " + containerHttpPort + " ] is mapped to container host port [ " + httpPort + " ] <"));
                     }
+                    info(formatAttentionMessage("Liberty welcome page: http://localhost:" + httpPort + "/"));
                 } else {
                     info(formatAttentionMessage("Internal container HTTP port: [ " + containerHttpPort + " ]"));
                 }
@@ -2599,6 +2600,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     } else {
                         info(formatAttentionMessage("Internal container HTTPS port [ " + containerHttpsPort + " ] is mapped to container host port [ " + httpsPort + " ] <"));
                     }
+                    info(formatAttentionMessage("Liberty welcome page: https://localhost:" + httpsPort + "/"));
                 } else {
                     info(formatAttentionMessage("Internal container HTTPS port: [ " + containerHttpsPort + " ]"));
                 }
@@ -2632,9 +2634,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
             if (httpPort != null) {
                 info(formatAttentionMessage("Liberty server HTTP port: [ " + httpPort + " ]"));
+                info(formatAttentionMessage("Liberty welcome page: http://" + hostName + ":" + httpPort + "/"));
             }
             if (httpsPort != null) {
                 info(formatAttentionMessage("Liberty server HTTPS port: [ " + httpsPort + " ]"));
+                info(formatAttentionMessage("Liberty welcome page: https://" + hostName + ":" + httpsPort + "/"));
             }
             if (libertyDebug) {
                 int debugPort = (alternativeDebugPort == -1 ? libertyDebugPort : alternativeDebugPort);
@@ -2724,6 +2728,22 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void logFeatureGenerationStatus() {
         info("Setting automatic generation of features to: " + getFormattedBooleanString(generateFeatures));
+    }
+
+    protected void setContainerHttpPort(String containerHttpPort) {
+        this.containerHttpPort = containerHttpPort;
+    }
+
+    protected void setContainerHttpsPort(String containerHttpsPort) {
+        this.containerHttpsPort = containerHttpsPort;
+    }
+
+    protected void setHttpPort(String httpPort) {
+        this.httpPort = httpPort;
+    }
+
+    protected void setHttpsPort(String httpsPort) {
+        this.httpsPort = httpsPort;
     }
 
     protected void setFeatureGeneration(boolean generateFeatures) {
