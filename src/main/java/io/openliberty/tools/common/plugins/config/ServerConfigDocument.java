@@ -357,7 +357,6 @@ public class ServerConfigDocument {
         Pattern pattern = OSUtil.isWindows() ? WINDOWS_EXPANSION_VAR_PATTERN : LINUX_EXPANSION_VAR_PATTERN;
         Matcher matcher = pattern.matcher(value);
         StringBuffer sb = new StringBuffer();
-        List<String> matchedVarNames = new ArrayList<>();
         while (matcher.find()) {
             String finalReplacement;
             String varName = matcher.group(1);
@@ -382,15 +381,10 @@ public class ServerConfigDocument {
                 finalReplacement = matcher.group(0); // Keep original
             }
             matcher.appendReplacement(sb, Matcher.quoteReplacement(finalReplacement));
-            matchedVarNames.add(varName);
+            log.info(String.format("Resolved environment variable \"%s\" in path \"%s\" to \"%s\"", varName, value, finalReplacement));
         }
         // 4. Finalize the string
         matcher.appendTail(sb);
-        
-        // Log after appendTail so sb holds the complete resolved value
-        for (String varName : matchedVarNames) {
-            log.info(String.format("Resolved environment variable \"%s\" in path \"%s\" to \"%s\"", varName, value, sb));
-        }
         return sb.toString();
     }
 

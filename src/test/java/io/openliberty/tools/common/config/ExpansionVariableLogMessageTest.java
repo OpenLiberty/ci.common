@@ -70,7 +70,7 @@ public class ExpansionVariableLogMessageTest {
         String envContent = "BASE=TEST\nDERIVED=${BASE}_SUFFIX\n";
         buildDoc(log, serverDir, envContent).processServerEnv();
 
-        String expectedMsg = "Resolved environment variable \"BASE\" in path \"${BASE}_SUFFIX\" to \"TEST_SUFFIX\"";
+        String expectedMsg = "Resolved environment variable \"BASE\" in path \"${BASE}_SUFFIX\" to \"TEST\"";
         assertTrue("Expected log message not found.\nActual info messages: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg)));
     }
@@ -85,8 +85,8 @@ public class ExpansionVariableLogMessageTest {
         String envContent = "EXP_VAR=TEST\nEXP_VAR2=UNIX\nCOMBINED=${EXP_VAR}_${EXP_VAR2}\n";
         buildDoc(log, serverDir, envContent).processServerEnv();
 
-        String expectedMsg1 = "Resolved environment variable \"EXP_VAR\" in path \"${EXP_VAR}_${EXP_VAR2}\" to \"TEST_UNIX\"";
-        String expectedMsg2 = "Resolved environment variable \"EXP_VAR2\" in path \"${EXP_VAR}_${EXP_VAR2}\" to \"TEST_UNIX\"";
+        String expectedMsg1 = "Resolved environment variable \"EXP_VAR\" in path \"${EXP_VAR}_${EXP_VAR2}\" to \"TEST\"";
+        String expectedMsg2 = "Resolved environment variable \"EXP_VAR2\" in path \"${EXP_VAR}_${EXP_VAR2}\" to \"UNIX\"";
         assertTrue("Expected first log message not found.\nActual: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg1)));
         assertTrue("Expected second log message not found.\nActual: " + log.infoMessages,
@@ -122,7 +122,7 @@ public class ExpansionVariableLogMessageTest {
     }
 
     @Test
-    public void testWindowsStyleMultipleVarsLogsBothVarNames() throws Exception {
+    public void testWindowsStyleMultipleVarsOneLogPerExpression() throws Exception {
         Assume.assumeTrue("Skipped on non-Windows: !VAR! pattern only active on Windows", OSUtil.isWindows());
 
         CapturingLogger log = new CapturingLogger();
@@ -131,8 +131,8 @@ public class ExpansionVariableLogMessageTest {
         String envContent = "EXP_VAR=TEST\nEXP_VAR3=WINDOWS\nCOMBINED=!EXP_VAR!_!EXP_VAR3!\n";
         buildDoc(log, serverDir, envContent).processServerEnv();
 
-        String expectedMsg1 = "Resolved environment variable \"EXP_VAR\" in path \"!EXP_VAR!_!EXP_VAR3!\" to \"TEST_WINDOWS\"";
-        String expectedMsg2 = "Resolved environment variable \"EXP_VAR3\" in path \"!EXP_VAR!_!EXP_VAR3!\" to \"TEST_WINDOWS\"";
+        String expectedMsg1 = "Resolved environment variable \"EXP_VAR\" in path \"!EXP_VAR!_!EXP_VAR3!\" to \"TEST\"";
+        String expectedMsg2 = "Resolved environment variable \"EXP_VAR3\" in path \"!EXP_VAR!_!EXP_VAR3!\" to \"WINDOWS\"";
         assertTrue("Expected first log message not found.\nActual: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg1)));
         assertTrue("Expected second log message not found.\nActual: " + log.infoMessages,
