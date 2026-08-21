@@ -71,8 +71,11 @@ public class ExpansionVariableLogMessageTest {
         buildDoc(log, serverDir, envContent).processServerEnv();
 
         String expectedMsg = "Resolved environment variable \"BASE\" in path \"${BASE}_SUFFIX\" to \"TEST\"";
+        String expectedSummary = "Resolved path \"${BASE}_SUFFIX\" to \"TEST_SUFFIX\"";
         assertTrue("Expected log message not found.\nActual info messages: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg)));
+        assertTrue("Expected summary log message not found.\nActual: " + log.infoMessages,
+                log.infoMessages.stream().anyMatch(m -> m.equals(expectedSummary)));
     }
 
     @Test
@@ -87,10 +90,13 @@ public class ExpansionVariableLogMessageTest {
 
         String expectedMsg1 = "Resolved environment variable \"EXP_VAR\" in path \"${EXP_VAR}_${EXP_VAR2}\" to \"TEST\"";
         String expectedMsg2 = "Resolved environment variable \"EXP_VAR2\" in path \"${EXP_VAR}_${EXP_VAR2}\" to \"UNIX\"";
+        String expectedSummary = "Resolved path \"${EXP_VAR}_${EXP_VAR2}\" to \"TEST_UNIX\"";
         assertTrue("Expected first log message not found.\nActual: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg1)));
         assertTrue("Expected second log message not found.\nActual: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg2)));
+        assertTrue("Expected summary log message not found.\nActual: " + log.infoMessages,
+                log.infoMessages.stream().anyMatch(m -> m.equals(expectedSummary)));
     }
 
     @Test
@@ -117,8 +123,11 @@ public class ExpansionVariableLogMessageTest {
         buildDoc(log, serverDir, envContent).processServerEnv();
 
         String expectedMsg = "Resolved environment variable \"IBM_JAVA_SEMERU_HOME\" in path \"!IBM_JAVA_SEMERU_HOME!\\jdk-21.0.10+7\" to \"C:\\MyData\\java\\ibm-semeru-certified\\jdk-21.0.10+7\"";
+        String expectedSummary = "Resolved path \"!IBM_JAVA_SEMERU_HOME!\\jdk-21.0.10+7\" to \"C:\\MyData\\java\\ibm-semeru-certified\\jdk-21.0.10+7\"";
         assertTrue("Log message with backslashes not found — backslashes may have been dropped.\nActual: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg)));
+        assertTrue("Expected summary log message not found.\nActual: " + log.infoMessages,
+                log.infoMessages.stream().anyMatch(m -> m.equals(expectedSummary)));
     }
 
     @Test
@@ -133,9 +142,12 @@ public class ExpansionVariableLogMessageTest {
 
         String expectedMsg1 = "Resolved environment variable \"EXP_VAR\" in path \"!EXP_VAR!_!EXP_VAR3!\" to \"TEST\"";
         String expectedMsg2 = "Resolved environment variable \"EXP_VAR3\" in path \"!EXP_VAR!_!EXP_VAR3!\" to \"WINDOWS\"";
+        String expectedSummary = "Resolved path \"!EXP_VAR!_!EXP_VAR3!\" to \"TEST_WINDOWS\"";
         assertTrue("Expected first log message not found.\nActual: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg1)));
         assertTrue("Expected second log message not found.\nActual: " + log.infoMessages,
                 log.infoMessages.stream().anyMatch(m -> m.equals(expectedMsg2)));
+        assertTrue("Expected summary log message not found.\nActual: " + log.infoMessages,
+                log.infoMessages.stream().anyMatch(m -> m.equals(expectedSummary)));
     }
 }

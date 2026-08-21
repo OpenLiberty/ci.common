@@ -357,7 +357,9 @@ public class ServerConfigDocument {
         Pattern pattern = OSUtil.isWindows() ? WINDOWS_EXPANSION_VAR_PATTERN : LINUX_EXPANSION_VAR_PATTERN;
         Matcher matcher = pattern.matcher(value);
         StringBuffer sb = new StringBuffer();
+        boolean anyMatched = false;
         while (matcher.find()) {
+            anyMatched = true;
             String finalReplacement;
             String varName = matcher.group(1);
             // 2. Circular Reference Guard
@@ -385,6 +387,10 @@ public class ServerConfigDocument {
         }
         // 4. Finalize the string
         matcher.appendTail(sb);
+        // Log the complete resolved value once, only when at least one variable was expanded
+        if (anyMatched) {
+            log.info(String.format("Resolved path \"%s\" to \"%s\"", value, sb));
+        }
         return sb.toString();
     }
 
