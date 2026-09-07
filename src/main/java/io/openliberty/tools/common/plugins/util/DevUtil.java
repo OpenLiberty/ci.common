@@ -3138,10 +3138,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
                         if (p.getSourceDirectory().exists()) {
-                            Collection<File> omitList = getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath());
-                            if (omitList != null) {
-                                omitWatchingFiles.addAll(omitList);
-                            }
+                            omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath()));
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                             p.sourceDirRegistered = true;
                         }
@@ -3173,10 +3170,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             if (shouldIncludeSources(packagingType)) {
                 if (this.sourceDirectory.exists()) {
-                    Collection<File> omitList = getOmitFilesList(looseAppFile, this.sourceDirectory.getCanonicalPath());
-                    if (omitList != null) {
-                        omitWatchingFiles.addAll(omitList);
-                    }
+                    omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, this.sourceDirectory.getCanonicalPath()));
                     registerAll(srcPath, executor);
                     sourceDirRegistered = true;
                 }
