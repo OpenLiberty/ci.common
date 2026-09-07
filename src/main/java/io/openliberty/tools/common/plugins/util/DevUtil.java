@@ -3138,7 +3138,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (shouldIncludeSources(p.getPackagingType())) {
                         // watch src/main/java dir
                         if (p.getSourceDirectory().exists()) {
-                            omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath()));
+                            Collection<File> omitList = getOmitFilesList(looseAppFile, p.getSourceDirectory().getCanonicalPath());
+                            if (omitList != null) {
+                                omitWatchingFiles.addAll(omitList);
+                            }
                             registerAll(p.getSourceDirectory().getCanonicalFile().toPath(), executor);
                             p.sourceDirRegistered = true;
                         }
@@ -3170,7 +3173,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
             if (shouldIncludeSources(packagingType)) {
                 if (this.sourceDirectory.exists()) {
-                    omitWatchingFiles.addAll(getOmitFilesList(looseAppFile, this.sourceDirectory.getCanonicalPath()));
+                    Collection<File> omitList = getOmitFilesList(looseAppFile, this.sourceDirectory.getCanonicalPath());
+                    if (omitList != null) {
+                        omitWatchingFiles.addAll(omitList);
+                    }
                     registerAll(srcPath, executor);
                     sourceDirRegistered = true;
                 }
@@ -3849,7 +3855,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         } catch (ParserConfigurationException | SAXException | IOException e) {
             error("Unable to read loose application configuration file: " + looseAppFile.toString());
-            return null;
+            return omitFiles;
         }
         return omitFiles;
     }
