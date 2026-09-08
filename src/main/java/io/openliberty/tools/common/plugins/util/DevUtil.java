@@ -3849,7 +3849,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             }
         } catch (ParserConfigurationException | SAXException | IOException e) {
             error("Unable to read loose application configuration file: " + looseAppFile.toString());
-            return null;
+            return omitFiles;
         }
         return omitFiles;
     }
