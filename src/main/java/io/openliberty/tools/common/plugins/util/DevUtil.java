@@ -1837,19 +1837,28 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     // package-private for unit testing
     int resolveEffectiveContainerPort(int defaultPort, String endpointAttr) {
-        // Prefer serverXmlFile set by watchFiles(); fall back to configDirectory/server.xml
-        // for calls from startContainer() that happen before watchFiles() runs.
-        File effectiveServerXml = (serverXmlFile != null && serverXmlFile.isFile())
-                ? serverXmlFile
-                : (configDirectory != null ? new File(configDirectory, "server.xml") : null);
-        if (effectiveServerXml == null || !effectiveServerXml.isFile()) {
-            return defaultPort;
-        }
         try {
+            // Read liberty-plugin-config.xml first — it contains the resolved paths for
+            // configFile (custom server.xml), installDirectory, and userDirectory.
             File pluginConfigXml = (buildDirectory != null)
                     ? new File(buildDirectory, "liberty-plugin-config.xml") : null;
             File installDir = readTextElement(pluginConfigXml, "installDirectory");
             File userDir    = readTextElement(pluginConfigXml, "userDirectory");
+            // Use the configFile path from the plugin config if available; that is the
+            // user-specified server.xml (serverXmlFile parameter). Fall back to
+            // serverXmlFile set by watchFiles(), then to configDirectory/server.xml.
+            File configFileFromPlugin = readTextElement(pluginConfigXml, "configFile");
+            File effectiveServerXml;
+            if (configFileFromPlugin != null && configFileFromPlugin.isFile()) {
+                effectiveServerXml = configFileFromPlugin;
+            } else if (serverXmlFile != null && serverXmlFile.isFile()) {
+                effectiveServerXml = serverXmlFile;
+            } else {
+                effectiveServerXml = (configDirectory != null ? new File(configDirectory, "server.xml") : null);
+            }
+            if (effectiveServerXml == null || !effectiveServerXml.isFile()) {
+                return defaultPort;
+            }
 
             // Fall back to serverDirectory so that at minimum server.env and
             // bootstrap.properties are still picked up by ServerConfigDocument.
