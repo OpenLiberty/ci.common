@@ -82,6 +82,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import io.openliberty.tools.ant.ServerTask;
+import io.openliberty.tools.common.CommonLoggerI;
+import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
 
 import javax.xml.stream.XMLOutputFactory;
@@ -1694,13 +1696,15 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         List<ServerSocket> heldSockets = new ArrayList<ServerSocket>();
         try {
             if (!skipDefaultPorts) {
-                int httpPortToUse = findAndHoldPort(LIBERTY_DEFAULT_HTTP_PORT, false, heldSockets);
-                int httpsPortToUse = findAndHoldPort(LIBERTY_DEFAULT_HTTPS_PORT, false, heldSockets);
+                int effectiveHttpPort  = resolveEffectiveContainerPort(LIBERTY_DEFAULT_HTTP_PORT,  "httpPort");
+                int effectiveHttpsPort = resolveEffectiveContainerPort(LIBERTY_DEFAULT_HTTPS_PORT, "httpsPort");
+                int httpPortToUse  = findAndHoldPort(effectiveHttpPort,  false, heldSockets);
+                int httpsPortToUse = findAndHoldPort(effectiveHttpsPort, false, heldSockets);
                 commandElements.add("-p");
-                commandElements.add(httpPortToUse+":"+LIBERTY_DEFAULT_HTTP_PORT);
+                commandElements.add(httpPortToUse + ":" + effectiveHttpPort);
 
                 commandElements.add("-p");
-                commandElements.add(httpsPortToUse+":"+LIBERTY_DEFAULT_HTTPS_PORT);
+                commandElements.add(httpsPortToUse + ":" + effectiveHttpsPort);
             }
 
             if (libertyDebug) {
@@ -1739,6 +1743,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
             commandElements.add("-v");
             commandElements.add(looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+
+            // Mount configDropins/defaults and configDropins/overrides into the container
+            // so Liberty sees the same variable overrides (e.g. liberty-plugin-variable-config.xml)
+            // that port resolution used, ensuring Liberty starts on the published port.
+            for (String subDir : new String[]{"defaults", "overrides"}) {
+                File configDropinsDir = new File(serverDirectory, "configDropins/" + subDir);
+                if (configDropinsDir.isDirectory()) {
+                    commandElements.add("-v");
+                    commandElements.add(configDropinsDir.getAbsolutePath() + ":/config/configDropins/" + subDir);
+                }
+            }
 
             // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
             File logsDir = new File(serverDirectory.getAbsolutePath(), "logs");
@@ -1802,6 +1817,116 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             for (ServerSocket s : heldSockets) {
                 closeQuietly(s);
             }
+        }
+    }
+
+    /**
+     * Resolves the effective Liberty HTTP or HTTPS port by reading the server configuration
+     * using {@link ServerConfigDocument}.
+     * Returns {@code defaultPort} on any failure (missing files, parse errors, absent
+     * {@code <httpEndpoint>}, or non-integer resolved value).
+     *
+     * @param defaultPort  the Liberty default to fall back to (9080 or 9443)
+     * @param endpointAttr the {@code httpEndpoint} attribute name: {@code "httpPort"} or
+     *                     {@code "httpsPort"}
+     * @return the resolved effective port, or {@code defaultPort} on any failure
+     */
+    // package-private for unit testing
+    int resolveEffectiveContainerPort(int defaultPort, String endpointAttr) {
+        // Prefer serverXmlFile set by watchFiles(); fall back to configDirectory/server.xml
+        // for calls from startContainer() that happen before watchFiles() runs.
+        File effectiveServerXml = (serverXmlFile != null && serverXmlFile.isFile())
+                ? serverXmlFile
+                : (configDirectory != null ? new File(configDirectory, "server.xml") : null);
+        if (effectiveServerXml == null || !effectiveServerXml.isFile()) {
+            return defaultPort;
+        }
+        try {
+            File pluginConfigXml = (buildDirectory != null)
+                    ? new File(buildDirectory, "liberty-plugin-config.xml") : null;
+            File installDir = readTextElement(pluginConfigXml, "installDirectory");
+            File userDir    = readTextElement(pluginConfigXml, "userDirectory");
+
+            // Fall back to serverDirectory so that at minimum server.env and
+            // bootstrap.properties are still picked up by ServerConfigDocument.
+            if (installDir == null) installDir = serverDirectory;
+            if (userDir    == null) userDir    = serverDirectory;
+
+            // serverDirectory is where the plugin writes configDropins/overrides/
+            // liberty-plugin-variable-config.xml (liberty.var.* values). configDirectory
+            // is the source config dir and does not contain configDropins at runtime.
+            ServerConfigDocument scd = new ServerConfigDocument(
+                    CommonLoggerI.noop(), effectiveServerXml,
+                    installDir, userDir, serverDirectory, serverDirectory);
+
+            // Read the raw httpEndpoint attribute value from server.xml.
+            Document doc = scd.parseDocument(effectiveServerXml);
+            if (doc == null) {
+                return defaultPort;
+            }
+            javax.xml.xpath.XPath xp = javax.xml.xpath.XPathFactory.newInstance().newXPath();
+            org.w3c.dom.Element endpoint = (org.w3c.dom.Element)
+                    xp.compile("/server/httpEndpoint").evaluate(doc, javax.xml.xpath.XPathConstants.NODE);
+            if (endpoint == null) {
+                return defaultPort;
+            }
+            String raw = endpoint.getAttribute(endpointAttr);
+            if (raw == null || raw.trim().isEmpty()) {
+                return defaultPort;
+            }
+            raw = raw.trim();
+
+            // Literal integer — no variable resolution needed.
+            try {
+                return Integer.parseInt(raw);
+            } catch (NumberFormatException ignored) { /* fall through */ }
+
+            // Variable reference — resolve through the fully-loaded variable maps.
+            String resolved = VariableUtility.resolveVariables(
+                    CommonLoggerI.noop(), raw, null,
+                    scd.getProperties(), scd.getDefaultProperties(),
+                    scd.getLibertyDirPropertyFiles());
+            if (resolved == null) {
+                return defaultPort;
+            }
+            try {
+                return Integer.parseInt(resolved.trim());
+            } catch (NumberFormatException e) {
+                return defaultPort;
+            }
+        } catch (Exception e) {
+            debug("resolveEffectiveContainerPort: could not resolve port, using default " + defaultPort + ": " + e.getMessage());
+            return defaultPort;
+        }
+    }
+
+    /**
+     * Reads the text content of the first element matching {@code tagName} in an XML file,
+     * returning a {@link File} for that path, or {@code null} if absent or unreadable.
+     */
+    private File readTextElement(File xmlFile, String tagName) {
+        if (xmlFile == null || !xmlFile.isFile()) {
+            return null;
+        }
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar",  false);
+            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl",           true);
+            dbf.setFeature("http://xml.org/sax/features/external-parameter-entities",        false);
+            dbf.setFeature("http://xml.org/sax/features/external-general-entities",          false);
+            dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING,                           true);
+            dbf.setXIncludeAware(false);
+            dbf.setExpandEntityReferences(false);
+            Document doc = dbf.newDocumentBuilder().parse(xmlFile);
+            NodeList nodes = doc.getElementsByTagName(tagName);
+            if (nodes.getLength() == 0) {
+                return null;
+            }
+            String text = nodes.item(0).getTextContent();
+            return (text != null && !text.trim().isEmpty()) ? new File(text.trim()) : null;
+        } catch (Exception e) {
+            return null;
         }
     }
 
