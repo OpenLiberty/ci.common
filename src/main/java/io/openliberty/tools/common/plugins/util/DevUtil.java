@@ -89,6 +89,9 @@ import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatfo
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.NameFileFilter;
@@ -100,6 +103,7 @@ import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -1864,9 +1868,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (doc == null) {
                 return defaultPort;
             }
-            javax.xml.xpath.XPath xp = javax.xml.xpath.XPathFactory.newInstance().newXPath();
-            org.w3c.dom.Element endpoint = (org.w3c.dom.Element)
-                    xp.compile("/server/httpEndpoint").evaluate(doc, javax.xml.xpath.XPathConstants.NODE);
+            XPath xp = XPathFactory.newInstance().newXPath();
+            Element endpoint = (Element)
+                    xp.compile("/server/httpEndpoint").evaluate(doc, XPathConstants.NODE);
             if (endpoint == null) {
                 return defaultPort;
             }
