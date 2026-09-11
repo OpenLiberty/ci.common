@@ -84,6 +84,7 @@ import com.sun.nio.file.SensitivityWatchEventModifier;
 import io.openliberty.tools.ant.ServerTask;
 import io.openliberty.tools.common.CommonLoggerI;
 import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
+import io.openliberty.tools.common.plugins.config.XmlDocument;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
 
 import javax.xml.stream.XMLOutputFactory;
@@ -1842,12 +1843,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // configFile (custom server.xml), installDirectory, and userDirectory.
             File pluginConfigXml = (buildDirectory != null)
                     ? new File(buildDirectory, "liberty-plugin-config.xml") : null;
-            File installDir = readTextElement(pluginConfigXml, "installDirectory");
-            File userDir    = readTextElement(pluginConfigXml, "userDirectory");
+            File installDir = toFile(XmlDocument.readTextElementFromXmlFile(pluginConfigXml, "installDirectory"));
+            File userDir    = toFile(XmlDocument.readTextElementFromXmlFile(pluginConfigXml, "userDirectory"));
             // Use the configFile path from the plugin config if available; that is the
             // user-specified server.xml (serverXmlFile parameter). Fall back to
             // serverXmlFile set by watchFiles(), then to configDirectory/server.xml.
-            File configFileFromPlugin = readTextElement(pluginConfigXml, "configFile");
+            File configFileFromPlugin = toFile(XmlDocument.readTextElementFromXmlFile(pluginConfigXml, "configFile"));
             File effectiveServerXml;
             if (configFileFromPlugin != null && configFileFromPlugin.isFile()) {
                 effectiveServerXml = configFileFromPlugin;
@@ -1913,34 +1914,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         }
     }
 
-    /**
-     * Reads the text content of the first element matching {@code tagName} in an XML file,
-     * returning a {@link File} for that path, or {@code null} if absent or unreadable.
-     */
-    private File readTextElement(File xmlFile, String tagName) {
-        if (xmlFile == null || !xmlFile.isFile()) {
-            return null;
-        }
-        try {
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar",  false);
-            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl",           true);
-            dbf.setFeature("http://xml.org/sax/features/external-parameter-entities",        false);
-            dbf.setFeature("http://xml.org/sax/features/external-general-entities",          false);
-            dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING,                           true);
-            dbf.setXIncludeAware(false);
-            dbf.setExpandEntityReferences(false);
-            Document doc = dbf.newDocumentBuilder().parse(xmlFile);
-            NodeList nodes = doc.getElementsByTagName(tagName);
-            if (nodes.getLength() == 0) {
-                return null;
-            }
-            String text = nodes.item(0).getTextContent();
-            return (text != null && !text.trim().isEmpty()) ? new File(text.trim()) : null;
-        } catch (Exception e) {
-            return null;
-        }
+    private static File toFile(String path) {
+        return (path != null) ? new File(path) : null;
     }
 
     /**

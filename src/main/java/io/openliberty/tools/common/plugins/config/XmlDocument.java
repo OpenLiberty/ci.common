@@ -38,6 +38,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
 import org.xml.sax.SAXException;
 
@@ -110,6 +111,36 @@ public abstract class XmlDocument {
 
     protected boolean isWhitespace(Node node) {
         return node != null && node instanceof Text && ((Text)node).getData().trim().isEmpty();
+    }
+
+    /**
+     * Reads the text content of the first element matching {@code tagName} in an XML file,
+     * or {@code null} if the file is absent, the tag is missing, or any parse error occurs.
+     */
+    public static String readTextElementFromXmlFile(File xmlFile, String tagName) {
+        if (xmlFile == null || !xmlFile.isFile()) {
+            return null;
+        }
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar",  false);
+            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl",           true);
+            dbf.setFeature("http://xml.org/sax/features/external-parameter-entities",        false);
+            dbf.setFeature("http://xml.org/sax/features/external-general-entities",          false);
+            dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING,                           true);
+            dbf.setXIncludeAware(false);
+            dbf.setExpandEntityReferences(false);
+            Document doc = dbf.newDocumentBuilder().parse(xmlFile);
+            NodeList nodes = doc.getElementsByTagName(tagName);
+            if (nodes.getLength() == 0) {
+                return null;
+            }
+            String text = nodes.item(0).getTextContent();
+            return (text != null && !text.trim().isEmpty()) ? text.trim() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static void addNewlineBeforeFirstElement(File f) throws IOException {
