@@ -4151,6 +4151,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // The module with the latest src file change has compiled successfully
                         debug("Setting lastChangeCompiled to true");
                         lastChangeCompiled = true;
+                        // If the recompile was triggered by a pom.xml fix then the output directory may never
+                        // have been registered with the file watcher (it was empty when the initial compile
+                        // on start up failed), so class file events will not fire to populate
+                        // modifiedClasses. Add the output directory explicitly so generate features runs.
+                        if (triggerJavaSourceRecompile && generateFeatures && outputDirectory != null) {
+                            modifiedClasses.add(outputDirectory);
+                        }
                     }
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
@@ -4664,6 +4671,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     // trigger java source recompile if there are compilation errors
                     if (!failedCompilationJavaSources.isEmpty()) {
                         triggerJavaSourceRecompile = true;
+                        modifiedSrcBuildFile = buildFile;
                     }
                     // trigger java test recompile if there are compilation errors
                     if (!failedCompilationJavaTests.isEmpty()) {
