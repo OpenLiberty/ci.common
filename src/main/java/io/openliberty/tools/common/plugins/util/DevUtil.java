@@ -4082,6 +4082,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     currentProject.skipUTs(), true)) {
                 // successful compilation so we can clear failedCompilation list
                 currentProject.failedCompilationJavaSources.clear();
+                if (generateFeatures && modifiedSrcBuildFile != null 
+                        && modifiedSrcBuildFile.equals(currentProject.getBuildFile())
+                        && currentProject.getOutputDirectory() != null) {
+                    modifiedClasses.add(currentProject.getOutputDirectory());
+                }
             } else {
                 successfulSrcCompile = false;
             }
@@ -4517,6 +4522,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                             // in this project
                             if (!project.failedCompilationJavaSources.isEmpty()) {
                                 triggerUpstreamJavaSourceRecompile = true;
+                                modifiedSrcBuildFile = project.getBuildFile();
                             }
                             // trigger java test recompile of just this project if there are existing test
                             // compilation errors
