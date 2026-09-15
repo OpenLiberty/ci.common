@@ -1873,7 +1873,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     CommonLoggerI.noop(), effectiveServerXml,
                     installDir, userDir, serverDirectory, serverDirectory);
 
-            // Read the raw httpEndpoint attribute value from server.xml.
+            // Read the raw httpEndpoint attribute value from server.xml, including
+            // any files pulled in via <include location="..."/> elements.
             Document doc = scd.parseDocument(effectiveServerXml);
             if (doc == null) {
                 return defaultPort;
@@ -1881,6 +1882,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             XPath xp = XPathFactory.newInstance().newXPath();
             Element endpoint = (Element)
                     xp.compile("/server/httpEndpoint").evaluate(doc, XPathConstants.NODE);
+            if (endpoint == null) {
+                // Not in the top-level document — walk <include> files.
+                endpoint = findHttpEndpointInIncludes(doc, effectiveServerXml.getParentFile(), xp, scd);
+            }
             if (endpoint == null) {
                 return defaultPort;
             }
@@ -1916,6 +1921,56 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private static File toFile(String path) {
         return (path != null) ? new File(path) : null;
+    }
+
+    /**
+     * Recursively walks {@code <include>} elements in {@code doc} to find an
+     * {@code <httpEndpoint>} element that is not present in the top-level document.
+     * Relative include locations are resolved against {@code parentDir}.
+     *
+     * @return the first {@code httpEndpoint} {@link Element} found in any included
+     *         document, or {@code null} if none is found
+     */
+    private Element findHttpEndpointInIncludes(Document doc, File parentDir,
+            XPath xp, ServerConfigDocument scd) {
+        try {
+            NodeList includes = (NodeList)
+                    xp.compile("/server/include").evaluate(doc, XPathConstants.NODESET);
+            for (int i = 0; i < includes.getLength(); i++) {
+                if (!(includes.item(i) instanceof Element)) {
+                    continue;
+                }
+                String loc = ((Element) includes.item(i)).getAttribute("location");
+                if (loc == null || loc.trim().isEmpty()) {
+                    continue;
+                }
+                // Resolve relative paths against the parent dir of the including file.
+                File inclFile = new File(loc);
+                if (!inclFile.isAbsolute()) {
+                    inclFile = new File(parentDir, loc);
+                }
+                if (!inclFile.isFile()) {
+                    continue;
+                }
+                Document inclDoc = scd.parseDocument(inclFile);
+                if (inclDoc == null) {
+                    continue;
+                }
+                Element endpoint = (Element)
+                        xp.compile("/server/httpEndpoint").evaluate(inclDoc, XPathConstants.NODE);
+                if (endpoint != null) {
+                    return endpoint;
+                }
+                // Recurse into nested includes.
+                endpoint = findHttpEndpointInIncludes(inclDoc, inclFile.getParentFile(), xp, scd);
+                if (endpoint != null) {
+                    return endpoint;
+                }
+            }
+        } catch (Exception e) {
+            debug("findHttpEndpointInIncludes: error walking includes: " + e.getMessage());
+        }
+        return null;
     }
 
     /**

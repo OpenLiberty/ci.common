@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Collections;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -220,7 +221,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         write(new File(configDir, "server.xml"), content);
         write(new File(serverDir, "server.xml"), content);  // deployed copy for ServerConfigDocument
         DevTestUtil u = new DevTestUtil(serverDir, null, null, configDir,
-                java.util.Collections.emptyList(), java.util.Collections.emptyList(), false, false);
+                Collections.emptyList(), Collections.emptyList(), false, false);
 
         assertEquals(9097, u.resolveEffectiveContainerPort(9080, "httpPort"));
     }
@@ -289,7 +290,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         // DevUtil: configDirectory = srcConfigDir, serverDirectory = serverDir
         // serverXmlFile points to source server.xml (set by watchFiles in real usage)
         DevTestUtil u = new DevTestUtil(serverDir, null, null, srcConfigDir,
-                java.util.Collections.emptyList(), java.util.Collections.emptyList(), false, false);
+                Collections.emptyList(), Collections.emptyList(), false, false);
         u.serverXmlFile = srcServerXml;
 
         assertEquals(9090, u.resolveEffectiveContainerPort(9080, "httpPort"));
@@ -307,5 +308,75 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
         assertEquals(9453, u.resolveEffectiveContainerPort(9443, "httpsPort"));
+    }
+
+    /**
+     * A custom/external server.xml whose httpPort is defined in a sibling file
+     * pulled in via a relative {@code <include>}.
+     *
+     * Layout:
+     *   serverDir/server.xml  — contains {@code <include location="ports.xml"/>}
+     *   serverDir/ports.xml   — contains the httpEndpoint with the literal port
+     *
+     * ServerConfigDocument resolves the relative include against configDirectory
+     * (= serverDir), so it finds ports.xml and picks up the port value.
+     */
+    @Test
+    public void testPortDefinedViaRelativeInclude() throws Exception {
+        File serverDir = tmp.newFolder("server");
+
+        // ports.xml — the included file that defines the actual port
+        write(new File(serverDir, "ports.xml"),
+                "<server>\n" +
+                "    <httpEndpoint id=\"defaultHttpEndpoint\" httpPort=\"9094\"/>\n" +
+                "</server>");
+
+        // server.xml delegates to ports.xml via a relative include
+        File serverXml = new File(serverDir, "server.xml");
+        write(serverXml,
+                "<server>\n" +
+                "    <include location=\"ports.xml\"/>\n" +
+                "</server>");
+
+        DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
+
+        assertEquals(9094, u.resolveEffectiveContainerPort(9080, "httpPort"));
+    }
+
+    /**
+     * A custom/external server.xml with a sibling {@code configDropins} directory
+     * that supplies the port variable.
+     *
+     * Layout:
+     *   serverDir/server.xml                               — references ${ext.http.port}
+     *   serverDir/configDropins/overrides/port.xml         — defines ext.http.port = 9098
+     *
+     * {@code ServerConfigDocument} uses {@code serverDirectory} as its config directory, so
+     * it finds the sibling {@code configDropins} next to the deployed server.xml.
+     * This test validates that variables from that sibling {@code configDropins} are
+     * picked up and used to resolve the port, mirroring the real deployment layout.
+     */
+    @Test
+    public void testPortFromSiblingConfigDropins() throws Exception {
+        File serverDir = tmp.newFolder("server");
+
+        // server.xml references a variable defined only in the sibling configDropins
+        File serverXml = new File(serverDir, "server.xml");
+        write(serverXml,
+                "<server>\n" +
+                "    <httpEndpoint id=\"defaultHttpEndpoint\" httpPort=\"${ext.http.port}\"/>\n" +
+                "</server>");
+
+        // Sibling configDropins/overrides defines the variable
+        File overrides = new File(serverDir, "configDropins/overrides");
+        overrides.mkdirs();
+        write(new File(overrides, "port.xml"),
+                "<server>\n" +
+                "    <variable name=\"ext.http.port\" value=\"9098\"/>\n" +
+                "</server>");
+
+        DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
+
+        assertEquals(9098, u.resolveEffectiveContainerPort(9080, "httpPort"));
     }
 }
