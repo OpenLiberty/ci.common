@@ -1696,127 +1696,199 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @return the command string to use to start the container
      */
     private String[] getContainerCommand() throws IOException, PluginExecutionException {
-        // Use List<String> for building the command. This will be converted to a String[] when passed to ProcessBuilder. 
+        // Use List<String> for building the command. This will be converted to a String[] when passed to ProcessBuilder.
         // The ProcessBuilder will handle quoting of paths (for blanks) as needed for various OS.
         List<String> commandElements = new ArrayList<String>();
         commandElements.add(getContainerCommandPrefix().trim());
         commandElements.add("run");
         commandElements.add("--rm");
 
-        if (!skipDefaultPorts) {
-            int httpPortToUse, httpsPortToUse;
-            try {
-                httpPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTP_PORT, false);
-                httpsPortToUse = findAvailablePort(LIBERTY_DEFAULT_HTTPS_PORT, false);
-            } catch (IOException x) {
-                error("An error occurred while trying to find an available network port. Using default port numbers.", x);
-                httpPortToUse = LIBERTY_DEFAULT_HTTP_PORT;
-                httpsPortToUse = LIBERTY_DEFAULT_HTTPS_PORT;
-            }
-            commandElements.add("-p");
-            commandElements.add(httpPortToUse+":"+LIBERTY_DEFAULT_HTTP_PORT);
+        // Select host-side ports and hold them open for the entire command-build phase.
+        // Holding all three sockets simultaneously means a concurrent module's
+        // findAvailablePort() will see each chosen port as already bound and advance to
+        // the next one, eliminating the TOCTOU race without any shared state.
+        // The try/finally below ensures all sockets are released even if an exception
+        // is thrown while building the rest of the command.
+        List<ServerSocket> heldSockets = new ArrayList<ServerSocket>();
+        try {
+            if (!skipDefaultPorts) {
+                int httpPortToUse = findAndHoldPort(LIBERTY_DEFAULT_HTTP_PORT, false, heldSockets);
+                int httpsPortToUse = findAndHoldPort(LIBERTY_DEFAULT_HTTPS_PORT, false, heldSockets);
+                commandElements.add("-p");
+                commandElements.add(httpPortToUse+":"+LIBERTY_DEFAULT_HTTP_PORT);
 
-            commandElements.add("-p");
-            commandElements.add(httpsPortToUse+":"+LIBERTY_DEFAULT_HTTPS_PORT);
-        }
-        
-        if (libertyDebug) {
-            // map debug port
-            int containerDebugPort, hostDebugPort;
-            try {
+                commandElements.add("-p");
+                commandElements.add(httpsPortToUse+":"+LIBERTY_DEFAULT_HTTPS_PORT);
+            }
+
+            if (libertyDebug) {
+                // map debug port
+                int containerDebugPort, hostDebugPort;
                 if (alternativeDebugPort == -1) {
                     // it is possible another JVM has grabbed our port since dev mode last checked
-                    hostDebugPort = findAvailablePort(libertyDebugPort, true);
+                    hostDebugPort = findAndHoldPort(libertyDebugPort, true, heldSockets);
                     containerDebugPort = libertyDebugPort;
                 } else {
                     // dev mode has already selected an ephemeral port
                     containerDebugPort = hostDebugPort = alternativeDebugPort;
                 }
-            } catch (IOException x) {
-                containerDebugPort = hostDebugPort = libertyDebugPort;
+                commandElements.add("-p");
+                commandElements.add(hostDebugPort+":"+containerDebugPort);
+                // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
+                // and to allow remote debugging into the container
+                commandElements.add("-e");
+                commandElements.add("WLP_DEBUG_SUSPEND=n");
+                commandElements.add("-e");
+                commandElements.add("WLP_DEBUG_ADDRESS=" + containerDebugPort);
+                commandElements.add("-e");
+                commandElements.add("WLP_DEBUG_REMOTE=y");
             }
-            commandElements.add("-p");
-            commandElements.add(hostDebugPort+":"+containerDebugPort);
-            // set environment variables in the container to ensure debug mode does not suspend the server, and to enable a custom debug port to be used
-            // and to allow remote debugging into the container
-            commandElements.add("-e");
-            commandElements.add("WLP_DEBUG_SUSPEND=n");
-            commandElements.add("-e");
-            commandElements.add("WLP_DEBUG_ADDRESS=" + containerDebugPort);
-            commandElements.add("-e");
-            commandElements.add("WLP_DEBUG_REMOTE=y");
-        }
 
-        // mount potential directories containing .war.xml from devc specific folder - override /config/apps and /config/dropins
-        File tempApps = new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/apps");
-        File tempDropins = new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/dropins");
-        commandElements.add("-v");
-        commandElements.add(tempApps + ":/config/apps");
+            // mount potential directories containing .war.xml from devc specific folder - override /config/apps and /config/dropins
+            File tempApps = new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/apps");
+            File tempDropins = new File(buildDirectory, DEVC_HIDDEN_FOLDER + "/dropins");
+            commandElements.add("-v");
+            commandElements.add(tempApps + ":/config/apps");
 
-        commandElements.add("-v");
-        commandElements.add(tempDropins + ":/config/dropins");
+            commandElements.add("-v");
+            commandElements.add(tempDropins + ":/config/dropins");
 
-        // mount the loose application resources in the container using the appropriate project root
-        File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
-        commandElements.add("-v");
-        commandElements.add(looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+            // mount the loose application resources in the container using the appropriate project root
+            File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
+            commandElements.add("-v");
+            commandElements.add(looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
 
-        // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
-        File logsDir = new File(serverDirectory.getAbsolutePath(), "logs");
-        commandElements.add("-v");
-        commandElements.add(logsDir + ":/logs");
+            // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
+            File logsDir = new File(serverDirectory.getAbsolutePath(), "logs");
+            commandElements.add("-v");
+            commandElements.add(logsDir + ":/logs");
 
-        // mount the Maven .m2 cache directory for featureUtility to use. For now, featureUtility does not support Gradle cache.
-        commandElements.add("-v");
-        commandElements.add(mavenCacheLocation + ":/devmode-maven-cache");
+            // mount the Maven .m2 cache directory for featureUtility to use. For now, featureUtility does not support Gradle cache.
+            commandElements.add("-v");
+            commandElements.add(mavenCacheLocation + ":/devmode-maven-cache");
 
-        // mount all files from COPY commands in the Containerfile to allow for hot deployment
-        addCopiedFiles(commandElements);
+            // mount all files from COPY commands in the Containerfile to allow for hot deployment
+            addCopiedFiles(commandElements);
 
-        // Add a --user option when running Linux
-        addUserId(commandElements);
+            // Add a --user option when running Linux
+            addUserId(commandElements);
 
-        // Do not generate a name if the user has specified a name
-        String name = getContainerOption("--name");
-        if (name == null || name.isEmpty()) {
-            if (name != null && name.isEmpty()) {
-                error("The container option --name is specified with an unsupported value: empty string.");
-                // now generate a name so that the container errors make some sense to the user.
+            // Do not generate a name if the user has specified a name
+            String name = getContainerOption("--name");
+            if (name == null || name.isEmpty()) {
+                if (name != null && name.isEmpty()) {
+                    error("The container option --name is specified with an unsupported value: empty string.");
+                    // now generate a name so that the container errors make some sense to the user.
+                }
+                containerName = generateNewContainerName();
+                commandElements.add("--name");
+                commandElements.add(containerName);
+            } else {
+                containerName = name;
             }
-            containerName = generateNewContainerName();
-            commandElements.add("--name");
-            commandElements.add(containerName);
-        } else {
-            containerName = name;
+            debug("containerName: " + containerName + ".");
+
+            // Allow the user to add their own options to this command via a system property.
+            if (containerRunOpts != null) {
+                addContainerRunOpts(containerRunOpts, commandElements);
+            }
+
+            // Options must precede this in any order. Image name and command code follows.
+            commandElements.add(imageName);
+
+            // Command to start the server
+            commandElements.add("server");
+            if (libertyDebug) {
+                commandElements.add("debug");
+            } else {
+                commandElements.add("run");
+            }
+            commandElements.add("defaultServer");
+
+            // All the Liberty variable definitions must appear after the -- option.
+            // Important: other Liberty options must appear before --
+            commandElements.add("--");
+            commandElements.add("--"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
+
+            //return command.toString();
+            String[] newCommand = commandElements.toArray(new String[commandElements.size()]);
+            info("Container command: "+String.join(" ", newCommand));
+            // Release the held port sockets as late as possible so the container engine
+            // can bind those exact ports immediately after this command is issued.
+            return newCommand;
+        } finally {
+            for (ServerSocket s : heldSockets) {
+                closeQuietly(s);
+            }
         }
-        debug("containerName: " + containerName + ".");
+    }
 
-        // Allow the user to add their own options to this command via a system property.
-        if (containerRunOpts != null) {
-            addContainerRunOpts(containerRunOpts, commandElements);
+    /**
+     * Finds an available port starting from {@code preferred} and immediately binds a
+     * {@code ServerSocket} on it to hold that port open until the caller is done building
+     * the container command. The bound socket is added to {@code heldSockets} so the
+     * caller can release all of them in a single loop.
+     *
+     * <p>If {@code findAvailablePort} throws, the default port is returned without
+     * holding any socket (consistent with the pre-existing error-recovery behaviour).
+     *
+     * @param preferred    the preferred port number to try first
+     * @param isDebug      true if this is the debug port (affects ephemeral-port fallback)
+     * @param heldSockets  accumulator list; the new socket is appended if binding succeeds
+     * @return the selected port number
+     */
+    private int findAndHoldPort(int preferred, boolean isDebug, List<ServerSocket> heldSockets)
+            throws IOException {
+        int port;
+        try {
+            port = findAvailablePort(preferred, isDebug);
+        } catch (IOException x) {
+            error("An error occurred while trying to find an available network port. Using default port " + preferred + ".", x);
+            return preferred;
         }
-
-        // Options must precede this in any order. Image name and command code follows.
-        commandElements.add(imageName);
-
-        // Command to start the server
-        commandElements.add("server");
-        if (libertyDebug) {
-            commandElements.add("debug");
-        } else {
-            commandElements.add("run");
+        ServerSocket s = bindPortSocket(port);
+        if (s != null) {
+            heldSockets.add(s);
         }
-        commandElements.add("defaultServer");
+        return port;
+    }
 
-        // All the Liberty variable definitions must appear after the -- option.
-        // Important: other Liberty options must appear before --
-        commandElements.add("--");
-        commandElements.add("--"+DEVMODE_PROJECT_ROOT+"="+DEVMODE_DIR_NAME);
+    /**
+     * Closes a {@link ServerSocket}, logging any {@link IOException} at debug level
+     * rather than propagating it. Safe to call with a {@code null} argument.
+     */
+    private void closeQuietly(ServerSocket s) {
+        if (s != null) {
+            try {
+                s.close();
+            } catch (IOException e) {
+                debug("closeQuietly: error closing port socket: " + e.getMessage());
+            }
+        }
+    }
 
-        //return command.toString();
-        String[] newCommand = commandElements.toArray(new String[commandElements.size()]);
-        info("Container command: "+String.join(" ", newCommand));
-        return newCommand;
+    /**
+     * Attempts to bind the given port on the loopback interface to hold it open.
+     * Returns the bound ServerSocket, or null if binding fails (in which case the
+     * caller continues without holding a socket).
+     * <p>
+     * SO_REUSEADDR is explicitly set to false so that the OS will not allow another
+     * process to bind the same port while this socket is open.
+     */
+    ServerSocket bindPortSocket(int port) {
+        try {
+            if (OSUtil.isWindows()) {
+                return new ServerSocket(port);
+            } else {
+                ServerSocket s = new ServerSocket();
+                s.setReuseAddress(false);
+                s.bind(new InetSocketAddress(InetAddress.getByName(null), port), 1);
+                return s;
+            }
+        } catch (IOException e) {
+            debug("bindPortSocket: could not hold port " + port + ": " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -1841,38 +1913,89 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return null;
     }
 
-    private String generateNewContainerName() throws PluginExecutionException {
+    /**
+     * Generates a unique container name for this dev mode instance.
+     *
+     * <p>The preferred name is {@code "liberty-dev-<sanitizedApplicationId>"} (or just
+     * {@code "liberty-dev"} when {@code applicationId} is null or blank). Each module in a
+     * multi-module project therefore gets a stable, distinct default name that does not
+     * depend on the order in which modules start, eliminating the race condition that
+     * occurred when multiple modules computed the same numeric suffix from a shared
+     * container list.
+     *
+     * <p>If the preferred name is already in use by an existing container (e.g. a second
+     * instance of the same module, or two different apps that happen to share the same
+     * application ID), an incrementing numeric suffix is appended until an unused name is
+     * found (e.g. {@code "liberty-dev-modulea-1"}).
+     *
+     * @return a unique container name that is not currently used by any running or stopped container
+     * @throws PluginExecutionException if the container command cannot be executed
+     */
+    String generateNewContainerName() throws PluginExecutionException {
+        // Build a sanitized name segment from applicationId so each module gets a stable,
+        // unique default name (e.g. "liberty-dev-modulea") that does not depend on the
+        // order in which modules start. This eliminates the race condition that occurred
+        // when multiple modules computed the same numeric suffix from a shared container list.
+        String appSegment = sanitizeContainerNameSegment(applicationId);
+        String preferredName = DEVMODE_CONTAINER_BASE_NAME + (appSegment.isEmpty() ? "" : "-" + appSegment);
+
         String containerContNamesCmd = "ps -a --format \"{{.Names}}\"";
         debug("container names list command: " + containerContNamesCmd);
         String result = execContainerCmdWithPrefix(containerContNamesCmd, CONTAINER_TIMEOUT);
-        if (result == null) {
-            return DEVMODE_CONTAINER_BASE_NAME;
-        }
-        String[] containerNames = result.split(" ");
-        int highestNum = -1;
-        for(int i = 0; i < containerNames.length; i++) {
-            String name = removeSurroundingQuotes(containerNames[i]);
-            int num = -1;
-            if (name.equals(DEVMODE_CONTAINER_BASE_NAME)) {
-                num = 0;
-            } else if (name.startsWith(DEVMODE_CONTAINER_BASE_NAME + "-")) {
-                String[] nameSegments = name.split("-");
-                // if DEVMODE_CONTAINER_BASE_NAME changes, the logic below may need to change
-                if (nameSegments.length == 3) {
-                    String lastSegment = nameSegments[nameSegments.length - 1];
-                    try {
-                        num = Integer.parseInt(lastSegment);
-                    } catch (NumberFormatException e) {
-                        debug("Last segment of container name is not a number.");
-                    }
-                }
-            }
-            if (num > highestNum) {
-                highestNum = num;
+
+        Set<String> existingNames = new HashSet<String>();
+        if (result != null) {
+            for (String rawName : result.split(" ")) {
+                existingNames.add(removeSurroundingQuotes(rawName).trim());
             }
         }
-        
-        return DEVMODE_CONTAINER_BASE_NAME + ((highestNum != -1) ? "-" + ++highestNum : "");
+
+        if (!existingNames.contains(preferredName)) {
+            return preferredName;
+        }
+
+        // Preferred name is already in use (e.g. a second instance of the same module).
+        // Append an incrementing suffix until we find an unused name.
+        int suffix = 1;
+        String candidate;
+        do {
+            candidate = preferredName + "-" + suffix;
+            suffix++;
+        } while (existingNames.contains(candidate));
+        return candidate;
+    }
+
+    /**
+     * Sanitizes a string so it can be used as part of a container name.
+     * Container names must match {@code [a-zA-Z0-9][a-zA-Z0-9_.-]*}.
+     * The input is lower-cased, characters outside the allowed set are replaced
+     * with hyphens, consecutive separator runs are collapsed to a single hyphen,
+     * leading/trailing separators are removed, and the result is truncated to
+     * 110 characters so that the full {@code "liberty-dev-<segment>"} name stays
+     * within the 128-char limit that most container engines impose on container names.
+     *
+     * @param input the raw string to sanitize (e.g. applicationId)
+     * @return a sanitized, lower-case string suitable for use in a container name,
+     *         or an empty string if input is null or blank
+     */
+    static String sanitizeContainerNameSegment(String input) {
+        if (input == null || input.trim().isEmpty()) {
+            return "";
+        }
+        // Lower-case the input and replace any character that is not alphanumeric,
+        // hyphen, underscore, or dot with a hyphen.
+        String sanitized = input.trim().toLowerCase().replaceAll("[^a-z0-9_.\\-]", "-");
+        // Collapse consecutive separators (hyphens, dots, underscores) to a single hyphen.
+        sanitized = sanitized.replaceAll("[-_.]{2,}", "-");
+        // Remove leading and trailing separators (hyphens, dots, underscores).
+        sanitized = sanitized.replaceAll("^[-_.]+|[-_.]+$", "");
+        // Truncate to 110 characters so the full "liberty-dev-<segment>" name stays
+        // within the 128-char limit that most container engines impose on container names.
+        if (sanitized.length() > 110) {
+            sanitized = sanitized.substring(0, 110);
+            sanitized = sanitized.replaceAll("[-_.]+$", "");
+        }
+        return sanitized;
     }
 
     /**
@@ -6191,7 +6314,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
 
     private void writeElement(XMLStreamWriter writer, String element, String optional) throws XMLStreamException {
         writer.writeStartElement(element);
-        if (optional != null) writer.writeCharacters(optional);
+        // Always write the characters (empty string when null) so the XML stream writer
+        // emits <element></element> rather than the self-closing <element/> form.
+        // The test assertions depend on the open+close form being present.
+        writer.writeCharacters(optional != null ? optional : "");
         writer.writeEndElement();
     }
 }
