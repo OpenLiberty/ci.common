@@ -138,7 +138,7 @@ public abstract class FeatureGeneratorUtil {
      * @param currentFeatureSet - the features already specified in the server configuration
      * @param classFiles - a set of class files for the generator to handle. Should be a subset of allClassesDirectories
      * @param allClassesDirectories - the directories containing all the class files of the application
-     * @param looseConfigFilePath - the absolute path to the xml config of the loose application
+     * @param deployedAppFilePath - the absolute path to the xml config of the loose application
      * @param logLocation - directory name relative to project or absolute path passed to feature generator
      * @param targetJavaEE - generate features valid for the indicated version of EE
      * @param targetMicroProfile - generate features valid for the indicated version of MicroProfile
@@ -158,11 +158,14 @@ public abstract class FeatureGeneratorUtil {
      * @throws IllegalTargetComboException - indicates the MP or EE version parameters are not supported by the feature
      *                                       generator when used in combination with each other. E.g. EE 7 and MP 2.1
      */
-    public Set<String> runFeatureGenerator(Set<String> currentFeatureSet, List<String> classFiles, Set<String> allClassesDirectories,
-            String looseConfigFilePath, String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
+    public Set<String> runFeatureGenerator(Set<String> currentFeatureSet, List<String> classFiles, String deployedAppFilePath,
+            String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
             FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException, VersionlessFeatureDetectedException {
         Set<String> generatedFeatureList = null;
+        warn ("classFiles="+classFiles);
+        // warn ("allClassesDirectories="+allClassesDirectories);
+        warn ("looseConfigFilePath="+deployedAppFilePath);
         if (featureGenJar != null && featureGenJar.exists()) {
             // if we are already generating features for all class files (optimize=true) and
             // we are not passing any user specified features (currentFeatureSet is empty)
@@ -171,7 +174,7 @@ public abstract class FeatureGeneratorUtil {
             try {
                 Method generateFeatureSetMethod = getGeneratorMethod();
                 // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
-                Set<String> binaryInputs = getBinaryInputs(classFiles, allClassesDirectories, looseConfigFilePath, optimize);
+                Set<String> binaryInputs = getBinaryInputs(classFiles, deployedAppFilePath, optimize);
 
                 String logLevel;
                 if (isDebugEnabled()) {
@@ -189,9 +192,19 @@ public abstract class FeatureGeneratorUtil {
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
+                warn ("Calling " + featureGenJar.getName() + " with the following inputs...\n" +
+                        "  binaryInputs: " + binaryInputs + "\n" +
+                        "  targetJavaEE: " + targetJavaEE + "\n" +
+                        "  targetMicroP: " + targetMicroProfile + "\n" +
+                        "  currentFeatures: " + currentFeatureSet + "\n" +
+                        "  featureListFileMap: " + featureListFileMap + "\n" +
+                        "  logLocation: " + logLocation + "\n" +
+                        "  logLevel: " + logLevel + "\n" +
+                        "  locale: " + java.util.Locale.getDefault());
                 generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                         currentFeatureSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
                 for (String s : generatedFeatureList) {debug(s);};
+                for (String s : generatedFeatureList) {warn (s);};
             } catch (InvocationTargetException ite) {
                 // This is the exception from the JVM that indicates there was an exception in the method we
                 // called through reflection. We must extract the actual exception from the 'cause' field.
@@ -211,7 +224,7 @@ public abstract class FeatureGeneratorUtil {
                     // The list of features from the app is passed in but it contains conflicts
                     Set<String> conflicts = getFeatures(generatorException);
                     // always rerun feature generator in this scenario, this exception only occurs if a current feature list is passed to feature generator
-                    Set<String> sampleFeatureList = reRunFeatureGenerator(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap);
+                    Set<String> sampleFeatureList = reRunFeatureGenerator(deployedAppFilePath, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap);
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -221,7 +234,7 @@ public abstract class FeatureGeneratorUtil {
                     // The scanned files conflict with each other or with current features
                     Set<String> conflicts = getFeatures(generatorException);
                     //  rerun feature generator with all class files and without the current feature set to get feature recommendations
-                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap): null;
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(deployedAppFilePath, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap): null;
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -231,7 +244,7 @@ public abstract class FeatureGeneratorUtil {
                     // The scanned files conflict and the generator suggests modifying some features
                     Set<String> modifications = getFeatures(generatorException);
                     //  rerun feature generator with all class files and without the current feature set
-                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(allClassesDirectories, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap) : null;
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(deployedAppFilePath, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap) : null;
                     throw new FeatureModifiedException(modifications, 
                             (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, generatorException.getLocalizedMessage());
                 } else if (generatorException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
@@ -291,19 +304,19 @@ public abstract class FeatureGeneratorUtil {
      * In order to generate the optimal list we must scan all classes in the application and we do not consider
      * the features already specified in the server configuration (server.xml).
      * 
-     * @param allClassesDirectories - the generator will find all the class files in this set of directories
+     * @param deployedAppFilePath - the generator will find all the class files in this file
      * @param logLocation - directory name relative to project or absolute path passed to feature generator
      * @param targetJavaEE - generate features valid for the indicated version of EE
      * @param targetMicroProfile - generate features valid for the indicated version of MicroProfile
      * @return - a set of features that will allow the application to run in a Liberty server
      * @throws PluginExecutionException - any exception that prevents the generator from running
      */
-    public Set<String> reRunFeatureGenerator(Set<String> allClassesDirectories, String logLocation, String targetJavaEE, String targetMicroProfile,
+    public Set<String> reRunFeatureGenerator(String deployedAppFilePath, String logLocation, String targetJavaEE, String targetMicroProfile,
             Map featureListFileMap) throws PluginExecutionException {
         Set<String> generatedFeatureList = null;
         try {
             Method generateFeatureSetMethod = getGeneratorMethod();
-            Set<String> binaryInputs = allClassesDirectories;
+            Set<String> binaryInputs = getBinaryInputs(null, deployedAppFilePath, true);
             Set<String> currentFeaturesSet = new HashSet<String>(); // when re-running always pass in no features
             String logLevel;
             if (isDebugEnabled()) {
@@ -389,33 +402,27 @@ public abstract class FeatureGeneratorUtil {
         return featureGenMethod;
     }
 
-    private Set<String> getBinaryInputs(List<String> classFiles, Set<String> classDirectories, String looseConfigFilePath, boolean optimize) throws PluginExecutionException {
-        Set<String> resultSet;
+    private Set<String> getBinaryInputs(List<String> classFiles, String deployedAppFilePath, boolean optimize) throws PluginExecutionException {
+        Set<String> resultSet = new HashSet<String>();
         if (optimize) {
-            // Use either the loose app config or the class directories
-            if (looseConfigFilePath != null) {
+            // Use either the loose app config or a regular application deployment binary file (war/jar)
+            if (deployedAppFilePath != null && deployedAppFilePath.endsWith(".xml")) {
                 try {
-                    File looseAppFile = new File(looseConfigFilePath);
+                    // extract the file names from the xml file
+                    File looseAppFile = new File(deployedAppFilePath);
                     if (looseAppFile.exists()) {
                         resultSet = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
-                        if (!resultSet.isEmpty()) {
-                            return resultSet;
-                        }
                     }
                 } catch (IOException e) {
                     // if the app config is invalid try the class directories instead
+                    warn("Application descriptor file not found while generating features, using class files instead: " + deployedAppFilePath);
                 }
-                warn("Application descriptor file not found while generating features, using class files instead: " + looseConfigFilePath);
+            } else {
+                resultSet.add(deployedAppFilePath);
             }
-            if (classDirectories == null || classDirectories.isEmpty()) {
-                return new HashSet<String>();
-            }
-            resultSet = classDirectories;
         } else {
             if (classFiles != null && !classFiles.isEmpty()) {
                 resultSet = new HashSet<String>(classFiles);
-            } else {
-                return new HashSet<String>();
             }
         }
         return resultSet;
