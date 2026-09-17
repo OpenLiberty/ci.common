@@ -1701,8 +1701,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         List<ServerSocket> heldSockets = new ArrayList<ServerSocket>();
         try {
             if (!skipDefaultPorts) {
-                int effectiveHttpPort  = resolveEffectiveContainerPort(LIBERTY_DEFAULT_HTTP_PORT,  "httpPort");
-                int effectiveHttpsPort = resolveEffectiveContainerPort(LIBERTY_DEFAULT_HTTPS_PORT, "httpsPort");
+                Map<String, Integer> defaultPorts = new HashMap<String, Integer>();
+                defaultPorts.put("httpPort", LIBERTY_DEFAULT_HTTP_PORT);
+                defaultPorts.put("httpsPort", LIBERTY_DEFAULT_HTTPS_PORT);
+                Map<String, Integer> effectivePorts = resolveEffectiveContainerPorts(defaultPorts);
+                int effectiveHttpPort = effectivePorts.get("httpPort");
+                int effectiveHttpsPort = effectivePorts.get("httpsPort");
                 int httpPortToUse  = findAndHoldPort(effectiveHttpPort,  false, heldSockets);
                 int httpsPortToUse = findAndHoldPort(effectiveHttpsPort, false, heldSockets);
                 commandElements.add("-p");
@@ -1838,6 +1842,21 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      */
     // package-private for unit testing
     int resolveEffectiveContainerPort(int defaultPort, String endpointAttr) {
+        Map<String, Integer> defaultPorts = new HashMap<String, Integer>();
+        defaultPorts.put(endpointAttr, defaultPort);
+        Map<String, Integer> result = resolveEffectiveContainerPorts(defaultPorts);
+        return result.getOrDefault(endpointAttr, defaultPort);
+    }
+
+    /**
+     * Resolves the effective container ports for the given map of endpoint attributes and their defaults
+     * in a single pass using {@link ServerConfigDocument}.
+     *
+     * @param defaultPortsByAttr a map of endpoint attribute names to their default port integers (e.g. "httpPort" -> 9080, "httpsPort" -> 9443)
+     * @return a map containing resolved effective ports for each attribute key
+     */
+    Map<String, Integer> resolveEffectiveContainerPorts(Map<String, Integer> defaultPortsByAttr) {
+        Map<String, Integer> resolvedPorts = new HashMap<String, Integer>(defaultPortsByAttr);
         try {
             // Read liberty-plugin-config.xml first — it contains the resolved paths for
             // configFile (custom server.xml), installDirectory, and userDirectory.
@@ -1858,7 +1877,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 effectiveServerXml = (configDirectory != null ? new File(configDirectory, "server.xml") : null);
             }
             if (effectiveServerXml == null || !effectiveServerXml.isFile()) {
-                return defaultPort;
+                return resolvedPorts;
             }
 
             // Fall back to serverDirectory so that at minimum server.env and
@@ -1873,104 +1892,41 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     CommonLoggerI.noop(), effectiveServerXml,
                     installDir, userDir, serverDirectory, serverDirectory);
 
-            // Read the raw httpEndpoint attribute value from server.xml, including
-            // any files pulled in via <include location="..."/> elements.
-            Document doc = scd.parseDocument(effectiveServerXml);
-            if (doc == null) {
-                return defaultPort;
-            }
-            XPath xp = XPathFactory.newInstance().newXPath();
-            Element endpoint = (Element)
-                    xp.compile("/server/httpEndpoint").evaluate(doc, XPathConstants.NODE);
-            if (endpoint == null) {
-                // Not in the top-level document — walk <include> files.
-                endpoint = findHttpEndpointInIncludes(doc, effectiveServerXml.getParentFile(), xp, scd);
-            }
-            if (endpoint == null) {
-                return defaultPort;
-            }
-            String raw = endpoint.getAttribute(endpointAttr);
-            if (raw == null || raw.trim().isEmpty()) {
-                return defaultPort;
-            }
-            raw = raw.trim();
+            Map<String, String> endpointAttrs = scd.getHttpEndpointAttributes();
+            for (Map.Entry<String, Integer> entry : defaultPortsByAttr.entrySet()) {
+                String attrName = entry.getKey();
+                int defaultPort = entry.getValue();
+                String raw = endpointAttrs.get(attrName);
+                if (raw == null || raw.trim().isEmpty()) {
+                    continue;
+                }
+                raw = raw.trim();
 
-            // Literal integer — no variable resolution needed.
-            try {
-                return Integer.parseInt(raw);
-            } catch (NumberFormatException ignored) { /* fall through */ }
+                // Literal integer — no variable resolution needed.
+                try {
+                    resolvedPorts.put(attrName, Integer.parseInt(raw));
+                    continue;
+                } catch (NumberFormatException ignored) { /* fall through */ }
 
-            // Variable reference — resolve through the fully-loaded variable maps.
-            String resolved = VariableUtility.resolveVariables(
-                    CommonLoggerI.noop(), raw, null,
-                    scd.getProperties(), scd.getDefaultProperties(),
-                    scd.getLibertyDirPropertyFiles());
-            if (resolved == null) {
-                return defaultPort;
-            }
-            try {
-                return Integer.parseInt(resolved.trim());
-            } catch (NumberFormatException e) {
-                return defaultPort;
+                // Variable reference — resolve through the fully-loaded variable maps.
+                String resolved = VariableUtility.resolveVariables(
+                        CommonLoggerI.noop(), raw, null,
+                        scd.getProperties(), scd.getDefaultProperties(),
+                        scd.getLibertyDirPropertyFiles());
+                if (resolved != null) {
+                    try {
+                        resolvedPorts.put(attrName, Integer.parseInt(resolved.trim()));
+                    } catch (NumberFormatException ignored) { /* fall back to default */ }
+                }
             }
         } catch (Exception e) {
-            debug("resolveEffectiveContainerPort: could not resolve port, using default " + defaultPort + ": " + e.getMessage());
-            return defaultPort;
+            debug("resolveEffectiveContainerPorts: could not resolve ports, using defaults: " + e.getMessage());
         }
+        return resolvedPorts;
     }
 
     private static File toFile(String path) {
         return (path != null) ? new File(path) : null;
-    }
-
-    /**
-     * Recursively walks {@code <include>} elements in {@code doc} to find an
-     * {@code <httpEndpoint>} element that is not present in the top-level document.
-     * Relative include locations are resolved against {@code parentDir}.
-     *
-     * @return the first {@code httpEndpoint} {@link Element} found in any included
-     *         document, or {@code null} if none is found
-     */
-    private Element findHttpEndpointInIncludes(Document doc, File parentDir,
-            XPath xp, ServerConfigDocument scd) {
-        try {
-            NodeList includes = (NodeList)
-                    xp.compile("/server/include").evaluate(doc, XPathConstants.NODESET);
-            for (int i = 0; i < includes.getLength(); i++) {
-                if (!(includes.item(i) instanceof Element)) {
-                    continue;
-                }
-                String loc = ((Element) includes.item(i)).getAttribute("location");
-                if (loc == null || loc.trim().isEmpty()) {
-                    continue;
-                }
-                // Resolve relative paths against the parent dir of the including file.
-                File inclFile = new File(loc);
-                if (!inclFile.isAbsolute()) {
-                    inclFile = new File(parentDir, loc);
-                }
-                if (!inclFile.isFile()) {
-                    continue;
-                }
-                Document inclDoc = scd.parseDocument(inclFile);
-                if (inclDoc == null) {
-                    continue;
-                }
-                Element endpoint = (Element)
-                        xp.compile("/server/httpEndpoint").evaluate(inclDoc, XPathConstants.NODE);
-                if (endpoint != null) {
-                    return endpoint;
-                }
-                // Recurse into nested includes.
-                endpoint = findHttpEndpointInIncludes(inclDoc, inclFile.getParentFile(), xp, scd);
-                if (endpoint != null) {
-                    return endpoint;
-                }
-            }
-        } catch (Exception e) {
-            debug("findHttpEndpointInIncludes: error walking includes: " + e.getMessage());
-        }
-        return null;
     }
 
     /**

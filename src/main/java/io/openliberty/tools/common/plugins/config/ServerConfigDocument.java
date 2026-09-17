@@ -53,6 +53,8 @@ import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -75,6 +77,7 @@ public class ServerConfigDocument {
     private Set<String> namelessLocations;
     private Set<String> locations;
     private HashMap<String, String> locationsAndNames;
+    private Map<String, String> httpEndpointAttributes;
     private Properties props;
     private Properties defaultProps;
     private Map<String, File> libertyDirectoryPropertyToFile = null;
@@ -86,6 +89,7 @@ public class ServerConfigDocument {
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
     private static final XPathExpression XPATH_SERVER_SPRINGBOOT_APPLICATION;
     private static final XPathExpression XPATH_SERVER_ENTERPRISE_APPLICATION;
+    private static final XPathExpression XPATH_SERVER_HTTP_ENDPOINT;
     private static final XPathExpression XPATH_SERVER_INCLUDE;
     public static final XPathExpression XPATH_SERVER_VARIABLE;
     private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
@@ -102,6 +106,7 @@ public class ServerConfigDocument {
             XPATH_SERVER_WEB_APPLICATION = xPath.compile("/server/webApplication");
             XPATH_SERVER_SPRINGBOOT_APPLICATION = xPath.compile("/server/springBootApplication");
             XPATH_SERVER_ENTERPRISE_APPLICATION = xPath.compile("/server/enterpriseApplication");
+            XPATH_SERVER_HTTP_ENDPOINT = xPath.compile("/server/httpEndpoint");
             XPATH_SERVER_INCLUDE = xPath.compile("/server/include");
             XPATH_SERVER_VARIABLE = xPath.compile("/server/variable");
             XPATH_ALL_SERVER_APPLICATIONS = xPath.compile("/server/application | /server/webApplication | /server/enterpriseApplication | /server/springBootApplication");
@@ -125,6 +130,10 @@ public class ServerConfigDocument {
 
     public Set<String> getNamelessLocations() {
         return namelessLocations;
+    }
+
+    public Map<String, String> getHttpEndpointAttributes() {
+        return httpEndpointAttributes;
     }
 
     public Properties getProperties() {
@@ -165,6 +174,7 @@ public class ServerConfigDocument {
         names = new HashSet<String>();
         namelessLocations = new HashSet<String>();
         locationsAndNames = new HashMap<String, String>();
+        httpEndpointAttributes = new HashMap<String, String>();
         props = new Properties();
         defaultProps = new Properties();
         this.originalServerXMLFile = originalServerXMLFile;
@@ -196,6 +206,7 @@ public class ServerConfigDocument {
         names = new HashSet<String>();
         namelessLocations = new HashSet<String>();
         locationsAndNames = new HashMap<String, String>();
+        httpEndpointAttributes = new HashMap<String, String>();
         props = new Properties();
         if (initProperties != null) props.putAll(initProperties);
         defaultProps = new Properties();
@@ -268,6 +279,7 @@ public class ServerConfigDocument {
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
             parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
             parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
+            parseHttpEndpoint(doc);
             parseInclude(doc);
             parseConfigDropinsDir();
 
@@ -560,6 +572,28 @@ public class ServerConfigDocument {
         }
     }
 
+    private void parseHttpEndpoint(Document doc) throws XPathExpressionException {
+        if (doc == null) {
+            return;
+        }
+        NodeList nodeList = (NodeList) XPATH_SERVER_HTTP_ENDPOINT.evaluate(doc, XPathConstants.NODESET);
+        for (int i = 0; i < nodeList.getLength(); i++) {
+            Node node = nodeList.item(i);
+            if (node instanceof Element) {
+                Element elem = (Element) node;
+                NamedNodeMap attributes = elem.getAttributes();
+                if (attributes != null) {
+                    for (int j = 0; j < attributes.getLength(); j++) {
+                        Node attr = attributes.item(j);
+                        if (!httpEndpointAttributes.containsKey(attr.getNodeName())) {
+                            httpEndpointAttributes.put(attr.getNodeName(), attr.getNodeValue());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public String findNameForLocation(String location) {
         String appName = locationsAndNames.get(location);
 
@@ -634,6 +668,7 @@ public class ServerConfigDocument {
                     parseApplication(inclDoc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
                     parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
                     parseNames(inclDoc, XPATH_ALL_SERVER_APPLICATIONS);
+                    parseHttpEndpoint(inclDoc);
                     // handle nested include elements
                     parseInclude(inclDoc);
                 }
@@ -677,6 +712,7 @@ public class ServerConfigDocument {
             parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
             parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
+            parseHttpEndpoint(doc);
             parseInclude(doc);
         }
     }

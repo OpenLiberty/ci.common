@@ -379,4 +379,19 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
 
         assertEquals(9098, u.resolveEffectiveContainerPort(9080, "httpPort"));
     }
+
+    @Test
+    public void testResolveBothPortsInSinglePass() throws Exception {
+        File serverDir = tmp.newFolder("server");
+        File serverXml = writeServerXml(serverDir, "9090", "9453");
+        DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
+
+        java.util.Map<String, Integer> defaults = new java.util.HashMap<String, Integer>();
+        defaults.put("httpPort", 9080);
+        defaults.put("httpsPort", 9443);
+
+        java.util.Map<String, Integer> resolved = u.resolveEffectiveContainerPorts(defaults);
+        assertEquals(Integer.valueOf(9090), resolved.get("httpPort"));
+        assertEquals(Integer.valueOf(9453), resolved.get("httpsPort"));
+    }
 }
