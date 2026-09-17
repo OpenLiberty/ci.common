@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2024.
+ * (C) Copyright IBM Corporation 2017, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.openliberty.tools.common.plugins.config;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
@@ -56,20 +57,7 @@ public abstract class XmlDocument {
     }
     
     public void createDocument(File xmlFile) throws ParserConfigurationException, SAXException, IOException {
-        DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
-        builderFactory.setCoalescing(true);
-        builderFactory.setIgnoringElementContentWhitespace(true);
-        builderFactory.setValidating(false);
-        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
-        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-        builderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        builderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        builderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        builderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-        builderFactory.setXIncludeAware(false);
-        builderFactory.setExpandEntityReferences(false);
-        DocumentBuilder builder = builderFactory.newDocumentBuilder();
-        doc = builder.parse(xmlFile);
+        doc = parseDocument(xmlFile);
     }
 
     public void writeXMLDocument(String fileName) throws IOException, TransformerException {
@@ -114,7 +102,48 @@ public abstract class XmlDocument {
     }
 
     /**
-     * Reads the text content of the first element matching {@code tagName} in an XML file,
+     * Creates and returns a securely configured {@link DocumentBuilder}.
+     */
+    public static DocumentBuilder getDocumentBuilder() {
+        DocumentBuilder docBuilder;
+        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+        docBuilderFactory.setIgnoringComments(true);
+        docBuilderFactory.setCoalescing(true);
+        docBuilderFactory.setIgnoringElementContentWhitespace(true);
+        docBuilderFactory.setValidating(false);
+        try {
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            docBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            docBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            docBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            docBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            docBuilderFactory.setXIncludeAware(false);
+            docBuilderFactory.setExpandEntityReferences(false);
+            docBuilder = docBuilderFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            // fail if we can't create a document builder
+            throw new RuntimeException(e);
+        }
+        return docBuilder;
+    }
+
+    public static Document parseDocument(File file) throws IOException, SAXException {
+        try (InputStream is = Files.newInputStream(file.toPath())) {
+            Document document = parseDocument(is);
+            document.setDocumentURI(file.getCanonicalPath());
+            return document;
+        }
+    }
+
+    public static Document parseDocument(InputStream in) throws SAXException, IOException {
+        try (InputStream ins = in) {
+            return getDocumentBuilder().parse(ins);
+        }
+    }
+
+    /**
+     * Returns the text content of the first element matching {@code tagName} in an XML file,
      * or {@code null} if the file is absent, the tag is missing, or any parse error occurs.
      */
     public static String readTextElementFromXmlFile(File xmlFile, String tagName) {
@@ -122,16 +151,7 @@ public abstract class XmlDocument {
             return null;
         }
         try {
-            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar",  false);
-            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl",           true);
-            dbf.setFeature("http://xml.org/sax/features/external-parameter-entities",        false);
-            dbf.setFeature("http://xml.org/sax/features/external-general-entities",          false);
-            dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING,                           true);
-            dbf.setXIncludeAware(false);
-            dbf.setExpandEntityReferences(false);
-            Document doc = dbf.newDocumentBuilder().parse(xmlFile);
+            Document doc = parseDocument(xmlFile);
             NodeList nodes = doc.getElementsByTagName(tagName);
             if (nodes.getLength() == 0) {
                 return null;

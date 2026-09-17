@@ -202,30 +202,8 @@ public class ServerConfigDocument {
         this.originalServerXMLFile = originalServerXMLFile;
     }
 
-    private DocumentBuilder getDocumentBuilder() {
-        DocumentBuilder docBuilder;
-
-        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
-        docBuilderFactory.setIgnoringComments(true);
-        docBuilderFactory.setCoalescing(true);
-        docBuilderFactory.setIgnoringElementContentWhitespace(true);
-        docBuilderFactory.setValidating(false);
-        try {
-            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
-            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            docBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            docBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            docBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            docBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            docBuilderFactory.setXIncludeAware(false);
-            docBuilderFactory.setExpandEntityReferences(false);
-            docBuilder = docBuilderFactory.newDocumentBuilder();
-        } catch (ParserConfigurationException e) {
-            // fail catastrophically if we can't create a document builder
-            throw new RuntimeException(e);
-        }
-
-        return docBuilder;
+    public static DocumentBuilder getDocumentBuilder() {
+        return XmlDocument.getDocumentBuilder();
     }
 
     /**
@@ -809,14 +787,14 @@ public class ServerConfigDocument {
      * @throws SAXException
      */
     public Document parseDocument(File file) throws FileNotFoundException, IOException {
-        try (FileInputStream is = new FileInputStream(file)) {
-            Document document= parseDocument(is);
-            document.setDocumentURI(file.getCanonicalPath());
-            return document;
+        try {
+            return XmlDocument.parseDocument(file);
         } catch (SAXException ex) {
             // If the file was not valid XML, assume it was some other non XML
             // file in dropins.
-            log.info("Skipping parsing " + file.getAbsolutePath() + " because it was not recognized as XML.");
+            if (log != null) {
+                log.info("Skipping parsing " + file.getAbsolutePath() + " because it was not recognized as XML.");
+            }
             return null;
         }
     }
@@ -824,14 +802,12 @@ public class ServerConfigDocument {
     private Document parseDocument(URL url) throws IOException, SAXException {
         URLConnection connection = url.openConnection();
         try (InputStream is = connection.getInputStream()) {
-            return parseDocument(is);
+            return XmlDocument.parseDocument(is);
         }
     }
 
     private Document parseDocument(InputStream in) throws SAXException, IOException {
-        try (InputStream ins = in) { // ins will be auto-closed
-            return getDocumentBuilder().parse(ins);
-        }
+        return XmlDocument.parseDocument(in);
     }
 
     public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {
