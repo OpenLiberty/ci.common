@@ -48,8 +48,7 @@ public abstract class XmlDocument {
     protected Document doc;
     
     public void createDocument(String rootElement) throws ParserConfigurationException {
-        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
+        DocumentBuilder docBuilder = getDocumentBuilder();
         doc = docBuilder.newDocument();
         doc.setXmlStandalone(true);
         Element element = doc.createElement(rootElement);

@@ -37,10 +37,6 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
@@ -211,10 +207,6 @@ public class ServerConfigDocument {
         if (initProperties != null) props.putAll(initProperties);
         defaultProps = new Properties();
         this.originalServerXMLFile = originalServerXMLFile;
-    }
-
-    public static DocumentBuilder getDocumentBuilder() {
-        return XmlDocument.getDocumentBuilder();
     }
 
     /**
@@ -828,9 +820,7 @@ public class ServerConfigDocument {
         } catch (SAXException ex) {
             // If the file was not valid XML, assume it was some other non XML
             // file in dropins.
-            if (log != null) {
-                log.info("Skipping parsing " + file.getAbsolutePath() + " because it was not recognized as XML.");
-            }
+            log.info("Skipping parsing " + file.getAbsolutePath() + " because it was not recognized as XML.");
             return null;
         }
     }
@@ -840,10 +830,6 @@ public class ServerConfigDocument {
         try (InputStream is = connection.getInputStream()) {
             return XmlDocument.parseDocument(is);
         }
-    }
-
-    private Document parseDocument(InputStream in) throws SAXException, IOException {
-        return XmlDocument.parseDocument(in);
     }
 
     public void parsePropertiesFromFile(File propertiesFile) throws Exception, FileNotFoundException {

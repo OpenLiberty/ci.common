@@ -74,10 +74,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
-import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
@@ -1827,25 +1824,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 closeQuietly(s);
             }
         }
-    }
-
-    /**
-     * Resolves the effective Liberty HTTP or HTTPS port by reading the server configuration
-     * using {@link ServerConfigDocument}.
-     * Returns {@code defaultPort} on any failure (missing files, parse errors, absent
-     * {@code <httpEndpoint>}, or non-integer resolved value).
-     *
-     * @param defaultPort  the Liberty default to fall back to (9080 or 9443)
-     * @param endpointAttr the {@code httpEndpoint} attribute name: {@code "httpPort"} or
-     *                     {@code "httpsPort"}
-     * @return the resolved effective port, or {@code defaultPort} on any failure
-     */
-    // package-private for unit testing
-    int resolveEffectiveContainerPort(int defaultPort, String endpointAttr) {
-        Map<String, Integer> defaultPorts = new HashMap<String, Integer>();
-        defaultPorts.put(endpointAttr, defaultPort);
-        Map<String, Integer> result = resolveEffectiveContainerPorts(defaultPorts);
-        return result.getOrDefault(endpointAttr, defaultPort);
     }
 
     /**
@@ -3940,17 +3918,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Collection<File> omitFiles = new ArrayList<File>();
         try {
             if (looseAppFile != null && looseAppFile.exists()) {
-                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-                dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-                dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
-                dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-                dbf.setXIncludeAware(false);
-                dbf.setExpandEntityReferences(false);
-                DocumentBuilder db = dbf.newDocumentBuilder();
-                Document document = db.parse(looseAppFile);
+                Document document = XmlDocument.parseDocument(looseAppFile);
                 NodeList archiveList = document.getElementsByTagName("archive");
                 for (int i = 0; i < archiveList.getLength(); i++) {
                     NodeList ar = archiveList.item(i).getChildNodes();
@@ -3971,7 +3939,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
             }
-        } catch (ParserConfigurationException | SAXException | IOException e) {
+        } catch (SAXException | IOException e) {
             error("Unable to read loose application configuration file: " + looseAppFile.toString());
             return omitFiles;
         }
