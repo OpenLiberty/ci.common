@@ -81,6 +81,9 @@ public class ServerConfigDocument {
     Optional<String> springBootAppNodeLocation = Optional.empty();
     Optional<String> springBootAppNodeDocumentURI = Optional.empty();
 
+    public static final String HTTP_PORT_ATTR  = "httpPort";
+    public static final String HTTPS_PORT_ATTR = "httpsPort";
+
     private static final XPathExpression XPATH_SERVER_APPLICATION;
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
     private static final XPathExpression XPATH_SERVER_SPRINGBOOT_APPLICATION;

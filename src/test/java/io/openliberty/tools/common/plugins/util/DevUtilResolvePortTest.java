@@ -28,6 +28,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
+
 /**
  * Unit tests for {@link DevUtil#resolveEffectiveContainerPorts}.
  *
@@ -96,7 +98,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         File serverXml = writeServerXml(serverDir, "9090", null);
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9090, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9090, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -105,7 +107,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         File serverXml = writeServerXml(serverDir, null, "9453");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9453, resolvePort(u, 9443, "httpsPort"));
+        assertEquals(9453, resolvePort(u, 9443, ServerConfigDocument.HTTPS_PORT_ATTR));
     }
 
     @Test
@@ -115,7 +117,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         write(serverXml, "<server><featureManager><feature>servlet-4.0</feature></featureManager></server>");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9080, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9080, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -123,7 +125,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         File serverDir = tmp.newFolder("server");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), new File(serverDir, "nonexistent.xml"));
 
-        assertEquals(9080, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9080, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -132,7 +134,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         File serverXml = writeServerXmlWithVar(serverDir, "myHttpPort");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9090, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9090, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -148,7 +150,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         write(new File(serverDir, "bootstrap.properties"), "http.port=9091\n");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9091, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9091, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -162,7 +164,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         write(new File(serverDir, "server.env"), "HTTP_PORT=9092\n");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9092, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9092, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -182,7 +184,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
                 "</server>");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9095, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9095, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -199,7 +201,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
         // bootstrap.properties (step 3) overrides defaultValue (step 1)
-        assertEquals(9093, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9093, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -213,7 +215,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
         // Variable is not defined anywhere — should fall back to default
-        assertEquals(9080, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9080, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -233,7 +235,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         DevTestUtil u = new DevTestUtil(serverDir, null, null, configDir,
                 Collections.emptyList(), Collections.emptyList(), false, false);
 
-        assertEquals(9097, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9097, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -263,7 +265,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
 
         DevTestUtil u = util(serverDir, buildDir, serverXml);
 
-        assertEquals(9096, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9096, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -303,7 +305,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
                 Collections.emptyList(), Collections.emptyList(), false, false);
         u.serverXmlFile = srcServerXml;
 
-        assertEquals(9090, resolvePort(u, 9080, "httpPort"));
+        assertEquals(9090, resolvePort(u, 9080, ServerConfigDocument.HTTP_PORT_ATTR));
     }
 
     @Test
@@ -317,7 +319,7 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
                 "</server>");
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
-        assertEquals(9453, resolvePort(u, 9443, "httpsPort"));
+        assertEquals(9453, resolvePort(u, 9443, ServerConfigDocument.HTTPS_PORT_ATTR));
     }
 
     /**
@@ -450,11 +452,11 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
 
         java.util.Map<String, Integer> defaults = new java.util.HashMap<String, Integer>();
-        defaults.put("httpPort", 9080);
-        defaults.put("httpsPort", 9443);
+        defaults.put(ServerConfigDocument.HTTP_PORT_ATTR, 9080);
+        defaults.put(ServerConfigDocument.HTTPS_PORT_ATTR, 9443);
 
         java.util.Map<String, Integer> resolved = u.resolveEffectiveContainerPorts(defaults);
-        assertEquals(Integer.valueOf(9090), resolved.get("httpPort"));
-        assertEquals(Integer.valueOf(9453), resolved.get("httpsPort"));
+        assertEquals(Integer.valueOf(9090), resolved.get(ServerConfigDocument.HTTP_PORT_ATTR));
+        assertEquals(Integer.valueOf(9453), resolved.get(ServerConfigDocument.HTTPS_PORT_ATTR));
     }
 }

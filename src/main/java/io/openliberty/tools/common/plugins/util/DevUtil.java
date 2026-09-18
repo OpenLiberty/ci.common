@@ -1699,11 +1699,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         try {
             if (!skipDefaultPorts) {
                 Map<String, Integer> defaultPorts = new HashMap<String, Integer>();
-                defaultPorts.put("httpPort", LIBERTY_DEFAULT_HTTP_PORT);
-                defaultPorts.put("httpsPort", LIBERTY_DEFAULT_HTTPS_PORT);
+                defaultPorts.put(ServerConfigDocument.HTTP_PORT_ATTR, LIBERTY_DEFAULT_HTTP_PORT);
+                defaultPorts.put(ServerConfigDocument.HTTPS_PORT_ATTR, LIBERTY_DEFAULT_HTTPS_PORT);
                 Map<String, Integer> effectivePorts = resolveEffectiveContainerPorts(defaultPorts);
-                int effectiveHttpPort = effectivePorts.get("httpPort");
-                int effectiveHttpsPort = effectivePorts.get("httpsPort");
+                int effectiveHttpPort = effectivePorts.get(ServerConfigDocument.HTTP_PORT_ATTR);
+                int effectiveHttpsPort = effectivePorts.get(ServerConfigDocument.HTTPS_PORT_ATTR);
                 int httpPortToUse  = findAndHoldPort(effectiveHttpPort,  false, heldSockets);
                 int httpsPortToUse = findAndHoldPort(effectiveHttpsPort, false, heldSockets);
                 commandElements.add("-p");
