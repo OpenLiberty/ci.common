@@ -162,6 +162,15 @@ public abstract class XmlDocument {
         }
     }
 
+    /**
+     * Returns a {@link File} for the text content of the first element matching {@code tagName}
+     * in an XML file, or {@code null} if the file is absent, the tag is missing, or any parse error occurs.
+     */
+    public static File getFileElementFromXmlFile(File xmlFile, String tagName) {
+        String path = readTextElementFromXmlFile(xmlFile, tagName);
+        return (path != null) ? new File(path) : null;
+    }
+
     public static void addNewlineBeforeFirstElement(File f) throws IOException {
         // look for "<?xml version="1.0" ... ?><server .../>" and add a newline
         byte[] contents = Files.readAllBytes(f.toPath());

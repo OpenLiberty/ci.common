@@ -1840,12 +1840,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // configFile (custom server.xml), installDirectory, and userDirectory.
             File pluginConfigXml = (buildDirectory != null)
                     ? new File(buildDirectory, "liberty-plugin-config.xml") : null;
-            File installDir = toFile(XmlDocument.readTextElementFromXmlFile(pluginConfigXml, "installDirectory"));
-            File userDir    = toFile(XmlDocument.readTextElementFromXmlFile(pluginConfigXml, "userDirectory"));
+            File installDir = XmlDocument.getFileElementFromXmlFile(pluginConfigXml, "installDirectory");
+            File userDir    = XmlDocument.getFileElementFromXmlFile(pluginConfigXml, "userDirectory");
             // Use the configFile path from the plugin config if available; that is the
             // user-specified server.xml (serverXmlFile parameter). Fall back to
             // serverXmlFile set by watchFiles(), then to configDirectory/server.xml.
-            File configFileFromPlugin = toFile(XmlDocument.readTextElementFromXmlFile(pluginConfigXml, "configFile"));
+            File configFileFromPlugin = XmlDocument.getFileElementFromXmlFile(pluginConfigXml, "configFile");
             File effectiveServerXml;
             if (configFileFromPlugin != null && configFileFromPlugin.isFile()) {
                 effectiveServerXml = configFileFromPlugin;
@@ -1901,10 +1901,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             debug("resolveEffectiveContainerPorts: could not resolve ports, using defaults: " + e.getMessage());
         }
         return resolvedPorts;
-    }
-
-    private static File toFile(String path) {
-        return (path != null) ? new File(path) : null;
     }
 
     /**
