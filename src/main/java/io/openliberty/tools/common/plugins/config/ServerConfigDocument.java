@@ -577,9 +577,7 @@ public class ServerConfigDocument {
                 if (attributes != null) {
                     for (int j = 0; j < attributes.getLength(); j++) {
                         Node attr = attributes.item(j);
-                        if (!httpEndpointAttributes.containsKey(attr.getNodeName())) {
-                            httpEndpointAttributes.put(attr.getNodeName(), attr.getNodeValue());
-                        }
+                        httpEndpointAttributes.put(attr.getNodeName(), attr.getNodeValue());
                     }
                 }
             }
