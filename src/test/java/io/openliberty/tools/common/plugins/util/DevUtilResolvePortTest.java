@@ -390,6 +390,59 @@ public class DevUtilResolvePortTest extends BaseDevUtilTest {
         assertEquals(9098, resolvePort(u, 9080, "httpPort"));
     }
 
+    /**
+     * An included file overrides the {@code httpPort} attribute defined in {@code server.xml}.
+     */
+    @Test
+    public void testIncludeOverridesHttpEndpointPort() throws Exception {
+        File serverDir = tmp.newFolder("server");
+
+        // included file that overrides the port
+        write(new File(serverDir, "ports.xml"),
+                "<server>\n" +
+                "    <httpEndpoint id=\"defaultHttpEndpoint\" httpPort=\"9094\"/>\n" +
+                "</server>");
+
+        // server.xml defines httpPort=9090 but includes ports.xml which overrides it to 9094
+        File serverXml = new File(serverDir, "server.xml");
+        write(serverXml,
+                "<server>\n" +
+                "    <httpEndpoint id=\"defaultHttpEndpoint\" httpPort=\"9090\"/>\n" +
+                "    <include location=\"ports.xml\"/>\n" +
+                "</server>");
+
+        DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
+
+        assertEquals(9094, resolvePort(u, 9080, "httpPort"));
+    }
+
+    /**
+     * A {@code configDropins/overrides} file overrides the {@code httpPort} attribute defined in {@code server.xml}.
+     */
+    @Test
+    public void testConfigDropinsOverridesHttpEndpointPort() throws Exception {
+        File serverDir = tmp.newFolder("server");
+
+        // server.xml defines httpPort=9090
+        File serverXml = new File(serverDir, "server.xml");
+        write(serverXml,
+                "<server>\n" +
+                "    <httpEndpoint id=\"defaultHttpEndpoint\" httpPort=\"9090\"/>\n" +
+                "</server>");
+
+        // configDropins/overrides/override.xml defines httpPort=9099 which should take precedence
+        File overrides = new File(serverDir, "configDropins/overrides");
+        overrides.mkdirs();
+        write(new File(overrides, "override.xml"),
+                "<server>\n" +
+                "    <httpEndpoint id=\"defaultHttpEndpoint\" httpPort=\"9099\"/>\n" +
+                "</server>");
+
+        DevTestUtil u = util(serverDir, tmp.newFolder("build"), serverXml);
+
+        assertEquals(9099, resolvePort(u, 9080, "httpPort"));
+    }
+
     @Test
     public void testResolveBothPortsInSinglePass() throws Exception {
         File serverDir = tmp.newFolder("server");
