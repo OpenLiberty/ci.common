@@ -173,7 +173,6 @@ public abstract class FeatureGeneratorUtil {
             boolean reRunIfFailed = !currentFeatureSet.isEmpty() || !optimize;
             try {
                 Method generateFeatureSetMethod = getGeneratorMethod();
-                // names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, logLocation, logLevel, locale
                 Set<String> binaryInputs = getBinaryInputs(classFiles, deployedAppFilePath, optimize);
 
                 String logLevel;
@@ -201,6 +200,7 @@ public abstract class FeatureGeneratorUtil {
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
+                // argument names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, featureListFileMap??, logLocation, logLevel, locale
                 generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                         currentFeatureSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
                 for (String s : generatedFeatureList) {debug(s);};
@@ -406,21 +406,24 @@ public abstract class FeatureGeneratorUtil {
         Set<String> resultSet = new HashSet<String>();
         if (optimize) {
             // Use either the loose app config or a regular application deployment binary file (war/jar)
-            if (deployedAppFilePath != null && deployedAppFilePath.endsWith(".xml")) {
-                try {
-                    // extract the file names from the xml file
-                    File looseAppFile = new File(deployedAppFilePath);
-                    if (looseAppFile.exists()) {
-                        resultSet = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
+            if (deployedAppFilePath != null) {
+                if (deployedAppFilePath.endsWith(".xml")) {
+                    try {
+                        // extract the file names from the xml file
+                        File looseAppFile = new File(deployedAppFilePath);
+                        if (looseAppFile.exists()) {
+                            resultSet = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
+                        }
+                    } catch (IOException e) {
+                        // if the app config is invalid try the class directories instead
+                        warn("Application descriptor file not found while generating features, using class files instead: " + deployedAppFilePath);
                     }
-                } catch (IOException e) {
-                    // if the app config is invalid try the class directories instead
-                    warn("Application descriptor file not found while generating features, using class files instead: " + deployedAppFilePath);
+                } else {
+                    resultSet.add(deployedAppFilePath);
                 }
-            } else {
-                resultSet.add(deployedAppFilePath);
             }
         } else {
+            // incremental generate features passes only individual class files to the scanner
             if (classFiles != null && !classFiles.isEmpty()) {
                 resultSet = new HashSet<String>(classFiles);
             }
