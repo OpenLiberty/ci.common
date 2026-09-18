@@ -161,11 +161,9 @@ public abstract class FeatureGeneratorUtil {
     public Set<String> runFeatureGenerator(Set<String> currentFeatureSet, List<String> classFiles, String deployedAppFilePath,
             String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
-            FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException, VersionlessFeatureDetectedException {
+            FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException, VersionlessFeatureDetectedException,
+            IOErrorReadingXMLException {
         Set<String> generatedFeatureList = null;
-        warn ("classFiles="+classFiles);
-        // warn ("allClassesDirectories="+allClassesDirectories);
-        warn ("looseConfigFilePath="+deployedAppFilePath);
         if (featureGenJar != null && featureGenJar.exists()) {
             // if we are already generating features for all class files (optimize=true) and
             // we are not passing any user specified features (currentFeatureSet is empty)
@@ -191,20 +189,10 @@ public abstract class FeatureGeneratorUtil {
                         "  logLocation: " + logLocation + "\n" +
                         "  logLevel: " + logLevel + "\n" +
                         "  locale: " + java.util.Locale.getDefault());
-                warn ("Calling " + featureGenJar.getName() + " with the following inputs...\n" +
-                        "  binaryInputs: " + binaryInputs + "\n" +
-                        "  targetJavaEE: " + targetJavaEE + "\n" +
-                        "  targetMicroP: " + targetMicroProfile + "\n" +
-                        "  currentFeatures: " + currentFeatureSet + "\n" +
-                        "  featureListFileMap: " + featureListFileMap + "\n" +
-                        "  logLocation: " + logLocation + "\n" +
-                        "  logLevel: " + logLevel + "\n" +
-                        "  locale: " + java.util.Locale.getDefault());
                 // argument names: binaryInputs, targetJavaEE, targetMicroProfile, currentFeatures, featureListFileMap??, logLocation, logLevel, locale
                 generatedFeatureList = (Set<String>) generateFeatureSetMethod.invoke(null, binaryInputs, targetJavaEE, targetMicroProfile,
                         currentFeatureSet, featureListFileMap, logLocation, logLevel, java.util.Locale.getDefault());
                 for (String s : generatedFeatureList) {debug(s);};
-                for (String s : generatedFeatureList) {warn (s);};
             } catch (InvocationTargetException ite) {
                 // This is the exception from the JVM that indicates there was an exception in the method we
                 // called through reflection. We must extract the actual exception from the 'cause' field.
@@ -312,7 +300,7 @@ public abstract class FeatureGeneratorUtil {
      * @throws PluginExecutionException - any exception that prevents the generator from running
      */
     public Set<String> reRunFeatureGenerator(String deployedAppFilePath, String logLocation, String targetJavaEE, String targetMicroProfile,
-            Map featureListFileMap) throws PluginExecutionException {
+            Map featureListFileMap) throws PluginExecutionException, IOErrorReadingXMLException {
         Set<String> generatedFeatureList = null;
         try {
             Method generateFeatureSetMethod = getGeneratorMethod();
@@ -402,10 +390,11 @@ public abstract class FeatureGeneratorUtil {
         return featureGenMethod;
     }
 
-    private Set<String> getBinaryInputs(List<String> classFiles, String deployedAppFilePath, boolean optimize) throws PluginExecutionException {
+    // Required is either some type of app file or some class files. This is checked by the caller to runFeatureGenerator()
+    private Set<String> getBinaryInputs(List<String> classFiles, String deployedAppFilePath, boolean optimize) throws IOErrorReadingXMLException {
         Set<String> resultSet = new HashSet<String>();
         if (optimize) {
-            // Use either the loose app config or a regular application deployment binary file (war/jar)
+            // Use either the loose app config or a regular application deployment binary file (ear/war/jar)
             if (deployedAppFilePath != null) {
                 if (deployedAppFilePath.endsWith(".xml")) {
                     try {
@@ -415,8 +404,7 @@ public abstract class FeatureGeneratorUtil {
                             resultSet = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
                         }
                     } catch (IOException e) {
-                        // if the app config is invalid try the class directories instead
-                        warn("Application descriptor file not found while generating features, using class files instead: " + deployedAppFilePath);
+                        throw new IOErrorReadingXMLException();
                     }
                 } else {
                     resultSet.add(deployedAppFilePath);
@@ -668,6 +656,10 @@ public abstract class FeatureGeneratorUtil {
     }
 
     public class VersionlessFeatureDetectedException extends Exception {
+        private static final long serialVersionUID = 1L;
+    }
+
+    public class IOErrorReadingXMLException extends Exception {
         private static final long serialVersionUID = 1L;
     }
 }
