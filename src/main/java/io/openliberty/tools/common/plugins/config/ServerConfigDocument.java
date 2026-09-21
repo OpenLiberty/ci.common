@@ -49,7 +49,6 @@ import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -576,12 +575,15 @@ public class ServerConfigDocument {
             Node node = nodeList.item(i);
             if (node instanceof Element) {
                 Element elem = (Element) node;
-                NamedNodeMap attributes = elem.getAttributes();
-                if (attributes != null) {
-                    for (int j = 0; j < attributes.getLength(); j++) {
-                        Node attr = attributes.item(j);
-                        httpEndpointAttributes.put(attr.getNodeName(), attr.getNodeValue());
-                    }
+                
+                String httpAttribute = elem.getAttribute(HTTP_PORT_ATTR);
+                if (!httpAttribute.isEmpty()) {
+                    httpEndpointAttributes.put(HTTP_PORT_ATTR, httpAttribute);
+                }
+
+                String httpsAttribute = elem.getAttribute(HTTPS_PORT_ATTR);
+                if (!httpsAttribute.isEmpty()) {
+                    httpEndpointAttributes.put(HTTPS_PORT_ATTR, httpsAttribute);
                 }
             }
         }
