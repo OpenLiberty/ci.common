@@ -4082,6 +4082,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     currentProject.skipUTs(), true)) {
                 // successful compilation so we can clear failedCompilation list
                 currentProject.failedCompilationJavaSources.clear();
+                // TODO: see if this is only needed when recompileDependencies==false, add that boolean here?
+                // But if recompileDependencies==false are the class files being tracked in the multimodule case?
                 if (generateFeatures && modifiedSrcBuildFile != null 
                         && modifiedSrcBuildFile.equals(currentProject.getBuildFile())
                         && currentProject.getOutputDirectory() != null) {
@@ -5937,6 +5939,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         triggerProjectCompile(this.sourceDirectory, recompileJavaSources,
                 this.testSourceDirectory, recompileJavaTests, testsOnly, packagingType);
         if (trackForGenerateFeatures && outputDirectory != null && !recompileJavaSources.isEmpty()) {
+            // TODO: this should be done later when the compilation is done. Remove from here?
             modifiedClasses.add(outputDirectory);
             lastChangeCompiled = false; // compilation of Java files has been triggered
             modifiedSrcBuildFile = buildFile;
@@ -5974,6 +5977,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         if (trackForGenerateFeatures &&
                 project.getOutputDirectory() != null &&
                 !project.recompileJavaSources.isEmpty()) {
+            // TODO: this should be done later when the compilation is done. Remove from here?
             modifiedClasses.add(project.getOutputDirectory());
             lastChangeCompiled = false; // compilation of Java files has been triggered
             modifiedSrcBuildFile = project.getBuildFile();
