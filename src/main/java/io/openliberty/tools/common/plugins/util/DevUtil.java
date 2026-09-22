@@ -447,6 +447,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected File generateFeaturesOutputDir; // output directory for the generate-features goal/task (i.e. where the file is generated)
     protected File generateFeaturesTmpDir; // the location where the generated features file is written during dev mode loop when generateToSrc is false
     private File modifiedSrcBuildFile;
+    protected boolean modifiedDependencies; // important when the build file is modified and we need to regenerate the features
 
     protected boolean skipInstallFeature;
     // for gradle, this map will be kept as null
@@ -577,6 +578,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             this.generatedFeaturesSet = new HashSet<String>();
         }
         this.modifiedSrcBuildFile = null;
+        this.modifiedDependencies = false;
     }
 
     private void initGenerationContext() {
@@ -3261,22 +3263,35 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
 
-                // Generate features from source or class file changes
+                // Generate features from class file changes
                 // do not run generate features if there are classes failing to compile
                 if (generateFeatures && !classesFailingToCompile() && !modifiedClasses.isEmpty()) {
                     // recompileDependencies = no class file tracking, so we wait for compilation to be complete
-                    // !recompileDepenencies = class file tracking, so waiting on class file changes
-                    if ((recompileDependencies && lastChangeCompiled) || !recompileDependencies) {
-                        if (!failedToGenerateClasses.isEmpty()) {
-                            modifiedClasses.addAll(failedToGenerateClasses);
-                        }
+                    // !recompileDepenencies = class file tracking, class file changes aggregated in modifiedClasses
+                    boolean generateFeaturesRequired = (recompileDependencies && lastChangeCompiled) || !recompileDependencies;
+                    boolean optimizeRequired = generateFeaturesRequired && modifiedDependencies;
+
+                    if (generateFeaturesRequired) {
                         debug("Detected a change in the following classes/directories: " + modifiedClasses);
                         // reset lastChangeCompiled and modifiedSrcBuildFile
                         lastChangeCompiled = false; // only needed when recompileDependencies is true
                         modifiedSrcBuildFile = null; // only needed when recompileDependencies is true
+                        modifiedDependencies = false;
                         long generatedTime = generateFeaturesFile.lastModified();
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
-                        incrementGenerateFeatures(!generateToSrc);
+                        // If the generated-features.xml file is modified by this call then an event will be
+                        // fired and the file watcher will install new features and update the dev mode cache
+                        if (optimizeRequired) {
+                            // Even though we do not use the modifiedClasses in this case it is required
+                            // to add classes to it and to reset lastChangeCompiled so that compilation takes
+                            // place and lastChangeCompiled is set true before we get here.
+                            optimizeGenerateFeatures(!generateToSrc);
+                        } else {
+                            if (!failedToGenerateClasses.isEmpty()) {
+                                modifiedClasses.addAll(failedToGenerateClasses);
+                            }
+                            incrementGenerateFeatures(!generateToSrc);
+                        }
                         if (!generateFeaturesFile.exists()) {
                             // run tests if generated-features.xml does not exist as there are no new features to install
                             // (typically tests run after generate features & install when hotTests=true)
@@ -4067,6 +4082,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     currentProject.skipUTs(), true)) {
                 // successful compilation so we can clear failedCompilation list
                 currentProject.failedCompilationJavaSources.clear();
+                // TODO: see if this is only needed when recompileDependencies==false, add that boolean here?
+                // But if recompileDependencies==false are the class files being tracked in the multimodule case?
+                if (generateFeatures && modifiedSrcBuildFile != null 
+                        && modifiedSrcBuildFile.equals(currentProject.getBuildFile())
+                        && currentProject.getOutputDirectory() != null) {
+                    modifiedClasses.add(currentProject.getOutputDirectory());
+                }
             } else {
                 successfulSrcCompile = false;
             }
@@ -4136,6 +4158,13 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                         // The module with the latest src file change has compiled successfully
                         debug("Setting lastChangeCompiled to true");
                         lastChangeCompiled = true;
+                        // If the recompile was triggered by a pom.xml fix then the output directory may never
+                        // have been registered with the file watcher (it was empty when the initial compile
+                        // on start up failed), so class file events will not fire to populate
+                        // modifiedClasses. Add the output directory explicitly so generate features runs.
+                        if (triggerJavaSourceRecompile && generateFeatures && outputDirectory != null) {
+                            modifiedClasses.add(outputDirectory);
+                        }
                     }
                 } else {
                     failedCompilationJavaSources.addAll(recompileJavaSources);
@@ -4380,12 +4409,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (isMultiModuleProject()) {
                     ProjectModule project = getFirstProjectModule(fileChanged);
                     if (project != null) {
-                        triggerUpstreamModuleCompile(project, false);
+                        triggerUpstreamModuleCompile(project, false, generateFeatures);
                     } else {
-                        triggerMainModuleCompile(false);
+                        triggerMainModuleCompile(false, generateFeatures);
                     }
                 } else {
-                    triggerMainModuleCompile(false);
+                    triggerMainModuleCompile(false, generateFeatures);
                 }
             } else {
                 // trigger recompile of failing source and test
@@ -4486,15 +4515,16 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                                     && !project.getDependentModules().isEmpty()) {
                                 // parent project, trigger compile on first dependent module
                                 triggerUpstreamModuleCompile(getProjectModule(project.getDependentModules().get(0)),
-                                        false);
+                                        false, generateFeatures);
                             } else {
-                                triggerUpstreamModuleCompile(project, false);
+                                triggerUpstreamModuleCompile(project, false, generateFeatures);
                             }
                         } else {
                             // trigger java source recompile of all projects if there are compilation errors
                             // in this project
                             if (!project.failedCompilationJavaSources.isEmpty()) {
                                 triggerUpstreamJavaSourceRecompile = true;
+                                modifiedSrcBuildFile = project.getBuildFile();
                             }
                             // trigger java test recompile of just this project if there are existing test
                             // compilation errors
@@ -4644,11 +4674,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             // run all tests on build file change
             if (recompiledBuild) {
                 if (recompileDependencies) {
-                    triggerMainModuleCompile(false);
+                    triggerMainModuleCompile(false, generateFeatures);
                 } else {
                     // trigger java source recompile if there are compilation errors
                     if (!failedCompilationJavaSources.isEmpty()) {
                         triggerJavaSourceRecompile = true;
+                        modifiedSrcBuildFile = buildFile;
                     }
                     // trigger java test recompile if there are compilation errors
                     if (!failedCompilationJavaTests.isEmpty()) {
@@ -4733,7 +4764,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             isGeneratedFeaturesFile ? generateFeaturesOutputDir : configDirectory;
 
         if (fileChanged.exists() && (changeType == ChangeType.MODIFY || changeType == ChangeType.CREATE)) {
-            debug("Config file modified: " + fileChanged);
+            debug("Config file exists and is modified: " + fileChanged);
             boolean generateFeaturesSuccess = true; // default to true in case feature generation is disabled
             boolean serverFeaturesModified = serverFeaturesModified();
 
@@ -5892,8 +5923,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException
      */
     protected void triggerMainModuleCompile(boolean testsOnly) throws IOException {
-        triggerProjectCompile(this.sourceDirectory, recompileJavaSources, this.testSourceDirectory, recompileJavaTests,
-                testsOnly, packagingType);
+        triggerMainModuleCompile(testsOnly, false);
+    }
+
+    /**
+     * Trigger a compile of the main module and track the output directory for
+     * generate features. Used when we change the build file.
+     *
+     * @param testsOnly                true if ONLY tests should be compiled
+     * @param trackForGenerateFeatures true to monitor the modified classes and set the
+     *                                 flag to generate features after compilation
+     * @throws IOException
+     */
+    protected void triggerMainModuleCompile(boolean testsOnly, boolean trackForGenerateFeatures) throws IOException {
+        triggerProjectCompile(this.sourceDirectory, recompileJavaSources,
+                this.testSourceDirectory, recompileJavaTests, testsOnly, packagingType);
+        if (trackForGenerateFeatures && outputDirectory != null && !recompileJavaSources.isEmpty()) {
+            // TODO: this should be done later when the compilation is done. Remove from here?
+            modifiedClasses.add(outputDirectory);
+            lastChangeCompiled = false; // compilation of Java files has been triggered
+            modifiedSrcBuildFile = buildFile;
+        }
     }
 
     /**
@@ -5906,8 +5956,32 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws IOException
      */
     protected void triggerUpstreamModuleCompile(ProjectModule project, boolean testsOnly) throws IOException {
+        triggerUpstreamModuleCompile(project, testsOnly, false);
+    }
+
+    /**
+     * Trigger a compile of the specified upstream module and track its output
+     * directory for generate features. Used when we change the build file.
+     *
+     * @param project                  the module to be compiled
+     * @param testsOnly                true if ONLY tests should be compiled
+     * @param trackForGenerateFeatures true to monitor the modified classes and and set the
+     *                                 flag to generate features after compilation
+     * @throws IOException
+     */
+    protected void triggerUpstreamModuleCompile(ProjectModule project, boolean testsOnly,
+            boolean trackForGenerateFeatures) throws IOException {
         triggerProjectCompile(project.getSourceDirectory(), project.recompileJavaSources,
-                project.getTestSourceDirectory(), project.recompileJavaTests, testsOnly, project.getPackagingType());
+                project.getTestSourceDirectory(), project.recompileJavaTests,
+                testsOnly, project.getPackagingType());
+        if (trackForGenerateFeatures &&
+                project.getOutputDirectory() != null &&
+                !project.recompileJavaSources.isEmpty()) {
+            // TODO: this should be done later when the compilation is done. Remove from here?
+            modifiedClasses.add(project.getOutputDirectory());
+            lastChangeCompiled = false; // compilation of Java files has been triggered
+            modifiedSrcBuildFile = project.getBuildFile();
+        }
     }
 
     private void triggerProjectCompile(File sourceDir, Collection<File> recompileJavaSourceSet, File testSourceDir,
