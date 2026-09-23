@@ -74,19 +74,22 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.StandardLocation;
 import javax.tools.ToolProvider;
-import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
 import io.openliberty.tools.ant.ServerTask;
+import io.openliberty.tools.common.CommonLoggerI;
+import io.openliberty.tools.common.plugins.config.ServerConfigDocument;
+import io.openliberty.tools.common.plugins.config.XmlDocument;
 import io.openliberty.tools.common.plugins.util.ServerFeatureUtil.FeaturesPlatforms;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.NameFileFilter;
@@ -98,6 +101,7 @@ import org.apache.commons.io.monitor.FileAlterationObserver;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -1694,13 +1698,19 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         List<ServerSocket> heldSockets = new ArrayList<ServerSocket>();
         try {
             if (!skipDefaultPorts) {
-                int httpPortToUse = findAndHoldPort(LIBERTY_DEFAULT_HTTP_PORT, false, heldSockets);
-                int httpsPortToUse = findAndHoldPort(LIBERTY_DEFAULT_HTTPS_PORT, false, heldSockets);
+                Map<String, Integer> defaultPorts = new HashMap<String, Integer>();
+                defaultPorts.put(ServerConfigDocument.HTTP_PORT_ATTR, LIBERTY_DEFAULT_HTTP_PORT);
+                defaultPorts.put(ServerConfigDocument.HTTPS_PORT_ATTR, LIBERTY_DEFAULT_HTTPS_PORT);
+                Map<String, Integer> effectivePorts = resolveEffectiveContainerPorts(defaultPorts);
+                int effectiveHttpPort = effectivePorts.get(ServerConfigDocument.HTTP_PORT_ATTR);
+                int effectiveHttpsPort = effectivePorts.get(ServerConfigDocument.HTTPS_PORT_ATTR);
+                int httpPortToUse  = findAndHoldPort(effectiveHttpPort,  false, heldSockets);
+                int httpsPortToUse = findAndHoldPort(effectiveHttpsPort, false, heldSockets);
                 commandElements.add("-p");
-                commandElements.add(httpPortToUse+":"+LIBERTY_DEFAULT_HTTP_PORT);
+                commandElements.add(httpPortToUse + ":" + effectiveHttpPort);
 
                 commandElements.add("-p");
-                commandElements.add(httpsPortToUse+":"+LIBERTY_DEFAULT_HTTPS_PORT);
+                commandElements.add(httpsPortToUse + ":" + effectiveHttpsPort);
             }
 
             if (libertyDebug) {
@@ -1739,6 +1749,17 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             File looseApplicationProjectRoot = getLooseAppProjectRoot(projectDirectory, multiModuleProjectDirectory);
             commandElements.add("-v");
             commandElements.add(looseApplicationProjectRoot.getAbsolutePath() + ":" + DEVMODE_DIR_NAME);
+
+            // Mount configDropins/defaults and configDropins/overrides into the container
+            // so Liberty sees the same variable overrides (e.g. liberty-plugin-variable-config.xml)
+            // that port resolution used, ensuring Liberty starts on the published port.
+            for (String subDir : new String[]{"defaults", "overrides"}) {
+                File configDropinsDir = new File(serverDirectory, "configDropins/" + subDir);
+                if (configDropinsDir.isDirectory()) {
+                    commandElements.add("-v");
+                    commandElements.add(configDropinsDir.getAbsolutePath() + ":/config/configDropins/" + subDir);
+                }
+            }
 
             // mount the server logs directory over the /logs used by the open liberty container as defined by the LOG_DIR env. var.
             File logsDir = new File(serverDirectory.getAbsolutePath(), "logs");
@@ -1803,6 +1824,83 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 closeQuietly(s);
             }
         }
+    }
+
+    /**
+     * Resolves the effective container ports for the given map of endpoint attributes and their defaults
+     * in a single pass using {@link ServerConfigDocument}.
+     *
+     * @param defaultPortsByAttr a map of endpoint attribute names to their default port integers (e.g. "httpPort" -> 9080, "httpsPort" -> 9443)
+     * @return a map containing resolved effective ports for each attribute key
+     */
+    Map<String, Integer> resolveEffectiveContainerPorts(Map<String, Integer> defaultPortsByAttr) {
+        Map<String, Integer> resolvedPorts = new HashMap<String, Integer>(defaultPortsByAttr);
+        try {
+            // Read liberty-plugin-config.xml first — it contains the resolved paths for
+            // configFile (custom server.xml), installDirectory, and userDirectory.
+            File pluginConfigXml = (buildDirectory != null)
+                    ? new File(buildDirectory, "liberty-plugin-config.xml") : null;
+            File installDir = XmlDocument.getFileElementFromXmlFile(pluginConfigXml, "installDirectory");
+            File userDir    = XmlDocument.getFileElementFromXmlFile(pluginConfigXml, "userDirectory");
+            // Use the configFile path from the plugin config if available; that is the
+            // user-specified server.xml (serverXmlFile parameter). Fall back to
+            // serverXmlFile set by watchFiles(), then to configDirectory/server.xml.
+            File configFileFromPlugin = XmlDocument.getFileElementFromXmlFile(pluginConfigXml, "configFile");
+            File effectiveServerXml;
+            if (configFileFromPlugin != null && configFileFromPlugin.isFile()) {
+                effectiveServerXml = configFileFromPlugin;
+            } else if (serverXmlFile != null && serverXmlFile.isFile()) {
+                effectiveServerXml = serverXmlFile;
+            } else {
+                effectiveServerXml = (configDirectory != null ? new File(configDirectory, "server.xml") : null);
+            }
+            if (effectiveServerXml == null || !effectiveServerXml.isFile()) {
+                return resolvedPorts;
+            }
+
+            // Fall back to serverDirectory so that at minimum server.env and
+            // bootstrap.properties are still picked up by ServerConfigDocument.
+            if (installDir == null) installDir = serverDirectory;
+            if (userDir    == null) userDir    = serverDirectory;
+
+            // serverDirectory is where the plugin writes configDropins/overrides/
+            // liberty-plugin-variable-config.xml (liberty.var.* values). configDirectory
+            // is the source config dir and does not contain configDropins at runtime.
+            ServerConfigDocument scd = new ServerConfigDocument(
+                    CommonLoggerI.noop(), effectiveServerXml,
+                    installDir, userDir, serverDirectory, serverDirectory);
+
+            Map<String, String> endpointAttrs = scd.getHttpEndpointAttributes();
+            for (Map.Entry<String, Integer> entry : defaultPortsByAttr.entrySet()) {
+                String attrName = entry.getKey();
+                int defaultPort = entry.getValue();
+                String raw = endpointAttrs.get(attrName);
+                if (raw == null || raw.trim().isEmpty()) {
+                    continue;
+                }
+                raw = raw.trim();
+
+                // Literal integer — no variable resolution needed.
+                try {
+                    resolvedPorts.put(attrName, Integer.parseInt(raw));
+                    continue;
+                } catch (NumberFormatException ignored) { /* fall through */ }
+
+                // Variable reference — resolve through the fully-loaded variable maps.
+                String resolved = VariableUtility.resolveVariables(
+                        CommonLoggerI.noop(), raw, null,
+                        scd.getProperties(), scd.getDefaultProperties(),
+                        scd.getLibertyDirPropertyFiles());
+                if (resolved != null) {
+                    try {
+                        resolvedPorts.put(attrName, Integer.parseInt(resolved.trim()));
+                    } catch (NumberFormatException ignored) { /* fall back to default */ }
+                }
+            }
+        } catch (Exception e) {
+            debug("resolveEffectiveContainerPorts: could not resolve ports, using defaults: " + e.getMessage());
+        }
+        return resolvedPorts;
     }
 
     /**
@@ -3816,17 +3914,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         Collection<File> omitFiles = new ArrayList<File>();
         try {
             if (looseAppFile != null && looseAppFile.exists()) {
-                DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false); 
-                dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-                dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-                dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
-                dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-                dbf.setXIncludeAware(false);
-                dbf.setExpandEntityReferences(false);
-                DocumentBuilder db = dbf.newDocumentBuilder();
-                Document document = db.parse(looseAppFile);
+                Document document = XmlDocument.parseDocument(looseAppFile);
                 NodeList archiveList = document.getElementsByTagName("archive");
                 for (int i = 0; i < archiveList.getLength(); i++) {
                     NodeList ar = archiveList.item(i).getChildNodes();
@@ -3847,7 +3935,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
             }
-        } catch (ParserConfigurationException | SAXException | IOException e) {
+        } catch (SAXException | IOException e) {
             error("Unable to read loose application configuration file: " + looseAppFile.toString());
             return omitFiles;
         }

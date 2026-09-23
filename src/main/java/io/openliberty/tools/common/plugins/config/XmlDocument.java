@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2017, 2024.
+ * (C) Copyright IBM Corporation 2017, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.openliberty.tools.common.plugins.config;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
@@ -38,6 +39,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
 import org.xml.sax.SAXException;
 
@@ -46,8 +48,7 @@ public abstract class XmlDocument {
     protected Document doc;
     
     public void createDocument(String rootElement) throws ParserConfigurationException {
-        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
+        DocumentBuilder docBuilder = getDocumentBuilder();
         doc = docBuilder.newDocument();
         doc.setXmlStandalone(true);
         Element element = doc.createElement(rootElement);
@@ -55,20 +56,7 @@ public abstract class XmlDocument {
     }
     
     public void createDocument(File xmlFile) throws ParserConfigurationException, SAXException, IOException {
-        DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
-        builderFactory.setCoalescing(true);
-        builderFactory.setIgnoringElementContentWhitespace(true);
-        builderFactory.setValidating(false);
-        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
-        builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-        builderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        builderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        builderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        builderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-        builderFactory.setXIncludeAware(false);
-        builderFactory.setExpandEntityReferences(false);
-        DocumentBuilder builder = builderFactory.newDocumentBuilder();
-        doc = builder.parse(xmlFile);
+        doc = parseDocument(xmlFile);
     }
 
     public void writeXMLDocument(String fileName) throws IOException, TransformerException {
@@ -110,6 +98,77 @@ public abstract class XmlDocument {
 
     protected boolean isWhitespace(Node node) {
         return node != null && node instanceof Text && ((Text)node).getData().trim().isEmpty();
+    }
+
+    /**
+     * Creates and returns a securely configured {@link DocumentBuilder}.
+     */
+    public static DocumentBuilder getDocumentBuilder() {
+        DocumentBuilder docBuilder;
+        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+        docBuilderFactory.setIgnoringComments(true);
+        docBuilderFactory.setCoalescing(true);
+        docBuilderFactory.setIgnoringElementContentWhitespace(true);
+        docBuilderFactory.setValidating(false);
+        try {
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            docBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            docBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            docBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            docBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            docBuilderFactory.setXIncludeAware(false);
+            docBuilderFactory.setExpandEntityReferences(false);
+            docBuilder = docBuilderFactory.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            // fail if we can't create a document builder
+            throw new RuntimeException(e);
+        }
+        return docBuilder;
+    }
+
+    public static Document parseDocument(File file) throws IOException, SAXException {
+        try (InputStream is = Files.newInputStream(file.toPath())) {
+            Document document = parseDocument(is);
+            document.setDocumentURI(file.getCanonicalPath());
+            return document;
+        }
+    }
+
+    public static Document parseDocument(InputStream in) throws SAXException, IOException {
+        try (InputStream ins = in) {
+            return getDocumentBuilder().parse(ins);
+        }
+    }
+
+    /**
+     * Returns the text content of the first element matching {@code tagName} in an XML file,
+     * or {@code null} if the file is absent, the tag is missing, or any parse error occurs.
+     */
+    public static String readTextElementFromXmlFile(File xmlFile, String tagName) {
+        if (xmlFile == null || !xmlFile.isFile()) {
+            return null;
+        }
+        try {
+            Document doc = parseDocument(xmlFile);
+            NodeList nodes = doc.getElementsByTagName(tagName);
+            if (nodes.getLength() == 0) {
+                return null;
+            }
+            String text = nodes.item(0).getTextContent();
+            return (text != null && !text.trim().isEmpty()) ? text.trim() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Returns a {@link File} for the text content of the first element matching {@code tagName}
+     * in an XML file, or {@code null} if the file is absent, the tag is missing, or any parse error occurs.
+     */
+    public static File getFileElementFromXmlFile(File xmlFile, String tagName) {
+        String path = readTextElementFromXmlFile(xmlFile, tagName);
+        return (path != null) ? new File(path) : null;
     }
 
     public static void addNewlineBeforeFirstElement(File f) throws IOException {

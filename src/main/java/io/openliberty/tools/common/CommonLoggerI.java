@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corporation 2019.
+ * (C) Copyright IBM Corporation 2019, 2026.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,27 @@
 package io.openliberty.tools.common;
 
 public interface CommonLoggerI {
+
+    /**
+     * Returns a no-op {@code CommonLoggerI} that silently discards all log calls.
+     * Useful when a logger instance is required by an API but no output is desired.
+     */
+    static CommonLoggerI noop() {
+        return NoopLogger.INSTANCE;
+    }
+
+    /** Singleton backing {@link #noop()}. */
+    final class NoopLogger implements CommonLoggerI {
+        static final NoopLogger INSTANCE = new NoopLogger();
+        private NoopLogger() {}
+        @Override public void debug(String msg)              {}
+        @Override public void debug(String msg, Throwable e) {}
+        @Override public void debug(Throwable e)             {}
+        @Override public void warn(String msg)               {}
+        @Override public void info(String msg)               {}
+        @Override public void error(String msg)              {}
+        @Override public boolean isDebugEnabled()            { return false; }
+    }
 
     /**
      * Log debug

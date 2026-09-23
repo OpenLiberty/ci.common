@@ -37,10 +37,6 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
@@ -53,6 +49,7 @@ import io.openliberty.tools.common.plugins.util.PluginExecutionException;
 import org.apache.commons.io.comparator.NameFileComparator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -75,6 +72,7 @@ public class ServerConfigDocument {
     private Set<String> namelessLocations;
     private Set<String> locations;
     private HashMap<String, String> locationsAndNames;
+    private Map<String, String> httpEndpointAttributes;
     private Properties props;
     private Properties defaultProps;
     private Map<String, File> libertyDirectoryPropertyToFile = null;
@@ -82,10 +80,14 @@ public class ServerConfigDocument {
     Optional<String> springBootAppNodeLocation = Optional.empty();
     Optional<String> springBootAppNodeDocumentURI = Optional.empty();
 
+    public static final String HTTP_PORT_ATTR  = "httpPort";
+    public static final String HTTPS_PORT_ATTR = "httpsPort";
+
     private static final XPathExpression XPATH_SERVER_APPLICATION;
     private static final XPathExpression XPATH_SERVER_WEB_APPLICATION;
     private static final XPathExpression XPATH_SERVER_SPRINGBOOT_APPLICATION;
     private static final XPathExpression XPATH_SERVER_ENTERPRISE_APPLICATION;
+    private static final XPathExpression XPATH_SERVER_HTTP_ENDPOINT;
     private static final XPathExpression XPATH_SERVER_INCLUDE;
     public static final XPathExpression XPATH_SERVER_VARIABLE;
     private static final XPathExpression XPATH_ALL_SERVER_APPLICATIONS;
@@ -102,6 +104,7 @@ public class ServerConfigDocument {
             XPATH_SERVER_WEB_APPLICATION = xPath.compile("/server/webApplication");
             XPATH_SERVER_SPRINGBOOT_APPLICATION = xPath.compile("/server/springBootApplication");
             XPATH_SERVER_ENTERPRISE_APPLICATION = xPath.compile("/server/enterpriseApplication");
+            XPATH_SERVER_HTTP_ENDPOINT = xPath.compile("/server/httpEndpoint");
             XPATH_SERVER_INCLUDE = xPath.compile("/server/include");
             XPATH_SERVER_VARIABLE = xPath.compile("/server/variable");
             XPATH_ALL_SERVER_APPLICATIONS = xPath.compile("/server/application | /server/webApplication | /server/enterpriseApplication | /server/springBootApplication");
@@ -125,6 +128,10 @@ public class ServerConfigDocument {
 
     public Set<String> getNamelessLocations() {
         return namelessLocations;
+    }
+
+    public Map<String, String> getHttpEndpointAttributes() {
+        return httpEndpointAttributes;
     }
 
     public Properties getProperties() {
@@ -165,6 +172,7 @@ public class ServerConfigDocument {
         names = new HashSet<String>();
         namelessLocations = new HashSet<String>();
         locationsAndNames = new HashMap<String, String>();
+        httpEndpointAttributes = new HashMap<String, String>();
         props = new Properties();
         defaultProps = new Properties();
         this.originalServerXMLFile = originalServerXMLFile;
@@ -196,36 +204,11 @@ public class ServerConfigDocument {
         names = new HashSet<String>();
         namelessLocations = new HashSet<String>();
         locationsAndNames = new HashMap<String, String>();
+        httpEndpointAttributes = new HashMap<String, String>();
         props = new Properties();
         if (initProperties != null) props.putAll(initProperties);
         defaultProps = new Properties();
         this.originalServerXMLFile = originalServerXMLFile;
-    }
-
-    private DocumentBuilder getDocumentBuilder() {
-        DocumentBuilder docBuilder;
-
-        DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
-        docBuilderFactory.setIgnoringComments(true);
-        docBuilderFactory.setCoalescing(true);
-        docBuilderFactory.setIgnoringElementContentWhitespace(true);
-        docBuilderFactory.setValidating(false);
-        try {
-            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
-            docBuilderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            docBuilderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            docBuilderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            docBuilderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            docBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            docBuilderFactory.setXIncludeAware(false);
-            docBuilderFactory.setExpandEntityReferences(false);
-            docBuilder = docBuilderFactory.newDocumentBuilder();
-        } catch (ParserConfigurationException e) {
-            // fail catastrophically if we can't create a document builder
-            throw new RuntimeException(e);
-        }
-
-        return docBuilder;
     }
 
     /**
@@ -290,6 +273,7 @@ public class ServerConfigDocument {
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
             parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
             parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
+            parseHttpEndpoint(doc);
             parseInclude(doc);
             parseConfigDropinsDir();
 
@@ -582,6 +566,29 @@ public class ServerConfigDocument {
         }
     }
 
+    private void parseHttpEndpoint(Document doc) throws XPathExpressionException {
+        if (doc == null) {
+            return;
+        }
+        NodeList nodeList = (NodeList) XPATH_SERVER_HTTP_ENDPOINT.evaluate(doc, XPathConstants.NODESET);
+        for (int i = 0; i < nodeList.getLength(); i++) {
+            Node node = nodeList.item(i);
+            if (node instanceof Element) {
+                Element elem = (Element) node;
+                
+                String httpAttribute = elem.getAttribute(HTTP_PORT_ATTR);
+                if (!httpAttribute.isEmpty()) {
+                    httpEndpointAttributes.put(HTTP_PORT_ATTR, httpAttribute);
+                }
+
+                String httpsAttribute = elem.getAttribute(HTTPS_PORT_ATTR);
+                if (!httpsAttribute.isEmpty()) {
+                    httpEndpointAttributes.put(HTTPS_PORT_ATTR, httpsAttribute);
+                }
+            }
+        }
+    }
+
     public String findNameForLocation(String location) {
         String appName = locationsAndNames.get(location);
 
@@ -656,6 +663,7 @@ public class ServerConfigDocument {
                     parseApplication(inclDoc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
                     parseApplication(inclDoc, XPATH_SERVER_ENTERPRISE_APPLICATION);
                     parseNames(inclDoc, XPATH_ALL_SERVER_APPLICATIONS);
+                    parseHttpEndpoint(inclDoc);
                     // handle nested include elements
                     parseInclude(inclDoc);
                 }
@@ -699,6 +707,7 @@ public class ServerConfigDocument {
             parseApplication(doc, XPATH_SERVER_SPRINGBOOT_APPLICATION);
             parseApplication(doc, XPATH_SERVER_ENTERPRISE_APPLICATION);
             parseNames(doc, XPATH_ALL_SERVER_APPLICATIONS);
+            parseHttpEndpoint(doc);
             parseInclude(doc);
         }
     }
@@ -809,10 +818,8 @@ public class ServerConfigDocument {
      * @throws SAXException
      */
     public Document parseDocument(File file) throws FileNotFoundException, IOException {
-        try (FileInputStream is = new FileInputStream(file)) {
-            Document document= parseDocument(is);
-            document.setDocumentURI(file.getCanonicalPath());
-            return document;
+        try {
+            return XmlDocument.parseDocument(file);
         } catch (SAXException ex) {
             // If the file was not valid XML, assume it was some other non XML
             // file in dropins.
@@ -824,13 +831,7 @@ public class ServerConfigDocument {
     private Document parseDocument(URL url) throws IOException, SAXException {
         URLConnection connection = url.openConnection();
         try (InputStream is = connection.getInputStream()) {
-            return parseDocument(is);
-        }
-    }
-
-    private Document parseDocument(InputStream in) throws SAXException, IOException {
-        try (InputStream ins = in) { // ins will be auto-closed
-            return getDocumentBuilder().parse(ins);
+            return XmlDocument.parseDocument(is);
         }
     }
 
