@@ -18,9 +18,10 @@ package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.ServerSocket;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -37,6 +38,8 @@ public class BaseDevUtilTest {
     public TemporaryFolder temp = new TemporaryFolder();
 
     public class DevTestUtil extends DevUtil {
+
+        private String containerCmdOutput = null;
 
         public DevTestUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
                 List<File> resourceDirs, List<Path> webResourceDirs, boolean hotTests, boolean skipTests) throws IOException {
@@ -57,12 +60,28 @@ public class BaseDevUtilTest {
                     container, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, false, null, null, null, Collections.emptyMap());
         }
 
+        public DevTestUtil(File buildDir, String applicationId, String containerCmdOutput) throws IOException {
+            super(buildDir, null, null, null, null, null, null,
+                    null, false, false, false, false, false, false, applicationId, 30, 30, 5, 500, true, false, false, false,
+                    false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, false, null, null, null, Collections.emptyMap());
+            this.containerCmdOutput = containerCmdOutput;
+        }
+
         /**
-         * Returns null for all container CLI commands to avoid requiring a running container engine.
+         * Returns null for all container CLI commands to avoid requiring a running container engine,
+         * unless a fake output has been set via the applicationId constructor.
          */
         @Override
         protected String execContainerCmdWithPrefix(String command, int timeout, boolean throwExceptionOnError) {
-            return null;
+            return containerCmdOutput;
+        }
+
+        public ServerSocket callBindPortSocket(int port) {
+            return bindPortSocket(port);
+        }
+
+        public String callGenerateNewContainerName() throws PluginExecutionException {
+            return generateNewContainerName();
         }
 
         /**
@@ -306,5 +325,9 @@ public class BaseDevUtilTest {
 
     public DevTestUtil getNewContainerUtil() {
         return new DevTestUtil(null, null, true);
+    }
+
+    public DevTestUtil getNewDevUtil(File buildDir, String applicationId, String containerCmdOutput) throws IOException {
+        return new DevTestUtil(buildDir, applicationId, containerCmdOutput);
     }
 }
