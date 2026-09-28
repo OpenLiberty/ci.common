@@ -383,13 +383,13 @@ public class ServerConfigDocument {
                 finalReplacement = matcher.group(0); // Keep original
             }
             matcher.appendReplacement(sb, Matcher.quoteReplacement(finalReplacement));
-            log.info(String.format("Resolved environment variable \"%s\" in path \"%s\" to \"%s\"", varName, value, finalReplacement));
+            log.debug(String.format("Resolved environment variable \"%s\" in path \"%s\" to \"%s\"", varName, value, finalReplacement));
         }
         // 4. Finalize the string
         matcher.appendTail(sb);
         // Log the complete resolved value once, only when at least one variable was expanded
         if (anyMatched) {
-            log.info(String.format("Resolved path \"%s\" to \"%s\"", value, sb));
+            log.debug(String.format("Resolved path \"%s\" to \"%s\"", value, sb));
         }
         return sb.toString();
     }
