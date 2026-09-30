@@ -202,7 +202,7 @@ public class ServerConfigDocument {
         this.originalServerXMLFile = originalServerXMLFile;
     }
 
-    private DocumentBuilder getDocumentBuilder() {
+    private static DocumentBuilder getDocumentBuilder() {
         DocumentBuilder docBuilder;
 
         DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
@@ -357,7 +357,9 @@ public class ServerConfigDocument {
         Pattern pattern = OSUtil.isWindows() ? WINDOWS_EXPANSION_VAR_PATTERN : LINUX_EXPANSION_VAR_PATTERN;
         Matcher matcher = pattern.matcher(value);
         StringBuffer sb = new StringBuffer();
+        boolean anyMatched = false;
         while (matcher.find()) {
+            anyMatched = true;
             String finalReplacement;
             String varName = matcher.group(1);
             // 2. Circular Reference Guard
@@ -381,10 +383,14 @@ public class ServerConfigDocument {
                 finalReplacement = matcher.group(0); // Keep original
             }
             matcher.appendReplacement(sb, Matcher.quoteReplacement(finalReplacement));
-            log.info(String.format("Resolving Property %s for expression %s. Resolved expression value is %s", varName , value , sb));
+            log.debug(String.format("Resolved environment variable \"%s\" in path \"%s\" to \"%s\"", varName, value, finalReplacement));
         }
         // 4. Finalize the string
         matcher.appendTail(sb);
+        // Log the complete resolved value once, only when at least one variable was expanded
+        if (anyMatched) {
+            log.debug(String.format("Resolved path \"%s\" to \"%s\"", value, sb));
+        }
         return sb.toString();
     }
 
@@ -1005,4 +1011,32 @@ public class ServerConfigDocument {
         this.springBootAppNodeLocation = springBootAppNodeLocation;
     }
 
+    /**
+     * Parses a loose application XML file and returns a list of all sourceOnDisk
+     * attribute values found on {@code <file>} and {@code <dir>} elements.
+     *
+     * @param looseAppFile - the loose application XML file to parse
+     * @return a List of sourceOnDisk path strings; empty if none are found or the file cannot be parsed
+     * @throws FileNotFoundException if the file does not exist
+     * @throws IOException if the file cannot be read
+     */
+    public static Set<String> getSourceOnDiskPaths(File looseAppFile) throws FileNotFoundException, IOException {
+        Set<String> result = new HashSet<String>();
+        Document doc;
+        try (FileInputStream is = new FileInputStream(looseAppFile)) {
+            doc = getDocumentBuilder().parse(is);
+        } catch (SAXException e) {
+            return result; // not valid XML
+        }
+        for (String tag : new String[]{"file", "dir"}) {
+            NodeList nodes = doc.getElementsByTagName(tag);
+            for (int i = 0; i < nodes.getLength(); i++) {
+                org.w3c.dom.Node attr = nodes.item(i).getAttributes().getNamedItem("sourceOnDisk");
+                if (attr != null && !attr.getNodeValue().isEmpty()) {
+                    result.add(attr.getNodeValue());
+                }
+            }
+        }
+        return result;
+    }
 }

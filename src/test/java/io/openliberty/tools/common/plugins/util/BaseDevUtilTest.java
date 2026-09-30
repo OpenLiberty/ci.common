@@ -18,6 +18,7 @@ package io.openliberty.tools.common.plugins.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -50,6 +51,32 @@ public class BaseDevUtilTest {
                     false, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, false, null, null, null, Collections.emptyMap());
         }
 
+        public DevTestUtil(File serverDirectory, File buildDir, boolean container) {
+            super(buildDir, serverDirectory, null, null, null, null, null,
+                    null, false, false, false, false, false, false, null, 30, 30, 5, 500, true, false, false, false,
+                    container, null, null, null, 0, false, null, false, null, null, false, null, null, null, false, false, null, null, null, Collections.emptyMap());
+        }
+
+        /**
+         * Returns null for all container CLI commands to avoid requiring a running container engine.
+         */
+        @Override
+        protected String execContainerCmdWithPrefix(String command, int timeout, boolean throwExceptionOnError) {
+            return null;
+        }
+
+        /**
+         * Sets the container port fields without going through findLocalPort (which calls Docker).
+         * Only meaningful when container=true.
+         */
+        public void setContainerPorts(String containerHttpPort, String mappedHttpPort,
+                                      String containerHttpsPort, String mappedHttpsPort) {
+            setContainerHttpPort(containerHttpPort);
+            setHttpPort(mappedHttpPort);
+            setContainerHttpsPort(containerHttpsPort);
+            setHttpsPort(mappedHttpsPort);
+        }
+
         @Override
         public void debug(String msg) {
             // not needed for tests
@@ -74,10 +101,20 @@ public class BaseDevUtilTest {
             
         }
 
+        public final List<String> infoMessages = new ArrayList<>();
+
         @Override
         public void info(String msg) {
-            // not needed for tests
-            
+            infoMessages.add(msg);
+        }
+
+        public boolean hasMessage(String substring) {
+            for (String msg : infoMessages) {
+                if (msg.contains(substring)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
@@ -265,5 +302,9 @@ public class BaseDevUtilTest {
 
     public DevUtil getNewDevUtil(File serverDirectory, File buildDir) {
         return new DevTestUtil(serverDirectory, buildDir);
+    }
+
+    public DevTestUtil getNewContainerUtil() {
+        return new DevTestUtil(null, null, true);
     }
 }
