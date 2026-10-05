@@ -393,20 +393,15 @@ public abstract class FeatureGeneratorUtil {
     // Required is either some type of app file or some class files. This is checked by the caller to runFeatureGenerator()
     private Set<String> getBinaryInputs(List<String> classFiles, String[] deployedAppFilePaths, boolean optimize) throws IOErrorReadingXMLException {
         Set<String> resultSet = new HashSet<String>();
-        warn ("getBinaryInputs");
         if (optimize) {
-            warn ("optimize, deployedAppFilePaths="+deployedAppFilePaths);
             // Use either the loose app config or a regular application deployment binary file (ear/war/jar)
             if (deployedAppFilePaths != null) {
                 for (String deployedAppFilePath : deployedAppFilePaths) {
                     if (deployedAppFilePath.endsWith(".xml")) {
-                        warn ("app file ends with xml");
                         try {
                             // extract the file names from the xml file
                             File looseAppFile = new File(deployedAppFilePath);
-                            warn (" file object created");
                             if (looseAppFile.exists()) {
-                                warn (" file exists");
                                 resultSet.addAll(ServerConfigDocument.getSourceOnDiskPaths(looseAppFile));
                             }
                         } catch (IOException e) {
