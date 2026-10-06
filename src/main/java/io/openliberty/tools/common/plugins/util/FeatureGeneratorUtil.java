@@ -405,7 +405,6 @@ public abstract class FeatureGeneratorUtil {
                                 resultSet.addAll(ServerConfigDocument.getSourceOnDiskPaths(looseAppFile));
                             }
                         } catch (IOException e) {
-                            e. printStackTrace();
                             throw new IOErrorReadingXMLException();
                         }
                     } else {
