@@ -106,7 +106,7 @@ public abstract class XmlDocument {
     public static DocumentBuilder getDocumentBuilder() {
         DocumentBuilder docBuilder;
         DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
-        docBuilderFactory.setIgnoringComments(true);
+        docBuilderFactory.setIgnoringComments(false);
         docBuilderFactory.setCoalescing(true);
         docBuilderFactory.setIgnoringElementContentWhitespace(true);
         docBuilderFactory.setValidating(false);
