@@ -403,6 +403,8 @@ public abstract class FeatureGeneratorUtil {
                             File looseAppFile = new File(deployedAppFilePath);
                             if (looseAppFile.exists()) {
                                 resultSet.addAll(ServerConfigDocument.getSourceOnDiskPaths(looseAppFile));
+                            } else {
+                                debug("Error, specified application file does not exist:" + deployedAppFilePath);
                             }
                         } catch (IOException e) {
                             throw new IOErrorReadingXMLException();
