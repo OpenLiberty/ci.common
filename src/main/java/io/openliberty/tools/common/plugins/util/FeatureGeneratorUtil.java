@@ -158,7 +158,7 @@ public abstract class FeatureGeneratorUtil {
      * @throws IllegalTargetComboException - indicates the MP or EE version parameters are not supported by the feature
      *                                       generator when used in combination with each other. E.g. EE 7 and MP 2.1
      */
-    public Set<String> runFeatureGenerator(Set<String> currentFeatureSet, List<String> classFiles, String deployedAppFilePath,
+    public Set<String> runFeatureGenerator(Set<String> currentFeatureSet, List<String> classFiles, String[] deployedAppFilePaths,
             String logLocation, String targetJavaEE, String targetMicroProfile, Map featureListFileMap, boolean optimize)
             throws PluginExecutionException, NoRecommendationException, RecommendationSetException, FeatureModifiedException,
             FeatureUnavailableException, IllegalTargetException, IllegalTargetComboException, VersionlessFeatureDetectedException,
@@ -171,7 +171,7 @@ public abstract class FeatureGeneratorUtil {
             boolean reRunIfFailed = !currentFeatureSet.isEmpty() || !optimize;
             try {
                 Method generateFeatureSetMethod = getGeneratorMethod();
-                Set<String> binaryInputs = getBinaryInputs(classFiles, deployedAppFilePath, optimize);
+                Set<String> binaryInputs = getBinaryInputs(classFiles, deployedAppFilePaths, optimize);
 
                 String logLevel;
                 if (isDebugEnabled()) {
@@ -212,7 +212,7 @@ public abstract class FeatureGeneratorUtil {
                     // The list of features from the app is passed in but it contains conflicts
                     Set<String> conflicts = getFeatures(generatorException);
                     // always rerun feature generator in this scenario, this exception only occurs if a current feature list is passed to feature generator
-                    Set<String> sampleFeatureList = reRunFeatureGenerator(deployedAppFilePath, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap);
+                    Set<String> sampleFeatureList = reRunFeatureGenerator(deployedAppFilePaths, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap);
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -222,7 +222,7 @@ public abstract class FeatureGeneratorUtil {
                     // The scanned files conflict with each other or with current features
                     Set<String> conflicts = getFeatures(generatorException);
                     //  rerun feature generator with all class files and without the current feature set to get feature recommendations
-                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(deployedAppFilePath, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap): null;
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(deployedAppFilePaths, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap): null;
                     if (sampleFeatureList == null) {
                         throw new NoRecommendationException(conflicts);
                     } else {
@@ -232,7 +232,7 @@ public abstract class FeatureGeneratorUtil {
                     // The scanned files conflict and the generator suggests modifying some features
                     Set<String> modifications = getFeatures(generatorException);
                     //  rerun feature generator with all class files and without the current feature set
-                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(deployedAppFilePath, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap) : null;
+                    Set<String> sampleFeatureList = reRunIfFailed ? reRunFeatureGenerator(deployedAppFilePaths, logLocation, targetJavaEE, targetMicroProfile, featureListFileMap) : null;
                     throw new FeatureModifiedException(modifications, 
                             (sampleFeatureList == null) ? getNoSampleFeatureList() : sampleFeatureList, generatorException.getLocalizedMessage());
                 } else if (generatorException.getClass().getName().equals(FEATURE_NOT_AVAILABLE_EXCEPTION)) {
@@ -299,12 +299,12 @@ public abstract class FeatureGeneratorUtil {
      * @return - a set of features that will allow the application to run in a Liberty server
      * @throws PluginExecutionException - any exception that prevents the generator from running
      */
-    public Set<String> reRunFeatureGenerator(String deployedAppFilePath, String logLocation, String targetJavaEE, String targetMicroProfile,
+    public Set<String> reRunFeatureGenerator(String[] deployedAppFilePaths, String logLocation, String targetJavaEE, String targetMicroProfile,
             Map featureListFileMap) throws PluginExecutionException, IOErrorReadingXMLException {
         Set<String> generatedFeatureList = null;
         try {
             Method generateFeatureSetMethod = getGeneratorMethod();
-            Set<String> binaryInputs = getBinaryInputs(null, deployedAppFilePath, true);
+            Set<String> binaryInputs = getBinaryInputs(null, deployedAppFilePaths, true);
             Set<String> currentFeaturesSet = new HashSet<String>(); // when re-running always pass in no features
             String logLevel;
             if (isDebugEnabled()) {
@@ -391,23 +391,27 @@ public abstract class FeatureGeneratorUtil {
     }
 
     // Required is either some type of app file or some class files. This is checked by the caller to runFeatureGenerator()
-    private Set<String> getBinaryInputs(List<String> classFiles, String deployedAppFilePath, boolean optimize) throws IOErrorReadingXMLException {
+    private Set<String> getBinaryInputs(List<String> classFiles, String[] deployedAppFilePaths, boolean optimize) throws IOErrorReadingXMLException {
         Set<String> resultSet = new HashSet<String>();
         if (optimize) {
             // Use either the loose app config or a regular application deployment binary file (ear/war/jar)
-            if (deployedAppFilePath != null) {
-                if (deployedAppFilePath.endsWith(".xml")) {
-                    try {
-                        // extract the file names from the xml file
-                        File looseAppFile = new File(deployedAppFilePath);
-                        if (looseAppFile.exists()) {
-                            resultSet = ServerConfigDocument.getSourceOnDiskPaths(looseAppFile);
+            if (deployedAppFilePaths != null) {
+                for (String deployedAppFilePath : deployedAppFilePaths) {
+                    if (deployedAppFilePath.endsWith(".xml")) {
+                        try {
+                            // extract the file names from the xml file
+                            File looseAppFile = new File(deployedAppFilePath);
+                            if (looseAppFile.exists()) {
+                                resultSet.addAll(ServerConfigDocument.getSourceOnDiskPaths(looseAppFile));
+                            } else {
+                                debug("Error, specified application file does not exist:" + deployedAppFilePath);
+                            }
+                        } catch (IOException e) {
+                            throw new IOErrorReadingXMLException();
                         }
-                    } catch (IOException e) {
-                        throw new IOErrorReadingXMLException();
+                    } else {
+                        resultSet.add(deployedAppFilePath);
                     }
-                } else {
-                    resultSet.add(deployedAppFilePath);
                 }
             }
         } else {
