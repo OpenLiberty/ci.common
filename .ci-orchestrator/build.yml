@@ -1,0 +1,27 @@
+type: pipeline_definition
+product: Liberty
+name: CiCommon
+description: Run a Pipeline for ci.common using Cognitive Software Delivery infrastructure
+
+triggers:
+- type: manual
+  triggerName: "Manual"
+  description: "Runs a ci.common Pipeline, building and testing the PR - Manual Trigger"
+  triggerRank: 50
+  groups: ["CommonComponents"]
+- type: github
+  triggerName: "GitHub"
+  description: "Runs a ci.common Pipeline, building and testing the PR - Github Trigger"
+  triggerRank: 50
+  groups: ["CommonComponents"]
+  keyword: "!build"
+  aliasKeywords:
+    - "#build"
+
+steps:
+- stepGroup: Build ci.common Dependency
+  includeSteps:
+  - file: steps/buildCiCommonDependency.yml
+- stepGroup: Build ci.common
+  includeSteps:
+  - file: steps/buildCiCommon.yml

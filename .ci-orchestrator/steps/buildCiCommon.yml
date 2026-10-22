@@ -1,0 +1,10 @@
+- stepName: "CiCommonBuild"
+  coreStep: true
+  workType: Jenkins
+  projectName: CiCommonBuild
+  timeoutInMinutes: 30
+  dependsOn:
+    - stepName: CiCommonDependencyBuild
+      awaitOutputProperties: true
+  properties:
+    jenkinsServiceName: "websphere-extra-jenkins"
