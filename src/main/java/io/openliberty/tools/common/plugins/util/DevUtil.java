@@ -577,7 +577,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.generatedFeaturesModified = false;
         this.generatedFeaturesCopied = false;
         if (this.generateFeatures) {
-            this.generatedFeaturesSet = getGeneratedFeatures();
+            this.generatedFeaturesSet = getGeneratedFeaturesOnStartup();
         } else {
             this.generatedFeaturesSet = new HashSet<String>();
         }
@@ -6429,13 +6429,30 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return false;
     }
 
-    // returns the features specified in the generated-features.xml file
+    // returns the features specified in the generated-features.xml file either in src dir
+    // or in the generate features temp dir (generateFeaturesFile could indicate either)
+    private Set<String> getGeneratedFeatures() {
+        return getGeneratedFeatures(generateFeaturesFile);
+    }
+
+    // Special case: on startup the generate features temp dir has not yet been used to install so
+    // we must use the server dir. When generateToSrc is on we should have also copied the file to server dir.
+    private Set<String> getGeneratedFeaturesOnStartup() {
+        File generateFeaturesServerFile = new File(serverDirectory, FeatureGeneratorUtil.GENERATED_FEATURES_FILE_PATH);
+        // Assert that when generateToSrc is on the features file was copied from src to server dir.
+        if (!generateFeaturesServerFile.exists() || generateFeaturesServerFile.length() == 0) {
+            debug("Attempting to scan file for features but it is missing or empty:" + generateFeaturesServerFile.getAbsolutePath());
+            return new HashSet<String>(); 
+        }
+        return getGeneratedFeatures(generateFeaturesServerFile);
+    }
+
     // generated-features.xml has a <server> element so it is also a "serverFile"
     // The second parameter will not be used for generated-features.xml.
-    private Set<String> getGeneratedFeatures() {
+    private Set<String> getGeneratedFeatures(File generateFeaturesFileParam) {
         ServerFeatureUtil servUtil = getServerFeatureUtilObj();
         FeaturesPlatforms fp = servUtil.getServerXmlFeatures(new FeaturesPlatforms(), configDirectory,
-                generateFeaturesFile, null, null);
+                generateFeaturesFileParam, null, null);
         return fp!=null ? fp.getFeatures() : new HashSet<String>(); 
     }
 
