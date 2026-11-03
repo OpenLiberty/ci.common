@@ -175,7 +175,7 @@ public class BaseDevUtilTest {
 
         @Override
         public boolean updateArtifactPaths(ProjectModule projectModule, boolean redeployCheck,
-                boolean generateFeatures, ThreadPoolExecutor executor) throws PluginExecutionException {
+                ThreadPoolExecutor executor) throws PluginExecutionException {
             // not needed for tests
             return false;
         }
