@@ -175,10 +175,9 @@ public abstract class FeatureGeneratorUtil {
 
                 String logLevel;
                 if (isDebugEnabled()) {
-                    logLevel = "*=FINE";  // generate messages for debugging by support team
+                    logLevel = "*=FINE"; // generate messages for debugging by support team
                 } else {
-                    logLevel = null;
-                    logLocation = null;
+                    logLevel = "*=INFO"; // regular messages
                 }
                 debug("Calling " + featureGenJar.getName() + " with the following inputs...\n" +
                         "  binaryInputs: " + binaryInputs + "\n" +
