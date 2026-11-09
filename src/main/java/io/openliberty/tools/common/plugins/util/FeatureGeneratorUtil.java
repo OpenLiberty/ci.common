@@ -73,6 +73,7 @@ public abstract class FeatureGeneratorUtil {
     public static final String GENERATED_FEATURES_FILE_PATH = GENERATED_FEATURES_DIR_PATH + GENERATED_FEATURES_FILE_NAME;
     public static final String GENERATED_FEATURES_TEMP_DIR = ".libertyFeatures";
     public static final String GENERATED_FEATURES_TEMP_PATH = GENERATED_FEATURES_TEMP_DIR + File.separator + GENERATED_FEATURES_FILE_PATH;
+    public static final String FEATURE_GEN_LOG_LOCATION = "/feature-gen";
     private static final String FEATURE_MODIFIED_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.RequiredFeatureModifiedException";
     private static final String FEATURE_CONFLICT_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.FeatureConflictException";
     private static final String PROVIDED_FEATURE_EXCEPTION = "com.ibm.websphere.binary.cmdline.exceptions.ProvidedFeatureConflictException";
@@ -177,7 +178,7 @@ public abstract class FeatureGeneratorUtil {
                 if (isDebugEnabled()) {
                     logLevel = "*=FINE"; // generate messages for debugging by support team
                 } else {
-                    logLevel = "*=INFO"; // regular messages
+                    logLevel = "*=OFF"; // regular messages are turned off by default
                 }
                 debug("Calling " + featureGenJar.getName() + " with the following inputs...\n" +
                         "  binaryInputs: " + binaryInputs + "\n" +
