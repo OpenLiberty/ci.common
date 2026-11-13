@@ -310,8 +310,7 @@ public abstract class FeatureGeneratorUtil {
             if (isDebugEnabled()) {
                 logLevel = "*=FINE";  // generate messages for debugging by support team
             } else {
-                logLevel = null;
-                logLocation = null;
+                logLevel = "*=OFF"; // regular messages are turned off by default
             }
             debug("Recalling feature generator with the following inputs...\n" +
                   "  binaryInputs: " + binaryInputs + "\n" +
